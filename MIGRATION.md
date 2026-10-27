@@ -188,6 +188,13 @@ Three conda environments, each recorded where it was built:
 | `scalevln` | DUET/ScaleVLN eval, the explorer's DUET logger and what-if worker (Python 3.9, torch 2.5.1 cu121, transformers 4.12.5, numpy 1.23.5) | `[prior works]/ScaleVLN/LOCAL_SETUP.md` + `requirements-runtime.txt`. Build MatterSim in `ScaleVLN/Matterport3DSimulator/build`; the build needs the workarounds below |
 | `etpnav` | ETPNav and `build_navmaps.py` (Python 3.8, habitat-sim 0.1.7 headless, torch 2.4.1 cu121) | `[prior works]/ETPNav/LOCAL_SETUP.md`; habitat-lab v0.1.7 is in `third_party_habitat-lab-v0.1.7/`, put on the path with a `.pth` file |
 
+The exact package versions of each env on the old server (2026-10-27) are in `migration/envs/<env>/`:
+`environment.yml` (`conda env export`), `conda-explicit.txt` (`conda list --explicit --md5`), `pip-freeze.txt` and
+`python-version.txt`. Follow the recipe above, then compare
+`diff <(python -m pip list --format=freeze) migration/envs/<env>/pip-freeze.txt` and pin the packages that differ
+(`pip install name==version`; habitat-sim comes from conda, not PyPI). Local builds (MatterSim, the habitat-lab
+v0.1.7 path entry) are not packages: rebuild them as described.
+
 MatterSim build workarounds (from the old server):
 - Build through a symlink without spaces: the `[prior works]` path breaks the compiler flags.
 - Pass `-DCMAKE_BUILD_RPATH_USE_ORIGIN=ON`.
