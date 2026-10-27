@@ -96,7 +96,7 @@ ITEMS = [
          filters=['+ /steplogs/', '+ /steplogs/*/', '+ /steplogs/*/steps_train.jsonl', '- *'],
          note='also a release asset'),
     item('our_checkpoints', 'required', '[OURS]/baseline-v0/runs',
-         'all our checkpoints + optimizer states (15 are also in git; 89 also on the release)',
+         'all our checkpoints + optimizer states (15 are also in git; the rest also on the release)',
          filters=CKPT_FILTERS, note='includes the 3 upstream DINO-WM checkpoints under step5/assets'),
     item('hf_smolvlm2', 'required', f'{SERVER_HF}/hub/models--HuggingFaceTB--SmolVLM2-500M-Video-Instruct',
          'policy backbone (revision 7b375e1b)', dest='{HF_HOME}/hub/models--HuggingFaceTB--SmolVLM2-500M-Video-Instruct',

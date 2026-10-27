@@ -8,7 +8,8 @@
 What goes where (see MIGRATION.md):
   git      code, docs, results, logs, the explorer with its run logs and the small public annotations it reads,
            and the selected/frozen checkpoints (TIER1, every file < 95 MiB)
-  release  every other checkpoint of ours + the two step logs over 100 MB (migration/release_assets.json)
+  release  every other checkpoint of ours, the third-party checkpoints we evaluate or start from, and the two step
+           logs over 100 MB (migration/release_assets.json); files over PART go up as .partNN pieces
   server   everything else, incl. all Matterport-derived files (scenes, renders, meshes: not redistributable
            in a public repo): migration/pull_from_server.py, RETRIEVE_FROM_SERVER.md
 
@@ -54,8 +55,17 @@ TIER1 = [
 ] + [f'step8_smolvlm2_refined512_dino_pair_v1/{v}/checkpoints/step_{s:06d}.pt'     # Step 9 shortlisted scorers
      for v, steps in (('null', (128, 1408, 1536)), ('pooled', (512, 1536, 2048))) for s in steps]
 
-# Upstream checkpoints that only sit in our runs folder: re-download instead (MIGRATION.md).
-UPSTREAM_CKPTS = ['step5_smolvlm2_refined512/assets/outputs/*/checkpoints/*']
+# Third-party checkpoints (relative to SRC; their folders are pruned from git) released too, so the new machine
+# does not depend on the upstream hosts. ScaleVLN fine-tuned models and ETPNav waypoint predictors have no suffix.
+THIRD_PARTY_CKPTS = [
+    '[prior works]/ETPNav/data/logs/checkpoints/release_*/*.pth',              # ETPNav R2R-CE / RxR-CE
+    '[prior works]/ETPNav/data/wp_pred/check_cwp_*',                           # ETPNav waypoint predictors
+    '[prior works]/ETPNav/data/ddppo-models/*.pth',                            # depth encoder
+    '[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/trained_models/*/*',         # ScaleVLN fine-tuned + pretrained
+    '[prior works]/ScaleVLN/VLN-DUET/datasets/pretrained/LXMERT/*.pth',
+    '[prior works]/ScaleVLN/VLN-DUET-RVR/datasets/REVERIE/trained_models/*',
+    'data/datasets/HA-VLN/original/huggingface/checkpoints/*/*.pth',          # HA-VLN-CMA
+]
 
 # Folders packed into release archives: (asset prefix, folder relative to SRC, compress). Empty now: the explorer
 # logs are in git, and ETPNav's cube-face renders are Matterport-derived, so they come from the server instead.
@@ -159,6 +169,11 @@ def asset_name(r):
     return str(r)[len(OURS_RUNS) + 1:].replace('/', '--')
 
 
+def flat_name(r):
+    """Asset name for a file outside our runs folder: its path without spaces or brackets."""
+    return str(r).replace('/', '--').replace(' ', '_').replace('[', '').replace(']', '')
+
+
 def git(cwd, *args, check=True):
     return subprocess.run(['git', *args], cwd=cwd, check=check, capture_output=True, text=True).stdout.strip()
 
@@ -238,9 +253,6 @@ def classify_file(plan, p, r, st):
             plan.skip('dataset payload', size)
         return
     if under(r, OURS_RUNS) and (is_ckpt(name) or name.endswith('.bin')):
-        sub = str(r)[len(OURS_RUNS) + 1:]
-        if any(fnmatch.fnmatch(sub, g) for g in UPSTREAM_CKPTS):
-            return plan.skip('upstream DINO-WM checkpoints (re-download)', size)
         if tier1(r):
             if size > TIER1_LIMIT:
                 raise SystemExit(f'TIER1 file over the git limit: {r} ({size / MIB:.0f} MiB)')
@@ -254,8 +266,8 @@ def classify_file(plan, p, r, st):
     if under(r, OURS_RUNS) and name.lower().endswith(FRAME_SUFFIXES):
         return plan.skip('simulator frame dumps in runs/ (jpg)', size)
     if any(fnmatch.fnmatchcase(str(r), pat(g)) for g in RELEASE_FILES):
-        plan.assets.append({'name': 'file--' + str(r).replace('/', '--').replace(' ', '_').replace('[', '').replace(']', ''),
-                            'path': str(r), 'size': size, 'mtime': st.st_mtime, 'kind': 'file'})
+        plan.assets.append({'name': 'file--' + flat_name(r), 'path': str(r), 'size': size, 'mtime': st.st_mtime,
+                            'kind': 'file'})
         return
     big_ok = any(fnmatch.fnmatchcase(str(r), pat(g)) for g in BIG_OK) and size <= TIER1_LIMIT
     if size > GIT_LIMIT and not big_ok:
@@ -334,6 +346,16 @@ def markdown_notes(plan):
                     plan.git[r] = p
 
 
+def third_party_checkpoints(plan):
+    """Release entries for THIRD_PARTY_CKPTS (the walk skips their pruned folders)."""
+    for g in THIRD_PARTY_CKPTS:
+        for p in sorted(SRC.glob(pat(g))):
+            if p.is_file() and not p.is_symlink():
+                r, st = rel(p), p.stat()
+                plan.assets.append({'name': 'ckpt--' + flat_name(r), 'path': str(r), 'size': st.st_size,
+                                    'mtime': st.st_mtime, 'kind': 'checkpoint'})
+
+
 def sha256(path, cache):
     st = path.stat()
     key = str(path)
@@ -378,6 +400,29 @@ def build_archives(out_dir):
                             'archive': tar_path.name, 'extract_to': str(PurePosixPath(folder).parent),
                             'archive_size': size})
     return entries
+
+
+def split_parts(e, out_dir, cache):
+    """Cut a release file over PART into PART-sized pieces in out_dir (rewritten only when the source is newer) and
+    mark it split; release_assets.py uploads the pieces and joins them back at e['path'] on download."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    sizes = [min(PART, e['size'] - o) for o in range(0, e['size'], PART)]
+    files = [out_dir / f'{e["name"]}.part{i:02d}' for i in range(len(sizes))]
+    for old in out_dir.glob(f'{e["name"]}.part*'):
+        if old not in files:
+            old.unlink()
+    if any(not f.is_file() or f.stat().st_size != s or f.stat().st_mtime < e['mtime'] for f, s in zip(files, sizes)):
+        print(f'splitting {e["path"]} into {len(files)} parts', flush=True)
+        with open(e['source'], 'rb') as src:
+            for f, s in zip(files, sizes):
+                with open(f, 'wb') as out:
+                    while s:
+                        block = src.read(min(8 * MIB, s))
+                        out.write(block)
+                        s -= len(block)
+    e['split'] = True
+    return [{'name': f.name, 'path': None, 'size': s, 'kind': 'file-part', 'of': e['name'], 'source': str(f),
+             'mtime': f.stat().st_mtime, 'sha256': sha256(f, cache)} for f, s in zip(files, sizes)]
 
 
 def link_assets(assets, out_dir):
@@ -466,6 +511,7 @@ def main():
     plan = Plan()
     walk(plan)
     markdown_notes(plan)
+    third_party_checkpoints(plan)
     git_bytes = sum(p.stat().st_size for p in plan.git.values())
     copied, removed = mirror(plan, a.dest, a.dry_run)
 
@@ -486,18 +532,21 @@ def main():
             e['source'] = str(src)
             e['sha256'] = sha256(src, cache)
             assets.append(e)
+            if e['size'] > PART:
+                assets += split_parts(e, a.assets_dir, cache)
         for e in archive_entries:
             src = Path(e['source'])
             if src.is_file():
                 e['sha256'] = sha256(src, cache)
                 e['mtime'] = src.stat().st_mtime
             assets.append(e)
-        link_assets([e for e in assets if e['kind'] in ('checkpoint', 'file')], a.assets_dir)
+        link_assets([e for e in assets if e['kind'] in ('checkpoint', 'file') and not e.get('split')], a.assets_dir)
         names = [e['name'] for e in assets]
         assert len(names) == len(set(names)), 'duplicate release asset names'
 
         manifest = {'repo': REPO, 'tag': TAG, 'updated_utc': datetime.now(timezone.utc).isoformat(),
-                    'note': 'Tier-2 files: our checkpoints not in git, and the explorer logs. '
+                    'note': 'Tier-2 files: our checkpoints not in git, the third-party checkpoints, and the explorer '
+                            'logs. Entries with split=true go up as their file-part pieces. '
                             'migration/release_assets.py upload | download | verify.',
                     'assets': assets}
         manifest_path.parent.mkdir(parents=True, exist_ok=True)

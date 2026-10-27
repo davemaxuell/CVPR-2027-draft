@@ -115,7 +115,7 @@ These are our own results. [MIGRATION.md](MIGRATION.md) §1 shows how each one m
 
 | Path | Size | How it moves |
 |---|---:|---|
-| `[OURS]/baseline-v0/runs/` | 13 G | Records, results and the 15 selected/frozen checkpoints are in **git**. The other 89 checkpoints and optimizer states are **release assets** (`migration/release_assets.py download`). 2 G of `*.jpg` frame dumps are left out. |
+| `[OURS]/baseline-v0/runs/` | 13 G | Records, results and the 15 selected/frozen checkpoints are in **git**. The other 93 checkpoints and optimizer states (incl. the upstream DINO-WM ones) are **release assets** (`migration/release_assets.py download`). The third-party checkpoints in sections 4–5 (ETPNav, ScaleVLN/DUET, LXMERT, REVERIE, HA-VLN-CMA) are release assets too. 2 G of `*.jpg` frame dumps are left out. |
 | `[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/exprs_map/` (eval preds, step logs, what-if results) | 891 M | **git**, except the two `steps_train.jsonl` over 100 MB (**release** + server item `explorer_train_steplogs`) |
 | `[prior works]/ETPNav/data/logs/explorer/` (episode logs + cube-face renders) | 3.8 G | episode logs in **git**; the 138k cube-face renders are Matterport-derived: server item `etpnav_explorer_views` |
 | `[prior works]/ScaleVLN/analysis/vln_viz/cache/` | 3.7 G | `rxr_subtasks/`, `view_index.json`, `navmaps/` in **git**; meshes are Matterport-derived: server item `explorer_meshes`, or rebuild with `build_meshes.py --detail`; row caches rebuild on start |

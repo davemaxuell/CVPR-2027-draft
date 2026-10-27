@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Tier-2 files (our checkpoints that are not in git, and two explorer step logs over 100 MB) as GitHub release assets.
+"""Tier-2 files (our checkpoints that are not in git, the third-party checkpoints, and two explorer step logs over
+100 MB) as GitHub release assets.
 
     # old server: upload everything in migration/release_assets.json (token needs Contents: read and write)
     python3 -I migration/release_assets.py upload
     # new machine, from the repo root (public repo: press Enter at the token prompt; private: Contents: read)
-    python3 -I migration/release_assets.py download                        # everything (~12 GiB)
+    python3 -I migration/release_assets.py download                        # everything (~23 GiB)
     python3 -I migration/release_assets.py download --kind checkpoint      # only checkpoints
     python3 -I migration/release_assets.py download --match 'step5_*'      # by asset name
     python3 -I migration/release_assets.py download --from-dir /mnt/disk/CVPR-2027-draft-assets   # no GitHub
@@ -13,7 +14,8 @@
 The token comes from GITHUB_TOKEN or GH_TOKEN, else a hidden prompt; it is never written anywhere. Downloads
 from a public repo work without one (empty prompt), using the public release download links.
 Uploads skip assets already on the release with the right size. Downloads skip files whose sha256 already
-matches and put every file at its original path (archive parts, if any, are unpacked where they came from).
+matches and put every file at its original path (archive parts, if any, are unpacked where they came from; files
+over GitHub's 2 GiB limit went up as .partNN pieces and are joined back).
 Standard library only.
 """
 import argparse
@@ -164,7 +166,14 @@ def load_manifest(args):
         assets = [a for a in assets if a['kind'] == args.kind]
     if args.match:
         assets = [a for a in assets if fnmatch.fnmatch(a['name'], args.match)]
+    names = {a['name'] for a in assets}
+    assets += [a for a in m['assets'] if a.get('of') in names and a['name'] not in names]   # a split file's parts
     return m, assets
+
+
+def present(a):
+    t = local_target(a)
+    return t.is_file() and t.stat().st_size == a['size'] and sha256(t) == a['sha256']
 
 
 def local_target(a):
@@ -195,6 +204,7 @@ def with_retries(fn, what, tries=4):
 
 def cmd_upload(args):
     m, assets = load_manifest(args)
+    assets = [a for a in assets if not a.get('split')]       # these go up as their file-part pieces
     missing = [a['name'] for a in assets if not upload_source(a, args.assets_dir)]
     if missing:
         raise SystemExit(f'{len(missing)} assets have no local file of the right size, e.g. {missing[:3]}; '
@@ -254,6 +264,32 @@ def extract_archives(entries, keep_parts):
                 f.unlink()
 
 
+def join_parts(entries, keep_parts):
+    """Rebuild each split file at its own path from its downloaded .partNN pieces; returns the failures."""
+    failed = []
+    for a in entries:
+        if not a.get('split') or present(a):
+            continue
+        parts = sorted((p for p in entries if p.get('of') == a['name']), key=lambda p: p['name'])
+        files = [DOWNLOADS / p['name'] for p in parts]
+        if not files or not all(f.is_file() for f in files):
+            failed.append(f'{a["name"]}: parts missing, not joined')
+            continue
+        t = local_target(a)
+        print(f'joining {len(files)} parts -> {a["path"]}', flush=True)
+        with Concat(files) as stream:
+            tmp = copy_stream(stream, t, a['name'], a['size'])
+        if sha256(tmp) != a['sha256']:
+            tmp.unlink()
+            failed.append(f'{a["name"]}: sha256 mismatch after joining')
+            continue
+        os.replace(tmp, t)
+        if not keep_parts:
+            for f in files:
+                f.unlink()
+    return failed
+
+
 class Concat:
     """Read several files as one stream (the archive parts)."""
     def __init__(self, files):
@@ -282,13 +318,13 @@ class Concat:
 
 def cmd_download(args):
     m, assets = load_manifest(args)
+    whole_ok = {a['name']: present(a) for a in assets if a.get('split')}
     todo = []
     for a in assets:
-        t = local_target(a)
-        if t.is_file() and t.stat().st_size == a['size'] and sha256(t) == a['sha256']:
+        if a.get('split') or whole_ok.get(a.get('of')) or present(a):   # split files: joined from parts below
             continue
         todo.append(a)
-    print(f'{len(assets) - len(todo)} already present, {len(todo)} to fetch '
+    print(f'{sum(not a.get("split") for a in assets) - len(todo)} already present, {len(todo)} to fetch '
           f'({sum(a["size"] for a in todo) / 2**30:.2f} GiB)')
     gh, remote = None, {}
     if todo and not args.from_dir:
@@ -320,6 +356,7 @@ def cmd_download(args):
             bad.append(f'{a["name"]}: sha256 mismatch')
             continue
         os.replace(tmp, t)
+    bad += join_parts(assets, args.keep_parts)
     extract_archives(assets, args.keep_parts)
     if bad:
         raise SystemExit('failed:\n  ' + '\n  '.join(bad))
@@ -347,11 +384,11 @@ def cmd_verify(args):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('command', choices=['upload', 'download', 'verify'])
-    ap.add_argument('--kind', choices=['checkpoint', 'file', 'archive-part'])
+    ap.add_argument('--kind', choices=['checkpoint', 'file', 'archive-part', 'file-part'])
     ap.add_argument('--match', help='only assets whose name matches this glob')
     ap.add_argument('--assets-dir', type=Path, default=ASSETS_DIR, help='upload: staged files (export_repo.py)')
     ap.add_argument('--from-dir', help='download: copy from a local folder of assets instead of GitHub')
-    ap.add_argument('--keep-parts', action='store_true', help='download: keep archive parts after unpacking')
+    ap.add_argument('--keep-parts', action='store_true', help='download: keep archive parts / file parts after unpacking or joining')
     ap.add_argument('--dry-run', action='store_true')
     ap.add_argument('--api', default=API, help=argparse.SUPPRESS)
     ap.add_argument('--uploads', default=UPLOADS, help=argparse.SUPPRESS)

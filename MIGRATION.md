@@ -14,7 +14,7 @@ old H100 server, taken 2026-10-27. Four documents cover the move:
 | Tier | Contents | Size | How you get it |
 |---|---|---:|---|
 | **git** | All code (ours + the patched ScaleVLN/DUET, ETPNav, MatterSim and habitat-lab v0.1.7 sources), docs, drafts, run records and results, logs; the **navigation explorer** (`[prior works]/ScaleVLN/analysis/vln_viz`) with its small caches, all its run logs (DUET/ScaleVLN eval predictions, step logs, what-if results; ETPNav R2R-CE/RxR-CE episode logs) and the small public annotations it reads (R2R/FGR2R/REVERIE/RxR val, connectivity); the **selected/frozen checkpoints** (15 files, every one < 100 MB) | ~3.5 G | `git clone` |
-| **release** `assets-v1` | Every other checkpoint of ours (89 files: intermediate checkpoints, optimizer/trainer states, NWM EMA weights) and the two DUET train-split step logs over 100 MB | ~8 G | `python3 -I migration/release_assets.py download` (after the upload in §2.2) |
+| **release** `assets-v1` | Every other checkpoint of ours (93 files: intermediate checkpoints, optimizer/trainer states, NWM EMA weights, the upstream DINO-WM checkpoints), the third-party checkpoints we evaluate or start from (12 files: ETPNav R2R-CE/RxR-CE + waypoint predictors + depth encoder, ScaleVLN/DUET fine-tuned + pretrained, LXMERT, REVERIE, HA-VLN-CMA) and the two DUET train-split step logs over 100 MB. Files over 1.9 GiB go up as parts and are joined on download | ~23 G | `python3 -I migration/release_assets.py download` (after the upload in §2.2) |
 | **old server** | Everything else: datasets, Matterport-derived files (scenes, skyboxes, house meshes, ETPNav cube-face renders, explorer mesh caches), public weights and model caches, processed training data. 74 GiB required + 64 GiB recommended | — | `python3 -I migration/pull_from_server.py pull --host …` ([RETRIEVE_FROM_SERVER.md](RETRIEVE_FROM_SERVER.md)) |
 | **regenerate** | Expert renders, DINO features (or pull them: 318 G) | ~320 G | scripts, §3.6 |
 
@@ -29,7 +29,7 @@ Not in git on purpose:
   and the repo is public). That includes ETPNav's cube-face renders and the explorer's mesh caches.
 - Files over GitHub's 100 MB limit.
 - 22k simulator frame dumps (`runs/**/*.jpg`).
-- The upstream DINO-WM checkpoints, the `.git` folders of the upstream clones and a virtualenv.
+- The `.git` folders of the upstream clones and a virtualenv.
 - An upstream file with an API key in it (`drafts/.../CAST/.../gamma_api.txt`).
 
 All of these are server items (or regenerable).
@@ -65,15 +65,16 @@ own terminal on the server, so the token stays out of shell history and logs:
 ```bash
 cd /data/team_a/dave-workspace/CVPR-2027-draft
 read -rs GITHUB_TOKEN && export GITHUB_TOKEN        # paste the token, press Enter
-python3 -I migration/release_assets.py upload       # ~8 GiB; resumable, re-run after any failure
+python3 -I migration/release_assets.py upload       # ~23 GiB; resumable, re-run after any failure
 unset GITHUB_TOKEN
 ```
 
 Uploads read the staged files in `../CVPR-2027-draft-assets/`. They are hardlinks, so they take no extra space.
 Assets already on the release with the right size are skipped, so re-running after a re-export uploads only
-what changed. At this server's ~6 MB/s, a first upload takes about 25 minutes. Delete the token afterwards.
+what changed. At this server's ~6 MB/s, a first upload takes about 70 minutes. Delete the token afterwards.
 The release is a second copy that survives the server: everything in it can also be pulled from the server
-(item `our_checkpoints`).
+(items `our_checkpoints`, `explorer_train_steplogs`, `etpnav_data`, `duet_eval`, `duet_training`, `reverie_training`,
+`ha_vln`).
 
 Fallback if you prefer the GitHub CLI: `gh release create assets-v1 ../CVPR-2027-draft-assets/*`
 (asset names = file names; `release_assets.py download` works with either).
@@ -140,7 +141,7 @@ python3 -I migration/pull_from_server.py check --host USER@OLD_SERVER --priority
 
 With that done, skip §3.3 (except gated-model access, if you will re-download anything) and go to §3.4.
 
-### 3.2b Our checkpoints from the GitHub release (alternative)
+### 3.2b Checkpoints from the GitHub release (alternative)
 
 After the upload in §2.2, the release keeps a copy that survives the server. No token is needed while the
 repo is public (press Enter at the token prompt):
@@ -153,8 +154,10 @@ python3 -I migration/release_assets.py verify            # sha256 of every check
 If you make the repo private later, downloads need a fine-grained token with *Contents: Read-only*
 (`read -rs GITHUB_TOKEN && export GITHUB_TOKEN` first).
 
-Checkpoints land at their original paths under `[OURS]/baseline-v0/runs/`, and the two big step logs under
-`[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/exprs_map/steplogs/`.
+Checkpoints land at their original paths: ours under `[OURS]/baseline-v0/runs/`, the third-party ones under
+`[prior works]/ETPNav/data/`, `[prior works]/ScaleVLN/VLN-DUET*/datasets/` and `data/datasets/HA-VLN/`, and the two
+big step logs under `[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/exprs_map/steplogs/`. Files that went up as
+`.partNN` pieces are joined back (the pieces wait in `.release_downloads/` until then).
 If you moved `CVPR-2027-draft-assets/` by disk instead: `release_assets.py download --from-dir /path/to/it`.
 
 ### 3.3 Datasets and public weights from their public sources (if the server is gone)
@@ -166,15 +169,15 @@ Follow [DATA_MIGRATION.md](DATA_MIGRATION.md) §1–4 and its checklist. In shor
 2. VLN-CE episodes: R2R-CE v1-3, RxR-CE v0, IR2R-CE, REVERIE-CE, NavRAG-CE, HA-VLN → `data/datasets/`
    (the folders already exist with their `source_manifest.json` / README files, holding the exact URLs).
 3. ETPNav: `cd "[prior works]/ETPNav" && modelscope download --model admagic/ETPNav --local_dir ./data`
-   (episodes, released checkpoints, waypoint predictors).
+   (episodes, released checkpoints, waypoint predictors; the checkpoints are also in the release, §3.2b).
 4. ScaleVLN: from HF `OpenGVLab/ScaleVLN`, the R2R annotations/connectivity, the two `*_mp3d_original.hdf5` eval
-   features and the two fine-tuned checkpoints into `[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/`; the
+   features and the two fine-tuned checkpoints (also in the release) into `[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/`; the
    REVERIE annotations + `BBoxes.json` into `VLN-DUET-RVR/datasets/REVERIE/annotations/`.
 5. Hugging Face models into `$HF_HOME` (use the same revisions):
    `cd "[OURS]/baseline-v0" && HF_HOME=... python -I env/download_models.py manifest/model_revisions.json`;
    plus `facebook/nwm` (gated: request access again for the new account/token), `gaoyuezhou/dino_wm`, and the
    backbone trials in `manifest/Backbone_Trials.json`.
-6. Upstream DINO-WM checkpoints (left out of git): `gaoyuezhou/dino_wm` →
+6. Upstream DINO-WM checkpoints: in the release (§3.2b), or from `gaoyuezhou/dino_wm` →
    `[OURS]/baseline-v0/runs/step5_smolvlm2_refined512/assets/outputs/{point_maze,pusht,wall_single}/checkpoints/model_latest.pth`
    (only needed to repeat the Step 5 transfer from scratch; the trained models are in git).
 

@@ -5,7 +5,8 @@ Snapshot of 2026-10-27, written for picking the work up on the new machine. The 
 `final_verification.json`. This page says what was done, what is still running, and where every artifact
 is after the move: **git** (in this repo), **release** (GitHub release `assets-v1`, fetched with
 `migration/release_assets.py`), **carry** (a server item in RETRIEVE_FROM_SERVER.md: `pull_from_server.py`),
-or **regenerate**. Every release file is also available as the server item `our_checkpoints`.
+or **regenerate**. Our release files are also in the server item `our_checkpoints`; the release also holds the
+third-party checkpoints (MIGRATION.md §1).
 
 ## The pipeline in one paragraph
 

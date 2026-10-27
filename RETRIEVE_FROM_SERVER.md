@@ -40,11 +40,12 @@ relative to the repo as on the server. `hf_*` items go into `$HF_HOME/hub/`; `hf
 After pulling:
 
 1. If the repo is not at `/data/team_a/dave-workspace/RoleVLN`, run `migration/relocate_paths.py` (MIGRATION.md §3.1).
-2. Checkpoint integrity: `python3 -I migration/release_assets.py verify` (sha256 of all 91 release files,
-   which `our_checkpoints` + `explorer_train_steplogs` also provide).
+2. Checkpoint integrity: `python3 -I migration/release_assets.py verify` (sha256 of all 107 release files, which
+   `our_checkpoints`, `explorer_train_steplogs`, `etpnav_data`, `duet_eval`, `ha_vln` and the optional
+   `duet_training` + `reverie_training` also provide).
 3. Set up the environments and run the checks: MIGRATION.md §3.4–3.7.
 
-Alternatives if the server is gone: our checkpoints come from the GitHub release (`release_assets.py download`,
+Alternatives if the server is gone: all checkpoints, ours and third-party, come from the GitHub release (`release_assets.py download`,
 once the user has uploaded it), and public data from the sources in the `alt` field of each manifest item and in
 DATA_MIGRATION.md. The Matterport-derived explorer files can be regenerated: `etpnav_explorer_views` with
 `ETPNav/tools/log_etpnav_steps.py`, `explorer_meshes` with `build_meshes.py --detail` after pulling or
@@ -69,7 +70,7 @@ downloading `mattersim_house_ply`. Processed data can be regenerated with the st
 | `etpnav_explorer_views` | 3.8 G | explorer CE runs: habitat cube faces at every map node (episode logs are already in git) (Matterport-derived renders, so not in the public repo) | `[prior works]/ETPNav/data/logs/explorer` |
 | `duet_eval` | 5.6 G | DUET/ScaleVLN eval, explorer what-if and log_duet_steps.py | `[prior works]/ScaleVLN/VLN-DUET/datasets/R2R` |
 | `explorer_train_steplogs` | 0.2 G | explorer: DUET train-split step logs (the two files over GitHub's 100 MB limit) (also a release asset) | `[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/exprs_map` |
-| `our_checkpoints` | 9.5 G | all our checkpoints + optimizer states (15 are also in git; 89 also on the release) (includes the 3 upstream DINO-WM checkpoints under step5/assets) | `[OURS]/baseline-v0/runs` |
+| `our_checkpoints` | 9.5 G | all our checkpoints + optimizer states (15 are also in git; the rest also on the release) (includes the 3 upstream DINO-WM checkpoints under step5/assets) | `[OURS]/baseline-v0/runs` |
 | `hf_smolvlm2` | 1.9 G | policy backbone (revision 7b375e1b) | `/data/shared/hf_cache/hub/models--HuggingFaceTB--SmolVLM2-500M-Video-Instruct` |
 | `hf_dinov2_small` | 84 M | world-model encoder | `/data/shared/hf_cache/hub/models--facebook--dinov2-small` |
 | `hf_nwm` | 0.7 G | NWM/CDiT (gated on HF) | `/data/shared/hf_cache/hub/models--facebook--nwm` |
