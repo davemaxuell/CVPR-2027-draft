@@ -118,6 +118,7 @@ PUBLIC_DATASET_FILES = {'data/datasets/RxR/rxr_val_seen_guide.jsonl.gz', 'data/d
 DATASET_DOC_GLOBS = ['README*.md', 'LICENSE*', 'source_manifest.json', 'generation_manifest.json',
                      'required_scenes.json', 'envdrop_missing_episode_ids.json', 'haps_extraction_report.json']
 SKIP_FILES = {'data/splits/rxr_original_download_manifest.jsonl'}    # 93 MB download provenance
+DOC_LIMIT = 2 * MIB                                                    # *.md notes are exported from every folder
 SECRET_FILES = {'drafts/Research_Investigation_2026-10-22/repositories/05/CAST/cast/baselines/convoi/gamma_api.txt'}  # upstream-committed API key
 FRAME_SUFFIXES = ('.jpg', '.jpeg')                                     # simulator frame dumps in runs/
 # Reference clones under drafts/ keep their code and text, not their simulator assets or data blobs.
@@ -317,6 +318,22 @@ def walk(plan):
                     classify_file(plan, p, r, st)
 
 
+def markdown_notes(plan):
+    """Add the *.md files the walk left out: inside PRUNE folders and below data/datasets/<name>/."""
+    for top in sorted(PRUNE | {'data/datasets'}):
+        for d, dirs, files in os.walk(SRC / top):
+            dirs[:] = [x for x in dirs if x not in SKIP_NAMES]
+            for name in files:
+                p = Path(d) / name
+                r = rel(p)
+                if not name.lower().endswith('.md') or r in plan.git or r in plan.links or str(r) in SECRET_FILES:
+                    continue
+                if p.is_symlink():
+                    plan.links[r] = link_target(p, r)
+                elif p.stat().st_size < DOC_LIMIT:
+                    plan.git[r] = p
+
+
 def sha256(path, cache):
     st = path.stat()
     key = str(path)
@@ -448,6 +465,7 @@ def main():
 
     plan = Plan()
     walk(plan)
+    markdown_notes(plan)
     git_bytes = sum(p.stat().st_size for p in plan.git.values())
     copied, removed = mirror(plan, a.dest, a.dry_run)
 
