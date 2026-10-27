@@ -1,0 +1,61 @@
+actor_learning_rate: 0.0003
+critic_learning_rate: 0.0003
+encoder_learning_rate: 0.0001
+model_learning_rate: 0.0003
+gradient_clip: 10.
+gamma: 0.99
+tau: 0.99
+use_target_encoder: False
+batch_size: ${train.batch_size}
+proportion_real: 0.9
+
+use_daml: True
+use_aux: True
+use_model_loss: True
+
+# daml hyperparams
+model_daml_model_steps: 1
+model_daml_real_env_steps: 1
+model_daml_target_steps: 0
+
+critic_daml_model_steps: 1
+critic_daml_real_env_steps: 1
+critic_daml_target_steps: 0
+
+add_first_model_state: False
+num_stochastic_samples: 1
+
+num_critic_samples: 16
+
+# mpc parameters
+use_mpc: True
+num_policy_mpc_samples: 1
+num_mpc_samples: 512
+mpc_iterations: 6
+mpc_top_k: 64
+mpc_temperature: 0.5
+use_cheap_mpc: False
+
+expl_multiplier: 0.
+expl_bonus: none
+
+
+model_loss_scaler: 1.
+model_loss: likelihood
+
+bayes_risk_lin: False 
+bayes_risk_stop: 100_000
+bayes_risk_lambda: 0.
+
+uncertainty_method: entropy
+stoch_agg: mean
+use_encoder_uncertainty: const
+
+use_encoder_mean_critic: False
+use_rank_by_model_critic: False
+num_model_samples_critic: 1
+
+penalize_enc_div_from_uniform: 0.
+
+lat_to_env_ratio: 0.
+update_encoder_with_critic_loss: False

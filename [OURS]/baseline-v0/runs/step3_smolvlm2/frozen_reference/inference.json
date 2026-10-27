@@ -1,0 +1,91 @@
+{
+  "status": "frozen",
+  "frozen_utc": "2026-10-24T08:18:44.354464+00:00",
+  "selected": "Step 2 parent (3072)",
+  "source_checkpoint": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/step2_smolvlm2/train/checkpoints/step_003072",
+  "source_evaluation": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/step2_smolvlm2/evaluations/step_003072",
+  "weights": "backbone and all LoRA adapters frozen; evaluation mode",
+  "policy_config": {
+    "backbone": "smolvlm2",
+    "repo": "HuggingFaceTB/SmolVLM2-500M-Video-Instruct",
+    "revision": "7b375e1b73b11138ff12fe22c8f2822d8fe03467",
+    "past_frames": 7,
+    "frame_sampling": "uniform",
+    "recent_actions": 16,
+    "forward_step_m": 0.25,
+    "turn_angle_deg": 15,
+    "action_words": [
+      "STOP",
+      "FORWARD",
+      "LEFT",
+      "RIGHT"
+    ],
+    "decoding": "argmax over the first token of each action word",
+    "image_splitting": false,
+    "max_length": 4096
+  },
+  "action_ids": [
+    "STOP",
+    "FORWARD",
+    "LEFT",
+    "RIGHT"
+  ],
+  "schedule": "one primitive action per model forward; deterministic first-token argmax; batch size 1",
+  "simulator": {
+    "habitat_sim": "0.2.4 headless withbullet",
+    "habitat_lab": "v0.2.4",
+    "env": "conda `rolevln` (env/setup_env.sh)",
+    "rgb": {
+      "width": 640,
+      "height": 480,
+      "hfov": 79
+    },
+    "depth": {
+      "width": 640,
+      "height": 480,
+      "hfov": 79,
+      "min": 0.0,
+      "max": 10.0
+    },
+    "rgb_sensor_position_m": [
+      0.0,
+      1.25,
+      0.0
+    ],
+    "forward_step_m": 0.25,
+    "turn_angle_deg": 15,
+    "allow_sliding": true,
+    "success_distance_m": 3.0,
+    "max_episode_steps": {
+      "r2r": 500,
+      "rxr": 700
+    },
+    "gt_replay_check": "logs/check_ce_replay_r2r.json",
+    "rxr_expert_turn_angle_deg": 30,
+    "rxr_turn_handling": "unified_15",
+    "render_gpu": 0
+  },
+  "partition_sha256": "8ee6a37535c92f953fe509f9cfa38e1ce2ac069656d4b443fbdfd4b13f54d2d7",
+  "source_sha256": {
+    "tools/run_step3.py": "831934a6c2e37e3d41ef20d6d6f35e1badf0e6f108e263fba3a70ceb01917d20",
+    "tools/collect_dagger.py": "069fcd3edd324bd0ec7dec8b40d0d1a33b97c4ee54a312c5e59f957192b76746",
+    "tools/train_policy_dagger.py": "1f299ea2203c6418ae50e51159842fec2d411fea261b0a42dec2cee3383d3b97",
+    "tools/check_dagger.py": "7b6b8b011fcad7fb8990446b273ddfa760d0309fc9409e9392b18eeeabd7b23a",
+    "tools/train_policy_sft.py": "eebf8ff1a78d8462d962d8382f3da26aa6abe00d59c00168e83ca0705d3d2043",
+    "tools/eval_policy.py": "36ca811dc9b6dbd97991aceaa1d81455d1b5eb0178dfb6cce0fcbef4dc75736b",
+    "policy/dagger_data.py": "9c403f9cba4860b28982ce831a75e8b45d9ae8bac3ee26a8a35f7a08d77baeb2",
+    "policy/data.py": "3a940ff39d7ee76399689ffaa3a16f9bb07b20d6283a37bd5cd7c4eb64fc31d9",
+    "policy/common.py": "fa30de03d782dae761b2444a2d1dcdb853dd756d25cd76cee84ce6b69c5b474e",
+    "policy/smolvlm2.py": "2dc097c0f3bd09eacd94cb5a438e15635a62b1a9215a0c66f7c2655b437c1a96",
+    "policy/online.py": "763dd6e8873953cc82e427d196fba32aa2ba1d9bc0a5d64ade187d33d7481ac2",
+    "sim/recovery.py": "ea08d01000a1594f29c1e551dcbea4ab361bd1e9815afe73ff2a2fb5dadbc05a",
+    "sim/config.py": "c345359be6f06d8cbfcd993673c29a9f24df5669b50ade09f15de6a722ca3787",
+    "sim/episodes.py": "a80e05d3c3cf740095a5afaf115a8f8d87ec310a7ec3355118b1783e4ea27ef1",
+    "sim/rxr_dataset.py": "2b5fe06551eeed52b6dbdb3030c9e9c1cfbb884efe99d5a0c530592fd2187bcd",
+    "manifest/scene_partition.json": "8ee6a37535c92f953fe509f9cfa38e1ce2ac069656d4b443fbdfd4b13f54d2d7",
+    "manifest/model_revisions.json": "28f7ec7490f8eca8157ad0a4c179644e7d88cc10f6825333cf5b1cb2cad337a2"
+  },
+  "macro_success": 0.0625,
+  "macro_spl": 0.04723891470806945,
+  "versioning": "Later continuation labels and policy features must identify this bundle; replacing it requires recollection."
+}

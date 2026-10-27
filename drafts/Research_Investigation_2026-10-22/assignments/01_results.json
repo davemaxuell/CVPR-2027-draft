@@ -1,0 +1,4244 @@
+[
+  {
+    "paper_id": "duet",
+    "short_name": "DUET",
+    "full_title": "Think Global, Act Local: Dual-Scale Graph Transformer for Vision-and-Language Navigation",
+    "authors": [
+      "Shizhe Chen",
+      "Pierre-Louis Guhur",
+      "Makarand Tapaswi",
+      "Cordelia Schmid",
+      "Ivan Laptev"
+    ],
+    "year": 2022,
+    "venue_or_status": "CVPR 2022",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content/CVPR2022/papers/Chen_Think_Global_Act_Local_Dual-Scale_Graph_Transformer_for_Vision-and-Language_Navigation_CVPR_2022_paper.pdf",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "associated_files_reviewed": [
+      {
+        "filename": "DUET (arXiv).pdf",
+        "sha256": "c88f98b2378f5250d82fc3b44c3e195f5c38be59a91dcfb18f3f47db3ee8685b",
+        "pages_read": [
+          11,
+          12,
+          13,
+          14,
+          15
+        ],
+        "scope": "Distinct extended appendix: objectives, data, hyperparameters, backtracking statistics and failure analysis; text inspected. Extended.pdf is exact SHA duplicate."
+      }
+    ],
+    "repo_url": "https://github.com/cshizhe/VLN-DUET",
+    "repo_commit": "93e8b233164bc079a6db48b8a0a78d123ec8de41",
+    "code_files_inspected": [
+      {
+        "path": "map_nav_src/models/vilmodel.py",
+        "locator": "forward_navigation_per_step, lines 750–817",
+        "finding": "dual branches, learned fusion, masks and shared backtrack contribution"
+      },
+      {
+        "path": "map_nav_src/r2r/agent.py",
+        "locator": "lines 239–285, 295–303, 394–402, 452–478",
+        "finding": "teacher policy, shortest-path action execution, stop cache, train/test stop difference, terminal return"
+      },
+      {
+        "path": "map_nav_src/models/graph_utils.py",
+        "locator": "FloydGraph.path lines 76–92",
+        "finding": "routes recursively include intermediary visited nodes"
+      },
+      {
+        "path": "pretrain_src/model/pretrain_cmt.py",
+        "locator": "forward_mlm, forward_mrc, forward_sap",
+        "finding": "Task heads implement token NLL, soft-label region KL and action classification; these proxy objectives differ from rollout fine-tuning."
+      },
+      {
+        "path": "pretrain_src/data/dataset.py",
+        "locator": "376–466",
+        "finding": "R2R STOP labels equal index0 at the exact final path node; otherwise labels target the next reference node, with unavailable actions ignored; constructs truncated instruction and graph/panorama inputs."
+      },
+      {
+        "path": "map_nav_src/scripts/run_r2r.sh",
+        "locator": "19–67",
+        "finding": "Released script fixes DAgger, dynamic fusion, SPL expert, 15 action steps, 200 instruction tokens, AdamW and behavioral-cloning weight.2; checkpoints/data remain external."
+      },
+      {
+        "path": "map_nav_src/r2r/eval_utils.py",
+        "locator": "6–25",
+        "finding": "DTW uses graph shortest distances; nDTW=exp(−DTW/(3×reference_length)); SDTW multiplies endpoint success."
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/duet.md",
+    "key_findings": [
+      {
+        "claim": "Visited-node masking does not prevent backtracking; final return can select a visited node.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/cshizhe/VLN-DUET/blob/93e8b233164bc079a6db48b8a0a78d123ec8de41/map_nav_src/r2r/agent.py",
+        "locator": "295–303;469–478"
+      },
+      {
+        "claim": "dual branches, learned fusion, masks and shared backtrack contribution",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/cshizhe/VLN-DUET/blob/93e8b233164bc079a6db48b8a0a78d123ec8de41/map_nav_src/models/vilmodel.py",
+        "locator": "forward_navigation_per_step, lines 750–817"
+      },
+      {
+        "claim": "teacher policy, shortest-path action execution, stop cache, train/test stop difference, terminal return",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/cshizhe/VLN-DUET/blob/93e8b233164bc079a6db48b8a0a78d123ec8de41/map_nav_src/r2r/agent.py",
+        "locator": "lines 239–285, 295–303, 394–402, 452–478"
+      },
+      {
+        "claim": "routes recursively include intermediary visited nodes",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/cshizhe/VLN-DUET/blob/93e8b233164bc079a6db48b8a0a78d123ec8de41/map_nav_src/models/graph_utils.py",
+        "locator": "FloydGraph.path lines 76–92"
+      },
+      {
+        "claim": "Task heads implement token NLL, soft-label region KL and action classification; these proxy objectives differ from rollout fine-tuning.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/cshizhe/VLN-DUET/blob/93e8b233164bc079a6db48b8a0a78d123ec8de41/pretrain_src/model/pretrain_cmt.py",
+        "locator": "forward_mlm, forward_mrc, forward_sap"
+      },
+      {
+        "claim": "R2R STOP labels equal index0 at the exact final path node; otherwise labels target the next reference node, with unavailable actions ignored; constructs truncated instruction and graph/panorama inputs.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/cshizhe/VLN-DUET/blob/93e8b233164bc079a6db48b8a0a78d123ec8de41/pretrain_src/data/dataset.py",
+        "locator": "376–466"
+      },
+      {
+        "claim": "Released script fixes DAgger, dynamic fusion, SPL expert, 15 action steps, 200 instruction tokens, AdamW and behavioral-cloning weight.2; checkpoints/data remain external.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/cshizhe/VLN-DUET/blob/93e8b233164bc079a6db48b8a0a78d123ec8de41/map_nav_src/scripts/run_r2r.sh",
+        "locator": "19–67"
+      },
+      {
+        "claim": "DTW uses graph shortest distances; nDTW=exp(−DTW/(3×reference_length)); SDTW multiplies endpoint success.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/cshizhe/VLN-DUET/blob/93e8b233164bc079a6db48b8a0a78d123ec8de41/map_nav_src/r2r/eval_utils.py",
+        "locator": "6–25"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "duet-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Stop scores are normalized over a changing action set and then compared across time; cached values also come from different histories. Such values need not be temporally calibrated. Test this with fixed logits/candidate perturbations and held-out final-node selection, not an OSR gap alone.",
+        "evidence": "INSPECTED CODE agent.py 394–402,472–478; DEDUCTION",
+        "kind": "methodological",
+        "status": "Still unresolved in reviewed evidence",
+        "followups": [
+          "ScaleVLN",
+          "SRDF"
+        ],
+        "confidence": "high for code, medium for practical impact"
+      },
+      {
+        "id": "duet-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Discrete routing and exact pose/neighbour access omit continuous obstacle avoidance and localization error. BEVBert/ETPNav add continuous control but inherit waypoint/sensor assumptions.",
+        "evidence": "AUTHOR TASK §3 p 3; PAPER EXPERIMENT Table 7",
+        "kind": "methodological",
+        "status": "Partially addressed",
+        "followups": [
+          "BEVBert",
+          "ScaleVLN R2R-CE",
+          "ETPNav"
+        ],
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://github.com/wz0919/ScaleVLN",
+      "https://github.com/wz0919/VLN-SRDF",
+      "https://github.com/MarSaKi/ETPNav"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "scalevln",
+    "short_name": "ScaleVLN",
+    "full_title": "Scaling Data Generation in Vision-and-Language Navigation",
+    "authors": [
+      "Zun Wang",
+      "Jialu Li",
+      "Yicong Hong",
+      "Yi Wang",
+      "Qi Wu",
+      "Mohit Bansal",
+      "Stephen Gould",
+      "Hao Tan",
+      "Yu Qiao"
+    ],
+    "year": 2023,
+    "venue_or_status": "ICCV 2023",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content/ICCV2023/papers/Wang_Scaling_Data_Generation_in_Vision-and-Language_Navigation_ICCV_2023_paper.pdf",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "associated_files_reviewed": [
+      {
+        "filename": "ScaleVLN (supplement).pdf",
+        "sha256": "ca89c239b0312fb9561d781b14e6970563c2aaf7ccfac77163d7d37293f781e4",
+        "pages_read": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "scope": "Training/data details, Tables1–6 and graph/image figure captions inspected; visual graph and image quality figures do not quantify repair reliability. Supplement copy is exact SHA duplicate."
+      }
+    ],
+    "repo_url": "https://github.com/wz0919/ScaleVLN",
+    "repo_commit": "3bdff0da2216066cade2e7923c4ad0b5c36d6592",
+    "code_files_inspected": [
+      {
+        "path": "VLN-DUET/map_nav_src/r2r/agent.py",
+        "locator": "407–424;469–503",
+        "finding": "Inspected action-label/rollout loss path: categorical teacher action supervision with policy/teacher feedback; comparison requires matching expert and STOP handling."
+      },
+      {
+        "path": "VLN-DUET/pretrain_src/data/dataset.py",
+        "locator": "382–472",
+        "finding": "Inspected annotation/feature and action-target preparation; geometric/map/confounder inputs are additional data requirements where used."
+      },
+      {
+        "path": "VLN-DUET/map_nav_src/r2r/eval_utils.py",
+        "locator": "6–25",
+        "finding": "Graph-distance DTW, exponential normalization and success-weighted DTW use the inherited discrete evaluator."
+      },
+      {
+        "path": "VLN-DUET/pretrain_src/run_r2r_h14.sh",
+        "locator": "2–14",
+        "finding": "Two-GPU launcher selects CLIP-H14 model and HM3D+MP3D+Gibson pretraining configuration."
+      },
+      {
+        "path": "VLN-DUET-RVR/map_nav_src/reverie/agent_obj.py",
+        "locator": "rollout and training loss",
+        "finding": "REVERIE-specific navigation/object grounding branch was inspected separately from R2R."
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/scalevln.md",
+    "key_findings": [
+      {
+        "claim": "Inspected action-label/rollout loss path: categorical teacher action supervision with policy/teacher feedback; comparison requires matching expert and STOP handling.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/wz0919/ScaleVLN/blob/3bdff0da2216066cade2e7923c4ad0b5c36d6592/VLN-DUET/map_nav_src/r2r/agent.py",
+        "locator": "407–424;469–503"
+      },
+      {
+        "claim": "Inspected annotation/feature and action-target preparation; geometric/map/confounder inputs are additional data requirements where used.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/wz0919/ScaleVLN/blob/3bdff0da2216066cade2e7923c4ad0b5c36d6592/VLN-DUET/pretrain_src/data/dataset.py",
+        "locator": "382–472"
+      },
+      {
+        "claim": "Graph-distance DTW, exponential normalization and success-weighted DTW use the inherited discrete evaluator.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/wz0919/ScaleVLN/blob/3bdff0da2216066cade2e7923c4ad0b5c36d6592/VLN-DUET/map_nav_src/r2r/eval_utils.py",
+        "locator": "6–25"
+      },
+      {
+        "claim": "Two-GPU launcher selects CLIP-H14 model and HM3D+MP3D+Gibson pretraining configuration.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/wz0919/ScaleVLN/blob/3bdff0da2216066cade2e7923c4ad0b5c36d6592/VLN-DUET/pretrain_src/run_r2r_h14.sh",
+        "locator": "2–14"
+      },
+      {
+        "claim": "REVERIE-specific navigation/object grounding branch was inspected separately from R2R.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/wz0919/ScaleVLN/blob/3bdff0da2216066cade2e7923c4ad0b5c36d6592/VLN-DUET-RVR/map_nav_src/reverie/agent_obj.py",
+        "locator": "rollout and training loss"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "scalevln-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Simple synthetic speakers constrain lexical/semantic diversity; scene scaling alone does not certify correct instructions. SRDF improves generated-language diversity and navigation-consistency filtering but introduces verifier selection bias and much greater compute.",
+        "evidence": "PAPER EXPERIMENT Table 5; AUTHOR limitation p 6",
+        "kind": "methodological",
+        "status": "Partially addressed",
+        "followups": [
+          "SRDF",
+          "NavRAG",
+          "RoomTour3D"
+        ],
+        "confidence": "high"
+      },
+      {
+        "id": "scalevln-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Best results combine data, larger visual encoder and EnvEdit; architecture-controlled comparisons must separate starred and unstarred Table 9 rows.",
+        "evidence": "PAPER EXPERIMENT Table 9 footnote",
+        "kind": "insufficiently tested",
+        "status": "Partially addressed",
+        "followups": [
+          "SRDF controlled InternViT comparison"
+        ],
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://github.com/wz0919/VLN-SRDF",
+      "https://github.com/MrZihan/NavRAG"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "srdf",
+    "short_name": "SRDF",
+    "full_title": "Bootstrapping Language-Guided Navigation Learning with Self-Refining Data Flywheel",
+    "authors": [
+      "Zun Wang",
+      "Jialu Li",
+      "Yicong Hong",
+      "Songze Li",
+      "Kunchang Li",
+      "Shoubin Yu",
+      "Yi Wang",
+      "Yu Qiao",
+      "Yali Wang",
+      "Mohit Bansal",
+      "Limin Wang"
+    ],
+    "year": 2025,
+    "venue_or_status": "ICLR 2025 (PDF header)",
+    "bibliography_sources": [
+      {
+        "url": "https://github.com/wz0919/VLN-SRDF",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/wz0919/VLN-SRDF",
+    "repo_commit": "1835eca4bd90958b9b42c210236006e40ed6aa32",
+    "code_files_inspected": [],
+    "code_executed": false,
+    "repository_status": "Official repository README-only at inspected commit",
+    "dossier_path": "dossiers/srdf.md",
+    "key_findings": [
+      {
+        "claim": "The original flywheel snapshot is README-only; later HLR/SkillNav specialist code does not establish release of the entire original flywheel.",
+        "evidence_type": "INSPECTED REPOSITORY (README/tree only)",
+        "source": "https://github.com/wz0919/VLN-SRDF/tree/1835eca4bd90958b9b42c210236006e40ed6aa32",
+        "locator": "Pinned tree and README"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "srdf-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "SPL=1 is not equivalent to exact path following: equal-length alternative routes and goal-radius stopping can satisfy it. nDTW similarity likewise does not prove language entailment. Navigator-based acceptance may preferentially retain instructions compatible with that navigator rather than counterfactually necessary wording.",
+        "evidence": "AUTHOR filter §3.2 p 5; DEDUCTION from SPL definition; no benchmark failure measured",
+        "kind": "methodological",
+        "status": "Still unresolved in reviewed evidence",
+        "followups": [
+          "CAST counterfactual augmentation (lead for follow-up audit)"
+        ],
+        "confidence": "high for metric counterexample; medium for selection-bias impact"
+      },
+      {
+        "id": "srdf-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "The flywheel requires repeated large generator/navigator training; study reports 3 navigator rounds but no unlimited-round stability guarantee. Additional rounds can amplify verifier bias.",
+        "evidence": "AUTHOR compute §4.1; Alg 1 p 20; HYPOTHESIS about long-run drift",
+        "kind": "methodological",
+        "status": "Shifted into compute/verification costs",
+        "followups": [
+          "SkillNav"
+        ],
+        "confidence": "medium"
+      }
+    ],
+    "followup_sources": [
+      "https://arxiv.org/abs/2508.13446",
+      "https://hlr.github.io/SkillNav/"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "gaussianmap",
+    "short_name": "3D Gaussian Map",
+    "full_title": "3D Gaussian Map with Open-Set Semantic Grouping for Vision-Language Navigation",
+    "authors": [
+      "Jianzhe Gao",
+      "Rui Liu",
+      "Wenguan Wang"
+    ],
+    "year": 2025,
+    "venue_or_status": "ICCV 2025",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content/ICCV2025/papers/Gao_3D_Gaussian_Map_with_Open-Set_Semantic_Grouping_for_Vision-Language_Navigation_ICCV_2025_paper.pdf",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/Gaozzzz/3D-Gaussian-Map-VLN",
+    "repo_commit": "3a42711d7449280d4eda89d257e5891947a1ced2",
+    "code_files_inspected": [],
+    "code_executed": false,
+    "repository_status": "Official README-only snapshot",
+    "dossier_path": "dossiers/gaussianmap.md",
+    "key_findings": [
+      {
+        "claim": "Mean reduction from a 512-dimensional semantic feature to one scalar is non-injective; the behavioral impact remains unmeasured.",
+        "evidence_type": "DEDUCTION",
+        "source": "https://openaccess.thecvf.com/content/ICCV2025/papers/Gao_3D_Gaussian_Map_with_Open-Set_Semantic_Grouping_for_Vision-Language_Navigation_ICCV_2025_paper.pdf",
+        "locator": "Eqs 7?8, PDF p 4"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "gaussianmap-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Open-set scalar semantic compression irreversibly discards distinctions; test with pairs of regions with equal/near-equal feature mean but different navigation relevance. UAGM changes semantic representation/uncertainty, but released implementation is also unavailable.",
+        "evidence": "AUTHOR Eq 7–8 p 4; DEDUCTION",
+        "kind": "methodological",
+        "status": "Uncertain because evidence is insufficient",
+        "followups": [
+          "UAGM"
+        ],
+        "confidence": "high for information loss, unknown behavioral impact"
+      },
+      {
+        "id": "gaussianmap-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "RGB-D/pose assumptions and segmentation/rendering overhead remain; no observed closed-loop physical robot robustness established by discrete benchmark gains.",
+        "evidence": "AUTHOR task §3 and runtime §3.5",
+        "kind": "insufficiently tested",
+        "status": "Still unresolved in reviewed evidence",
+        "followups": [
+          "GA-VLN"
+        ],
+        "confidence": "medium"
+      }
+    ],
+    "followup_sources": [
+      "https://github.com/Gaozzzz/Uncertainty-Aware-VLN"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "uagm",
+    "short_name": "UAGM",
+    "full_title": "Uncertainty-Aware Gaussian Map for Vision-Language Navigation",
+    "authors": [
+      "Jianzhe Gao",
+      "Rui Liu",
+      "Yuxuan Xu",
+      "Tongtong Cao",
+      "Yingxue Zhang",
+      "Zhanguang Zhang",
+      "Sida Peng",
+      "Yi Yang",
+      "Wenguan Wang"
+    ],
+    "year": 2026,
+    "venue_or_status": "ICLR 2026 (PDF header)",
+    "bibliography_sources": [
+      {
+        "url": "https://arxiv.org/abs/2605.26503v1",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/Gaozzzz/Uncertainty-Aware-VLN",
+    "repo_commit": "43748013cc34376b68b159cca6226535ed84ccd0",
+    "code_files_inspected": [],
+    "code_executed": false,
+    "repository_status": "Official README-only snapshot",
+    "dossier_path": "dossiers/uagm.md",
+    "key_findings": [
+      {
+        "claim": "The paper reports five-run mean and standard deviation with paired-test p-values; the analysis unit should be checked before interpreting very small p-values. This is an unresolved reporting question.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "https://arxiv.org/pdf/2605.26503v1",
+        "locator": "Appendix Table 11, PDF p 19; local checksum in evidence/01/uagm_version_provenance.json"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "uagm-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Calibration and numerical interpretation of appearance uncertainty are unverified: Fisher sensitivity is not posterior covariance without extra assumptions. A scalar uncertainty controller should not treat these features as probabilities.",
+        "evidence": "AUTHOR Eqs 8–9 p 5; DEDUCTION",
+        "kind": "methodological",
+        "status": "Still unresolved in reviewed evidence",
+        "followups": [],
+        "confidence": "high for mathematical caveat"
+      },
+      {
+        "id": "uagm-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Reconstruction uncertainty can reflect texture/surface sensitivity rather than task-relevant ambiguity; test equal-compute selective sensing or wrong-action prediction before claiming active information gathering.",
+        "evidence": "DEDUCTION from unsupervised rendering scores vs task policy; Table 6 only aggregate navigation",
+        "kind": "insufficiently tested",
+        "status": "Uncertain because evidence is insufficient",
+        "followups": [
+          "active perception / world-model evaluators"
+        ],
+        "confidence": "medium"
+      },
+      {
+        "id": "uagm-B3",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Uncertainty is attached to current observations but does not select evidence-gathering actions; visible-yet-not-reached and hidden-target cases cause premature termination.",
+        "evidence": "AUTHOR ACKNOWLEDGMENT: Appendix E.4/Figure 7, PDF p 21; F.1, p 23",
+        "kind": "methodological",
+        "status": "Still unresolved in this method; broader literature audit required",
+        "followups": [
+          "HSGM",
+          "Active Visual Information Gathering",
+          "world-model methods in assignment 02"
+        ],
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "No implementation released in pinned tree. Table 1 versus Table 4/6 REVERIE SR discrepancy remains unresolved. Figures show qualitative cases but do not establish physical collision avoidance on the discrete benchmark.\n\nVersion provenance: the local 23-page PDF is byte-identical to arXiv 2605.26503v 1 (26 May 2026); SHA256 and the exact downloaded URL are in evidence/01/uagm_version_provenance.json. Appendix F.1 explicitly lists active perception and predictive future views as future work. Noise robustness in Table 12 does not establish epistemic/aleatoric identifiability, nor physical navigation safety. The Table 11 test-unit question remains unresolved pending independent mathematical review."
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "bevbert",
+    "short_name": "BEVBert",
+    "full_title": "BEVBert: Multimodal Map Pre-training for Language-guided Navigation",
+    "authors": [
+      "Dong An",
+      "Yuankai Qi",
+      "Yangguang Li",
+      "Yan Huang",
+      "Liang Wang",
+      "Tieniu Tan",
+      "Jing Shao"
+    ],
+    "year": 2023,
+    "venue_or_status": "ICCV 2023",
+    "bibliography_sources": [
+      {
+        "url": "https://arxiv.org/pdf/2212.04385",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      13,
+      14,
+      15,
+      16,
+      17
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/MarSaKi/VLN-BEVBert",
+    "repo_commit": "ee40002e9eb75ca6d587e8746990e91b0463f5ca",
+    "code_files_inspected": [
+      {
+        "path": "bevbert_ce/pretrain/pretrain_src/model/bev_utils.py",
+        "locator": "pixel_to_world_mapping200;PointCloud.forward349;project_bev382",
+        "finding": "depth/pose projection and BEV pooling"
+      },
+      {
+        "path": "bevbert_ce/pretrain/pretrain_src/model/vilmodel.py",
+        "locator": "LocalBEVEncoder581–609;GlocalTextPathCMT712–730",
+        "finding": "cell embedding and CE grid setting"
+      },
+      {
+        "path": "bevbert_ce/pretrain/pretrain_src/model/pretrain_cmt.py",
+        "locator": "347–350",
+        "finding": "global/local/fused action cross-entropy losses"
+      },
+      {
+        "path": "map_nav_src/r2r/agent.py",
+        "locator": "539–555;585–633",
+        "finding": "Inspected action-label/rollout loss path: categorical teacher action supervision with policy/teacher feedback; comparison requires matching expert and STOP handling."
+      },
+      {
+        "path": "pretrain_src/data/dataset.py",
+        "locator": "397–440;471–578",
+        "finding": "Inspected annotation/feature and action-target preparation; geometric/map/confounder inputs are additional data requirements where used."
+      },
+      {
+        "path": "map_nav_src/r2r/eval_utils.py",
+        "locator": "6–25",
+        "finding": "Graph-distance DTW, exponential normalization and success-weighted DTW use the inherited discrete evaluator."
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/bevbert.md",
+    "key_findings": [
+      {
+        "claim": "depth/pose projection and BEV pooling",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/MarSaKi/VLN-BEVBert/blob/ee40002e9eb75ca6d587e8746990e91b0463f5ca/bevbert_ce/pretrain/pretrain_src/model/bev_utils.py",
+        "locator": "pixel_to_world_mapping200;PointCloud.forward349;project_bev382"
+      },
+      {
+        "claim": "cell embedding and CE grid setting",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/MarSaKi/VLN-BEVBert/blob/ee40002e9eb75ca6d587e8746990e91b0463f5ca/bevbert_ce/pretrain/pretrain_src/model/vilmodel.py",
+        "locator": "LocalBEVEncoder581–609;GlocalTextPathCMT712–730"
+      },
+      {
+        "claim": "global/local/fused action cross-entropy losses",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/MarSaKi/VLN-BEVBert/blob/ee40002e9eb75ca6d587e8746990e91b0463f5ca/bevbert_ce/pretrain/pretrain_src/model/pretrain_cmt.py",
+        "locator": "347–350"
+      },
+      {
+        "claim": "Inspected action-label/rollout loss path: categorical teacher action supervision with policy/teacher feedback; comparison requires matching expert and STOP handling.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/MarSaKi/VLN-BEVBert/blob/ee40002e9eb75ca6d587e8746990e91b0463f5ca/map_nav_src/r2r/agent.py",
+        "locator": "539–555;585–633"
+      },
+      {
+        "claim": "Inspected annotation/feature and action-target preparation; geometric/map/confounder inputs are additional data requirements where used.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/MarSaKi/VLN-BEVBert/blob/ee40002e9eb75ca6d587e8746990e91b0463f5ca/pretrain_src/data/dataset.py",
+        "locator": "397–440;471–578"
+      },
+      {
+        "claim": "Graph-distance DTW, exponential normalization and success-weighted DTW use the inherited discrete evaluator.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/MarSaKi/VLN-BEVBert/blob/ee40002e9eb75ca6d587e8746990e91b0463f5ca/map_nav_src/r2r/eval_utils.py",
+        "locator": "6–25"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "bevbert-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Fixed local metric extent limits detailed memory of distant regions; GridMM keeps global history but dynamic rescaling sacrifices resolution as coverage expands.",
+        "evidence": "AUTHOR §3.1; GridMM §3.2",
+        "kind": "methodological",
+        "status": "Shifted into another cost or limitation",
+        "followups": [
+          "GridMM",
+          "VER",
+          "GA-VLN"
+        ],
+        "confidence": "high"
+      },
+      {
+        "id": "bevbert-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "MSI fills masked semantic cells without proving action-conditioned future prediction or calibrated uncertainty; unseen-region hallucination remains insufficiently tested.",
+        "evidence": "AUTHOR Eq 6; DEDUCTION",
+        "kind": "insufficiently tested",
+        "status": "Partially addressed",
+        "followups": [
+          "HNR",
+          "UAGM"
+        ],
+        "confidence": "medium"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "gridmm",
+    "short_name": "GridMM",
+    "full_title": "GridMM: Grid Memory Map for Vision-and-Language Navigation",
+    "authors": [
+      "Zihan Wang",
+      "Xiangyang Li",
+      "Jiahao Yang",
+      "Yeqi Liu",
+      "Shuqiang Jiang"
+    ],
+    "year": 2023,
+    "venue_or_status": "ICCV 2023",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content/ICCV2023/papers/Wang_GridMM_Grid_Memory_Map_for_Vision-and-Language_Navigation_ICCV_2023_paper.pdf",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/MrZihan/GridMM",
+    "repo_commit": "713139f0be045f339bd041a7caefe10b5c4fc6eb",
+    "code_files_inspected": [
+      {
+        "path": "VLN_CE/vlnce_baselines/models/Policy_ViewSelection_GridMap.py",
+        "locator": "get_rel_position1263;get_gridmap_pos_fts1321;getGlobalMap1377",
+        "finding": "depth-driven map construction"
+      },
+      {
+        "path": "VLN_CE/vlnce_baselines/models/gridmap/vilmodel.py",
+        "locator": "forward_navigation_per_step1419–1595",
+        "finding": "map-conditioned action path and local/global masked logits"
+      },
+      {
+        "path": "map_nav_src/r2r/agent.py",
+        "locator": "330–370;401–448",
+        "finding": "Inspected action-label/rollout loss path: categorical teacher action supervision with policy/teacher feedback; comparison requires matching expert and STOP handling."
+      },
+      {
+        "path": "pretrain_src/data/dataset.py",
+        "locator": "636–751",
+        "finding": "Inspected annotation/feature and action-target preparation; geometric/map/confounder inputs are additional data requirements where used."
+      },
+      {
+        "path": "map_nav_src/r2r/eval_utils.py",
+        "locator": "6–25",
+        "finding": "Graph-distance DTW, exponential normalization and success-weighted DTW use the inherited discrete evaluator."
+      },
+      {
+        "path": "map_nav_src/scripts/run_r2r.sh",
+        "locator": "19–67",
+        "finding": "Default script uses four GPUs, batch 4 and15 action steps; test invocation and training command/checkpoint selection must be distinguished."
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/gridmm.md",
+    "key_findings": [
+      {
+        "claim": "depth-driven map construction",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/MrZihan/GridMM/blob/713139f0be045f339bd041a7caefe10b5c4fc6eb/VLN_CE/vlnce_baselines/models/Policy_ViewSelection_GridMap.py",
+        "locator": "get_rel_position1263;get_gridmap_pos_fts1321;getGlobalMap1377"
+      },
+      {
+        "claim": "map-conditioned action path and local/global masked logits",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/MrZihan/GridMM/blob/713139f0be045f339bd041a7caefe10b5c4fc6eb/VLN_CE/vlnce_baselines/models/gridmap/vilmodel.py",
+        "locator": "forward_navigation_per_step1419–1595"
+      },
+      {
+        "claim": "Inspected action-label/rollout loss path: categorical teacher action supervision with policy/teacher feedback; comparison requires matching expert and STOP handling.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/MrZihan/GridMM/blob/713139f0be045f339bd041a7caefe10b5c4fc6eb/map_nav_src/r2r/agent.py",
+        "locator": "330–370;401–448"
+      },
+      {
+        "claim": "Inspected annotation/feature and action-target preparation; geometric/map/confounder inputs are additional data requirements where used.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/MrZihan/GridMM/blob/713139f0be045f339bd041a7caefe10b5c4fc6eb/pretrain_src/data/dataset.py",
+        "locator": "636–751"
+      },
+      {
+        "claim": "Graph-distance DTW, exponential normalization and success-weighted DTW use the inherited discrete evaluator.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/MrZihan/GridMM/blob/713139f0be045f339bd041a7caefe10b5c4fc6eb/map_nav_src/r2r/eval_utils.py",
+        "locator": "6–25"
+      },
+      {
+        "claim": "Default script uses four GPUs, batch 4 and15 action steps; test invocation and training command/checkpoint selection must be distinguished.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/MrZihan/GridMM/blob/713139f0be045f339bd041a7caefe10b5c4fc6eb/map_nav_src/scripts/run_r2r.sh",
+        "locator": "19–67"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "gridmm-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Fixed cell count with expanding physical extent merges increasingly distant objects into cells; raw history grows with steps. Long-horizon gains must be evaluated against both spatial resolution and cumulative memory.",
+        "evidence": "AUTHOR Eqs 2–4; Table 7; DEDUCTION",
+        "kind": "methodological",
+        "status": "Partially addressed",
+        "followups": [
+          "VER",
+          "3D Gaussian Map"
+        ],
+        "confidence": "high"
+      },
+      {
+        "id": "gridmm-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Instruction-max relevance pooling can suppress evidence for negation/order when salient nouns dominate; no counterfactual grounding experiment in inspected ablations establishes compositional fidelity.",
+        "evidence": "DEDUCTION Eqs 6–9",
+        "kind": "insufficiently tested",
+        "status": "Uncertain because evidence is insufficient",
+        "followups": [
+          "NavNuances"
+        ],
+        "confidence": "medium"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "kerm",
+    "short_name": "KERM",
+    "full_title": "KERM: Knowledge Enhanced Reasoning for Vision-and-Language Navigation",
+    "authors": [
+      "Xiangyang Li",
+      "Zihan Wang",
+      "Jiahao Yang",
+      "Yaowei Wang",
+      "Shuqiang Jiang"
+    ],
+    "year": 2023,
+    "venue_or_status": "CVPR 2023",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content/CVPR2023/html/Li_KERM_Knowledge_Enhanced_Reasoning_for_Vision-and-Language_Navigation_CVPR_2023_paper.html",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/XiangyangLi20/KERM",
+    "repo_commit": "b51504334bebb2805b4608b7774bac076d85432a",
+    "code_files_inspected": [
+      {
+        "path": "knowledge_nav_src/models/vilmodel.py",
+        "locator": "forward_panorama_per_step1465–1467;forward_navigation_per_step1747;masking1823–1833",
+        "finding": "knowledge-conditioned DUET pipeline"
+      },
+      {
+        "path": "preprocess/retrieve_facts.py",
+        "locator": "FeaturesDB22–28",
+        "finding": "HDF5 feature loading for retrieval"
+      },
+      {
+        "path": "preprocess/get_knowledge_base.py",
+        "locator": "VisualGenomeCaptions15–21",
+        "finding": "Visual Genome annotation parsing"
+      },
+      {
+        "path": "knowledge_nav_src/r2r/agent.py",
+        "locator": "426–442;515",
+        "finding": "Inspected action-label/rollout loss path: categorical teacher action supervision with policy/teacher feedback; comparison requires matching expert and STOP handling."
+      },
+      {
+        "path": "pretrain_src/data/dataset.py",
+        "locator": "419–512",
+        "finding": "Inspected annotation/feature and action-target preparation; geometric/map/confounder inputs are additional data requirements where used."
+      },
+      {
+        "path": "knowledge_nav_src/r2r/eval_utils.py",
+        "locator": "6–25",
+        "finding": "Graph-distance DTW, exponential normalization and success-weighted DTW use the inherited discrete evaluator."
+      },
+      {
+        "path": "knowledge_nav_src/scripts/run_r2r.sh",
+        "locator": "19–68",
+        "finding": "Pinned script selects dynamic fusion and external trained checkpoint; training command is commented out in this file."
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/kerm.md",
+    "key_findings": [
+      {
+        "claim": "knowledge-conditioned DUET pipeline",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/XiangyangLi20/KERM/blob/b51504334bebb2805b4608b7774bac076d85432a/knowledge_nav_src/models/vilmodel.py",
+        "locator": "forward_panorama_per_step1465–1467;forward_navigation_per_step1747;masking1823–1833"
+      },
+      {
+        "claim": "HDF5 feature loading for retrieval",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/XiangyangLi20/KERM/blob/b51504334bebb2805b4608b7774bac076d85432a/preprocess/retrieve_facts.py",
+        "locator": "FeaturesDB22–28"
+      },
+      {
+        "claim": "Visual Genome annotation parsing",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/XiangyangLi20/KERM/blob/b51504334bebb2805b4608b7774bac076d85432a/preprocess/get_knowledge_base.py",
+        "locator": "VisualGenomeCaptions15–21"
+      },
+      {
+        "claim": "Inspected action-label/rollout loss path: categorical teacher action supervision with policy/teacher feedback; comparison requires matching expert and STOP handling.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/XiangyangLi20/KERM/blob/b51504334bebb2805b4608b7774bac076d85432a/knowledge_nav_src/r2r/agent.py",
+        "locator": "426–442;515"
+      },
+      {
+        "claim": "Inspected annotation/feature and action-target preparation; geometric/map/confounder inputs are additional data requirements where used.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/XiangyangLi20/KERM/blob/b51504334bebb2805b4608b7774bac076d85432a/pretrain_src/data/dataset.py",
+        "locator": "419–512"
+      },
+      {
+        "claim": "Graph-distance DTW, exponential normalization and success-weighted DTW use the inherited discrete evaluator.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/XiangyangLi20/KERM/blob/b51504334bebb2805b4608b7774bac076d85432a/knowledge_nav_src/r2r/eval_utils.py",
+        "locator": "6–25"
+      },
+      {
+        "claim": "Pinned script selects dynamic fusion and external trained checkpoint; training command is commented out in this file.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/XiangyangLi20/KERM/blob/b51504334bebb2805b4608b7774bac076d85432a/knowledge_nav_src/scripts/run_r2r.sh",
+        "locator": "19–68"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "kerm-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "CLIP top-k retrieval supplies plausible but unverified region facts. Instruction-aware filtering measures relevance, not truth; wrong relationships can be amplified.",
+        "evidence": "AUTHOR §3.2–3.3; DEDUCTION",
+        "kind": "methodological",
+        "status": "Partially addressed",
+        "followups": [
+          "OVER-NAV",
+          "NavRAG",
+          "UAGM"
+        ],
+        "confidence": "medium"
+      },
+      {
+        "id": "kerm-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Five crops×five facts×36 views increases representation/preprocessing load; no matched-latency baseline in inspected main tables isolates utility per compute.",
+        "evidence": "AUTHOR representation counts; DEDUCTION",
+        "kind": "insufficiently tested",
+        "status": "Uncertain because evidence is insufficient",
+        "followups": [],
+        "confidence": "medium"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "ver",
+    "short_name": "VER",
+    "full_title": "Volumetric Environment Representation for Vision-Language Navigation",
+    "authors": [
+      "Rui Liu",
+      "Wenguan Wang",
+      "Yi Yang"
+    ],
+    "year": 2024,
+    "venue_or_status": "CVPR 2024",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content/CVPR2024/papers/Liu_Volumetric_Environment_Representation_for_Vision-Language_Navigation_CVPR_2024_paper.pdf",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/DefaultRui/VLN-VER",
+    "repo_commit": "d925dfa3c815779c3b6b131ccc3ccf9df1fbfc3a",
+    "code_files_inspected": [
+      {
+        "path": "projects/mmdet3d_plugin/bevformer/detectors/voxelformer.py",
+        "locator": "231–326",
+        "finding": "Loads six horizontal-view precomputed ViT patch feature tensors, ground-truth geometry/occupancy and invokes volumetric losses; HDF5 drops CLS to retain196×768 patch features."
+      },
+      {
+        "path": "projects/mmdet3d_plugin/bevformer/dense_heads/voxelformer_occupancy_head.py",
+        "locator": "282–350;903–991;1505–1540",
+        "finding": "Learned voxel queries and positional embeddings; matched detection classification/L1 plus occupancy loss; focal-loss inference adds a0.25 empty-space threshold before argmax."
+      },
+      {
+        "path": "projects/configs/verformer/vocc.py",
+        "locator": "9–20;55–207;209 onward",
+        "finding": "15×15×4 initial volume, 768 channels, 17 object and16 occupancy classes; focal-loss and L1 weights; external feature/annotation paths remain placeholders."
+      },
+      {
+        "path": "projects/mmdet3d_plugin/datasets/mp3docc_dataset.py",
+        "locator": "304–345;485–579",
+        "finding": "Indoor box evaluation and occupancy IoU using sparse labels/optional invalid-voxel masks; these are perception metrics, not VLN SR/SPL."
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/ver.md",
+    "key_findings": [
+      {
+        "claim": "Loads six horizontal-view precomputed ViT patch feature tensors, ground-truth geometry/occupancy and invokes volumetric losses; HDF5 drops CLS to retain196×768 patch features.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/DefaultRui/VLN-VER/blob/d925dfa3c815779c3b6b131ccc3ccf9df1fbfc3a/projects/mmdet3d_plugin/bevformer/detectors/voxelformer.py",
+        "locator": "231–326"
+      },
+      {
+        "claim": "Learned voxel queries and positional embeddings; matched detection classification/L1 plus occupancy loss; focal-loss inference adds a0.25 empty-space threshold before argmax.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/DefaultRui/VLN-VER/blob/d925dfa3c815779c3b6b131ccc3ccf9df1fbfc3a/projects/mmdet3d_plugin/bevformer/dense_heads/voxelformer_occupancy_head.py",
+        "locator": "282–350;903–991;1505–1540"
+      },
+      {
+        "claim": "15×15×4 initial volume, 768 channels, 17 object and16 occupancy classes; focal-loss and L1 weights; external feature/annotation paths remain placeholders.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/DefaultRui/VLN-VER/blob/d925dfa3c815779c3b6b131ccc3ccf9df1fbfc3a/projects/configs/verformer/vocc.py",
+        "locator": "9–20;55–207;209 onward"
+      },
+      {
+        "claim": "Indoor box evaluation and occupancy IoU using sparse labels/optional invalid-voxel masks; these are perception metrics, not VLN SR/SPL.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/DefaultRui/VLN-VER/blob/d925dfa3c815779c3b6b131ccc3ccf9df1fbfc3a/projects/mmdet3d_plugin/datasets/mp3docc_dataset.py",
+        "locator": "304–345;485–579"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "ver-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Volumetric resolution, labeling and feature storage cost scale with XYZ; height grouping reduces attention coupling but does not make dense voxels free. Gaussian maps target compact/sparse geometry but add reconstruction costs.",
+        "evidence": "AUTHOR §3.1–3.5; DEDUCTION",
+        "kind": "methodological",
+        "status": "Shifted into another cost or limitation",
+        "followups": [
+          "3D Gaussian Map",
+          "UAGM"
+        ],
+        "confidence": "high"
+      },
+      {
+        "id": "ver-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Manhattan layout and static frozen geometry supervision are untested under pose drift, movable objects and non-Manhattan scenes in the inspected navigation table.",
+        "evidence": "AUTHOR assumptions §3; DEDUCTION",
+        "kind": "insufficiently tested",
+        "status": "Still unresolved in reviewed evidence",
+        "followups": [
+          "GA-VLN sensor noise"
+        ],
+        "confidence": "medium"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "hamt",
+    "short_name": "HAMT",
+    "full_title": "History Aware Multimodal Transformer for Vision-and-Language Navigation",
+    "authors": [
+      "Shizhe Chen",
+      "Pierre-Louis Guhur",
+      "Cordelia Schmid",
+      "Ivan Laptev"
+    ],
+    "year": 2021,
+    "venue_or_status": "NeurIPS 2021",
+    "bibliography_sources": [
+      {
+        "url": "https://proceedings.neurips.cc/paper/2021/hash/2e5c2cb8d13e8fba78d95211440ba326-Abstract.html",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "associated_files_reviewed": [
+      {
+        "filename": "HAMT (supplement).pdf",
+        "sha256": "04cf30a9a09f504dc01d594cd012616f7ec42dcd0b6086f1afe2e915cb93fe59",
+        "pages_read": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "scope": "All supplementary text, objective definitions, ablations, compute and qualitative captions inspected; no independent reproduction."
+      },
+      {
+        "filename": "HAMT (arXiv).pdf",
+        "sha256": "2baed3f1d02fc264398281cfd7d6bdb998cf503cc59a2713e971486566071157",
+        "pages_read": [
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23
+        ],
+        "scope": "Extended appendix checked against standalone supplement; tables renumbered, same principal experiments. Pages20–23 qualitative captions inspected; not an independent experiment."
+      }
+    ],
+    "repo_url": "https://github.com/cshizhe/VLN-HAMT",
+    "repo_commit": "c8b9ee12125f9fe36c51d2ab928fde38f7d846bd",
+    "code_files_inspected": [
+      {
+        "path": "finetune_src/models/vilmodel_cmt.py",
+        "locator": "HistoryEmbeddings lines 523–559; NavCMT lines 624–629",
+        "finding": "History encodes temporal and panoramic structure and is passed alongside current visual observations into cross-modal navigation."
+      },
+      {
+        "path": "finetune_src/r2r/agent_cmt.py",
+        "locator": "training paths lines 549 and584–602",
+        "finding": "Imitation and reinforcement updates are explicit; gradients are clipped at40 before optimizer steps."
+      },
+      {
+        "path": "pretrain_src/model/pretrain_cmt.py",
+        "locator": "task-dispatch and prediction-head definitions",
+        "finding": "Separate proxy heads implement the paper’s multi-task pretraining; this is training-time supervision, not an inference-time planner."
+      },
+      {
+        "path": "finetune_src/r2r/env.py",
+        "locator": "evaluation methods",
+        "finding": "Checked final and oracle graph-distance evaluation, supporting distinction between endpoint SR and route fidelity."
+      },
+      {
+        "path": "finetune_src/r2r/data_utils.py",
+        "locator": "feature and instruction loaders",
+        "finding": "Inspected precomputed feature/encoded-instruction loading, not an executed preprocessing pipeline."
+      },
+      {
+        "path": "finetune_src/scripts/run_r2r.sh",
+        "locator": "released training/evaluation flags",
+        "finding": "Configuration snapshot inspected; scripts select task data, model dimensions and checkpoint paths."
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/hamt.md",
+    "key_findings": [
+      {
+        "claim": "History encodes temporal and panoramic structure and is passed alongside current visual observations into cross-modal navigation.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/cshizhe/VLN-HAMT/blob/c8b9ee12125f9fe36c51d2ab928fde38f7d846bd/finetune_src/models/vilmodel_cmt.py",
+        "locator": "HistoryEmbeddings lines 523–559; NavCMT lines 624–629"
+      },
+      {
+        "claim": "Imitation and reinforcement updates are explicit; gradients are clipped at40 before optimizer steps.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/cshizhe/VLN-HAMT/blob/c8b9ee12125f9fe36c51d2ab928fde38f7d846bd/finetune_src/r2r/agent_cmt.py",
+        "locator": "training paths lines 549 and584–602"
+      },
+      {
+        "claim": "Separate proxy heads implement the paper’s multi-task pretraining; this is training-time supervision, not an inference-time planner.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/cshizhe/VLN-HAMT/blob/c8b9ee12125f9fe36c51d2ab928fde38f7d846bd/pretrain_src/model/pretrain_cmt.py",
+        "locator": "task-dispatch and prediction-head definitions"
+      },
+      {
+        "claim": "Checked final and oracle graph-distance evaluation, supporting distinction between endpoint SR and route fidelity.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/cshizhe/VLN-HAMT/blob/c8b9ee12125f9fe36c51d2ab928fde38f7d846bd/finetune_src/r2r/env.py",
+        "locator": "evaluation methods"
+      },
+      {
+        "claim": "Inspected precomputed feature/encoded-instruction loading, not an executed preprocessing pipeline.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/cshizhe/VLN-HAMT/blob/c8b9ee12125f9fe36c51d2ab928fde38f7d846bd/finetune_src/r2r/data_utils.py",
+        "locator": "feature and instruction loaders"
+      },
+      {
+        "claim": "Configuration snapshot inspected; scripts select task data, model dimensions and checkpoint paths.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/cshizhe/VLN-HAMT/blob/c8b9ee12125f9fe36c51d2ab928fde38f7d846bd/finetune_src/scripts/run_r2r.sh",
+        "locator": "released training/evaluation flags"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "hamt-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "History storage grows with episode length and temporal attention remains quadratic in t.",
+        "evidence": "PDF §3 hierarchy and complexity discussion pp 3–5",
+        "kind": "architectural",
+        "status": "Partially addressed",
+        "followups": [
+          "DUET topological map aggregation",
+          "GridMM spatial memory"
+        ],
+        "confidence": "high"
+      },
+      {
+        "id": "hamt-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "A local candidate policy must discover its own multi-step return decisions even with rich history; explicit graph routing is not present.",
+        "evidence": "PDF action prediction pp 4–5; inspected NavCMT",
+        "kind": "methodological",
+        "status": "Partially addressed",
+        "followups": [
+          "DUET global graph actions"
+        ],
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://github.com/cshizhe/VLN-DUET",
+      "https://github.com/MrZihan/GridMM"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "vlnbert",
+    "short_name": "VLN-BERT",
+    "full_title": "VLN BERT: A Recurrent Vision-and-Language BERT for Navigation",
+    "authors": [
+      "Yicong Hong",
+      "Qi Wu",
+      "Yuankai Qi",
+      "Cristian Rodriguez-Opazo",
+      "Stephen Gould"
+    ],
+    "year": 2021,
+    "venue_or_status": "CVPR 2021",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content/CVPR2021/papers/Hong_VLN_BERT_A_Recurrent_Vision-and-Language_BERT_for_Navigation_CVPR_2021_paper.pdf",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/YicongHong/Recurrent-VLN-BERT",
+    "repo_commit": "ad147f464ae81ef0a9eeb29dc0a0cbbcddcb1f3e",
+    "code_files_inspected": [
+      {
+        "path": "r2r_src/vlnbert/vlnbert_PREVALENT.py",
+        "locator": "forward lines 322–327 and mode dispatch near384",
+        "finding": "The recurrent state is concatenated with current visual features for the visual/cross-modal branch."
+      },
+      {
+        "path": "r2r_src/agent.py",
+        "locator": "lines 527–544",
+        "finding": "Imitation and RL losses are optimized with gradient clipping40."
+      },
+      {
+        "path": "r2r_src/eval.py",
+        "locator": "Evaluation scoring functions",
+        "finding": "Scoring computes endpoint and path measures; no instruction counterfactual evaluation is implemented in the inspected evaluator."
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/vlnbert.md",
+    "key_findings": [
+      {
+        "claim": "The recurrent state is concatenated with current visual features for the visual/cross-modal branch.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/YicongHong/Recurrent-VLN-BERT/blob/ad147f464ae81ef0a9eeb29dc0a0cbbcddcb1f3e/r2r_src/vlnbert/vlnbert_PREVALENT.py",
+        "locator": "forward lines 322–327 and mode dispatch near384"
+      },
+      {
+        "claim": "Imitation and RL losses are optimized with gradient clipping40.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/YicongHong/Recurrent-VLN-BERT/blob/ad147f464ae81ef0a9eeb29dc0a0cbbcddcb1f3e/r2r_src/agent.py",
+        "locator": "lines 527–544"
+      },
+      {
+        "claim": "Scoring computes endpoint and path measures; no instruction counterfactual evaluation is implemented in the inspected evaluator.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/YicongHong/Recurrent-VLN-BERT/blob/ad147f464ae81ef0a9eeb29dc0a0cbbcddcb1f3e/r2r_src/eval.py",
+        "locator": "Evaluation scoring functions"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "vlnbert-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "A fixed-dimensional state must compress the full trajectory, so histories requiring distinct decisions can become aliased.",
+        "evidence": "Eq 12–13 and recurrent state architecture; this is a capacity deduction, not a demonstrated universal failure",
+        "kind": "architectural",
+        "status": "Partially addressed",
+        "followups": [
+          "HAMT explicit history",
+          "DUET graph memory"
+        ],
+        "confidence": "medium"
+      },
+      {
+        "id": "vlnbert-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Headline accuracy depends strongly on pretrained initialization; pure architecture claims need matched initialization/data controls.",
+        "evidence": "Table 1 p 6 random versus OSCAR/PREVALENT",
+        "kind": "experimental confounding",
+        "status": "Partially addressed",
+        "followups": [
+          "HAMT Table 2 matched-feature comparison"
+        ],
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://github.com/cshizhe/VLN-HAMT"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "airbert",
+    "short_name": "AirBERT",
+    "full_title": "Airbert: In-Domain Pretraining for Vision-and-Language Navigation",
+    "authors": [
+      "Pierre-Louis Guhur",
+      "Makarand Tapaswi",
+      "Shizhe Chen",
+      "Ivan Laptev",
+      "Cordelia Schmid"
+    ],
+    "year": 2021,
+    "venue_or_status": "ICCV 2021",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content/ICCV2021/html/Guhur_Airbert_In-Domain_Pretraining_for_Vision-and-Language_Navigation_ICCV_2021_paper.html",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/airbert-vln/airbert",
+    "repo_commit": "34f533dba3f2a78cc111e40e5ffd46315a349f1b",
+    "code_files_inspected": [
+      {
+        "path": "airbert.py",
+        "locator": "forward nearline62",
+        "finding": "The model consumes text tokens and image-region features for multimodal scoring."
+      },
+      {
+        "path": "utils/dataset/bnb_dataset.py",
+        "locator": "load_shuffler284–286; caption construction288 onward; negatives536 and587–593",
+        "finding": "Shufflers produce negative captions/images and return them with positives, confirming the supervision mechanism."
+      },
+      {
+        "path": "train_bnb.py",
+        "locator": "training entrypoint and loss aggregation",
+        "finding": "Pretraining is an optimization stage; inference is not training-free use of an unchanged general VLM."
+      },
+      {
+        "path": "test.py",
+        "locator": "125–192",
+        "finding": "Reranks externally supplied beams; test conversion explicitly prepends exploration_path. This confirms long exploration belongs in comparison cost."
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/airbert.md",
+    "key_findings": [
+      {
+        "claim": "The model consumes text tokens and image-region features for multimodal scoring.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/airbert-vln/airbert/blob/34f533dba3f2a78cc111e40e5ffd46315a349f1b/airbert.py",
+        "locator": "forward nearline62"
+      },
+      {
+        "claim": "Shufflers produce negative captions/images and return them with positives, confirming the supervision mechanism.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/airbert-vln/airbert/blob/34f533dba3f2a78cc111e40e5ffd46315a349f1b/utils/dataset/bnb_dataset.py",
+        "locator": "load_shuffler284–286; caption construction288 onward; negatives536 and587–593"
+      },
+      {
+        "claim": "Pretraining is an optimization stage; inference is not training-free use of an unchanged general VLM.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/airbert-vln/airbert/blob/34f533dba3f2a78cc111e40e5ffd46315a349f1b/train_bnb.py",
+        "locator": "training entrypoint and loss aggregation"
+      },
+      {
+        "claim": "Reranks externally supplied beams; test conversion explicitly prepends exploration_path. This confirms long exploration belongs in comparison cost.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/airbert-vln/airbert/blob/34f533dba3f2a78cc111e40e5ffd46315a349f1b/test.py",
+        "locator": "125–192"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "airbert-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Listing membership and shuffled order do not guarantee a valid navigable transition or faithful directional language.",
+        "evidence": "Pseudo-path construction §3; Table 5 direction errors",
+        "kind": "data/methodological",
+        "status": "Partially addressed",
+        "followups": [
+          "RoomTour3D video/geometry data",
+          "ScaleVLN rendered traversable environments",
+          "SRDF consistency filtering"
+        ],
+        "confidence": "high"
+      },
+      {
+        "id": "airbert-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Exploration reranking obtains high SR at extreme movement cost; compare physically charged trajectories and SPL.",
+        "evidence": "Table 8 SR 77/TL 687/SPL 0.01",
+        "kind": "inference cost",
+        "status": "Partially addressed",
+        "followups": [
+          "DUET single-run global navigation"
+        ],
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://roomtour3d.github.io",
+      "https://github.com/wz0919/ScaleVLN"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "prevalent",
+    "short_name": "PREVALENT",
+    "full_title": "Towards Learning a Generic Agent for Vision-and-Language Navigation via Pre-Training",
+    "authors": [
+      "Weituo Hao",
+      "Chunyuan Li",
+      "Xiujun Li",
+      "Lawrence Carin",
+      "Jianfeng Gao"
+    ],
+    "year": 2020,
+    "venue_or_status": "CVPR 2020",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content_CVPR_2020/papers/Hao_Towards_Learning_a_Generic_Agent_for_Vision-and-Language_Navigation_via_Pre-Training_CVPR_2020_paper.pdf",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/weituo12321/PREVALENT",
+    "repo_commit": "4ccf59be11a9f7fb6b28f43631fd147edbaecf37",
+    "code_files_inspected": [
+      {
+        "path": "r2r_src/r2rpretrain_class.py",
+        "locator": "104–145",
+        "finding": "Application repository has MLM/action heads with positive CE sum; this is inspected source, not a full reproduction of original pretraining.",
+        "repo_url": "https://github.com/weituo12321/PREVALENT_R2R",
+        "commit": "868fb53d6b7978bbb10439a59e65044c811ee5c2"
+      },
+      {
+        "path": "r2r_src/agent.py",
+        "locator": "167–174;353–503",
+        "finding": "Listener training combines teacher CE and actor-critic policy/value/entropy terms.",
+        "repo_url": "https://github.com/weituo12321/PREVALENT_R2R",
+        "commit": "868fb53d6b7978bbb10439a59e65044c811ee5c2"
+      },
+      {
+        "path": "r2r_src/eval.py",
+        "locator": "51–107",
+        "finding": "Final/nearest goal distances and graph path length yield SR/OSR/SPL.",
+        "repo_url": "https://github.com/weituo12321/PREVALENT_R2R",
+        "commit": "868fb53d6b7978bbb10439a59e65044c811ee5c2"
+      },
+      {
+        "path": "r2r_src/train.py",
+        "locator": "181–250;444–479",
+        "finding": "Training loop, validation-SPL checkpoint selection and split/vocabulary construction.",
+        "repo_url": "https://github.com/weituo12321/PREVALENT_R2R",
+        "commit": "868fb53d6b7978bbb10439a59e65044c811ee5c2"
+      },
+      {
+        "path": "run/agent.bash",
+        "locator": "1–9",
+        "finding": "Sample-feedback listener configuration, RMS optimizer and80k iterations; exact pretrained model branch must be checked before reproduction.",
+        "repo_url": "https://github.com/weituo12321/PREVALENT_R2R",
+        "commit": "868fb53d6b7978bbb10439a59e65044c811ee5c2"
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/prevalent.md",
+    "key_findings": [
+      {
+        "claim": "Application repository has MLM/action heads with positive CE sum; this is inspected source, not a full reproduction of original pretraining.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/weituo12321/PREVALENT_R2R/blob/868fb53d6b7978bbb10439a59e65044c811ee5c2/r2r_src/r2rpretrain_class.py",
+        "locator": "104–145"
+      },
+      {
+        "claim": "Listener training combines teacher CE and actor-critic policy/value/entropy terms.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/weituo12321/PREVALENT_R2R/blob/868fb53d6b7978bbb10439a59e65044c811ee5c2/r2r_src/agent.py",
+        "locator": "167–174;353–503"
+      },
+      {
+        "claim": "Final/nearest goal distances and graph path length yield SR/OSR/SPL.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/weituo12321/PREVALENT_R2R/blob/868fb53d6b7978bbb10439a59e65044c811ee5c2/r2r_src/eval.py",
+        "locator": "51–107"
+      },
+      {
+        "claim": "Training loop, validation-SPL checkpoint selection and split/vocabulary construction.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/weituo12321/PREVALENT_R2R/blob/868fb53d6b7978bbb10439a59e65044c811ee5c2/r2r_src/train.py",
+        "locator": "181–250;444–479"
+      },
+      {
+        "claim": "Sample-feedback listener configuration, RMS optimizer and80k iterations; exact pretrained model branch must be checked before reproduction.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/weituo12321/PREVALENT_R2R/blob/868fb53d6b7978bbb10439a59e65044c811ee5c2/run/agent.bash",
+        "locator": "1–9"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "prevalent-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Current-state action pretraining does not explicitly resolve visually aliased states requiring past observations.",
+        "evidence": "§3 image–text–action triplet objective",
+        "kind": "architectural/training",
+        "status": "Partially addressed",
+        "followups": [
+          "Recurrent VLN-BERT",
+          "HAMT"
+        ],
+        "confidence": "high"
+      },
+      {
+        "id": "prevalent-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Millions of synthetic triplets still originate from a restricted set of environments and an imperfect speaker.",
+        "evidence": "§4 pretraining data",
+        "kind": "data",
+        "status": "Partially addressed",
+        "followups": [
+          "ScaleVLN environment expansion",
+          "SRDF iterative consistency filtering"
+        ],
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://github.com/weituo12321/PREVALENT_R2R",
+      "https://github.com/YicongHong/Recurrent-VLN-BERT"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "speakerfollower",
+    "short_name": "Speaker-Follower",
+    "full_title": "Speaker-Follower Models for Vision-and-Language Navigation",
+    "authors": [
+      "Daniel Fried",
+      "Ronghang Hu",
+      "Volkan Cirik",
+      "Anna Rohrbach",
+      "Jacob Andreas",
+      "Louis-Philippe Morency",
+      "Taylor Berg-Kirkpatrick",
+      "Kate Saenko",
+      "Dan Klein",
+      "Trevor Darrell"
+    ],
+    "year": 2018,
+    "venue_or_status": "NeurIPS 2018",
+    "bibliography_sources": [
+      {
+        "url": "https://proceedings.neurips.cc/paper_files/paper/2018/file/6a81681a7af700c6385d36577ebec359-Paper.pdf",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/ronghanghu/speaker_follower",
+    "repo_commit": "e4dcdf923ecacf7893397bd9821377e71e32a75a",
+    "code_files_inspected": [
+      {
+        "path": "tasks/R2R/speaker.py",
+        "locator": "lines 179–182",
+        "finding": "Speaker score sums token log likelihoods and trains with token NLL."
+      },
+      {
+        "path": "tasks/R2R/follower.py",
+        "locator": "rollout lines 430–538; state-factored search",
+        "finding": "Follower trains on action CE and maintains recurrent state during rollout/search."
+      },
+      {
+        "path": "tasks/R2R/rational_follower.py",
+        "locator": "lines 85–106, 131–150",
+        "finding": "Physical path reconstruction is distinct from weighted speaker/follower candidate reranking; tested speaker weights include0.95."
+      },
+      {
+        "path": "tasks/R2R/data_augmentation_from_speaker.py",
+        "locator": "entry_point lines 35–83",
+        "finding": "Speaker-generated and scored candidates form augmentation output."
+      },
+      {
+        "path": "tasks/R2R/eval.py",
+        "locator": "56–138",
+        "finding": "Scores endpoint/oracle distances and full trajectory length; candidate reranking and search cost should not be collapsed into greedy performance."
+      },
+      {
+        "path": "tasks/R2R/train.py",
+        "locator": "68–138;174–233",
+        "finding": "Training driver configures data augmentation, training split, vocabulary and validation separately."
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/speakerfollower.md",
+    "key_findings": [
+      {
+        "claim": "Speaker score sums token log likelihoods and trains with token NLL.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/ronghanghu/speaker_follower/blob/e4dcdf923ecacf7893397bd9821377e71e32a75a/tasks/R2R/speaker.py",
+        "locator": "lines 179–182"
+      },
+      {
+        "claim": "Follower trains on action CE and maintains recurrent state during rollout/search.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/ronghanghu/speaker_follower/blob/e4dcdf923ecacf7893397bd9821377e71e32a75a/tasks/R2R/follower.py",
+        "locator": "rollout lines 430–538; state-factored search"
+      },
+      {
+        "claim": "Physical path reconstruction is distinct from weighted speaker/follower candidate reranking; tested speaker weights include0.95.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/ronghanghu/speaker_follower/blob/e4dcdf923ecacf7893397bd9821377e71e32a75a/tasks/R2R/rational_follower.py",
+        "locator": "lines 85–106, 131–150"
+      },
+      {
+        "claim": "Speaker-generated and scored candidates form augmentation output.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/ronghanghu/speaker_follower/blob/e4dcdf923ecacf7893397bd9821377e71e32a75a/tasks/R2R/data_augmentation_from_speaker.py",
+        "locator": "entry_point lines 35–83"
+      },
+      {
+        "claim": "Scores endpoint/oracle distances and full trajectory length; candidate reranking and search cost should not be collapsed into greedy performance.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/ronghanghu/speaker_follower/blob/e4dcdf923ecacf7893397bd9821377e71e32a75a/tasks/R2R/eval.py",
+        "locator": "56–138"
+      },
+      {
+        "claim": "Training driver configures data augmentation, training split, vocabulary and validation separately.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/ronghanghu/speaker_follower/blob/e4dcdf923ecacf7893397bd9821377e71e32a75a/tasks/R2R/train.py",
+        "locator": "68–138;174–233"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "speakerfollower-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "A high reverse-language likelihood can favor common descriptions without establishing exact route semantics; same-scene synthetic routes do not add environmental diversity.",
+        "evidence": "Speaker likelihood objective and training-scene augmentation §3",
+        "kind": "data/methodological",
+        "status": "Partially addressed",
+        "followups": [
+          "ScaleVLN",
+          "SRDF",
+          "AirBERT"
+        ],
+        "confidence": "medium"
+      },
+      {
+        "id": "speakerfollower-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Candidate search observes and traverses extra paths, creating a distinct resource protocol.",
+        "evidence": "§3 search; rational_follower physical trajectory reconstruction",
+        "kind": "inference cost",
+        "status": "Partially addressed",
+        "followups": [
+          "FAST",
+          "DUET"
+        ],
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://github.com/Kelym/FAST",
+      "https://github.com/wz0919/VLN-SRDF"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "selfmonitoring",
+    "short_name": "Self-Monitoring Agent",
+    "full_title": "Self-Monitoring Navigation Agent via Auxiliary Progress Estimation",
+    "authors": [
+      "Chih-Yao Ma",
+      "Jiasen Lu",
+      "Zuxuan Wu",
+      "Ghassan AlRegib",
+      "Zsolt Kira",
+      "Richard Socher",
+      "Caiming Xiong"
+    ],
+    "year": 2019,
+    "venue_or_status": "ICLR 2019",
+    "bibliography_sources": [
+      {
+        "url": "https://arxiv.org/pdf/1901.03035",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      14,
+      15,
+      16,
+      17,
+      18
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/chihyaoma/selfmonitoring-agent",
+    "repo_commit": "28174ef695fb2483130cb00708ac306e465613ef",
+    "code_files_inspected": [
+      {
+        "path": "tasks/R2R-pano/agents/pano_agent.py",
+        "locator": "lines 156–181",
+        "finding": "Target is normalized start-to-goal distance improvement, with≤3m override and positive MSELoss."
+      },
+      {
+        "path": "tasks/R2R-pano/agents/pano_agent.py",
+        "locator": "lines 311–329 and602–634",
+        "finding": "Positive weighted CE/MSE training; inference compares progress scores and records exploration/rollback."
+      },
+      {
+        "path": "tasks/R2R-pano/models/policy_model.py",
+        "locator": "co-grounding forward definitions lines 57 onward",
+        "finding": "Visual candidate and language attentions feed the recurrent action policy."
+      },
+      {
+        "path": "tasks/R2R-pano/trainer.py",
+        "locator": "28–70",
+        "finding": "Loads training ground-truth paths, selects the model-specific rollout, and backpropagates the returned loss."
+      },
+      {
+        "path": "tasks/R2R-pano/eval.py",
+        "locator": "43–95",
+        "finding": "Final endpoint and nearest visited viewpoint determine success/oracle success; explicit path distances are scored."
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/selfmonitoring.md",
+    "key_findings": [
+      {
+        "claim": "Target is normalized start-to-goal distance improvement, with≤3m override and positive MSELoss.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/chihyaoma/selfmonitoring-agent/blob/28174ef695fb2483130cb00708ac306e465613ef/tasks/R2R-pano/agents/pano_agent.py",
+        "locator": "lines 156–181"
+      },
+      {
+        "claim": "Positive weighted CE/MSE training; inference compares progress scores and records exploration/rollback.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/chihyaoma/selfmonitoring-agent/blob/28174ef695fb2483130cb00708ac306e465613ef/tasks/R2R-pano/agents/pano_agent.py",
+        "locator": "lines 311–329 and602–634"
+      },
+      {
+        "claim": "Visual candidate and language attentions feed the recurrent action policy.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/chihyaoma/selfmonitoring-agent/blob/28174ef695fb2483130cb00708ac306e465613ef/tasks/R2R-pano/models/policy_model.py",
+        "locator": "co-grounding forward definitions lines 57 onward"
+      },
+      {
+        "claim": "Loads training ground-truth paths, selects the model-specific rollout, and backpropagates the returned loss.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/chihyaoma/selfmonitoring-agent/blob/28174ef695fb2483130cb00708ac306e465613ef/tasks/R2R-pano/trainer.py",
+        "locator": "28–70"
+      },
+      {
+        "claim": "Final endpoint and nearest visited viewpoint determine success/oracle success; explicit path distances are scored.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/chihyaoma/selfmonitoring-agent/blob/28174ef695fb2483130cb00708ac306e465613ef/tasks/R2R-pano/eval.py",
+        "locator": "43–95"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "selfmonitoring-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Distance progress conflates geometric goal approach with following an instruction that may require a detour or intermediate landmark.",
+        "evidence": "Target formula/code lines 156–169; deduction for non-shortest instructions",
+        "kind": "supervision",
+        "status": "Partially addressed",
+        "followups": [
+          "Regretful Agent",
+          "RxR longer path-faithfulness tasks"
+        ],
+        "confidence": "high"
+      },
+      {
+        "id": "selfmonitoring-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Progress is not calibrated as a completion probability and search gains incur physical backtracking.",
+        "evidence": "Tanh regression target; Table 1 protocol",
+        "kind": "methodological/inference cost",
+        "status": "Partially addressed",
+        "followups": [
+          "FAST",
+          "DUET"
+        ],
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://github.com/chihyaoma/regretful-agent",
+      "https://github.com/Kelym/FAST"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "regretful",
+    "short_name": "Regretful Agent",
+    "full_title": "The Regretful Agent: Heuristic-Aided Navigation Through Progress Estimation",
+    "authors": [
+      "Chih-Yao Ma",
+      "Zuxuan Wu",
+      "Ghassan AlRegib",
+      "Caiming Xiong",
+      "Zsolt Kira"
+    ],
+    "year": 2019,
+    "venue_or_status": "CVPR 2019",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content_CVPR_2019/html/Ma_The_Regretful_Agent_Heuristic-Aided_Navigation_Through_Progress_Estimation_CVPR_2019_paper.html",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/chihyaoma/regretful-agent",
+    "repo_commit": "5caf7b500667981bc7064e4d31b49e83db64c95a",
+    "code_files_inspected": [
+      {
+        "path": "tasks/R2R-pano/models/policy_model.py",
+        "locator": "lines 126–157",
+        "finding": "Detached progress difference drives2-way rollback attention; current-minus-stored progress features affect action logits."
+      },
+      {
+        "path": "tasks/R2R-pano/agents/pano_agent.py",
+        "locator": "lines 381–437",
+        "finding": "Per-episode dictionary tracks node progress; positive MSE/CE plus negative-entropy regularization trains the agent."
+      },
+      {
+        "path": "tasks/R2R-pano/trainer.py",
+        "locator": "27–70",
+        "finding": "Loads training ground-truth paths, selects the model-specific rollout, and backpropagates the returned loss."
+      },
+      {
+        "path": "tasks/R2R-pano/eval.py",
+        "locator": "43–95",
+        "finding": "Final endpoint and nearest visited viewpoint determine success/oracle success; explicit path distances are scored."
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/regretful.md",
+    "key_findings": [
+      {
+        "claim": "Detached progress difference drives2-way rollback attention; current-minus-stored progress features affect action logits.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/chihyaoma/regretful-agent/blob/5caf7b500667981bc7064e4d31b49e83db64c95a/tasks/R2R-pano/models/policy_model.py",
+        "locator": "lines 126–157"
+      },
+      {
+        "claim": "Per-episode dictionary tracks node progress; positive MSE/CE plus negative-entropy regularization trains the agent.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/chihyaoma/regretful-agent/blob/5caf7b500667981bc7064e4d31b49e83db64c95a/tasks/R2R-pano/agents/pano_agent.py",
+        "locator": "lines 381–437"
+      },
+      {
+        "claim": "Loads training ground-truth paths, selects the model-specific rollout, and backpropagates the returned loss.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/chihyaoma/regretful-agent/blob/5caf7b500667981bc7064e4d31b49e83db64c95a/tasks/R2R-pano/trainer.py",
+        "locator": "27–70"
+      },
+      {
+        "claim": "Final endpoint and nearest visited viewpoint determine success/oracle success; explicit path distances are scored.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/chihyaoma/regretful-agent/blob/5caf7b500667981bc7064e4d31b49e83db64c95a/tasks/R2R-pano/eval.py",
+        "locator": "43–95"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "regretful-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Local rollback and an oscillation mask do not provide multi-step global route planning; distance progress can misclassify valid detours.",
+        "evidence": "§4 policy and distance target; code gate",
+        "kind": "methodological",
+        "status": "Partially addressed",
+        "followups": [
+          "FAST frontier search",
+          "DUET graph routing"
+        ],
+        "confidence": "high"
+      },
+      {
+        "id": "regretful-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Progress markers require reliable node identity and do not quantify map localization uncertainty.",
+        "evidence": "Dictionary keyed by simulator viewpoint",
+        "kind": "operating assumption",
+        "status": "Uncertain because evidence is insufficient",
+        "followups": [
+          "Continuous VLN mapping methods"
+        ],
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://github.com/Kelym/FAST",
+      "https://github.com/cshizhe/VLN-DUET"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "tacticalrewind",
+    "short_name": "Tactical Rewind",
+    "full_title": "Tactical Rewind: Self-Correction via Backtracking in Vision-And-Language Navigation",
+    "authors": [
+      "Liyiming Ke",
+      "Xiujun Li",
+      "Yonatan Bisk",
+      "Ari Holtzman",
+      "Zhe Gan",
+      "Jingjing Liu",
+      "Jianfeng Gao",
+      "Yejin Choi",
+      "Siddhartha Srinivasa"
+    ],
+    "year": 2019,
+    "venue_or_status": "CVPR 2019",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content_CVPR_2019/papers/Ke_Tactical_Rewind_Self-Correction_via_Backtracking_in_Vision-And-Language_Navigation_CVPR_2019_paper.pdf",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/Kelym/FAST",
+    "repo_commit": "c4f1dabb388a16d96a388d4d6c3a309047bc41e3",
+    "code_files_inspected": [
+      {
+        "path": "follower.py",
+        "locator": "lines 844–917",
+        "finding": "Tracks logit/log-prob summaries; selectively expands topK actions; routes STOP candidates to ending_queue separately from frontier nodes."
+      },
+      {
+        "path": "follower.py",
+        "locator": "lines 966–986",
+        "finding": "Goal reranker uses length/logit/log-prob/progress/speaker features, then realistic_jumping returns through the visited graph."
+      },
+      {
+        "path": "follower.py",
+        "locator": "lines 542–551 and658–666",
+        "finding": "Progress MSE and action CE training remain separate from search heuristics."
+      },
+      {
+        "path": "run_search.py",
+        "locator": "search setup and sweep entrypoints",
+        "finding": "Search settings are explicit experiment choices and must be matched in comparisons."
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/tacticalrewind.md",
+    "key_findings": [
+      {
+        "claim": "Tracks logit/log-prob summaries; selectively expands topK actions; routes STOP candidates to ending_queue separately from frontier nodes.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/Kelym/FAST/blob/c4f1dabb388a16d96a388d4d6c3a309047bc41e3/follower.py",
+        "locator": "lines 844–917"
+      },
+      {
+        "claim": "Goal reranker uses length/logit/log-prob/progress/speaker features, then realistic_jumping returns through the visited graph.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/Kelym/FAST/blob/c4f1dabb388a16d96a388d4d6c3a309047bc41e3/follower.py",
+        "locator": "lines 966–986"
+      },
+      {
+        "claim": "Progress MSE and action CE training remain separate from search heuristics.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/Kelym/FAST/blob/c4f1dabb388a16d96a388d4d6c3a309047bc41e3/follower.py",
+        "locator": "lines 542–551 and658–666"
+      },
+      {
+        "claim": "Search settings are explicit experiment choices and must be matched in comparisons.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/Kelym/FAST/blob/c4f1dabb388a16d96a388d4d6c3a309047bc41e3/run_search.py",
+        "locator": "search setup and sweep entrypoints"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "tacticalrewind-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Higher success consumes far more movement; a fixed expansion budget is not adaptive value-of-information control.",
+        "evidence": "Table 1 short/long comparison",
+        "kind": "inference cost",
+        "status": "Partially addressed",
+        "followups": [
+          "DUET global single-run policy"
+        ],
+        "confidence": "high"
+      },
+      {
+        "id": "tacticalrewind-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Raw-logit heuristic is sensitive to arbitrary state-dependent offsets even when local action probabilities are unchanged.",
+        "evidence": "L definition §2; softmax invariance deduction; no empirical claim",
+        "kind": "score identifiability",
+        "status": "Still unresolved in reviewed evidence; broader frontier audit required",
+        "followups": [],
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://github.com/cshizhe/VLN-DUET"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "rcm",
+    "short_name": "RCM",
+    "full_title": "Reinforced Cross-Modal Matching and Self-Supervised Imitation Learning for Vision-Language Navigation",
+    "authors": [
+      "Xin Wang",
+      "Qiuyuan Huang",
+      "Asli Celikyilmaz",
+      "Jianfeng Gao",
+      "Dinghan Shen",
+      "Yuan-Fang Wang",
+      "William Yang Wang",
+      "Lei Zhang"
+    ],
+    "year": 2019,
+    "venue_or_status": "CVPR 2019",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content_CVPR_2019/html/Wang_Reinforced_Cross-Modal_Matching_and_Self-Supervised_Imitation_Learning_for_Vision-Language_Navigation_CVPR_2019_paper.html",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": null,
+    "repo_commit": null,
+    "code_files_inspected": [],
+    "code_executed": false,
+    "repository_status": "No executable implementation located in bounded search",
+    "dossier_path": "dossiers/rcm.md",
+    "key_findings": [
+      {
+        "claim": "Figure 6 shows high matching reward for both a successful trajectory and an incorrectly stopped trajectory, directly showing that this reward is not a correctness certificate.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "https://openaccess.thecvf.com/content_CVPR_2019/html/Wang_Reinforced_Cross-Modal_Matching_and_Self-Supervised_Imitation_Learning_for_Vision-Language_Navigation_CVPR_2019_paper.html",
+        "locator": "Figure 6, PDF p 8"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "rcm-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Learned critic and policy can agree on semantically wrong but likely trajectories; no independent entailment guarantee is supplied.",
+        "evidence": "Matching likelihood and SIL replay §3; Figure 6/PDF p 8 explicitly shows high intrinsic reward despite incorrect stopping",
+        "kind": "self-training/verifier bias",
+        "status": "Partially addressed",
+        "followups": [
+          "SRDF bidirectional consistency filtering",
+          "CAST counterfactual relabeling lead"
+        ],
+        "confidence": "high for the published counterexample; unknown frequency"
+      },
+      {
+        "id": "rcm-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Unseen-environment SIL trades zero-shot generalization for target-environment interaction/training.",
+        "evidence": "Table 1 evaluation footnote and SIL setup",
+        "kind": "protocol/resource tradeoff",
+        "status": "Shifted into another cost or limitation",
+        "followups": [
+          "IVLN persistent experience",
+          "test-time adaptation methods"
+        ],
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://github.com/wz0919/VLN-SRDF",
+      "https://arxiv.org/abs/2508.13446"
+    ],
+    "access_limitations": [
+      "Official code not located in documented search scope; this is not a claim that none exists. No benchmark executed.\n\nThe coordinator checked Xin Wang’s primary homepage (https://eric-xw.github.io/), whose RCM entry links paper/video/bibliography but no Code link. Nearby entries explicitly link code. This supports the bounded “official executable implementation not located” status, not a claim of universal nonexistence. The same page lists the TPAMI2020 extension Vision-Language Navigation Policy Learning and Adaptation as a follow-up lead."
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "r2r",
+    "short_name": "R2R",
+    "full_title": "Vision-and-Language Navigation: Interpreting Visually-Grounded Navigation Instructions in Real Environments",
+    "authors": [
+      "Peter Anderson",
+      "Qi Wu",
+      "Damien Teney",
+      "Jake Bruce",
+      "Mark Johnson",
+      "Niko Sünderhauf",
+      "Ian Reid",
+      "Stephen Gould",
+      "Anton van den Hengel"
+    ],
+    "year": 2018,
+    "venue_or_status": "CVPR 2018",
+    "bibliography_sources": [
+      {
+        "url": "https://arxiv.org/abs/1711.07280",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/peteanderson80/Matterport3DSimulator",
+    "repo_commit": "589d091b111333f9e9f9d6cfd021b2eb68435925",
+    "code_files_inspected": [
+      {
+        "path": "tasks/R2R/agent.py",
+        "locator": "Seq2SeqAgent action definitions and rollout",
+        "finding": "Low-level turn/look/forward/end actions are distinct from later panoramic neighbor actions."
+      },
+      {
+        "path": "tasks/R2R/model.py",
+        "locator": "EncoderLSTM and attention decoder",
+        "finding": "Sequence encoder and image-conditioned recurrent decoder implement the original baseline."
+      },
+      {
+        "path": "tasks/R2R/eval.py",
+        "locator": "Evaluation._score_item and score",
+        "finding": "Uses shortest-path graph distance for endpoint and oracle proximity."
+      },
+      {
+        "path": "tasks/R2R/utils.py",
+        "locator": "19–120",
+        "finding": "Loads connectivity with Euclidean edge weights; tokenizes/lowercases, reverses words and constructs training vocabulary."
+      },
+      {
+        "path": "tasks/R2R/train.py",
+        "locator": "45–101;105–151",
+        "finding": "Distinct train-validation and test-submission routines; the latter intentionally combines train/validation data, so it must not be reused to report held-out validation results."
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/r2r.md",
+    "key_findings": [
+      {
+        "claim": "Low-level turn/look/forward/end actions are distinct from later panoramic neighbor actions.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/peteanderson80/Matterport3DSimulator/blob/589d091b111333f9e9f9d6cfd021b2eb68435925/tasks/R2R/agent.py",
+        "locator": "Seq2SeqAgent action definitions and rollout"
+      },
+      {
+        "claim": "Sequence encoder and image-conditioned recurrent decoder implement the original baseline.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/peteanderson80/Matterport3DSimulator/blob/589d091b111333f9e9f9d6cfd021b2eb68435925/tasks/R2R/model.py",
+        "locator": "EncoderLSTM and attention decoder"
+      },
+      {
+        "claim": "Uses shortest-path graph distance for endpoint and oracle proximity.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/peteanderson80/Matterport3DSimulator/blob/589d091b111333f9e9f9d6cfd021b2eb68435925/tasks/R2R/eval.py",
+        "locator": "Evaluation._score_item and score"
+      },
+      {
+        "claim": "Loads connectivity with Euclidean edge weights; tokenizes/lowercases, reverses words and constructs training vocabulary.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/peteanderson80/Matterport3DSimulator/blob/589d091b111333f9e9f9d6cfd021b2eb68435925/tasks/R2R/utils.py",
+        "locator": "19–120"
+      },
+      {
+        "claim": "Distinct train-validation and test-submission routines; the latter intentionally combines train/validation data, so it must not be reused to report held-out validation results.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/peteanderson80/Matterport3DSimulator/blob/589d091b111333f9e9f9d6cfd021b2eb68435925/tasks/R2R/train.py",
+        "locator": "45–101;105–151"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "r2r-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Endpoint success can coexist with failure to follow an intended route; OSR–SR cannot isolate softmax competition, grounding, exploration, or goal-estimation causes.",
+        "evidence": "Annotation instructions p 5 and metric definitions p 6",
+        "kind": "evaluation/task scope",
+        "status": "Partially addressed",
+        "followups": [
+          "RxR dense path grounding",
+          "nDTW/SDTW evaluation",
+          "REVERIE object grounding"
+        ],
+        "confidence": "high"
+      },
+      {
+        "id": "r2r-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Static panoramas, known graph adjacency and exact viewpoint state bypass perception/control/localization failures encountered by robots.",
+        "evidence": "Simulator construction pp 3–4",
+        "kind": "operating assumption",
+        "status": "Partially addressed",
+        "followups": [
+          "VLN-CE",
+          "Cross-Modal Map Learning",
+          "BEVBert/VER continuous variants"
+        ],
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://github.com/google-research-datasets/RxR",
+      "https://github.com/YuankaiQi/REVERIE"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "crossmodalmap",
+    "short_name": "CM2",
+    "full_title": "Cross-Modal Map Learning for Vision and Language Navigation",
+    "authors": [
+      "Georgios Georgakis",
+      "Karl Schmeckpeper",
+      "Karan Wanchoo",
+      "Soham Dan",
+      "Eleni Miltsakaki",
+      "Dan Roth",
+      "Kostas Daniilidis"
+    ],
+    "year": 2022,
+    "venue_or_status": "CVPR 2022",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content/CVPR2022/papers/Georgakis_Cross-Modal_Map_Learning_for_Vision_and_Language_Navigation_CVPR_2022_paper.pdf",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/ggeorgak11/CM2",
+    "repo_commit": "4730cfdf49c468d6632fff03ecc9cee9955e7dee",
+    "code_files_inspected": [
+      {
+        "path": "models/vln_goal_predictor.py",
+        "locator": "coverage_loss89–102; position_loss106–126",
+        "finding": "Two-class coverage CE and visibility-masked heatmap MSE."
+      },
+      {
+        "path": "models/semantic_grid.py",
+        "locator": "spatial-transform and map update methods",
+        "finding": "Map construction uses pose-aligned spatial transformations."
+      },
+      {
+        "path": "datasets/util/map_utils.py",
+        "locator": "projection and heatmap helpers",
+        "finding": "Training labels and observations use explicit metric coordinates."
+      },
+      {
+        "path": "trainer_vln.py",
+        "locator": "training loss aggregation",
+        "finding": "Waypoint and map objectives are optimized together."
+      },
+      {
+        "path": "trainer_vln.py",
+        "locator": "24–75",
+        "finding": "Offline dataset, Adam optimization, and summed waypoint-position plus coverage losses."
+      },
+      {
+        "path": "tester.py",
+        "locator": "260–298",
+        "finding": "Stops by predicted goal distance or time limit; local-policy STOP is replaced by random motion, and final metric helper is called with stop_signal=True. This protocol must be replicated before comparisons."
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/crossmodalmap.md",
+    "key_findings": [
+      {
+        "claim": "Two-class coverage CE and visibility-masked heatmap MSE.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/ggeorgak11/CM2/blob/4730cfdf49c468d6632fff03ecc9cee9955e7dee/models/vln_goal_predictor.py",
+        "locator": "coverage_loss89–102; position_loss106–126"
+      },
+      {
+        "claim": "Map construction uses pose-aligned spatial transformations.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/ggeorgak11/CM2/blob/4730cfdf49c468d6632fff03ecc9cee9955e7dee/models/semantic_grid.py",
+        "locator": "spatial-transform and map update methods"
+      },
+      {
+        "claim": "Training labels and observations use explicit metric coordinates.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/ggeorgak11/CM2/blob/4730cfdf49c468d6632fff03ecc9cee9955e7dee/datasets/util/map_utils.py",
+        "locator": "projection and heatmap helpers"
+      },
+      {
+        "claim": "Waypoint and map objectives are optimized together.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/ggeorgak11/CM2/blob/4730cfdf49c468d6632fff03ecc9cee9955e7dee/trainer_vln.py",
+        "locator": "training loss aggregation"
+      },
+      {
+        "claim": "Offline dataset, Adam optimization, and summed waypoint-position plus coverage losses.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/ggeorgak11/CM2/blob/4730cfdf49c468d6632fff03ecc9cee9955e7dee/trainer_vln.py",
+        "locator": "24–75"
+      },
+      {
+        "claim": "Stops by predicted goal distance or time limit; local-policy STOP is replaced by random motion, and final metric helper is called with stop_signal=True. This protocol must be replicated before comparisons.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/ggeorgak11/CM2/blob/4730cfdf49c468d6632fff03ecc9cee9955e7dee/tester.py",
+        "locator": "260–298"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "crossmodalmap-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Language-conditioned hallucination may invent unseen semantics and local 9.6m coverage excludes distant goals.",
+        "evidence": "§3.4 and local map dimensions",
+        "followups": [
+          "WS-MGMap",
+          "BEVBert",
+          "HSGM"
+        ],
+        "status": "Partially addressed",
+        "kind": "methodological",
+        "confidence": "high"
+      },
+      {
+        "id": "crossmodalmap-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "True-pose projection and fixed pretrained controller hide localization/control robustness costs.",
+        "evidence": "§3.2 ground-truth pose assumption",
+        "followups": [],
+        "status": "Uncertain because evidence is insufficient",
+        "kind": "operating assumption",
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://github.com/PeihaoChen/WS-MGMap",
+      "https://github.com/Teacher-Tom/HSGM_public"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "weakmap",
+    "short_name": "WS-MGMap",
+    "full_title": "Weakly-Supervised Multi-Granularity Map Learning for Vision-and-Language Navigation",
+    "authors": [
+      "Peihao Chen",
+      "Dongyu Ji",
+      "Kunyang Lin",
+      "Runhao Zeng",
+      "Thomas H. Li",
+      "Mingkui Tan",
+      "Chuang Gan"
+    ],
+    "year": 2022,
+    "venue_or_status": "NeurIPS 2022",
+    "bibliography_sources": [
+      {
+        "url": "https://arxiv.org/pdf/2210.07506",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      14,
+      15,
+      16,
+      17,
+      18
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/PeihaoChen/WS-MGMap",
+    "repo_commit": "e6af3c40c19010ecf07ea1d62c18c8196e37150d",
+    "code_files_inspected": [
+      {
+        "path": "vlnce_baselines/models/mg_map_policy.py",
+        "locator": "forward180–251",
+        "finding": "Projects RGB features, predicts semantic map, concatenates map features, computes text-conditioned map attention, and updates the second recurrent state."
+      },
+      {
+        "path": "vlnce_baselines/common/rgb_mapping.py",
+        "locator": "mapping update methods",
+        "finding": "Builds pose-aligned projected latent-feature memory."
+      },
+      {
+        "path": "vlnce_baselines/dagger_trainer.py",
+        "locator": "collection/training paths",
+        "finding": "DAgger is a substantive training stage rather than an inference-only map addition."
+      },
+      {
+        "path": "vlnce_baselines/config/CMA_AUG_DA_TUNE.yaml",
+        "locator": "training configuration",
+        "finding": "Defines the augmented/DAgger setup needed for matched reproduction."
+      },
+      {
+        "path": "vlnce_baselines/dagger_trainer.py",
+        "locator": "505–536",
+        "finding": "Applies tanh to2D waypoint predictions and weighted MSE to target waypoints, then adds auxiliary map/localization losses and backpropagates."
+      },
+      {
+        "path": "habitat_extensions/measures.py",
+        "locator": "320–323",
+        "finding": "Success requires task.is_stop_called and target distance below threshold."
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/weakmap.md",
+    "key_findings": [
+      {
+        "claim": "Projects RGB features, predicts semantic map, concatenates map features, computes text-conditioned map attention, and updates the second recurrent state.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/PeihaoChen/WS-MGMap/blob/e6af3c40c19010ecf07ea1d62c18c8196e37150d/vlnce_baselines/models/mg_map_policy.py",
+        "locator": "forward180–251"
+      },
+      {
+        "claim": "Builds pose-aligned projected latent-feature memory.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/PeihaoChen/WS-MGMap/blob/e6af3c40c19010ecf07ea1d62c18c8196e37150d/vlnce_baselines/common/rgb_mapping.py",
+        "locator": "mapping update methods"
+      },
+      {
+        "claim": "DAgger is a substantive training stage rather than an inference-only map addition.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/PeihaoChen/WS-MGMap/blob/e6af3c40c19010ecf07ea1d62c18c8196e37150d/vlnce_baselines/dagger_trainer.py",
+        "locator": "collection/training paths"
+      },
+      {
+        "claim": "Defines the augmented/DAgger setup needed for matched reproduction.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/PeihaoChen/WS-MGMap/blob/e6af3c40c19010ecf07ea1d62c18c8196e37150d/vlnce_baselines/config/CMA_AUG_DA_TUNE.yaml",
+        "locator": "training configuration"
+      },
+      {
+        "claim": "Applies tanh to2D waypoint predictions and weighted MSE to target waypoints, then adds auxiliary map/localization losses and backpropagates.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/PeihaoChen/WS-MGMap/blob/e6af3c40c19010ecf07ea1d62c18c8196e37150d/vlnce_baselines/dagger_trainer.py",
+        "locator": "505–536"
+      },
+      {
+        "claim": "Success requires task.is_stop_called and target distance below threshold.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/PeihaoChen/WS-MGMap/blob/e6af3c40c19010ecf07ea1d62c18c8196e37150d/habitat_extensions/measures.py",
+        "locator": "320–323"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "weakmap-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Path proximity is an imperfect proxy for the exact object referred to; salient objects can be off the path.",
+        "evidence": "KL target §3.3",
+        "followups": [
+          "OVER-NAV open-vocabulary detections",
+          "REVERIE explicit grounding"
+        ],
+        "status": "Partially addressed",
+        "kind": "supervision",
+        "confidence": "high"
+      },
+      {
+        "id": "weakmap-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Height-collapsed fixed-resolution maps and exact-pose projection lose 3D distinctions and inherit localization noise sensitivity.",
+        "evidence": "§3.2 map construction",
+        "followups": [
+          "VER",
+          "GaussianMap",
+          "GA-VLN"
+        ],
+        "status": "Partially addressed",
+        "kind": "methodological",
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://github.com/DefaultRui/VLN-VER",
+      "https://arxiv.org/abs/2403.17334"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "goat",
+    "short_name": "GOAT",
+    "full_title": "Vision-and-Language Navigation via Causal Learning",
+    "authors": [
+      "Liuyi Wang",
+      "Zongtao He",
+      "Ronghao Dang",
+      "Mengjiao Shen",
+      "Chengju Liu",
+      "Qijun Chen"
+    ],
+    "year": 2024,
+    "venue_or_status": "CVPR 2024",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content/CVPR2024/html/Wang_Vision-and-Language_Navigation_via_Causal_Learning_CVPR_2024_paper.html",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/CrystalSixone/VLN-GOAT",
+    "repo_commit": "c083bf458e6d2041fbdf91c2a8036f458faa95b4",
+    "code_files_inspected": [
+      {
+        "path": "map_nav_src/models/vilmodel_GOAT.py",
+        "locator": "lines 94–162",
+        "finding": "Frequency-weighted or attention-based dictionary features are added/gated with original text embeddings, including direct residual paths."
+      },
+      {
+        "path": "map_nav_src/do_utils/do_intervention.py",
+        "locator": "dictionary construction/extraction routines",
+        "finding": "Confounder representations are estimated from training samples, not externally randomized assignments."
+      },
+      {
+        "path": "map_nav_src/do_utils/extract_room_type.py",
+        "locator": "BLIP room-type extraction",
+        "finding": "Room labels are model predictions and can carry perception errors."
+      },
+      {
+        "path": "map_nav_src/r2r/agent.py",
+        "locator": "306–350;616–621;697",
+        "finding": "Inspected action-label/rollout loss path: categorical teacher action supervision with policy/teacher feedback; comparison requires matching expert and STOP handling."
+      },
+      {
+        "path": "pretrain_src/data/dataset.py",
+        "locator": "68–132;616–721",
+        "finding": "Inspected annotation/feature and action-target preparation; geometric/map/confounder inputs are additional data requirements where used."
+      },
+      {
+        "path": "map_nav_src/r2r/eval_utils.py",
+        "locator": "6–25",
+        "finding": "Graph-distance DTW, exponential normalization and success-weighted DTW use the inherited discrete evaluator."
+      },
+      {
+        "path": "map_nav_src/scripts/run_r2r_goat.sh",
+        "locator": "15–72",
+        "finding": "Activates front/back-door branches, updated text dictionary, generated speaker labels and augmented data; these additions must be matched in causal-module comparisons."
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/goat.md",
+    "key_findings": [
+      {
+        "claim": "Frequency-weighted or attention-based dictionary features are added/gated with original text embeddings, including direct residual paths.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/CrystalSixone/VLN-GOAT/blob/c083bf458e6d2041fbdf91c2a8036f458faa95b4/map_nav_src/models/vilmodel_GOAT.py",
+        "locator": "lines 94–162"
+      },
+      {
+        "claim": "Confounder representations are estimated from training samples, not externally randomized assignments.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/CrystalSixone/VLN-GOAT/blob/c083bf458e6d2041fbdf91c2a8036f458faa95b4/map_nav_src/do_utils/do_intervention.py",
+        "locator": "dictionary construction/extraction routines"
+      },
+      {
+        "claim": "Room labels are model predictions and can carry perception errors.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/CrystalSixone/VLN-GOAT/blob/c083bf458e6d2041fbdf91c2a8036f458faa95b4/map_nav_src/do_utils/extract_room_type.py",
+        "locator": "BLIP room-type extraction"
+      },
+      {
+        "claim": "Inspected action-label/rollout loss path: categorical teacher action supervision with policy/teacher feedback; comparison requires matching expert and STOP handling.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/CrystalSixone/VLN-GOAT/blob/c083bf458e6d2041fbdf91c2a8036f458faa95b4/map_nav_src/r2r/agent.py",
+        "locator": "306–350;616–621;697"
+      },
+      {
+        "claim": "Inspected annotation/feature and action-target preparation; geometric/map/confounder inputs are additional data requirements where used.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/CrystalSixone/VLN-GOAT/blob/c083bf458e6d2041fbdf91c2a8036f458faa95b4/pretrain_src/data/dataset.py",
+        "locator": "68–132;616–721"
+      },
+      {
+        "claim": "Graph-distance DTW, exponential normalization and success-weighted DTW use the inherited discrete evaluator.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/CrystalSixone/VLN-GOAT/blob/c083bf458e6d2041fbdf91c2a8036f458faa95b4/map_nav_src/r2r/eval_utils.py",
+        "locator": "6–25"
+      },
+      {
+        "claim": "Activates front/back-door branches, updated text dictionary, generated speaker labels and augmented data; these additions must be matched in causal-module comparisons.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/CrystalSixone/VLN-GOAT/blob/c083bf458e6d2041fbdf91c2a8036f458faa95b4/map_nav_src/scripts/run_r2r_goat.sh",
+        "locator": "15–72"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "goat-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Causal effect identification is unverified; representation regularization can improve SR without removing the hypothesized confounding.",
+        "evidence": "§3 SCM/§4 approximations; residual source path",
+        "followups": [],
+        "status": "Uncertain because evidence is insufficient",
+        "kind": "causal identification",
+        "confidence": "high"
+      },
+      {
+        "id": "goat-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Dictionary construction and multimodal attention add compute and depend on augmentation/backbone quality.",
+        "evidence": "§4–5; official README dependency note",
+        "followups": [
+          "Walk and Read Less token pruning"
+        ],
+        "status": "Partially addressed",
+        "kind": "compute/data",
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://aclanthology.org/2025.emnlp-main.1202/"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "gavln",
+    "short_name": "GA-VLN",
+    "full_title": "GA-VLN: Geometry-Aware BEV Representation for Efficient Vision-Language Navigation",
+    "authors": [
+      "Jiahao Yang",
+      "Zihan Wang",
+      "Xiangyang Li",
+      "Xing Zhu",
+      "Yujun Shen",
+      "Yinghao Xu",
+      "Shuqiang Jiang"
+    ],
+    "year": 2026,
+    "venue_or_status": "CVPR 2026",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content/CVPR2026/papers/Yang_GA-VLN_Geometry-Aware_BEV_Representation_for_Efficient_Vision-Language_Navigation_CVPR_2026_paper.pdf",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/jahhaoyang/GA-VLN",
+    "repo_commit": "cc6086b7081a346695abecf6821f827e2db44a43",
+    "code_files_inspected": [
+      {
+        "path": "gavln/model/model_gavln.py",
+        "locator": "encode_images127–261",
+        "finding": "VGGT aggregation runs under no_grad; SigLIP/VGGT features share grid accumulators and are averaged only in occupied cells before MLLM projection."
+      },
+      {
+        "path": "gavln/dataset/vln_action_dataset.py",
+        "locator": "83–154;237–318",
+        "finding": "Conversation preprocessing masks prompt tokens with IGNORE_INDEX and supplies assistant/action text labels for autoregressive supervision."
+      },
+      {
+        "path": "gavln/gavln_eval.py",
+        "locator": "178–215;412–454;456 onward",
+        "finding": "Greedy model generation is parsed into actions; Habitat metrics are recorded after rollout. Training driver was not verified from the official entry-point documentation."
+      },
+      {
+        "path": "scripts/gavln_eval.sh",
+        "locator": "6–25",
+        "finding": "Evaluation requires external checkpoints, SigLIP and VGGT paths plus distributed-launch settings."
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/gavln.md",
+    "key_findings": [
+      {
+        "claim": "VGGT aggregation runs under no_grad; SigLIP/VGGT features share grid accumulators and are averaged only in occupied cells before MLLM projection.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/jahhaoyang/GA-VLN/blob/cc6086b7081a346695abecf6821f827e2db44a43/gavln/model/model_gavln.py",
+        "locator": "encode_images127–261"
+      },
+      {
+        "claim": "Conversation preprocessing masks prompt tokens with IGNORE_INDEX and supplies assistant/action text labels for autoregressive supervision.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/jahhaoyang/GA-VLN/blob/cc6086b7081a346695abecf6821f827e2db44a43/gavln/dataset/vln_action_dataset.py",
+        "locator": "83–154;237–318"
+      },
+      {
+        "claim": "Greedy model generation is parsed into actions; Habitat metrics are recorded after rollout. Training driver was not verified from the official entry-point documentation.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/jahhaoyang/GA-VLN/blob/cc6086b7081a346695abecf6821f827e2db44a43/gavln/gavln_eval.py",
+        "locator": "178–215;412–454;456 onward"
+      },
+      {
+        "claim": "Evaluation requires external checkpoints, SigLIP and VGGT paths plus distributed-launch settings.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/jahhaoyang/GA-VLN/blob/cc6086b7081a346695abecf6821f827e2db44a43/scripts/gavln_eval.sh",
+        "locator": "6–25"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "gavln-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Pose/depth errors misregister feature memory and mean pooling collapses height and potentially conflicting observations.",
+        "evidence": "Eqs 1–5 and scatter-add implementation; Table 4/PDF p 8 partially tests additive Gaussian sensor noise",
+        "followups": [],
+        "status": "Uncertain because evidence is insufficient",
+        "kind": "representation/sensor",
+        "confidence": "high"
+      },
+      {
+        "id": "gavln-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "BEV reused for 8 actions can become stale at decision points; more history is not monotonically beneficial.",
+        "evidence": "§3.3;Table 3 history-length saturation",
+        "followups": [
+          "HSGM observation-triggered planning"
+        ],
+        "status": "Partially addressed",
+        "kind": "latency/feedback",
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://github.com/Teacher-Tom/HSGM_public"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "hsgm",
+    "short_name": "HSGM",
+    "full_title": "Bridging the 2D-3D Gap: A Hierarchical Semantic-Geometric Map for Vision Language Navigation",
+    "authors": [
+      "Kailing Li",
+      "Tianwen Qian",
+      "Lijin Yang",
+      "Yuqian Fu",
+      "Jingyu Gong",
+      "Xiaoling Wang",
+      "Liang He"
+    ],
+    "year": 2026,
+    "venue_or_status": "CVPR 2026",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content/CVPR2026/html/Li_Bridging_the_2D-3D_Gap_A_Hierarchical_Semantic-Geometric_Map_for_Vision_CVPR_2026_paper.html",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/Teacher-Tom/HSGM_public",
+    "repo_commit": "e2df6e70df869af57d77a32ba658fba04e6814eb",
+    "code_files_inspected": [
+      {
+        "path": "src/agent/agent.py",
+        "locator": "804–979;1082–1094;1646–1884",
+        "finding": "Instruction subtask state, persistent first/second STOP flags, no-movement guard, replanning and timeout rollback."
+      },
+      {
+        "path": "src/run_experiments.py",
+        "locator": "445–529;979–1120",
+        "finding": "Final-distance success/SPL and Euclidean fast-DTW; stopping/saving occurs on second_stop or maximum steps."
+      },
+      {
+        "path": "config/vlnce_test.yaml",
+        "locator": "camera and simulator configuration",
+        "finding": "Sensor FOV135 degrees, pitch−30 degrees, height 1.2m, maximum 200 steps and radius 0.1m are part of the released operating conditions."
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/hsgm.md",
+    "key_findings": [
+      {
+        "claim": "Instruction subtask state, persistent first/second STOP flags, no-movement guard, replanning and timeout rollback.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/Teacher-Tom/HSGM_public/blob/e2df6e70df869af57d77a32ba658fba04e6814eb/src/agent/agent.py",
+        "locator": "804–979;1082–1094;1646–1884"
+      },
+      {
+        "claim": "Final-distance success/SPL and Euclidean fast-DTW; stopping/saving occurs on second_stop or maximum steps.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/Teacher-Tom/HSGM_public/blob/e2df6e70df869af57d77a32ba658fba04e6814eb/src/run_experiments.py",
+        "locator": "445–529;979–1120"
+      },
+      {
+        "claim": "Sensor FOV135 degrees, pitch−30 degrees, height 1.2m, maximum 200 steps and radius 0.1m are part of the released operating conditions.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/Teacher-Tom/HSGM_public/blob/e2df6e70df869af57d77a32ba658fba04e6814eb/config/vlnce_test.yaml",
+        "locator": "camera and simulator configuration"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "hsgm-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Repeated self-reported completion is not independent verification because the same model can repeat a correlated error. The paper proposes consecutive STOP confirmation, while the inspected release does not reset the first STOP flag after motion.",
+        "evidence": "Paper §3.4; INSPECTED CODE src/agent/agent.py 1070–1094; deduction about correlated errors",
+        "followups": [],
+        "status": "Uncertain because evidence is insufficient",
+        "kind": "verification",
+        "confidence": "medium"
+      },
+      {
+        "id": "hsgm-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Geometric safety holds only for the observed map and sensor/model assumptions; mapping misses and pose drift can invalidate reachability.",
+        "evidence": "§3.3 cylinder/edge checks",
+        "followups": [],
+        "status": "Uncertain because evidence is insufficient",
+        "kind": "sensor/control",
+        "confidence": "high"
+      },
+      {
+        "id": "hsgm-B3",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Runtime API cost and sampled RxR evaluation limit reproducibility/comparability.",
+        "evidence": "§4.1 GPT-5 and 500/300-episode subsets",
+        "followups": [],
+        "status": "Shifted into another cost or limitation",
+        "kind": "compute/protocol",
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://github.com/Teacher-Tom/HSGM_public"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "ivln",
+    "short_name": "IVLN",
+    "full_title": "Iterative Vision-and-Language Navigation",
+    "authors": [
+      "Jacob Krantz",
+      "Shurjo Banerjee",
+      "Wang Zhu",
+      "Jason Corso",
+      "Peter Anderson",
+      "Stefan Lee",
+      "Jesse Thomason"
+    ],
+    "year": 2023,
+    "venue_or_status": "CVPR 2023",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content/CVPR2023/papers/Krantz_Iterative_Vision-and-Language_Navigation_CVPR_2023_paper.pdf",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/jacobkrantz/IVLN-CE",
+    "repo_commit": "14417fc0930fc273183667c09e3e3564adc823a0",
+    "code_files_inspected": [
+      {
+        "path": "ivlnce_baselines/models/map_cma_policy.py",
+        "locator": "276–368",
+        "finding": "Map/depth/text attention and episodic recurrent-state masks; optional tanh progress monitor with positive MSE."
+      },
+      {
+        "path": "ivlnce_baselines/trainers/iterative_dagger_trainer.py",
+        "locator": "33–94",
+        "finding": "Tour memory versus episodic resets, truncated gradient state, weighted action CE and auxiliary losses."
+      },
+      {
+        "path": "ivlnce_baselines/common/environments.py",
+        "locator": "36–110",
+        "finding": "Iterative environment includes agent, oracle_goal and oracle_start phases, explicitly using oracle transit between episodes."
+      },
+      {
+        "path": "ivlnce_baselines/common/base_il_trainer.py",
+        "locator": "173–218;585–914",
+        "finding": "Weighted imitation update and iterative evaluation maintaining tour/episode masks and aggregating tour-nDTW."
+      },
+      {
+        "path": "ivlnce_baselines/config/map_cma/pred_semantics/iterative_maps/1_ftune_dagger.yaml",
+        "locator": "1–38",
+        "finding": "Predicted-semantics iterative mapper, 10 DAgger iterations, 5000 collected trajectories and progress auxiliary enabled."
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/ivln.md",
+    "key_findings": [
+      {
+        "claim": "Map/depth/text attention and episodic recurrent-state masks; optional tanh progress monitor with positive MSE.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/jacobkrantz/IVLN-CE/blob/14417fc0930fc273183667c09e3e3564adc823a0/ivlnce_baselines/models/map_cma_policy.py",
+        "locator": "276–368"
+      },
+      {
+        "claim": "Tour memory versus episodic resets, truncated gradient state, weighted action CE and auxiliary losses.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/jacobkrantz/IVLN-CE/blob/14417fc0930fc273183667c09e3e3564adc823a0/ivlnce_baselines/trainers/iterative_dagger_trainer.py",
+        "locator": "33–94"
+      },
+      {
+        "claim": "Iterative environment includes agent, oracle_goal and oracle_start phases, explicitly using oracle transit between episodes.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/jacobkrantz/IVLN-CE/blob/14417fc0930fc273183667c09e3e3564adc823a0/ivlnce_baselines/common/environments.py",
+        "locator": "36–110"
+      },
+      {
+        "claim": "Weighted imitation update and iterative evaluation maintaining tour/episode masks and aggregating tour-nDTW.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/jacobkrantz/IVLN-CE/blob/14417fc0930fc273183667c09e3e3564adc823a0/ivlnce_baselines/common/base_il_trainer.py",
+        "locator": "173–218;585–914"
+      },
+      {
+        "claim": "Predicted-semantics iterative mapper, 10 DAgger iterations, 5000 collected trajectories and progress auxiliary enabled.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/jacobkrantz/IVLN-CE/blob/14417fc0930fc273183667c09e3e3564adc823a0/ivlnce_baselines/config/map_cma/pred_semantics/iterative_maps/1_ftune_dagger.yaml",
+        "locator": "1–38"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "ivln-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Memory contents learned under short episodic training do not automatically transfer to persistent tours.",
+        "evidence": "§5.1 negative TourHAMT/TourCMA results",
+        "followups": [
+          "OVER-NAV structured open-vocabulary memory"
+        ],
+        "status": "Partially addressed",
+        "kind": "methodological",
+        "confidence": "high"
+      },
+      {
+        "id": "ivln-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Persistent map gains are established under oracle corrections, static scenes and accurate pose, leaving autonomous updating/forgetting under changes insufficiently tested.",
+        "evidence": "§3 oracle phases and §4 maps",
+        "followups": [
+          "Context-Nav/continual-navigation frontier audit"
+        ],
+        "status": "Uncertain because evidence is insufficient",
+        "kind": "protocol",
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://arxiv.org/abs/2403.17334",
+      "https://jacobkrantz.github.io/ivln"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "overnav",
+    "short_name": "OVER-NAV",
+    "full_title": "OVER-NAV: Elevating Iterative Vision-and-Language Navigation with Open-Vocabulary Detection and StructurEd Representation",
+    "authors": [
+      "Ganlong Zhao",
+      "Guanbin Li",
+      "Weikai Chen",
+      "Yizhou Yu"
+    ],
+    "year": 2024,
+    "venue_or_status": "CVPR 2024",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content/CVPR2024/papers/Zhao_OVER-NAV_Elevating_Iterative_Vision-and-Language_Navigation_with_Open-Vocabulary_Detection_and_StructurEd_CVPR_2024_paper.pdf",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": null,
+    "repo_commit": null,
+    "code_files_inspected": [],
+    "code_executed": false,
+    "repository_status": "No executable implementation located in bounded search",
+    "dossier_path": "dossiers/overnav.md",
+    "key_findings": [
+      {
+        "claim": "Open-vocabulary semantic memory and structured egocentric retrieval extend IVLN. This is not a frozen VLM directly controlling navigation: the LLM preprocesses language, detector supplies memory, and trained HAMT/MAP-CMA predicts actions.",
+        "evidence_type": "PAPER EXPERIMENT / DEDUCTION as labeled",
+        "source": "https://openaccess.thecvf.com/content/CVPR2024/papers/Zhao_OVER-NAV_Elevating_Iterative_Vision-and-Language_Navigation_with_Open-Vocabulary_Detection_and_StructurEd_CVPR_2024_paper.pdf",
+        "locator": "[1, 3, 4, 5, 6, 7, 8]"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "overnav-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Collapsing same-keyword detections to modal heading/distance can merge distinct instances and lose attribute-grounding distinctions.",
+        "evidence": "§3.2 filtering algorithm",
+        "followups": [
+          "GaussianMap semantic grouping",
+          "HSGM instance maps"
+        ],
+        "status": "Partially addressed",
+        "kind": "methodological",
+        "confidence": "high"
+      },
+      {
+        "id": "overnav-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Persistent detections can become stale; static-tour gains do not validate changed-room/object scenarios.",
+        "evidence": "IVLN setup and update rules",
+        "followups": [],
+        "status": "Uncertain because evidence is insufficient",
+        "kind": "environment shift",
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://arxiv.org/abs/2403.17334",
+      "https://github.com/Teacher-Tom/HSGM_public"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "marval",
+    "short_name": "MARVAL",
+    "full_title": "A New Path: Scaling Vision-and-Language Navigation with Synthetic Instructions and Imitation Learning",
+    "authors": [
+      "Aishwarya Kamath",
+      "Peter Anderson",
+      "Su Wang",
+      "Jing Yu Koh",
+      "Alexander Ku",
+      "Austin Waters",
+      "Yinfei Yang",
+      "Jason Baldridge",
+      "Zarana Parekh"
+    ],
+    "year": 2023,
+    "venue_or_status": "CVPR 2023",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content/CVPR2023/html/Kamath_A_New_Path_Scaling_Vision-and-Language_Navigation_With_Synthetic_Instructions_and_CVPR_2023_paper.html",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "associated_files_reviewed": [
+      {
+        "filename": "MARVAL (slides).pdf",
+        "sha256": "5f6ab52e30525ebcd26e026ef60b6e4c25a1194b706ee81a1e0ce630bd54d643",
+        "pages_read": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30
+        ],
+        "scope": "All slide text inspected; slides22–23 also rendered and visually inspected for failure analysis and DAgger expert rules."
+      }
+    ],
+    "repo_url": null,
+    "repo_commit": null,
+    "code_files_inspected": [],
+    "code_executed": false,
+    "repository_status": "No executable implementation located in bounded search",
+    "dossier_path": "dossiers/marval.md",
+    "key_findings": [
+      {
+        "claim": "Large multilingual Marky-Gibson data and a deliberately simple, pure-imitation Transformer demonstrate the importance of instruction quality, environment diversity and distribution correction. It is outside DUET’s dual-branch architecture, although it shares panoramic graph tasks and history pooling.",
+        "evidence_type": "PAPER EXPERIMENT / DEDUCTION as labeled",
+        "source": "https://openaccess.thecvf.com/content/CVPR2023/html/Kamath_A_New_Path_Scaling_Vision-and-Language_Navigation_With_Synthetic_Instructions_and_CVPR_2023_paper.html",
+        "locator": "[1, 3, 4, 5, 6, 7, 8]"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "marval-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Synthetic-language style can help one benchmark while transferring poorly to another; low-quality additional data may reduce performance.",
+        "evidence": "Tables 2–4 and §6",
+        "followups": [
+          "ScaleVLN",
+          "SRDF",
+          "NavRAG"
+        ],
+        "status": "Partially addressed",
+        "kind": "data distribution",
+        "confidence": "high"
+      },
+      {
+        "id": "marval-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Automatic graph generation and novel-view rendering add synthetic transition/observation errors; larger dataset claims also consume substantial compute.",
+        "evidence": "§4 graph F1=.70;5.14M iterations",
+        "followups": [
+          "ScaleVLN graph refinement"
+        ],
+        "status": "Partially addressed",
+        "kind": "data/compute",
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://github.com/wz0919/ScaleVLN",
+      "https://github.com/MrZihan/NavRAG"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "navillm",
+    "short_name": "NaviLLM",
+    "full_title": "Towards Learning a Generalist Model for Embodied Navigation",
+    "authors": [
+      "Duo Zheng",
+      "Shijia Huang",
+      "Lin Zhao",
+      "Yiwu Zhong",
+      "Liwei Wang"
+    ],
+    "year": 2024,
+    "venue_or_status": "CVPR 2024",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content/CVPR2024/html/Zheng_Towards_Learning_a_Generalist_Model_for_Embodied_Navigation_CVPR_2024_paper.html",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "associated_files_reviewed": [
+      {
+        "filename": "NaviLLM (supplement).pdf",
+        "sha256": "8f0940a540efa07027ce4a8879f171ff3ac2902cad685a415f040a642a70a5d0",
+        "pages_read": [
+          1,
+          2,
+          3
+        ],
+        "scope": "All supplemental text, prompts, dataset counts and ablations inspected."
+      }
+    ],
+    "repo_url": "https://github.com/LaVi-Lab/NaviLLM",
+    "repo_commit": "e069f46ed98affb221d58715a785613622e11145",
+    "code_files_inspected": [
+      {
+        "path": "models/nav_model.py",
+        "locator": "forward_navigation129–247",
+        "finding": "Builds global graph embeddings, masks visited nodes, merges local views, permutes candidates, applies out_head to LLM CLS states and returns fused logits."
+      },
+      {
+        "path": "models/nav_model.py",
+        "locator": "summarization251–344;object grounding407 onward",
+        "finding": "Other tasks route through language-model losses/heads; training objectives depend on task mode."
+      },
+      {
+        "path": "models/image_embedding.py",
+        "locator": "multi-view embedding classes",
+        "finding": "Encodes visual and geometric inputs before the language model."
+      },
+      {
+        "path": "tasks/agents/mp3d_agent.py",
+        "locator": "rollout/teacher-action paths",
+        "finding": "Graph navigation and supervision sit outside the LLM module."
+      },
+      {
+        "path": "tasks/agents/mp3d_agent.py",
+        "locator": "734–756;845–904",
+        "finding": "Navigation criterion over candidate logits is backpropagated separately from QA/summarization token-generation loss."
+      },
+      {
+        "path": "train.py",
+        "locator": "207–231",
+        "finding": "Constructs summed categorical cross entropy with ignored padding targets; driver uses task-specific agents."
+      },
+      {
+        "path": "tasks/datasets/r2r.py",
+        "locator": "10–60;108–129",
+        "finding": "Expands instructions into samples, truncates encodings and prepares fine-grained labels; evaluation flattens graph subpaths and uses final/nearest geodesic errors, path length and SPL."
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/navillm.md",
+    "key_findings": [
+      {
+        "claim": "Builds global graph embeddings, masks visited nodes, merges local views, permutes candidates, applies out_head to LLM CLS states and returns fused logits.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/LaVi-Lab/NaviLLM/blob/e069f46ed98affb221d58715a785613622e11145/models/nav_model.py",
+        "locator": "forward_navigation129–247"
+      },
+      {
+        "claim": "Other tasks route through language-model losses/heads; training objectives depend on task mode.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/LaVi-Lab/NaviLLM/blob/e069f46ed98affb221d58715a785613622e11145/models/nav_model.py",
+        "locator": "summarization251–344;object grounding407 onward"
+      },
+      {
+        "claim": "Encodes visual and geometric inputs before the language model.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/LaVi-Lab/NaviLLM/blob/e069f46ed98affb221d58715a785613622e11145/models/image_embedding.py",
+        "locator": "multi-view embedding classes"
+      },
+      {
+        "claim": "Graph navigation and supervision sit outside the LLM module.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/LaVi-Lab/NaviLLM/blob/e069f46ed98affb221d58715a785613622e11145/tasks/agents/mp3d_agent.py",
+        "locator": "rollout/teacher-action paths"
+      },
+      {
+        "claim": "Navigation criterion over candidate logits is backpropagated separately from QA/summarization token-generation loss.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/LaVi-Lab/NaviLLM/blob/e069f46ed98affb221d58715a785613622e11145/tasks/agents/mp3d_agent.py",
+        "locator": "734–756;845–904"
+      },
+      {
+        "claim": "Constructs summed categorical cross entropy with ignored padding targets; driver uses task-specific agents.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/LaVi-Lab/NaviLLM/blob/e069f46ed98affb221d58715a785613622e11145/train.py",
+        "locator": "207–231"
+      },
+      {
+        "claim": "Expands instructions into samples, truncates encodings and prepares fine-grained labels; evaluation flattens graph subpaths and uses final/nearest geodesic errors, path length and SPL.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/LaVi-Lab/NaviLLM/blob/e069f46ed98affb221d58715a785613622e11145/tasks/datasets/r2r.py",
+        "locator": "10–60;108–129"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "navillm-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Shared multi-task training does not eliminate action grounding failures; broad transfer and specialized endpoint accuracy trade off.",
+        "evidence": "Tables 1,3,4",
+        "followups": [
+          "RoomTour3D action-enriched data",
+          "GA-VLN geometry tokens"
+        ],
+        "status": "Partially addressed",
+        "kind": "methodological",
+        "confidence": "high"
+      },
+      {
+        "id": "navillm-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Released action implementation differs from the paper’s generative description; matching architecture/checkpoint/protocol is a reproducibility prerequisite.",
+        "evidence": "Pinned nav_model.py 129–247",
+        "followups": [],
+        "status": "Uncertain because evidence is insufficient",
+        "kind": "implementation",
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://roomtour3d.github.io",
+      "https://github.com/jahhaoyang/GA-VLN"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "navrag",
+    "short_name": "NavRAG",
+    "full_title": "NavRAG: Generating User Demand Instructions for Embodied Navigation through Retrieval-Augmented LLM",
+    "authors": [
+      "Zihan Wang",
+      "Yaohui Zhu",
+      "Gim Hee Lee",
+      "Yachun Fan"
+    ],
+    "year": 2025,
+    "venue_or_status": "Findings of ACL 2025",
+    "bibliography_sources": [
+      {
+        "url": "https://arxiv.org/abs/2502.11142",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/MrZihan/NavRAG",
+    "repo_commit": "7dd133e88797a6c4baacf820f3edf905740077fa",
+    "code_files_inspected": [
+      {
+        "path": "VLN-DUET-NAVRAG/map_nav_src/NavRAG/agent.py",
+        "locator": "teacher/rollout/navigation routines",
+        "finding": "Downstream policy is a DUET-family graph navigator."
+      },
+      {
+        "path": "VLN-DUET-NAVRAG/pretrain_src/train_rag.py",
+        "locator": "training loop and data configuration",
+        "finding": "Dataset pretraining is a distinct optimization stage."
+      },
+      {
+        "path": "instruction_generator/convert_to_dataset.py",
+        "locator": "instruction/path conversion",
+        "finding": "Generated annotations are converted into navigation training records."
+      },
+      {
+        "path": "VLN-DUET-NAVRAG/map_nav_src/scripts/rag_h14_envedit_mix.sh",
+        "locator": "experiment configuration",
+        "finding": "Feature/data mixture choices are explicit and must be controlled."
+      },
+      {
+        "path": "instruction_generator/generate_instruction.py",
+        "locator": "22–70;74–150",
+        "finding": "API model is configured externally; hierarchical role→zone→viewpoint→direction→instance prompts construct demand instructions. Responses are parsed without independent semantic verification."
+      },
+      {
+        "path": "instruction_generator/convert_to_dataset.py",
+        "locator": "67–148",
+        "finding": "Uses seed 0, held-out building lists and shortest paths; samples starts with replacement from the nearest third of graph distances, 10 per training instruction versus 1 for held-out instructions."
+      },
+      {
+        "path": "VLN-DUET-NAVRAG/map_nav_src/NavRAG/agent.py",
+        "locator": "394–425",
+        "finding": "Shared softmax STOP score is cached; active training multiplies STOP-target loss by 10."
+      },
+      {
+        "path": "VLN-DUET-NAVRAG/map_nav_src/NavRAG/agent_base.py",
+        "locator": "141",
+        "finding": "CrossEntropyLoss uses reduction=none, confirming per-example STOP weighting is active."
+      },
+      {
+        "path": "VLN-DUET-NAVRAG/map_nav_src/NavRAG/env.py",
+        "locator": "314–335",
+        "finding": "Scores flattened graph paths with final/nearest target distances and SPL."
+      },
+      {
+        "path": "VLN-DUET-NAVRAG/pretrain_src/train_rag.py",
+        "locator": "180–260;349–428",
+        "finding": "Multi-task loader and optimizer; masked-token CE, region KL and action CE validation."
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/navrag.md",
+    "key_findings": [
+      {
+        "claim": "Downstream policy is a DUET-family graph navigator.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/MrZihan/NavRAG/blob/7dd133e88797a6c4baacf820f3edf905740077fa/VLN-DUET-NAVRAG/map_nav_src/NavRAG/agent.py",
+        "locator": "teacher/rollout/navigation routines"
+      },
+      {
+        "claim": "Dataset pretraining is a distinct optimization stage.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/MrZihan/NavRAG/blob/7dd133e88797a6c4baacf820f3edf905740077fa/VLN-DUET-NAVRAG/pretrain_src/train_rag.py",
+        "locator": "training loop and data configuration"
+      },
+      {
+        "claim": "Generated annotations are converted into navigation training records.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/MrZihan/NavRAG/blob/7dd133e88797a6c4baacf820f3edf905740077fa/instruction_generator/convert_to_dataset.py",
+        "locator": "instruction/path conversion"
+      },
+      {
+        "claim": "Feature/data mixture choices are explicit and must be controlled.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/MrZihan/NavRAG/blob/7dd133e88797a6c4baacf820f3edf905740077fa/VLN-DUET-NAVRAG/map_nav_src/scripts/rag_h14_envedit_mix.sh",
+        "locator": "experiment configuration"
+      },
+      {
+        "claim": "API model is configured externally; hierarchical role→zone→viewpoint→direction→instance prompts construct demand instructions. Responses are parsed without independent semantic verification.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/MrZihan/NavRAG/blob/7dd133e88797a6c4baacf820f3edf905740077fa/instruction_generator/generate_instruction.py",
+        "locator": "22–70;74–150"
+      },
+      {
+        "claim": "Uses seed 0, held-out building lists and shortest paths; samples starts with replacement from the nearest third of graph distances, 10 per training instruction versus 1 for held-out instructions.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/MrZihan/NavRAG/blob/7dd133e88797a6c4baacf820f3edf905740077fa/instruction_generator/convert_to_dataset.py",
+        "locator": "67–148"
+      },
+      {
+        "claim": "Shared softmax STOP score is cached; active training multiplies STOP-target loss by 10.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/MrZihan/NavRAG/blob/7dd133e88797a6c4baacf820f3edf905740077fa/VLN-DUET-NAVRAG/map_nav_src/NavRAG/agent.py",
+        "locator": "394–425"
+      },
+      {
+        "claim": "CrossEntropyLoss uses reduction=none, confirming per-example STOP weighting is active.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/MrZihan/NavRAG/blob/7dd133e88797a6c4baacf820f3edf905740077fa/VLN-DUET-NAVRAG/map_nav_src/NavRAG/agent_base.py",
+        "locator": "141"
+      },
+      {
+        "claim": "Scores flattened graph paths with final/nearest target distances and SPL.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/MrZihan/NavRAG/blob/7dd133e88797a6c4baacf820f3edf905740077fa/VLN-DUET-NAVRAG/map_nav_src/NavRAG/env.py",
+        "locator": "314–335"
+      },
+      {
+        "claim": "Multi-task loader and optimizer; masked-token CE, region KL and action CE validation.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/MrZihan/NavRAG/blob/7dd133e88797a6c4baacf820f3edf905740077fa/VLN-DUET-NAVRAG/pretrain_src/train_rag.py",
+        "locator": "180–260;349–428"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "navrag-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Generated descriptions, retrieval and target selection share model biases; navigation success on generated targets does not independently establish instruction truth.",
+        "evidence": "§6 Limitations;Table 4 varying train/test generation",
+        "followups": [
+          "SRDF consistency filtering",
+          "CAST counterfactual audit"
+        ],
+        "status": "Still unresolved in reviewed evidence; broader frontier audit required",
+        "kind": "data verification",
+        "confidence": "high"
+      },
+      {
+        "id": "navrag-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Targets are viewpoint-level and cannot support precise object manipulation claims.",
+        "evidence": "§6 Limitations",
+        "followups": [
+          "REVERIE object grounding"
+        ],
+        "status": "Partially addressed",
+        "kind": "annotation granularity",
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://arxiv.org/abs/2508.13446",
+      "https://github.com/wz0919/VLN-SRDF"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "roomtour3d",
+    "short_name": "RoomTour3D",
+    "full_title": "RoomTour3D: Geometry-Aware Video-Instruction Tuning for Embodied Navigation",
+    "authors": [
+      "Mingfei Han",
+      "Liang Ma",
+      "Kamila Zhumakhanova",
+      "Ekaterina Radionova",
+      "Jingyi Zhang",
+      "Xiaojun Chang",
+      "Xiaodan Liang",
+      "Ivan Laptev"
+    ],
+    "year": 2025,
+    "venue_or_status": "CVPR 2025",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content/CVPR2025/papers/Han_RoomTour3D_Geometry-Aware_Video-Instruction_Tuning_for_Embodied_Navigation_CVPR_2025_paper.pdf",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "associated_files_reviewed": [
+      {
+        "filename": "RoomTour3D (slides).pdf",
+        "sha256": "520d889f1b99ee94d6c580720deb02da4a32e31c45efa615e36fdf23504f8615",
+        "pages_read": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18
+        ],
+        "scope": "All slide text inspected; slide13 also rendered and visually inspected for the 100-action manual quality audit."
+      }
+    ],
+    "repo_url": "https://github.com/roomtour3d/roomtour3d-NaviLLM",
+    "repo_commit": "eac6c0753621e92ebc7ac8e92c3e25f14285e31c",
+    "code_files_inspected": [
+      {
+        "path": "tasks/agents/tour3d_agent.py",
+        "locator": "579–604;828–865;907–944",
+        "finding": "Teacher-forced video navigation criterion and separate summary generation loss; sampled DAgger path is commented out in this video agent."
+      },
+      {
+        "path": "tasks/datasets/tour3d_dataset.py",
+        "locator": "121–189;370–462",
+        "finding": "Filters short trajectories, expands instruction records, and constructs video-frame navigation candidates with angle/3D-position metadata."
+      },
+      {
+        "path": "configs/pretrain.yaml",
+        "locator": "Feature and Dataset sections",
+        "finding": "Explicit external EVA feature files and synthetic/MP3D task data paths."
+      },
+      {
+        "path": "configs/multi.yaml",
+        "locator": "Feature and Dataset sections",
+        "finding": "Fine-tuning data mix includes video features; one path has a.bak suffix, requiring local data-path validation."
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/roomtour3d.md",
+    "key_findings": [
+      {
+        "claim": "Teacher-forced video navigation criterion and separate summary generation loss; sampled DAgger path is commented out in this video agent.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/roomtour3d/roomtour3d-NaviLLM/blob/eac6c0753621e92ebc7ac8e92c3e25f14285e31c/tasks/agents/tour3d_agent.py",
+        "locator": "579–604;828–865;907–944"
+      },
+      {
+        "claim": "Filters short trajectories, expands instruction records, and constructs video-frame navigation candidates with angle/3D-position metadata.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/roomtour3d/roomtour3d-NaviLLM/blob/eac6c0753621e92ebc7ac8e92c3e25f14285e31c/tasks/datasets/tour3d_dataset.py",
+        "locator": "121–189;370–462"
+      },
+      {
+        "claim": "Explicit external EVA feature files and synthetic/MP3D task data paths.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/roomtour3d/roomtour3d-NaviLLM/blob/eac6c0753621e92ebc7ac8e92c3e25f14285e31c/configs/pretrain.yaml",
+        "locator": "Feature and Dataset sections"
+      },
+      {
+        "claim": "Fine-tuning data mix includes video features; one path has a.bak suffix, requiring local data-path validation.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/roomtour3d/roomtour3d-NaviLLM/blob/eac6c0753621e92ebc7ac8e92c3e25f14285e31c/configs/multi.yaml",
+        "locator": "Feature and Dataset sections"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "roomtour3d-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Video reconstruction and generated semantic labels can be wrong; sparse human audit establishes useful relevance, not exact action/landmark truth.",
+        "evidence": "§3 COLMAP/experts;§5.4 human ratings",
+        "followups": [
+          "SRDF-style consistency audits",
+          "counterfactual data validation"
+        ],
+        "status": "Partially addressed",
+        "kind": "data quality",
+        "confidence": "high"
+      },
+      {
+        "id": "roomtour3d-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Video-derived candidate frames may contain future-position visual information unlike real current-view candidates; training/deployment observation matching must be controlled.",
+        "evidence": "§3.2/§4.3 candidate construction",
+        "followups": [],
+        "status": "Uncertain because evidence is insufficient",
+        "kind": "data/protocol",
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://github.com/roomtour3d/roomtour3d-NaviLLM"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "topologicalplanning",
+    "short_name": "Topological Planning",
+    "full_title": "Topological Planning with Transformers for Vision-and-Language Navigation",
+    "authors": [
+      "Kevin Chen",
+      "Junshen K. Chen",
+      "Jo Chuang",
+      "Marynel Vazquez",
+      "Silvio Savarese"
+    ],
+    "year": 2021,
+    "venue_or_status": "CVPR 2021",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content/CVPR2021/papers/Chen_Topological_Planning_With_Transformers_for_Vision-and-Language_Navigation_CVPR_2021_paper.pdf",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": null,
+    "repo_commit": null,
+    "code_files_inspected": [],
+    "code_executed": false,
+    "repository_status": "No executable implementation located in bounded search",
+    "dossier_path": "dossiers/topologicalplanning.md",
+    "key_findings": [
+      {
+        "claim": "A separate binary-cross-entropy STOP head alongside node classification is explicit CMTP-BCE prior art; stopping-head factorization alone is not novel.",
+        "evidence_type": "AUTHOR CLAIM",
+        "source": "https://openaccess.thecvf.com/content/CVPR2021/papers/Chen_Topological_Planning_With_Transformers_for_Vision-and-Language_Navigation_CVPR_2021_paper.pdf",
+        "locator": "Section 4.1, PDF p 6; Table 3, p 8"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "topologicalplanning-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Stopping and map-quality errors persist even with a pre-explored topology. Separate binary cross entropy helps modestly but does not close the no-STOP oracle gap.",
+        "evidence": "Table 1 p 6",
+        "followups": [
+          "DUET online topological navigation",
+          "HSGM double confirmation"
+        ],
+        "status": "Partially addressed",
+        "kind": "methodological",
+        "confidence": "high"
+      },
+      {
+        "id": "topologicalplanning-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Pre-exploration, true mapping odometry and a fixed initial plan move substantial costs and uncertainties outside instruction-time planning.",
+        "evidence": "§3/§4",
+        "followups": [
+          "CM² online map prediction",
+          "IVLN persistent memory"
+        ],
+        "status": "Partially addressed",
+        "kind": "protocol/resource",
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://topovln.stanford.edu/",
+      "https://github.com/cshizhe/VLN-DUET"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "reverie",
+    "short_name": "REVERIE",
+    "full_title": "REVERIE: Remote Embodied Visual Referring Expression in Real Indoor Environments",
+    "authors": [
+      "Yuankai Qi",
+      "Qi Wu",
+      "Peter Anderson",
+      "Xin Wang",
+      "William Yang Wang",
+      "Chunhua Shen",
+      "Anton van den Hengel"
+    ],
+    "year": 2020,
+    "venue_or_status": "CVPR 2020",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content_CVPR_2020/html/Qi_REVERIE_Remote_Embodied_Visual_Referring_Expression_in_Real_Indoor_Environments_CVPR_2020_paper.html",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      11
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/YuankaiQi/REVERIE",
+    "repo_commit": "207e90cdde48acf2f2f3fc912528966a062fc432",
+    "code_files_inspected": [
+      {
+        "path": "tasks/REVERIE/follower.py",
+        "locator": "304–305;685–712;798",
+        "finding": "Positive MSE and action CE, including an explicit equally weighted combined loss."
+      },
+      {
+        "path": "tasks/REVERIE/eval_release.py",
+        "locator": "56–109",
+        "finding": "Grounding target ID match; endpoint/anywhere target visibility for navigation and oracle success; graph-distance trajectory length."
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/reverie.md",
+    "key_findings": [
+      {
+        "claim": "Positive MSE and action CE, including an explicit equally weighted combined loss.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/YuankaiQi/REVERIE/blob/207e90cdde48acf2f2f3fc912528966a062fc432/tasks/REVERIE/follower.py",
+        "locator": "304–305;685–712;798"
+      },
+      {
+        "claim": "Grounding target ID match; endpoint/anywhere target visibility for navigation and oracle success; graph-distance trajectory length.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/YuankaiQi/REVERIE/blob/207e90cdde48acf2f2f3fc912528966a062fc432/tasks/REVERIE/eval_release.py",
+        "locator": "56–109"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "reverie-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Navigation success can hide incorrect object identity, while annotation-provided proposals simplify perception.",
+        "evidence": "Section 3 metric definitions and Table 4 grounding at the true goal",
+        "followups": [
+          "DUET object branch",
+          "GaussianMap",
+          "NavRAG navigation without object boxes"
+        ],
+        "status": "Partially addressed",
+        "kind": "evaluation/perception",
+        "confidence": "high"
+      },
+      {
+        "id": "reverie-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Goal-directed instructions may omit route evidence, and multiple objects or viewpoints create ambiguity. Endpoint confidence is not object confidence.",
+        "evidence": "Dataset definition and measured pointer errors",
+        "followups": [
+          "KERM knowledge",
+          "NaviLLM multitask grounding"
+        ],
+        "status": "Partially addressed",
+        "kind": "methodological",
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://github.com/cshizhe/VLN-DUET",
+      "https://github.com/LaVi-Lab/NaviLLM"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  },
+  {
+    "paper_id": "rxr",
+    "short_name": "RxR",
+    "full_title": "Room-Across-Room: Multilingual Vision-and-Language Navigation with Dense Spatiotemporal Grounding",
+    "authors": [
+      "Alexander Ku",
+      "Peter Anderson",
+      "Roma Patel",
+      "Eugene Ie",
+      "Jason Baldridge"
+    ],
+    "year": 2020,
+    "venue_or_status": "EMNLP 2020",
+    "bibliography_sources": [
+      {
+        "url": "https://arxiv.org/abs/2010.07954",
+        "locator": "PDF p1 and cited method/results pages"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      12,
+      19,
+      20,
+      21
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/google-research-datasets/RxR",
+    "repo_commit": "d22df5940a0486a42b703cd445937210ce21e9f5",
+    "code_files_inspected": [
+      {
+        "path": "README.md",
+        "locator": "Guide/Follower schemas; Pose Traces; Text Features; Changelog",
+        "finding": "Data release documents dense alignments, missing word timestamps in a small subset, and seven corrected training pose-trace archives. This is data-interface inspection, not baseline model execution."
+      }
+    ],
+    "code_executed": false,
+    "repository_status": "Source inspected; no benchmark execution",
+    "dossier_path": "dossiers/rxr.md",
+    "key_findings": [
+      {
+        "claim": "Data release documents dense alignments, missing word timestamps in a small subset, and seven corrected training pose-trace archives. This is data-interface inspection, not baseline model execution.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/google-research-datasets/RxR/blob/d22df5940a0486a42b703cd445937210ce21e9f5/README.md",
+        "locator": "Guide/Follower schemas; Pose Traces; Text Features; Changelog"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "rxr-B1",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Dense human alignment is partial and imperfect; simple attention constraints do not consistently improve policy performance.",
+        "evidence": "Section 5 grounding-supervision experiments and Table 5",
+        "followups": [
+          "GELA language alignment",
+          "MARVAL",
+          "SkillNav"
+        ],
+        "status": "Partially addressed",
+        "kind": "supervision",
+        "confidence": "high"
+      },
+      {
+        "id": "rxr-B2",
+        "conditions": "See description",
+        "cause": "See description",
+        "description": "Multilingual and cross-dataset distribution differences persist despite more data and shared scenes.",
+        "evidence": "Tables 5–6",
+        "followups": [
+          "MARVAL multilingual Marky data",
+          "NavRAG diversification"
+        ],
+        "status": "Partially addressed",
+        "kind": "generalization",
+        "confidence": "high"
+      }
+    ],
+    "followup_sources": [
+      "https://github.com/google-research-datasets/RxR",
+      "https://github.com/google-research/valan"
+    ],
+    "access_limitations": [
+      "No benchmark executed"
+    ],
+    "completion_status": "Dossier complete within explicitly documented evidence/access scope"
+  }
+]

@@ -1,0 +1,937 @@
+=== PDF PAGE 1 ===
+                                                                                                                                                          1
+
+      CLOSER: Evidence-Aware Active Visual
+    Verification for Embodied Object-Goal Navigation
+
+       Pengying Wu, Mingye Jiang, Yunze Hu, Zhejia Wen, Kangjie Zhou, Zongru Yang, Zhe Peng, and Chang Liu
+
+
+
+
+
+        Abstract—Object-goal navigation (ObjectNav) requires an em-
+                                                                                Task: find a bed                  Explore         Approaching
+      bodied agent to find an instance of a specified category in an
+      unseen environment and stop near it. The agent typically relies
+     on an object detector but must judge online from a limited
+      egocentric video stream, sometimes a  single frame, whether
+      a detected candidate  is the target. Detectors often confidently
+      mistake similar objects, such as a sofa for a bed, and stopping
+       at a  false  positive  fails the episode. Prevailing systems  also2026     approach candidates greedily, leaving them occluded or partially
+      observed. We present CLOSER, an evidence-aware active veri-
+       fication framework that treats stopping as closed-loop evidence                                            2Oct acquisition, coupling vision–language model (VLM) verification
+      with active perception. CLOSER fine-tunes an open-source VLM
+       to label each view of a candidate tracked across frames as20
+       target, non-target, or uncertain, selects complementary views
+      with an embedding-based diversity gate, and fuses their per-view
+       probabilities with a lightweight network. If the fused judgment                                    2
+      remains uncertain, a diffusion policy drives the agent toward
+      the candidate using only the tracked mask and depth until the
+      decision becomes decisive. CLOSER runs locally and plugs into
+       existing ObjectNav systems without retraining them. On Gibson[cs.CV] and Habitat-Matterport 3D, it raises average success rate by 3.6           Uncertain     No sofa confuser         Yes
+      points and success weighted by path length by 2.0 points, showing
+      that verifying evidence before committing improves embodied
+                                                                                           Fig. 1. With CLOSER, the agent approaches an uncertain candidate and
+      navigation.                                                                                 decides from closer views. Given the goal bed, the view at (1) shows a distant,
+        Index Terms—Object-goal navigation, embodied AI, spatial    partially occluded candidate and does not suffice for a decision. CLOSER
+                                                                                          therefore labels the candidate uncertain, and the agent approaches  it to      reasoning, scene understanding, vision for robotics, object de-
+                                                                                       gather additional views (orange, dotted). At (2), the closer view reveals a
+       tection and recognition.                                                                                       sofa confuser; CLOSER labels it no, and the agent resumes exploration (blue,
+                                                                                                    solid). At (3), the view of the next candidate suffices; CLOSER labels it yes,
+                                                                           and the agent moves to the bed and stops near it. The bottom panels show
+                                   I. INTRODUCTION                                                                                         the agent’s view and CLOSER’s label at each numbered location.
+        BJECT-GOAL navigation (ObjectNav) is a fundamental
+            task in embodied AI [1] in which an agent searches an O
+     unseen environment for an object of a specified target category                                                                       the episode ends once the agent stops, a wrong stop cannot
+     and stops near it [2], [3]. To find the target, the agent must                                                             be corrected, and this stopping decision has been identified
+      explore the environment efficiently and infer where the target                                                                     as a major bottleneck of modular systems [7], [8]. Although
+       is likely to be located. When an object resembling the target                                                         modern open-vocabulary detectors such as YOLO-World andarXiv:2610.28476v1     comes into view, the agent must further judge whether it is the                                                     Grounded-SAM  [9], [10] achieve high  recall on common
+       target. ObjectNav therefore demands both efficient exploration                                                                  indoor categories, they frequently mistake semantically similar
+     and reliable perception from its online egocentric video stream,                                                                       objects for the target. For example, a sofa observed from
+     and remains a challenging problem despite extensive study [4].                                                                 a distance may be detected as a bed (Fig. 1), and a stool
+       To meet these demands, prevailing modular systems adopt                                                                              partially occluded by a table may be detected as a chair. Such
+     an exploration strategy to search promising regions and an off-                                                                    confusers are often detected with tight bounding boxes and
+      the-shelf object detector to recognize the observed objects [2],                                                                 high confidence, so raising the confidence threshold removes
+       [5],  [6]. Whenever a candidate  for the  target category  is                                                                          true targets before  it removes these errors. Therefore, each
+      detected, the agent must decide from limited local observations                                                                     detected candidate needs to be further verified before the agent
+     whether the candidate is the target and hence whether to stop;                                                           commits to a stop.
+      in the worst case, only a single partial view is available. Since
+                                                          To  this  end,  recent systems  introduce  a  closed-source
+         Pengying Wu, Mingye  Jiang, Yunze Hu, Zhejia Wen, Kangjie Zhou,   vision–language model (VLM) such as GPT-4o-mini as a veri-
+      Zongru Yang, Zhe Peng, and Chang Liu are with the School of Advanced    fier that confirms or rejects each detected candidate [11]. Such
+       Manufacturing and Robotics, Peking University, Beijing 100871, China (e-
+        mail: changliucoe@pku.edu.cn).                                    a model provides open-world visual reasoning that the detector
+         (Corresponding author: Chang Liu.)                                    lacks, and can reject confusers even when the detection confi-
+
+=== PDF PAGE 2 ===
+                                                                                                                                                  2
+
+
+dence is high. However, the verifier is accessible only through     • We propose CLOSER, a plug-in layer for existing Ob-
+a remote API, which incurs per-query cost and latency and       jectNav systems that formulates the stopping decision as
+leaves its weights unavailable for local adaptation. A smaller       an active verification problem. Closer judges not only
+open-source VLM avoids these constraints, yet its verification       whether a candidate  is the target but also whether  its
+accuracy drops markedly on hard cases such as distant or       views suffice for that judgment, and it drives the agent to
+partially occluded confusers. Moreover, existing verifiers are        acquire more views by approaching the candidate when
+binary and must decide even when the current view supports        the current views are insufficient.
+neither confirmation nor rejection. Such a forced decision may     • Since a confident prediction on a distant or occluded view
+stop the agent at a non-target or reject a candidate that a       can be wrong, we design the verifier in Closer to assess
+closer view could confirm. Recent work has proposed ternary        the sufficiency of each view in addition to the identity
+uncertainty scores and explicit NOT-FOUND outcomes [12],        of the candidate. We fine-tune an open-source VLM for
+[13], but neither mechanism moves the agent to acquire more         this assessment under a closed-source VLM teacher and
+views of the candidate for verification.                                  train a lightweight MLP that fuses the assessments of
+  In  this paper, we propose CLOSER (Closed-Loop Ob-       complementary views into a single decision.
+servation Sensing for Embodied veRification), an evidence-     • We train a map-free approach policy by  distilling an
+aware active verification framework in which the agent decides        expert  into a Diffusion Transformer  that generates a
+whether to stop by reasoning over the visual evidence on a        trajectory toward the candidate from  its tracked mask
+candidate and acting to improve  it. Our key insight is that       and depth. To keep the candidate in view throughout
+a reliable stopping decision depends not only on what the        the approach phase, the expert plans each path along
+candidate appears to be but also on whether the available        the Voronoi medial axis of the free space for maximum
+views suffice to identify  it, and this sufficiency depends on        clearance from walls and smooths the path into a B´ezier
+the spatial relationship between the agent and the candidate,         trajectory.
+including its distance, viewing angle, and degree of occlusion.     • Simulation experiments confirm that CLOSER improves
+The agent therefore commits to a decision only when the       ObjectNav performance. Across diverse ObjectNav sys-
+evidence suffices and otherwise approaches the candidate to       tems on Gibson, HM3D v1, and HM3D v2, CLOSER
+acquire more informative views (Fig. 1). Realizing this closed       improves success rate (SR), with an average gain of 3.6
+loop poses two challenges. First, the agent must learn when its        points and a maximum gain of 4.9 points. CLOSER also
+evidence is insufficient, which confidence cannot reveal since       improves success weighted by path length (SPL) by 2.0
+distant or occluded views often yield confident predictions.        points on average.
+Second, it must learn how to reach a more informative view
+                                                                                                      II. RELATED WORK
+without a complete map of the unseen environment.
+  To learn when the evidence is insufficient, CLOSER fine-   A. Object-Goal Navigation and Target Verification
+tunes an open-source VLM with LoRA [14] to assess both     Existing ObjectNav methods range from end-to-end rein-
+the  identity of the candidate and the  sufficiency of each   forcement learning, which learns continuous environment rep-
+view. During navigation, CLOSER tracks the candidate across   resentations with multi-step look-ahead planning [18] or agent-
+egocentric frames with ByteTrack [15] and caches comple-   centric relation graphs that encode object layout and target
+mentary views of  it, and a lightweight MLP fuses the per-   distance [19], to modular pipelines that combine semantic
+view assessments of the VLM to decide whether the evidence  mapping with goal selection [2], [3] and zero-shot variants [4],
+suffices. To learn how to reach a more informative view,   supported by large-scale simulators [20]. Recent methods use
+CLOSER imitates an expert that plans maximum-clearance   vision–language models to score exploration frontiers [6] or
+paths along the Voronoi medial axis of the complete map and   large language models to prioritize search regions [21], [22];
+smooths them into B´ezier trajectories, so that walls are less  E2BA [23]  further fuses LLM commonsense scores with
+likely to occlude the candidate along the way. To eliminate this   geometric costs through particle filtering and uses a cascaded
+dependence on the map, we distill the expert trajectories into   discriminator to decide when to backtrack. These advances
+a Diffusion Transformer policy [16], [17] that conditions only   concentrate on where to explore, and a separate mechanism
+on the tracked candidate mask and depth, which encode the    is still required to verify whether a detected candidate is the
+distance and visibility of the candidate relative to the agent. As   target. For the stopping decision, DITA [7] decouples depth-
+the agent follows this policy, verification and active perception   based termination from the navigation policy, RATE-Nav [8]
+form a closed loop, in which every view cached along the  models spatial regions to trigger stopping, and ACRG [19] en-
+trajectory refines the assessment and the approach phase ends   codes the depth-derived agent–target distance into the policy.
+as soon as the evidence supports a decision. CLOSER  is   Classical pipelines verify candidates with detector confidence
+invoked only when a candidate for the  target category  is   thresholds  [2], which  fail under  partial observability [24].
+detected and leaves the exploration and mapping components  Memory  [3], [24] and blacklist mechanisms [25] improve
+of existing ObjectNav systems unchanged.  It can therefore   decision consistency, SPENav [26] filters task-irrelevant ob-
+be inserted into these systems as a plug-in verification layer   jects with room-guided semantic priors, and recent systems
+without retraining them.                                    query a closed-source VLM to verify each candidate [11].
+  The main contributions of this paper are summarized as   For image goals, RSRNav [27] reasons about the spatial rela-
+follows:                                                         tionship between the goal and the current observation through
+
+=== PDF PAGE 3 ===
+                                                                                                                                                  3
+
+
+direction-aware correlation and remains robust when the goal                           III. METHODOLOGY
+viewpoint  differs from the  test viewpoint. Beyond binary                                                             A. Problem Formulation
+decisions, QAsk-Nav [12] and VLN-NF [13] introduce ternary
+                                          We consider the standard ObjectNav setting, in which anuncertainty scores and an explicit NOT-FOUND outcome, while
+                                                             agent placed in a previously unseen indoor environment mustIEVE [28] and DRIVE-Nav [29] verify potential targets by
+                                                                    find an instance of a given target category c. At each step, thekeypoint matching and cross-frame VLM inspection. However,
+                                                             agent receives an egocentric RGB-D observation together withthese systems either depend on closed-source VLM APIs or
+                                                                                    its pose relative to the start of the episode. It then executesdo not collect further observations when the evidence on a
+                                                                      either a discrete movement action or the stop action, whichcandidate  is insufficient. In CLOSER, verification runs on
+                                                          ends the episode. The episode succeeds if the agent calls thelocal hardware, and the agent approaches a candidate with
+                                                               stop action within 1 m of an instance of the target categoryinsufficient evidence to acquire additional views.
+                                                          under a budget of 500 steps.
+                                      A candidate event begins with the detection of a candidate
+B. Vision–Language Model Adaptation and Chain-of-Thought                                                                    for the target category and ends when the agent decides to
+Reasoning                                                               stop at the candidate or to reject  it and resume exploration.
+  Large VLMs can be adapted by  training only a small  The agent may defer this decision to gather further views of
+fraction of their parameters, either a lightweight query module   the candidate. The event ends without a decision if the agent
+with the image encoder and language model frozen [30] or   loses track of the candidate or the episode terminates  first.
+low-rank updates such as LoRA [14], and EverWalker [31]   Since deferral consumes steps from the episode budget, the
+generates LoRA  parameters on  the  fly from  observation   goal in each event is to reach a correct decision with as few
+prototypes for lifelong navigation. Chain-of-thought super-   deferral steps as possible.
+vision provides training signal beyond the final label: CL-
+CoTNav [32] fine-tunes a VLM on hierarchical chain-of-
+                                                             B. Framework Overview
+thought annotations so that it reasons about ObjectNav deci-
+sions, and distilling rationales from closed-source teachers into   CLOSER controls the agent only during a candidate event,
+open models is now standard practice [33], [34]. Distillation is   so the host ObjectNav system keeps its exploration and map-
+likewise used to compress navigation models: Chen et al. [35]   ping modules unchanged. As shown in Fig. 2, the candidate
+distill both where to look and how to move from a teacher into    is tracked across frames, and a CLIP-based diversity gate
+a student with 93% fewer parameters. However, CURE [36]   maintains an evidence cache of complementary views. The
+shows that VLM rationales can be inconsistent with the visual   single-view perceiver is a fine-tuned VLM that predicts tri-
+evidence even when the final answer is correct, and program-   state probabilities for each retained view (yes for a target, no
+based  distillation [37] mitigates  this inconsistency through   for a non-target, and uncertain for insufficient evidence).
+executable verification. CLOSER adapts Qwen2.5-VL-7B with  A lightweight MLP fuses these probabilities into a tri-state
+LoRA and keeps a base-model rationale only when its label   decision (Sec. III-C). The perceiver and the MLP are trained
+is correct and a rule-based validator accepts it, so an external   offline on labels that encode both the semantic identity and
+teacher annotates only the remaining samples (Sec. III-D3).   the evidence sufficiency of each detection (Sec. III-D). If the
+Rendering novel viewpoints with 3D Gaussian Splatting also   fused decision is uncertain, the agent enters the approach
+improves the viewpoint robustness of VLN agents [38]; like-   phase, in which the approach policy generates a local trajectory
+wise, CLOSER renders confusers as hard negatives and refines   toward the candidate from its tracked mask and depth. The
+the perceiver on its residual errors (Sec. III-D2).                policy is trained to imitate expert trajectories planned on a
+                                                                  privileged navigability map (Sec. III-E). Views retained along
+                                                                 the local trajectory update the fused decision, so the agentC. Active Perception and Uncertainty-Driven Exploration
+                                                         can end the approach phase before reaching the candidate
+  Active perception selects sensor placements to maximize                                                                 (Sec. III-F).
+information gain. Next-best-view (NBV) methods optimize
+hand-crafted metrics [39] or predict the downstream value of
+                                                          C. Tri-State Verification Stackprospective viewpoints [40], [41]. Uncertainty-aware methods
+complement view selection through conformal prediction [42]    At each step t of a candidate event, the verification stack
+and uncertainty-driven intrinsic motivation [43], and recent   outputs a fused decision yt ∈Y = {yes, uncertain, no}
+work applies them to open-vocabulary object search [44].  from the cached views. An uncertain decision indicates
+Diffusion models have also become expressive policy rep-   that these views support neither yes nor no, so targets and
+resentations that capture multimodal action distributions [16]   confusers  alike can receive  it. A binary  verifier can also
+and generate navigation trajectories [45]. The approach policy   defer by withholding its decision whenever its confidence falls
+of CLOSER connects these two  lines without an  explicit  below a threshold. However, the threshold is selected on the
+information-gain objective (Sec. III-E). A Diffusion Trans-   validation split and is thus tied to the confidence distribution
+former [17] distilled from privileged expert trajectories takes   of that split. When this distribution shifts at deployment, confi-
+only the candidate mask and depth as input, and the verifica-   dent predictions on insufficient views can exceed the threshold
+tion stack decides from the newly acquired views whether the  and become forced decisions, while no labels are available
+evidence suffices.                                                 to re-tune the threshold. Moreover, a low confidence does
+
+=== PDF PAGE 4 ===
+                                                                                                                                                  4
+
+
+ Closed-Loop Active Verification (Inference)
+
+
+
+   A · Candidate Perception & Tracking           B · Keyframe Evidence Cache               C · Evidence-Aware Multi-View Verifier          D · Active Approach (Diffusion Policy)
+        RGB frames                             Masks                                                     ...                                               LoRA                         ...
+                                                                                                             ...                                              yes       Stop &                                                                                                                                      success
+
+         ...                         ...
+                                                                                                                     uncertain                                Diffusion
+   Grounded-SAM    ByteTrack      SAM                           CLIP
+     candidate init       track ID     mask refresh                                                        Qwen2.5-VL-7B          no       explorationresume
+                                                                                                             ...
+                                                                                         category: bed
+                                                                                            MLP
+                                                                                                                                               8 waypoints
+        mask             depth
+
+                                                                                        fine-tuning
+ Training                                                                                                                                              imitation learning
+
+                                                 Verifier Training                                                                 Policy Training: Privileged Expert
+
+      1. Evidence-sufficiency       2. Render augmentation      3. Rationale-supervised          4. Hard-case          navigability map     Voronoi path     Bézier smoothing  expert waypoint    inference flow
+      labeling                   bed         sofa        SFT                          refinement              (privileged)                                            chunks
+                     Sufficient  Insufficient                      vs                  base         yes:self-rationalekeep             errors                                                                  correct?                   40%                                                                              uncertain loop
+         Target     yes      uncertain
+                                                                                  GPT-4o                                                            vs                                  no:
+                                                                                      teacher                                                                                                  rewrite         correct                                                                                               training / transfer
+       Confuser   no      uncertain                                                  60%
+                                        chair        stool
+                                     hard confusers         LoRA SFT on rationale + label                                                                                                              yes / uncertain / no
+
+
+
+
+Fig. 2. Closed-loop inference and training of CLOSER. (A) Grounded-SAM, ByteTrack, and SAM track the candidate and refresh its mask in each RGB-D
+frame. (B) The evidence cache retains views selected by a CLIP-based diversity gate. (C) Per-view tri-state probabilities from the single-view perceiver are
+fused by a lightweight MLP. (D) After an uncertain decision, a Diffusion Transformer generates waypoints from the mask and depth. Frames observed
+along the waypoints re-enter panels A and B (uncertain loop). The lower panels depict the perceiver training pipeline (Verifier Training) and the construction
+of expert waypoint chunks (Policy Training).
+
+
+not indicate whether additional views of the candidate would   feature vt and the features in Kt−1,
+enable a decision. CLOSER therefore supervises uncertain
+as an explicit class. The training labels of this class are derived                ρt =   min   1 −cos vt, v(j)   ,           (2)
+                                                                      1≤j≤mt−1
+from view conditions that the agent can improve by moving,
+namely the image scale, truncation or occlusion, and viewing                                                      where cos(·, ·) denotes cosine similarity. The frame is eligible
+distance of the candidate (Sec. III-D1).                                                           only if ρt exceeds the threshold δview selected on the validation
+  1) Candidate Tracking: When Grounded-SAM [10] identi-    split. Each track  starts with an empty cache, and  its  first
+fies a candidate for the target category in the RGB frame It, it   frame is always eligible. If mt−1 < K, an eligible frame
+returns a bounding box Bt and a segmentation mask Mt; Dt    is appended as the newest entry (It, vt, pt). If mt−1 = K,
+denotes the aligned depth image. ByteTrack [15] associates the   the gate keeps the size-K subset of Vt = {v(1), . . . , v(K), vt}
+candidate across subsequent frames, and SAM [46] refreshes   with the largest diversity,
+Mt from the tracked box in each frame.
+  2) Evidence Cache and Diversity Gate: Consecutive frames              S⋆t = arg   max    Div(S),             (3)
+                                                                                   S⊆Vt, |S|=K
+of a tracked candidate are often nearly identical, and admitting
+every frame would waste perceiver queries and bias the fused  where Div(S) is the mean cosine distance over all pairs of
+decision toward repeated views. The diversity gate therefore   distinct features in S.  If vt /∈S⋆t , the frame  is discarded
+decides which frames enter the evidence cache of the tracked   without a perceiver query. Otherwise, the entry whose feature
+candidate. After frame It, the cache is                              lies outside S⋆t  is evicted, and the frame is appended as the
+                                                          newest entry.
+                            mt
+       Kt =  (I(j), v(j), p(j)) j=1,    mt ≤K,       (1)     3) Single-View Perceiver: Each frame that enters the cache
+                                                                               is evaluated exactly once by the perceiver hθ, a VLM that runs
+where mt is the number of retained views and K is the cache  on local hardware and is fine-tuned as described in Sec. III-D3.
+capacity. Entries are indexed in admission order, and entry j  The perceiver receives the full frame It and the target category
+stores the retained view I(j), its CLIP ViT-L/14 [47] feature    c, so that the scale, occlusion, and context of the candidate
+v(j), and  its  tri-state probabilities p(j) from the perceiver   remain visible. A constrained prompt restricts its output to the
+(Sec. III-C3). The gate measures the novelty of the current   three labels. Their probabilities, renormalized over Y, form
+frame by the minimum cosine distance between  its CLIP   pt = hθ(It, c) ∈R3.
+
+=== PDF PAGE 5 ===
+                                                                                                                                                  5
+
+
+  4) Cross-View Fusion: The fusion MLP gω receives the                         TABLE I
+probability vectors of all cached views, which together retain                EVIDENCE-AWARE LABEL ASSIGNMENT.
+how confident each view is and whether the views agree. Its
+                                                                                                                    Sufficient Evidence    Insufficient Evidence
+input Pt stacks these vectors and fills the K −mt empty slots
+                                                                                   Target candidate           yes          uncertainwith zero rows,
+                                                                                 Non-target candidate        no           uncertain
+     Pt =  p(1),  . . . , p(mt), 0,  . . . , 0 ⊤∈RK×3.   (4)
+
+                                                                  2) Detector-Aligned Data and Render Augmentation: Natu-As every cached probability vector sums to one, a zero row
+                                                                           ral training data come from collection trajectories that followmarks an empty slot without a separate indicator. The MLP
+gω maps the flattened input vec(Pt) ∈R3K to logits zt with   shortest paths through HM3D [20] training scenes in Habi-
+                                                                               tat [48]. Grounded-SAM runs on sampled frames, and eachone entry zt,a per label a ∈Y, and the fused decision is the
+                                                                 detection is labeled by Eq. (8). These data populate the fourlabel with the largest logit,
+                                                           regimes of Table I unevenly. Most non-target detections are
+       zt = gω vec(Pt) ∈R3,     yt = arg max zt,a.    (5)   easy to reject, whereas sufficient views of confusers are scarce
+                                      a∈Y            and insufficient views of confusers are rarer still. We therefore
+                                                         supplement these two regimes with rendered confusers, such
+                                                               as a sofa for the target bed or a stool for the target chairD. Training the Verification Stack
+                                                                       (Verifier Training panel of Fig. 2). Each confuser is rendered
+  1) Evidence-Sufficiency Labeling: We assign training labels   with varied camera distance, azimuth, image-plane placement,
+to Grounded-SAM detections, so that the training samples  and occlusion, so that  it is observed in both sufficient and
+carry the same localization errors and imperfect masks as   insufficient views. Rendered frames pass through the same
+the candidates encountered  at deployment. Each detection   detector and labeling function as natural frames. A rendered
+(I, B, M, D) comprises the frame, box, mask, and depth image   frame therefore yields a training sample only when Grounded-
+of Sec. III-C1 with the time index omitted.  It  is assessed  SAM identifies the confuser as a candidate for the target
+along two axes. Semantic identity is derived from simulator   category, and the sample is labeled from the detected mask.
+annotations, whereas evidence sufficiency is computed from     3) Rationale-Supervised Adaptation and Refinement: The
+the detection alone.                                             perceiver is adapted from Qwen2.5-VL-7B-Instruct [49] with
+  Each detection is obtained by prompting Grounded-SAM  LoRA [14] on the resulting single-view corpus. Its training
+with a target category c. Let Gc be the pixels annotated as c   target is a short rationale followed by the tri-state label. The
+in the simulator, and let |·| count pixels. The semantic overlap   rationale names the category-relevant attributes visible in the
+is                                                       frame and states whether the view suffices for a decision, so
+                       |M ∩Gc|                    the supervision covers both axes of the labeling function. Since               ptarget(M, Gc) =                .              (6)
+                            |M|                     only the label is decoded at deployment, the rationale adds no
+                                                                inference latency.
+An overlap of at least η+ indicates a target, an overlap below
+                                                     To limit queries to a closed-source teacher, we first prompt
+η−indicates a non-target, and intermediate values leave the
+                                                                 the base Qwen model to generate a rationale rbasei    and aidentity ambiguous.
+                                                                 prediction ˆℓi for each sample i from its frame Ii and category
+  Evidence sufficiency is measured by three quantities that
+                                                                              ci, without access to  its label ℓi. A correct prediction can
+correspond to the view conditions of Sec. III-C: the mask-
+                                                                                        still be accompanied by a malformed or label-inconsistent
+to-image ratio rimg = |M|/|I| for image scale, the box-fill                                                                      rationale. A rule-based validator V therefore checks each base
+ratio rfill = |M|/|B| for truncation or occlusion, and the mean                                                                    rationale for format, length, label consistency, and prohibited
+mask depth ¯d = Pu∈M D(u)/|M| for viewing distance. The                                                                      patterns, and outputs 1 only if all checks pass. The rationale
+sufficiency predicate requires all three quantities to satisfy their
+                                                          used for training is
+thresholds,
+                                     (rbasei     ,                   ˆℓi = ℓi ∧V (rbasei     , ℓi) = 1,
+    q(I, M, B, D) = 1[rimg ≥α] 1[rfill ≥β] 1[¯d ≤γ],    (7)        ri =                                                     (9)
+                                                                                 fext(Ii, ci, ℓi),  otherwise,
+where the indicator 1[·] equals 1 if its condition holds and 0  where fext queries GPT-4o to generate the rationale from the
+otherwise. The labeling function then assigns the label ℓby   image, the category, and the label.
+checking sufficiency before identity,                              In the first round, the perceiver is trained with autoregressive
+                                                               cross-entropy over the rationale and label tokens. A hard-
+      uncertain,  q = 0,                                                       example refinement round then repeats the LoRA fine-tuning
+      yes,          q = 1 ∧ptarget ≥η+,             at a reduced learning rate. Its training set is drawn from the     ℓ=                                                 (8)
+            no,            q = 1 ∧ptarget < η−,            training split and combines every sample that the first-round
+                                                                 perceiver misclassifies with correctly classified samples at a      discard,        otherwise,
+                                                                  fixed ratio.
+where η±, α, β, and γ are the thresholds of the labeling func-     4) Fusion MLP Training: The fusion MLP is trained with
+tion. Table I summarizes the four regimes of this assignment.   the perceiver frozen. When a candidate stays tracked over
+
+=== PDF PAGE 6 ===
+                                                                                                                                                  6
+
+
+several frames of a collection trajectory (Sec. III-D2), these  A0t at diffusion timestep k and is trained jointly with Eψ by
+frames pass through the diversity gate of Sec. III-C2, and   minimizing
+the retained views form a multi-view training sequence. For                                                     2                                                                               h                   i                                                      LDP(ϕ, ψ) = EA0t ,k,ϵ   ϵ −ϵϕ(Akt , k, et) F   ,     (10)sequence  i, the perceiver  probabilities of these views are
+stacked into Pi as in Eq. (4). Each sequence is labeled by a                                                      where Akt = √¯αk A0t + √1 −¯αk ϵ is the noised chunk andbest-evidence rule over the sufficiency values qj of its retained
+                                                                          ¯αk  is the cumulative noise schedule. At inference, reverse
+views, given by Eq.  (7). A sequence without a  sufficient
+                                                                  diffusion conditioned on the current mask and depth samples
+view (maxj qj = 0) is labeled uncertain. Otherwise,  it
+                                                           a chunk At ∼πϕ(· | Mt, Dt), and a low-level waypoint con-
+is labeled yes or no by applying Eq. (8) to  its sufficient
+                                                                            troller converts its waypoints into discrete movement actions.
+views. Sequences whose sufficient views yield ambiguous or
+conflicting identities are discarded. Since a single sufficient
+view makes the sequence label decisive, the MLP is trained   F. Closed-Loop Active Verification
+to let that view outweigh the insufficient views cached with     Algorithm 1 summarizes the inference procedure for one
+it. The training objective is three-class cross-entropy between   candidate event. Throughout the event, the perceiver evaluates
+gω(vec(Pi)) and the sequence label.                         each frame admitted by the diversity gate, and the fusion
+                                       MLP updates the fused decision yt from the evidence cache
+                                                                 (Sec. III-C). If yt is yes or no, the agent stops at the candidateE. Active Approach Policy
+                                                               or  rejects  it,  respectively. Otherwise, the agent enters the
+  During the approach phase, the approach policy πϕ gener-   approach phase and follows a chunk At sampled from the
+ates waypoints toward the candidate. Since shortest paths often   approach policy πϕ (Sec. III-E). Since verification continues
+pass close to walls and corners, where walls can block the line   during chunk  execution,  the agent  cancels  the remaining
+of sight to the candidate, the policy imitates expert trajectories   waypoints and acts on yt as soon as a newly retained view
+smoothed from maximum-clearance paths.                  makes it decisive. When the agent completes a chunk while
+  1) Privileged Expert Trajectory Construction: Each expert   yt remains uncertain, the approach policy samples the next
+demonstration starts from a simulated state in which a target  chunk from the current mask and depth. Once the mean mask
+instance  is detected as a candidate whose view  fails the   depth  ¯dt of Mt falls below the close-range threshold dclose,
+sufficiency predicate of Eq. (7). The goal of the expert  is  moving closer is unlikely to reveal substantially more detail.
+obtained by back-projecting the candidate mask and depth to a   Therefore, if yt is still uncertain at this range, the agent
+target position and projecting this position onto the navigable   applies a close-range fallback that selects whichever of yes
+plane. The expert has privileged access to the ground-truth  and no has the larger logit in zt.
+navigability map (Policy Training panel of Fig. 2), on which
+it plans a piecewise-linear path to the goal along the Voronoi                       IV. EXPERIMENTS
+medial axis of the free space. A B´ezier curve fitted to this
+                                          We  first  report ObjectNav performance across systems,
+path yields a smooth trajectory, from which waypoints are
+                                                             then analyze closed-loop verification and its components, and
+sampled at a fixed spacing. Sliding windows of H consecutive
+                                                                        finally examine efficiency and remaining failures.
+waypoints form the expert chunks. The chunk A0t ∈RH×2
+that starts at step t stacks the planar offsets of its waypoints
+in the egocentric frame of the agent at step t.                  A. Experimental Setup
+  2) Mask-and-Depth-Conditioned Diffusion Transformer:      Datasets and evaluation splits. We evaluate navigation in
+At deployment, the policy uses no map and observes only   Habitat on the standard validation episodes of Gibson [50]
+the tracked mask Mt and the aligned depth image Dt, which   (1,000 episodes), HM3D v1 (2,000), and HM3D v2 [20], [51]
+encode the relative position, scale, and visibility of the candi-   (1,000). The verification stack is trained, refined, validated,
+date with respect to the agent. These inputs are concatenated  and tested on scene-disjoint HM3D splits, and the approach
+channel-wise and processed by encoder Eψ into the condition   policy  is trained on expert demonstrations from the same
+et = Eψ([Mt; Dt]). Appearance reasoning  is  left  to the   training  scenes. MP3D  [52] uses a 21-category  protocol,
+perceiver, so the policy takes no RGB input. Omitting RGB   whereas the stack is trained on the six categories shared by
+is also intended to reduce the sensitivity of the policy to the  Gibson and HM3D, so MP3D serves only for the candidate-
+appearance gap between simulation and reality. As the policy   level distribution-shift evaluation of Table VI.
+receives no category input,  it approaches an uncertain     Metrics. At the episode level, we report success rate (SR)
+confuser in the same way as an uncertain target, although  and Success weighted by Path Length (SPL) [53]; closed-loop
+all demonstrations end at targets.                                  results are means over three evaluation seeds. Every failed
+  Similar mask and depth observations  in  different room   episode is attributed to exactly one cause, in priority order:
+layouts can correspond to geometrically distinct expert chunks,   false stop (FS), where the episode terminates by accepting
+and direct regression would average them. We therefore model   a  non-target;  false  reject  (FR), where  at  least one  true-
+the distribution of expert chunks conditioned on et with a   target candidate is detected and then rejected or abandoned;
+Diffusion Transformer [16], [17]. Each chunk A0t  is paired   exploration failure, where no true target is detected within the
+with the condition et computed at its start step t. The trans-   budget; or other, covering timeouts with a pending candidate
+former ϵϕ predicts the Gaussian noise ϵ ∼N(0, I) added to  and collision-induced termination. Episode-level FS and FR
+
+=== PDF PAGE 7 ===
+                                                                                                                                                  7
+
+
+Algorithm 1 Closed-Loop Active Verification                                     TABLE II
+Require: target category c; RGB-D frames (It, Dt); trained              IMPLEMENTATION SETTINGS FOR CLOSER.
+    hθ, gω, πϕ; cache capacity K; view-diversity threshold
+                                                                                  Setting                                                        Value
+    δview; fallback depth dclose
+                                                                                Target-overlap thresholds (η+, η−)                         (0.25, 0.05)  1: Grounded-SAM detects a candidate for c in It; Kt−1 ←∅                                                          Minimum mask-to-image ratio α                                 0.02
+  2: while ByteTrack keeps tracking the candidate do          Minimum box-fill ratio β                                       0.40
+  3:   Refresh Mt with SAM from the tracked box; extract   Maximum mean mask depth γ                                   3.0 m
+       the CLIP feature vt of It; Kt ←Kt−1                    Cache capacity K                                      4 views
+                                                                               View-diversity threshold δview                                   0.18
+  4:     if (mt−1 = 0 or ρt > δview) and (mt−1 < K or    Cached-view order                                     Oldest to newest
+      vt ∈S⋆t ) then {Eqs. (2), (3)}                                Fusion MLP input                          4 × 3 raw probabilities
+  5:        If mt−1 = K, evict the entry outside S⋆t from Kt     LoRA rank / scaling factor                               64/128
+  6:     pt ←hθ(It, c); append (It, vt, pt) to Kt            LoRA target modules                      Attention and MLP projections
+                                                                                Perceiver SFT learning rate                             2 × 10−5
+  7:   end if                                                                        Refinement correct-to-misclassified ratio                             1.5
+  8:    zt ←gω(vec(Pt)); yt ←arg maxa∈Y zt,a {Eq. (5)}       Expert B´ezier degree                                         7
+  9:     if yt = uncertain and ¯dt < dclose then                 Waypoint horizon H                                         8
+                                                                     Waypoint spacing                                            0.25 m 10:      yt ←arg maxa∈{yes,no} zt,a {close-range fallback}                                                  DDIM denoising steps                                       10
+ 11:   end if                                                               Policy learning rate                                   1 × 10−4
+ 12:     if yt = yes then                                                 Fallback mean-depth threshold dclose                             1.0 m
+ 13:      Call the stop action; return
+ 14:    else if yt = no then
+ 15:      Reject the candidate and resume exploration; return     Implementation details. The perceiver is trained on 78,350
+ 16:   end if                                                   labeled single-view detections from 108 HM3D training scenes
+ 17:     If no waypoints remain, sample At ∼πϕ(· | Mt, Dt)    (60,030 natural Grounded-SAM detections and 18,320 ren-
+ 18:   Execute one action toward the next waypoint; t ←t+1   dered samples covering the two rare regimes of Sec. III-D2),
+ 19: end while                                           and the fusion MLP on 8,070 tracked multi-view sequences.
+ 20: Resume exploration {track lost}                          Table II lists the remaining settings; the view-diversity thresh-
+                                                              old δview is selected on the validation split.
+
+
+are therefore exclusive shares of all episodes. Candidate-level   B. Overall ObjectNav Performance
+FS and FR are instead class-conditional rates: FS is the fraction                                                              Table  III compares eight ObjectNav systems with  their
+of non-target candidate events accepted with yes, and FR                                         CLOSER variants on Gibson, HM3D v1, and HM3D v2; each
+is the fraction of target candidate events rejected with no;                                                    “+ CLOSER” row differs from its baseline only in the stopping
+events that end in abandonment or episode termination with a                                                                    rule under the protocol of Sec. IV-A. CLOSER improves both
+pending candidate remain in the denominator but enter neither                                           SR and SPL in all 24 system–dataset pairs (Fig. 3), with SR
+numerator. In the approach phase, a candidate  is correctly                                                               gains averaging 3.6 points (up to 4.9) and SPL gains averaging
+resolved only if a correct yes/no decision is reached before                                                               2.0 points (up to 3.1). Since approach steps count against the
+the close-range fallback; fallback-triggered decisions, track                                                       unchanged 500-step budget, the consistent SPL gains show
+loss, abandonment, and episode termination with a pending                                                                      that the path spent on additional views is more than repaid by
+candidate do not count as correct resolution.                                                                 the failures they prevent.
+  Baselines and system integration. The eight baselines span    The size of each gain reflects how much candidate verifica-
+end-to-end and modular ObjectNav systems based on learned   tion the baseline already performs. DD-PPO, ZSON, SemExp,
+policies, semantic exploration, frontier scoring, value maps,  L3MVN, and VoroNav stop on detector or policy outputs and
+topological reasoning, and target-centric fusion. CLOSER at-   gain 3.4–4.9 SR points on each dataset; ESC and VLFM
+taches to each as a self-contained verification layer that runs   use map-level scoring without a candidate-level check and
+its own Grounded-SAM, ByteTrack, and SAM (Sec. III-F)   gain 2.2–3.4 points; ApexNav already fuses passively acquired
+on  the RGB-D stream  of  the  baseline, so every system   views of the candidate [58] and gains the least, yet CLOSER
+receives  candidates from  the same  detection-and-tracking    still improves  its SR and SPL on  all  three  datasets and
+pipeline. Exploration, mapping, and the low-level planner  makes  it the strongest system in Table III. This ordering is
+remain unchanged, and CLOSER replaces only the native   consistent with attributing the baseline failures to the stopping
+stopping rule. The 500-step budget, action space, and success   decision (Sec. IV-C), and the gains over ApexNav indicate
+criterion of each dataset are likewise unchanged, so  veri-   that the views gathered actively during the approach phase
+fication steps, including the approach phase, count against  add evidence that passive acquisition does not provide.
+the same budget. Simulator annotations are used only for
+training labels and privileged expert construction. Systems
+                                                          C. Failure Cause Analysiswith an LLM decision module use the same  locally de-
+ployed Qwen3-30B-A3B-Instruct-2507 model across   We analyze native VLFM on HM3D v2 using the episode-
+datasets.                                                            level  failure  attribution  of  Sec. IV-A.  Its SR  is 63.6%,
+
+=== PDF PAGE 8 ===
+                                                                                                                                                  8
+
+
+
+                                                TABLE III
+END-TO-END OBJECTNAV RESULTS. SR/SPL OF EIGHT OBJECTNAV SYSTEMS AND THEIR CLOSER PLUG-IN VARIANTS ON GIBSON, HM3D V1, AND
+  HM3D V2 (OV: OPEN-VOCABULARY). EACH SHADED “+ CLOSER” ROW REPORTS THE ABSOLUTE GAIN OVER ITS BASELINE IN PARENTHESES;
+ CLOSER RESULTS ARE MEANS OVER THREE SEEDS (STANDARD DEVIATIONS ≤0.9 SR AND ≤0.6 SPL POINTS). CLOSER IMPROVES BOTH METRICS
+                                           FOR EVERY SYSTEM ON EVERY DATASET.
+
+
+                                       Gibson                  HM3D v1                 HM3D v2
+Method      OV
+                            SR(%) ↑    SPL(%) ↑            SR(%) ↑    SPL(%) ↑            SR(%) ↑    SPL(%) ↑
+
+Plug-in comparison
+ZSON [54]    ✓                  31.3         12.0                    25.5         12.6                    28.7         13.1
+  + CLOSER  ✓               35.6 (+4.3)    14.5 (+2.5)               29.8 (+4.3)    15.1 (+2.5)               32.5 (+3.8)    14.7 (+1.6)
+
+DD-PPO [55]   ×                  34.8         14.0                    27.9         14.2                    33.5         15.6
+  + CLOSER  ×               38.9 (+4.1)    16.3 (+2.3)               32.1 (+4.2)    15.6 (+1.4)               36.9 (+3.4)    17.8 (+2.2)
+ESC [5]     ✓                  66.5         40.2                    43.4         24.1                    51.6         26.4
+  + CLOSER  ✓               69.9 (+3.4)    42.0 (+1.8)               46.7 (+3.3)    26.0 (+1.9)               54.8 (+3.2)    28.2 (+1.8)
+VoroNav [56]  ✓                  72.8         46.5                    46.2         28.1                    54.9         30.2
+  + CLOSER  ✓               76.9 (+4.1)    48.8 (+2.3)               50.3 (+4.1)    30.5 (+2.4)               59.0 (+4.1)    32.5 (+2.3)
+VLFM [6]    ✓                  84.0         52.2                    52.5         30.4                    63.6         32.5
+  + CLOSER  ✓               86.2 (+2.2)    53.7 (+1.5)               55.4 (+2.9)    32.2 (+1.8)               66.1 (+2.5)    34.1 (+1.6)
+
+L3MVN [57]   ×                  79.5         39.4                    53.9         25.2                    65.1         28.4
+  + CLOSER  ×               84.4 (+4.9)    41.8 (+2.4)               58.8 (+4.9)    28.3 (+3.1)               69.6 (+4.5)    31.2 (+2.8)
+
+SemExp [2]   ×                  54.4         19.9                    38.2         19.0                    44.8         20.3
+  + CLOSER  ×               58.9 (+4.5)    22.6 (+2.7)               42.6 (+4.4)    21.6 (+2.6)               49.1 (+4.3)    22.9 (+2.6)
+ApexNav [58]  ✓                  88.6         55.4                    58.6         32.4                    71.2         35.7
+  + CLOSER  ✓               89.3 (+0.7)    55.6 (+0.2)               60.4 (+1.8)    33.6 (+1.2)               72.5 (+1.3)    36.7 (+1.0)
+
+
+
+with 19.4% false stops and 13.8% false rejects. These stop-   path mark the steps spanned by the two events, and the black
+attributable causes sum to 33.2 percentage points of the overall   segments correspond to exploration by the baseline. Neither
+36.4% failure rate, so the stopping decision accounts for over  map in the panel is an input to CLOSER (Sec. III-E).
+90% of the failures; exploration and other failures account for     Real-world verification. Fig. 5 shows the verification stack
+the remaining 3.2 points.                                   deployed on a Unitree Go2 quadruped in two real indoor
+  CLOSER reduces the stop-attributable failures by more than   scenes, running the same components as in Sec. III-F on the
+half, from 33.2 to 15.7 points, with false stops falling to   onboard camera stream without any fine-tuning on real data. In
+6.4% and false rejects to 9.3%, and SR increases to 66.1%.   both scenes, stacked blocks occlude the candidate at the initial
+Preventing an early false stop or false reject allows navigation   viewpoint, so the initial views are deferred; as the robot moves
+to continue, and some of the continued episodes subsequently   around the blocks, clearer views enter the cache, and the fused
+time  out,  collide, or end with a pending  candidate. The   decision becomes decisive once the candidate is fully visible.
+exploration/other share therefore rises from 3.2% to 18.2%,  The tri-state verification thus transfers from simulation to real
+and more than half of the remaining failures fall outside the  camera streams without adaptation.
+stopping decision that CLOSER addresses.
+
+                                                             E. Ablation Studies
+D. Qualitative Results                                                                  1) Closed-loop Verification: Table IV compares the native
+   Fig. 4 shows how the closed loop prevents both error types  VLFM stopping rule, two binary verifiers, tri-state verification
+in one successful episode with target category sofa. In the first   without the approach policy, and the complete system on
+candidate event, the fused decision on the initial view at step   the same HM3D v2 episodes. Binary GPT-4o-mini follows
+34 is uncertain, so the agent enters the approach phase.   the API-based verification of prior work [11]; the local bi-
+The view retained at step 37 shows that the candidate is a   nary variant uses the same cache implementation but has
+bed; the fused decision becomes no, and the agent discards  no uncertain  state, so  its  first decision terminates the
+the candidate and resumes exploration instead of ending the   candidate event. The static tri-state variant keeps the candidate
+episode with a false stop. In the second event, the initial view   tracked while VLFM continues to explore and recomputes
+at step 63 is likewise deferred, and two further views retained   the fused decision whenever the cache admits a new view,
+at steps 72 and 75 add evidence during the approach phase   without a dedicated approach policy; the close-range fallback
+until the fused decision becomes yes. The agent then calls    still applies if VLFM brings the agent within 1 m of the candi-
+the stop action, and the episode succeeds. In the navigation   date. Cache construction and approach policies are evaluated
+context of Fig. 4(b), the colored segments of the top-down   separately in Tables VII and VIII.
+
+=== PDF PAGE 9 ===
+                                                                                                                                                  9
+
+
+(a)                                                                                   (b)
+
+                                                                                     60
+                             Stop on raw detector /                           Map-level       Candidate-level
+                                        policy output                                      heuristic            fusion                 24 / 24 configurations
+                                                                                                               improve on both axes
+                                          stronger native verification → smaller gain
+                                                                                     50
+     5                                                                          Gibson
+                                                            HM3D v1
+                                                            HM3D v2     (points) 4                                                                               40
+  rate                                                                                                             (%)
+     3                                                                                                          SPL                                                                                     30
+    Success 2
+ Δ
+                                                                                     20
+     1
+                                                                                                                                                                baseline
+                                                                                                                               + CLOSER
+     0                                                                               10
+        L3MVN  SemExp  ZSON   VoroNav DD-PPO   ESC    VLFM  ApexNav
+                                                                                            30    40    50    60    70    80    90
+                                                                                                   Success rate (%)
+
+
+Fig. 3.  Paired ObjectNav gains from CLOSER. (a) Absolute SR gains grouped by dataset and by the native candidate-verification mechanism (shading,
+left to right: none, map-level heuristic, and candidate-level fusion). (b) Changes in SR and SPL for the same 24 system–dataset pairs; each arrow starts at the
+baseline and ends at its “+ CLOSER” result. Data from Table III.
+
+
+   (a) Evidence timeline                                                               TABLE IV
+                                                           CLOSED-LOOP ABLATION OF THE VERIFICATION LAYER. ALL
+     A. Reject a confuser
+                                                         S=34                      VARIANTS ARE BUILT ON VLFM AND EVALUATED ON THE HM3D V2
+    S=34                         S=37                     "A sofa is not visible in the
+                                                                VALIDATION EPISODES. FS / FR / FB: EPISODE-LEVEL FALSE STOP, FALSE
+                                                               image."
+                                                                                     REJECT, AND FALLBACK TRIGGER (%).
+                                                         S=37
+                                                           "The candidate is a bed, not a
+                                                                        sofa, as evidenced by its size,              Variant                   SR↑  SPL↑  FS↓  FR↓ FB↓
+                                                                   mattress, and bedding. The
+                                                               surrounding context shows a        VLFM native stop               63.6   32.5   19.4  13.8   –
+                                                     bedroom with a dresser and
+             Uncertain                No -> Resume         mirror, not a sofa."                   Binary GPT-4o-mini (API)       64.9   33.3   11.2  12.1   –
+                                                                              Binary local                     64.4   33.0   13.6  14.2   –
+    B. Confirm the target                                                                           Tri-state + diverse cache (static)  65.3   33.6   8.7   15.1   4.2
+    S=63                        S=72                       S=75                      + Diffusion policy (CLOSER)   66.1   34.1   6.4   9.3   9.8
+
+
+
+                                                      must assign a binary outcome when the available evidence is
+             Uncertain                   Evidence grows                Yes -> success            insufficient.
+                                                       Adding an uncertain state without the approach policy
+  (b) Navigation context                                                     further reduces false stops to 8.7%, while false rejects increase
+                                                                    to 15.1%: deferred  target candidates are abandoned when
+                                                                 the views that VLFM subsequently observes do not provide
+                                                                       sufficient evidence. With the approach  policy,  false stops
+                                                       and false rejects decrease to 6.4% and 9.3%, and SR/SPL
+                                                             reach 66.1/34.1  (Fig.  6). During the approach phase, the
+                                                             agent acquires additional views of deferred candidates, which
+                             Top-down path                          Semantic map       accounts for the reduction in false rejects relative to the static
+                                                                              tri-state variant. The complete system triggers the close-range
+Fig. 4.  Closed-loop verification in one successful episode with target   fallback in 9.8% of episodes; fallback-induced false stops and
+category sofa. (a) Evidence timeline of the two candidate events (S: step   false rejects are included in the reported rates.
+index). In event A, the initial view is deferred as uncertain, and the view
+                                                                  2) Evidence-aware  Verification and View Selection:  Ta-retained at step 37 reveals the candidate to be a bed, so the agent discards the
+candidate and resumes exploration. In event B, the fused decision remains   ble V compares verifier variants on 5,184 held-out Grounded-
+uncertain at step 72 and becomes yes at step 75, so the agent stops.  SAM candidate events from the scene-disjoint HM3D  test
+The quoted text shows the perceiver rationales for the two views of event
+                                                                                split, separating semantic decisions on clear observations fromA, decoded here for illustration. (b) Top-down path and semantic map of the
+episode; the colored path segments correspond to the timeline arrows in (a).   deferral decisions on insufficient ones. Binary SFT shares
+                                                                 the backbone and corpus of the tri-state models but assigns
+                                                          each insufficient observation  its latent semantic label [11];
+  The binary API and local verifiers reduce false stops from   the threshold variant defers when  its maximum label-token
+19.4% to 11.2% and 13.6%, respectively, but improve SR by   probability falls below a threshold selected on the validation
+at most 1.3 points. The local binary variant also increases false    split.
+rejects from 13.8% to 14.2%, since it has no deferral state and     Binary SFT reaches 87.4% and 78.6% on clear target and
+
+=== PDF PAGE 10 ===
+                                                                                                                                                 10
+
+
+
+      1                 2                 3                  4
+
+
+
+
+
+      1                  2                 3                 4
+
+
+
+
+
+Fig. 5.  Real-world verification on a quadruped robot. The verification stack runs on the onboard camera stream of a Unitree Go2 in two indoor scenes
+(one scene per row, frames ordered left to right; insets show the onboard view). Stacked blocks occlude the candidate (a chair, top; an armchair, bottom), so
+the initial views are deferred as uncertain. As the robot moves around the blocks, clearer views enter the cache, and the fused decision becomes decisive
+once an unobstructed view is retained (rightmost insets).
+
+                                                       FS + FR                          TABLE VI
+      VLFM native stop              63.6               19.4    13.8     33.2       DEFERRAL QUALITY UNDER DISTRIBUTION SHIFT. THE DEFERRAL
+                                                          THRESHOLD OF THE BINARY VERIFIER IS SELECTED ONCE ON THE HM3D
+       Binary GPT-4o-mini              64.9              11.2 12.1  11.8   23.3            VALIDATION SPLIT AND KEPT FIXED. DEFER: FRACTION OF
+                                                                   INSUFFICIENT-EVIDENCE CANDIDATES CORRECTLY DEFERRED; FS / FR:
+Binary local (no uncertain)              64.4              13.6  14.2  7.8   27.8       CANDIDATE-LEVEL FALSE STOP AND FALSE REJECT. ALL VALUES IN %.                                                                                                                                                                     −17.5
+     Tri-state, no approach              65.3              8.7  15.1  10.9   23.8                                        Binary SFT + threshold  CLOSER (tri-state)
+                                                                                    Evaluation domain
+    CLOSER (full loop)              66.1              6.4 9.3   18.2     15.7                                        Defer ↑FS ↓  FR ↓   Defer ↑FS ↓FR ↓
+                                                   HM3D held-out (in-domain)       81.4    12.6    11.2     84.6    7.5    8.4
+                    0     20     40     60     80    100         MP3D candidates (cross-dataset)   63.7    17.9    15.8     82.1    8.6    9.3
+                                                                            Rendered hard regimes            46.8    23.4    20.7     79.2    9.8   10.9
+                              Share of all episodes (%)
+
+
+                            Success       False reject
+                               False stop     Exploration / other                   direct-label SFT from 66.6% to 78.0%, and sequence-level
+                                                               fusion with hard refinement brings the full stack to 85.4%
+Fig. 6.  Episode outcomes of the closed-loop ablation. Each episode is
+                                                       and 83.8% while also improving the clear-observation rates.assigned to exactly one outcome; the right column shows the total stop-
+attributable error (FS + FR). Data from Table IV.                    At the deployment operating point of Table IX, the local stack
+                                                              reaches 86.1% tri-state accuracy, compared with 82.4% for the
+                                                               single-view GPT-4o-mini API comparator.
+                      TABLE V
+   VERIFIER COMPARISON ON 5,184 HELD-OUT GROUNDED-SAM        Distribution  shift. Table VI evaluates threshold deferral
+  DETECTIONS. CLEAR COLUMNS: CORRECT SEMANTIC DECISIONS ON    and tri-state verification across three domains, with the binary
+   CLEAR OBSERVATIONS; LOW-Q COLUMNS: CORRECT DEFERRAL OF
+                                                                threshold selected once on the HM3D validation split and kept  INSUFFICIENT OBSERVATIONS (ZERO FOR THE PURE BINARY VERIFIER,
+  WHICH CANNOT DEFER). THE LOWER BLOCK REPORTS THE CLOSER     fixed.
+ TRAINING STAGES, THE FIRST TWO ON SINGLE VIEWS; PARENTHESIZED     From HM3D  to MP3D and  the rendered regimes,  the
+ VALUES GIVE THE GAIN OVER THE PREVIOUS STAGE. ALL VALUES IN %.
+                                                                    deferral rate of the thresholded model drops from 81.4% to
+                          Clear→  Low-Q tgt→  Clear→  Low-Q cnf→  63.7% and 46.8%, whereas that of CLOSER drops only from
+Verifier / variant                  yes ↑       unc. ↑      no ↑        unc. ↑    84.6% to 82.1% and 79.2% (Fig. 7); over the same range, the
+Qwen2.5-VL zero-shot             68.7        42.3        55.1         39.8       false-stop rate rises from 12.6% to 23.4% for the threshold
+Binary SFT (yes/no)             87.4          0.0         78.6          0.0       but only from 7.5% to 9.8% for CLOSER. The explicitlyBinary SFT + threshold            79.8        82.1        69.4         80.6
+                                                              supervised uncertain state is therefore far less sensitive
+Direct-label SFT, single view       83.6        67.4        73.2         65.8
++ Rendered regimes + rationale  85.9 (+2.3)   78.7 (+11.3)   77.1 (+3.9)   77.3 (+11.5)    to domain shift than a fixed confidence threshold.
+Full CLOSER stack           89.1 (+3.2)   85.4 (+6.7)   84.6 (+7.5)   83.8 (+6.5)     View selection. Table VII holds the learned components
+                                                                  fixed and compares a single latest frame with the latest K
+                                                          frames and CLIP-diverse selection, both with K=4.
+confuser observations but cannot  defer; threshold  deferral    The latest-K cache raises  tri-state accuracy from 80.7%
+raises the two low-quality rates to 82.1% and 80.6% at the   to 83.5%, and CLIP-diverse  selection  raises  it  further  to
+cost of the clear-observation rates, which drop to 79.8% and  86.1% while lifting low-quality deferral to 84.6% and lowering
+69.4%. Among the CLOSER stages, rendered regimes with   candidate-level  false  stops from 9.2%  to 7.5%. Selecting
+rationale supervision raise the average low-quality deferral of   complementary views thus improves the evidence supplied to
+
+=== PDF PAGE 11 ===
+                                                                                                                                                 11
+
+
+
+                         Binary SFT + threshold    CLOSER (tri-state)                               TABLE VIII
+                                                             APPROACH-POLICY COMPARISON ON INITIALLY UNCERTAIN
+   90                                                              +10.8          CANDIDATES. CORRECT: CORRECT Y E S/N O DECISION BEFORE THE
+↑                                  25                           CLOSE-RANGE FALLBACK; CONFUSER: REJECTION RATE ON INITIALLY
+                                   -5.4
+(%) 80             ↓                                 UNCERTAIN CONFUSERS; FB: FALLBACK TRIGGER RATE ON THIS
+                                    20                                CANDIDATE SUBSET. ALL VALUES EXCEPT PATH ARE IN %.
+deferral 70                                         (%)                                                                 stop 15                                  Policy                             Correct ↑Confuser ↑Path (m) ↓FB ↓
+   60             threshold                                                        In-place look-around                 32.4       26.1        0.00      0.0
+                        deferral                                                                                  False 10                                     Straight-line policy                   61.7       54.3        2.84     37.6                     collapses
+   50                                                                +2.3        Viewpoint re-verif. (STRIVE) [11]    70.2       63.8        2.21     25.4Low-quality                               -34.6                                                Voronoi–B´ezier det. BC              76.5       70.9        2.08     18.1                                     5   40                                                                      Voronoi–B´ezier diffusion            83.6       78.4        1.69     12.7
+      HM3D    MP3D   Rendered        HM3D    MP3D   Rendered
+
+                   Evaluation domain (increasing shift →)                                       In-place        32.4              0.00                      0.0
+                                                                                              look-around
+
+Fig. 7.  Deferral under distribution shift. The fixed binary threshold and            Straight-line         61.7                        2.84                     37.6
+CLOSER are evaluated on held-out HM3D candidates, MP3D candidates, and           approach
+the rendered hard regimes of Table I. Annotations show changes from the in-
+                                                                                        Viewpoint                                                                                                                             re-verif.          70.2                   2.21                    25.4domain to the rendered setting; the shaded region shows the gap between the                                                                                      (STRIVE)
+methods. Data from Table VI.
+                                                                                              Voronoi-Bezier            76.5                 2.08                      18.1
+                                                                                                                 det. BC
+                     TABLE VII
+  ABLATION OF CACHE CONSTRUCTION. THE LEARNED COMPONENTS        Voronoi-Bezier             83.6             1.69                      12.7
+ ARE FIXED; MULTI-VIEW ROWS USE K=4. ACC.: TRI-STATE ACCURACY;       diffusion (ours)
+LOW-Q: FRACTION OF INSUFFICIENT-EVIDENCE CANDIDATES CORRECTLY
+   DEFERRED; FS: CANDIDATE-LEVEL FALSE STOP. ALL VALUES IN %.                   0      50     100  0   1   2   3     0     20    40
+                                                                                                     Correct (%) ↑         Path (m) ↓         FB (%) ↓
+
+             Evidence input       Acc. ↑  Low-Q ↑  FS ↓
+                                                                                   Fig. 8.  Resolution accuracy, extra path, and fallback rate of approach
+              Latest frame only      80.7     78.9     11.4                                                                                   policies on the initially uncertain candidate subset. Data from Table VIII.
+             Latest-K frames       83.5     81.2     9.2
+            CLIP-diverse (ours)   86.1     84.6     7.5
+                                                     The single-view perceiver requires 0.28 s and 17.2 GB per
+                                                                  retained view, compared with 1.38 s and $0.41 per 1,000
+the fusion MLP at the same cache budget.                      queries for GPT-4o-mini. Fusing up to four cached views adds
+  3) Approach Policy: Table VIII compares policies on can-   0.1 ms and raises  tri-state accuracy from 80.7% to 86.1%,
+didates initially assigned uncertain. All variants share the   above the 82.4% of the API comparator, while leaving per-
+verifier, evidence rule, and close-range fallback and differ only   view latency and peak memory unchanged, since each retained
+in how they acquire additional observations; the fallback rate   view is evaluated exactly once.
+is conditioned on this subset and differs from the episode-level     Training cost. LoRA adaptation updates 160.8 M parame-
+rate in Table IV.                                                      ters (2.1% of the backbone). The perceiver and policy stages
+  In-place look-around resolves only 32.4% of candidates, and   require 111 GPU-hours on four A100-80GB GPUs: 76 hours
+the straight-line policy raises correct resolution to 61.7% at   for first-round SFT on the 78,350 single-view samples, 19
+the cost of 2.84 m of extra path and a 37.6% fallback rate;   hours for hard-example refinement, and 16 hours for diffusion-
+selecting a single re-verification viewpoint as in STRIVE [11]   policy training on 14,680 demonstration chunks (fusion-MLP
+reaches 70.2% with 2.21 m. The deterministic and diffusion   training excluded). The triage rule of Eq. (9) queries the GPT-
+policies imitate the same Voronoi–B´ezier demonstrations, and  4o teacher for 42.3% of the corpus and reduces annotation
+the diffusion policy raises correct resolution from 76.5% to   cost by 2.4× ($518 vs. $1,226).
+83.6%, shortens the extra path from 2.08 m to 1.69 m, and
+lowers the fallback rate from 18.1% to 12.7% (Fig. 8). It also  G. Remaining Failure Analysis
+rejects 78.4% of initially uncertain confusers, although  it is
+                                                              Table X compares the conditional candidate-level false-stop
+trained only on target-present demonstrations.
+                                                                      rates of the detector-only rule, the binary SFT verifier, and
+                                         CLOSER on four non-target confusion subsets.
+F. Efficiency and Training Cost                                                            For the sofa–bed, stool–chair, and sink–toilet confusions, bi-
+  Table IX compares the single-view API and local perceivers   nary verification reduces false stops from 64.8–79.2% to 42.7–
+with the complete verification stack. Local measurements use   53.1%, and CLOSER further reduces them to 27.1–35.4%;
+batch size 1 on one NVIDIA A100 40 GB GPU and include  on the remaining confusions, the rates are 46.3%, 30.2%,
+visual preprocessing and decoding; API latency is measured  and 19.6%. Binary verification handles clear confusers, while
+end to end. Because the perceiver is queried once per retained   the closed loop acquires additional views for candidates that
+view and the MLP fuses the cached probabilities after each   remain uncertain. As each row is conditioned on a different
+cache update, the latency of the stack is reported per retained   subset, these rates are not comparable with the aggregate 7.5%
+view.                                                               false-stop rate of Tables VI and VII.
+
+=== PDF PAGE 12 ===
+                                                                                                                                                 12
+
+
+                      TABLE IX                          improves success rate and path efficiency across heteroge-
+ VERIFIER RUNTIME AND DEPLOYMENT COST. LOCAL VLM LATENCY    neous ObjectNav harnesses; ablations show that the full gain
+AND MEMORY ARE MEASURED ON A SINGLE NVIDIA A100 40 GB GPU;
+     API COST IS IN USD PER 1,000 QUERIES. LATENCY OF THE         requires the closed loop, since deferral without resolution
+  PERCEIVER–MLP STACK IS PER RETAINED VIEW; EACH MLP FUSION     reduces false stops but raises false rejects. Looking ahead,
+                      ADDS 0.1 MS.                          extending evidence-aware deferral from candidate verification
+                                                                         Tri-state    Latency  Memory  Cost/1k    to exploration commitments, and validating the mask-and-
+ Verifier                                     Local  Views  accuracy ↑     (s) ↓    (GB) ↓  queries ↓   depth policy on physical platforms, are natural next steps
+ GPT-4o-mini           API                        (tri-state)                                  No                                                 1       82.4                                                                           1.38                                                                            –       0.41
+ Qwen2.5-VL               zero-shot                                           Yes                                                 1                                                                52.6                                                                           0.31      16.9                                                                                    0     toward irreversible decisions under partial observability.
+ CLOSER single-view perceiver               Yes    1       80.7       0.28      17.2      0
+ CLOSER perceiver + raw-probability MLP  Yes  ≤4      86.1     0.28/view    17.2      0
+                                                        ACKNOWLEDGMENT
+
+                      TABLE X                         The authors declare that they have no known competing
+  CANDIDATE-LEVEL FALSE-STOP RATE (%) ON CHARACTERISTIC      financial interests or personal relationships that could have
+CONFUSER PAIRS (VLFM+CLOSER, HM3D V2). “A AS B” DENOTES A
+ CANDIDATE OF CATEGORY A DETECTED WHILE SEARCHING FOR TARGET   appeared to influence the work reported in this paper.
+CATEGORY B; “OTHER CONFUSIONS” POOLS THE UNLISTED NON-TARGET
+                     CONFUSION TYPES.                                    REFERENCES
+
+                                Detector  Binary                                [1] Y. Liu et al., “Aligning cyber space with physical world: A comprehen-
+            Confusion          only     verifier  CLOSER                        sive survey on embodied AI,” IEEE/ASME Trans. Mechatronics, vol. 30,
+                                                                                     no. 6, pp. 7253–7274, 2025.
+            Sofa as bed         79.2      53.1      35.4                      [2] D. S. Chaplot, D. Gandhi, A. Gupta, and R. Salakhutdinov, “Object
+             Stool as chair       70.6      45.3      28.8                        goal navigation using goal-oriented semantic exploration,” in Proc. Adv.
+            Sink as toilet        64.8      42.7      27.1                       Neural Inf. Process. Syst. (NeurIPS), vol. 33, 2020, pp. 4247–4258.
+             Other confusions    46.3      30.2      19.6                      [3] R. Fukushima, K. Ota, A. Kanezaki, Y. Sasaki, and Y. Yoshiyasu,
+                                                                               “Object memory transformer for object goal navigation,” in Proc. IEEE
+                                                                                                        Int. Conf. Robot. Autom. (ICRA), 2022, pp. 11 288–11 294.
+                                                                                      [4]  J. Sun, J. Wu, Z. Ji, and Y.-K. Lai, “A survey of object goal navigation,”
+  On VLFM with CLOSER,  the remaining  episode-level       IEEE Trans. Autom. Sci. Eng., vol. 22, pp. 2292–2308, 2025.
+false stops and false rejects are 6.4% and 9.3%, respectively     [5] K. Zhou et al., “ESC: Exploration with soft commonsense constraints for
+                                                                                     zero-shot object navigation,” in Proc. Int. Conf. Mach. Learn. (ICML),
+(Table IV). Qualitative inspection identifies three recurrent                                                                              2023.
+modes.                                                                             [6] N. Yokoyama, S. Ha, D. Batra, J. Wang, and B. Bucher, “VLFM: Vision-
+  Track switches between adjacent similar instances. Byte-        language frontier maps for zero-shot semantic navigation,” in Proc. IEEE
+                                                                                                        Int. Conf. Robot. Autom. (ICRA), 2024, pp. 42–48.
+Track can transfer a candidate identity to a neighboring object                                                                                      [7] Y. Song, A. Nguyen, and C.-Y. Lee, “Learning to terminate in object
+with a similar appearance. The evidence cache may then mix         navigation,” in Proc. Asian Conf. Mach. Learn. (ACML), 2024, pp.
+views of different instances.                                            1247–1262.
+                                                                                      [8]  J. Li et  al., “RATE-Nav: Region-aware termination enhancement for
+   Persistent occlusion  at  close range. When a candidate                                                                                     zero-shot object navigation with vision-language models,” in Findings
+remains occluded within the 1 m region, the binary fallback         Assoc. Comput. Linguist.: ACL, 2025, pp. 6564–6574.
+makes a decision from insufficient evidence. The episode-level     [9]  T. Cheng, L. Song, Y. Ge, W. Liu, X. Wang, and Y. Shan, “YOLO-World:
+                                                                                 Real-time open-vocabulary object detection,” in Proc. IEEE/CVF Conf.
+fallback trigger rate is 9.8%, while 19.7% of fallback-triggered        Comput. Vis. Pattern Recognit. (CVPR), 2024, pp. 16 901–16 911.
+decisions on initially uncertain candidates are incorrect; these    [10]  T. Ren et  al., “Grounded SAM: Assembling open-world models for
+rates use different denominators.                                              diverse visual tasks,” arXiv preprint arXiv:2401.14159, 2024.
+                                                                               [11] H. Zhu et al., “STRIVE: Structured representation integrating VLM rea-
+  Confusers with similar appearance and context. Some in-         soning for efficient object navigation,” arXiv preprint arXiv:2505.06729,
+stances, such as daybeds staged as sofas, remain ambiguous        2025.
+at close range and require cues beyond local appearance.         [12] E. Zorzi et al., “Benchmarking interaction, beyond policy: a reproducible
+                                                                       benchmark for collaborative instance object navigation,” arXiv preprint
+  The remaining 18.2% of episodes belong to the combined         arXiv:2604.00265, 2026.
+exploration/other category. They include episodes in which no    [13] H.-T. Su,  T.-J. Wang,  J.-F. Yeh, M. Sun, and W. H. Hsu, “VLN-
+target is detected within the budget, timeouts with a pending       NF: Feasibility-aware vision-and-language navigation with false-premise
+                                                                                             instructions,” in Proc. 64th Annu. Meeting Assoc. Comput. Linguist.
+candidate, and collision-induced termination.                           (ACL), 2026, pp. 25 134–25 150.
+                                                                               [14] E. J. Hu et al., “LoRA: Low-rank adaptation of large language models,”
+                                                                                           in Proc. Int. Conf. Learn. Represent. (ICLR), 2022.
+                    V. CONCLUSION                               [15] Y. Zhang et al., “ByteTrack: Multi-object tracking by associating every
+                                                                                       detection box,” in Proc. Eur. Conf. Comput. Vis. (ECCV), 2022, pp.
+  We presented CLOSER, an evidence-aware active visual        1–21.
+verification framework that  treats the terminal decision of    [16] C. Chi et al., “Diffusion policy: Visuomotor policy learning via action
+object-goal navigation as a closed-loop evidence acquisition          diffusion,” Int. J. Robot. Res., vol. 44, no. 10–11, pp. 1684–1704, 2025.
+                                                                               [17] W. Peebles and S. Xie, “Scalable diffusion models with transformers,”
+problem rather than a one-shot binary  filter. A CLIP gate          in Proc. IEEE/CVF Int. Conf. Comput. Vis. (ICCV), 2023.
+maintains four complementary views, a locally deployable    [18] B. Chen  et  al., “Think  holistically,  act down-to-earth: A semantic
+single-view VLM  reports  their raw  tri-state  probabilities,         navigation strategy with continuous environmental representation and
+                                                                                       multi-step forward planning,” IEEE Trans. Circuits Syst. Video Technol.,
+and a lightweight MLP learns when the chronologically or-          vol. 34, no. 5, pp. 3860–3875, 2024.
+dered cache supports a category commitment; a privileged-    [19] X. Hu, Y. Lin, S. Wang, Z. Wu, and K. Lv, “Agent-centric relation graph
+to-observation Diffusion Transformer learns how to acquire          for object visual navigation,” IEEE Trans. Circuits Syst. Video Technol.,
+                                                                                              vol. 34, no. 2, pp. 1295–1309, 2024.
+a more informative view from only the tracked mask and    [20] K. Yadav et  al., “Habitat-matterport 3D semantics dataset,” in Proc.
+depth.  Inserted  as a  plug-in  layer, CLOSER  consistently       IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR), 2023.
+
+=== PDF PAGE 13 ===
+                                                                                                                                                 13
+
+
+
+[21] Y. Zhu et al., “ChatNav: Leveraging LLM to zero-shot semantic rea-    [44] U. Bajpai,  J. R¨uckin, C. Stachniss, and M. Popovi´c, “Uncertainty-
+     soning in object navigation,” IEEE Trans. Circuits Syst. Video Technol.,        informed active perception for open vocabulary object goal navigation,”
+      vol. 35, no. 3, pp. 2369–2381, 2025.                                              in Proc. Eur. Conf. Mobile Robots (ECMR), 2025, pp. 1–7.
+[22] Y. Cao et al., “CogNav: Cognitive process modeling for object goal    [45] A. Sridhar, D. Shah, C. Glossop, and S. Levine, “NoMaD: Goal masked
+     navigation with LLMs,” in Proc. IEEE/CVF Int. Conf. Comput. Vis.          diffusion policies for navigation and exploration,” in Proc. IEEE Int.
+     (ICCV), 2025, pp. 9550–9560.                                               Conf. Robot. Autom. (ICRA), 2024, pp. 63–70.
+[23] Y. Shi, J. Liu, L. Sun, and X. Zheng, “E2BA: Environment exploration    [46] A. Kirillov et al., “Segment anything,” in Proc. IEEE/CVF Int. Conf.
+     and backtracking agent for visual language object navigation,” IEEE        Comput. Vis. (ICCV), 2023, pp. 4015–4026.
+     Trans. Circuits Syst. Video Technol., vol. 35, no. 7, pp. 6231–6244, 2025.    [47] A. Radford et al., “Learning transferable visual models from natural
+[24]  F. Wu, W. Zuo, W. Yang, J. Xiao, Y. Liu, and X. Zeng, “ReMemNav:        language supervision,” in Proc. Int. Conf. Mach. Learn. (ICML), 2021,
+     Memory-based decision correction and target verification for zero-shot         pp. 8748–8763.
+      object navigation,” arXiv preprint arXiv:2603.26788, 2026.               [48] M. Savva et al., “Habitat: A platform for embodied AI research,” in
+[25] H. Yin, X. Xu, L. Zhao, Z. Wang, J. Zhou, and J. Lu, “UniGoal: Towards         Proc. IEEE/CVF Int. Conf. Comput. Vis. (ICCV), 2019, pp. 9339–9347.
+      universal zero-shot goal-oriented navigation,” in Proc. IEEE/CVF Conf.    [49]  S.  Bai  et   al.,  “Qwen2.5-VL  technical  report,”  arXiv  preprint
+     Comput. Vis. Pattern Recognit. (CVPR), 2025, pp. 19 057–19 066.             arXiv:2502.13923, 2025.
+[26]  S. Yuan, H. Zhang, L. Liu, L. Zhu, and X. Dong, “SPENav: Dynamic    [50]  F. Xia, A. R. Zamir, Z. He, A. Sax, J. Malik, and S. Savarese, “Gibson
+      object filtering with spatial perception enhancement for vision-language         env: Real-world perception for embodied agents,” in Proc. IEEE/CVF
+      navigation,” IEEE Trans. Circuits Syst. Video Technol., vol. 36, no. 5,         Conf. Comput. Vis. Pattern Recognit. (CVPR), 2018, pp. 9068–9079.
+     pp. 6905–6919, 2026.                                                    [51]  S. K. Ramakrishnan et  al., “Habitat-matterport 3D dataset (HM3D):
+[27] Z. Qin, L. Wang, Y. Wang, S. Zhou, G. Hua, and W. Tang, “RSRNav:        1000 large-scale 3D environments for embodied AI,” in Proc. Adv.
+     Reasoning spatial relationship for image-goal navigation,” IEEE Trans.        Neural Inf. Process. Syst. (NeurIPS) Datasets and Benchmarks Track,
+      Circuits Syst. Video Technol., vol. 36, no. 8, pp. 12 492–12 503, 2026.         2021.
+[28] X.  Lei, M. Wang, W. Zhou,  L.  Li, and H.  Li,  “Instance-aware    [52] A. Chang et al., “Matterport3D: Learning from RGB-D data in indoor
+      exploration-verification-exploitation for instance ImageGoal navigation,”         environments,” in Proc. Int. Conf. 3D Vis. (3DV), 2017, pp. 667–676.
+      in Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR), 2024,    [53]  P. Anderson et al., “On evaluation of embodied navigation agents,” arXiv
+     pp. 16 329–16 339.                                                              preprint arXiv:1807.06757, 2018.
+[29] M. Gao et  al., “DRIVE-Nav: Directional reasoning, inspection, and    [54] A. Majumdar, G. Aggarwal, B. Devnani,  J. Hoffman, and D. Batra,
+      verification for  efficient open-vocabulary navigation,” arXiv preprint       “ZSON: Zero-shot object-goal navigation using multimodal goal em-
+     arXiv:2603.28691, 2026.                                                      beddings,” in Proc. Adv. Neural Inf. Process. Syst. (NeurIPS), 2022.
+[30] W. Dai et al., “InstructBLIP: Towards general-purpose vision-language    [55] E. Wijmans et  al., “DD-PPO: Learning near-perfect PointGoal navi-
+     models with instruction tuning,” in Proc. Adv. Neural Inf. Process. Syst.         gators from 2.5 billion frames,” in Proc. Int. Conf. Learn. Represent.
+     (NeurIPS), 2023.                                                           (ICLR), 2020.
+[31] G. Li  et  al., “Evolving the prototype journey: Lifelong vision-and-    [56]  P. Wu et al., “VoroNav: Voronoi-based zero-shot object navigation with
+     language navigation with prototype adaptation,” IEEE Trans. Circuits          large language model,” in Proc. Int. Conf. Mach. Learn. (ICML), 2024,
+      Syst. Video Technol., 2026, early access.                                        pp. 53 757–53 775.
+[32] Y. Cai, X. He, M. Wang, H. Guo, W.-Y. Yau, and C. Lv, “CL-CoTNav:    [57] B. Yu, H. Kasaei, and M. Cao, “L3MVN: Leveraging large language
+     Closed-loop hierarchical chain-of-thought for zero-shot object-goal nav-        models for visual target navigation,” in Proc. IEEE/RSJ Int. Conf. Intell.
+      igation with vision-language models,” arXiv preprint arXiv:2504.09000,        Robots Syst. (IROS), 2023.
+     2025.                                                                    [58] M. Zhang et al., “ApexNav: An adaptive exploration strategy for zero-
+[33] Z. Zhang, G. P. Meyer, Z. Lu, A. Shrivastava, A. Ravichandran, and         shot object navigation with target-centric semantic fusion,” IEEE Robot.
+     E. M. Wolff, “VLM-KD: Knowledge distillation from VLM for long-        Autom. Lett., 2025.
+       tail visual recognition,” arXiv preprint arXiv:2408.16930, 2024.
+[34] L. H. Li, J. Hessel, Y. Yu, X. Ren, K.-W. Chang, and Y. Choi, “Symbolic
+     chain-of-thought distillation: Small models can also “think” step-by-
+      step,” in Proc. 61st Annu. Meeting Assoc. Comput. Linguist. (ACL),
+     2023, pp. 2665–2679.
+[35] Z. Chen, Y. Ge, Z. Wang, P. Cao, and L. Yang, “Query, align, and
+       distill: Navigation-aware cross-modal interaction for efficient vision-and-
+     language navigation,” IEEE Trans. Circuits Syst. Video Technol., 2026,
+      early access.
+[36] Y. Chen, K. Sikka, M. Cogswell, H. Ji, and A. Divakaran, “Measuring
+     and improving chain-of-thought reasoning in vision-language models,”
+      in Proc. Conf. North Amer. Chapter Assoc. Comput. Linguist. (NAACL),
+     2024, pp. 192–210.
+[37] Y. Hu et al., “Visual program distillation: Distilling tools and program-
+     matic reasoning into vision-language models,” in Proc. IEEE/CVF Conf.
+     Comput. Vis. Pattern Recognit. (CVPR), 2024, pp. 9590–9601.
+[38] Z. Zhong et al., “Spatial-aware and viewpoint-robust vision-language
+      navigation,” IEEE Trans. Circuits Syst. Video Technol., vol. 36, no. 8,
+     pp. 11 717–11 728, 2026.
+[39] M. Breyer, L. Ott, R. Siegwart, and J. J. Chung, “Closed-loop next-best-
+     view planning for target-driven grasping,” in Proc. IEEE/RSJ Int. Conf.
+       Intell. Robots Syst. (IROS), 2022, pp. 1411–1416.
+[40] X. Chen, Q. Li, T. Wang, T. Xue, and J. Pang, “GenNBV: Generalizable
+     next-best-view policy for active 3D reconstruction,” in Proc. IEEE/CVF
+     Conf. Comput. Vis. Pattern Recognit. (CVPR), 2024, pp. 16 436–16 445.
+[41] L. Jin, X. Chen, J. R¨uckin, and M. Popovi´c, “NeU-NBV: Next best view
+     planning using uncertainty estimation in image-based neural rendering,”
+      in Proc. IEEE/RSJ  Int. Conf.  Intell. Robots Syst. (IROS), 2023, pp.
+     11 305–11 312.
+[42] A. Z. Ren et al., “Robots that ask for help: Uncertainty alignment for
+      large language model planners,” in Proc. Conf. Robot Learn. (CoRL),
+     2023, pp. 661–682.
+[43] D. S. Chaplot, M. Dalal, S. Gupta,  J. Malik, and R. Salakhutdinov,
+    “SEAL: Self-supervised embodied active learning using exploration and
+    3D consistency,” in Proc. Adv. Neural Inf. Process. Syst. (NeurIPS),
+     2021.

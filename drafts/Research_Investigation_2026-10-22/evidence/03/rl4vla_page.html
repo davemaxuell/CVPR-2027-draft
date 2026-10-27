@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <!-- Meta tags for social media banners, these should be filled in appropriatly as they are your "business card" -->
+  <!-- Replace the content tag with appropriate information -->
+  <meta name="description" content="DESCRIPTION META TAG">
+  <meta property="og:title" content="What Can RL Bring to VLA Generalization? An Empirical Study" />
+  <meta property="og:description" content="Website of What Can RL Bring to VLA Generalization? An Empirical Study" />
+  <meta property="og:url" content="https://RLVLA.github.io" />
+  <!-- Path to banner image, should be in the path listed below. Optimal dimenssions are 1200X630-->
+  <!-- <meta property="og:image" content="static/image/your_banner_image.png" /> -->
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+
+
+  <!-- <meta name="twitter:title" content="TWITTER BANNER TITLE META TAG"> -->
+  <!-- <meta name="twitter:description" content="TWITTER BANNER DESCRIPTION META TAG"> -->
+  <!-- Path to banner image, should be in the path listed below. Optimal dimenssions are 1200X600-->
+  <!-- <meta name="twitter:image" content="static/images/your_twitter_banner_image.png"> -->
+  <!-- <meta name="twitter:card" content="summary_large_image"> -->
+  <!-- Keywords for your paper to be indexed by-->
+  <!-- <meta name="keywords" content="KEYWORDS SHOULD BE PLACED HERE"> -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+  <title>What Can RL Bring to VLA Generalization? An Empirical Study</title>
+  <link rel="icon" type="image/x-icon" href="static/images/favicon.ico">
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro" rel="stylesheet">
+
+  <link rel="stylesheet" href="static/css/bulma.min.css">
+  <link rel="stylesheet" href="static/css/bulma-carousel.min.css">
+  <link rel="stylesheet" href="static/css/bulma-slider.min.css">
+  <link rel="stylesheet" href="static/css/fontawesome.all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="static/css/index.css">
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script src="https://documentcloud.adobe.com/view-sdk/main.js"></script>
+  <script defer src="static/js/fontawesome.all.min.js"></script>
+  <script src="static/js/bulma-carousel.min.js"></script>
+  <script src="static/js/bulma-slider.min.js"></script>
+  <script src="static/js/index.js"></script>
+</head>
+
+<body>
+
+
+  <section class="hero">
+    <div class="hero-body">
+      <div class="container is-max-desktop">
+        <div class="columns is-centered">
+          <div class="column has-text-centered">
+            <h1 class="title is-1 publication-title">What Can RL Bring to VLA Generalization?<br>An Empirical Study</h1>
+            <div class="is-size-5 publication-authors">
+              <!-- Paper authors -->
+              <!-- <span class="author-block">
+                <a href="FIRST AUTHOR PERSONAL LINK" target="_blank">Jijia Liu</a><sup>*</sup>
+              </span>, -->
+              <span class="author-block">Jijia Liu<sup>1*</sup></span>,
+              <span class="author-block">Feng Gao<sup>2*</sup></span>,
+              <span class="author-block">Bingwen Wei<sup>1</sup></span>,
+              <span class="author-block">Xinlei Chen<sup>1</sup></span>,
+              <span class="author-block">Qingmin Liao<sup>1</sup></span>,
+              <span class="author-block">Yi Wu<sup>2</sup></span>,
+              <span class="author-block">Chao Yu<sup>1†</sup></span>,
+              <span class="author-block">Yu Wang<sup>3†</sup></span>
+            </div>
+
+            <div class="is-size-5 publication-authors">
+              <span class="author-block"><sup>1</sup>Shenzhen International Graduate School, Tsinghua University</span><br>
+              <span class="author-block"><sup>2</sup>Institute for Interdisciplinary Information Sciences, Tsinghua University</span><br>
+              <span class="author-block"><sup>3</sup>Department of Electronic Engineering, Tsinghua University</span>
+              <span class="eql-cntrb"><small><br><sup>*</sup>Equal Contribution</small></span>
+              <span class="eql-cntrb"><small><sup>†</sup>Corresponding Authors</small></span>
+              <br><br><span class="publication-venue">Accepted by NeurIPS 2025</span>
+            </div>
+
+            <div class="column has-text-centered">
+              <div class="publication-links">
+                <!-- ArXiv abstract Link -->
+                <span class="link-block">
+                  <a href="https://arxiv.org/abs/2505.19789" target="_blank"
+                    class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                      <i class="ai ai-arxiv"></i>
+                    </span>
+                    <span>arXiv</span>
+                  </a>
+                </span>
+
+                <!-- Github link -->
+                <span class="link-block">
+                  <a href="https://github.com/gen-robot/RL4VLA" target="_blank"
+                    class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                      <i class="fab fa-github"></i>
+                      <!-- <i class="fas fa-file-pdf"></i> -->
+                    </span>
+                    <span>Code</span>
+                  </a>
+                </span>
+
+                <!-- HuggingFace link -->
+                <span class="link-block">
+                  <a href="https://huggingface.co/collections/gen-robot/rlvla-684bc48aa6cf28bac37c57a2" target="_blank"
+                    class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                      <img src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg" alt="HuggingFace">
+                      <!-- <i class="fas fa-file-pdf"></i> -->
+                    </span>
+                    <span>Models</span>
+                  </a>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- Teaser video-->
+  <section class="hero teaser is-light">
+    <div class="hero-body">
+      <div class="container is-max-desktop">
+        <br>
+        <div class="columns is-centered">
+          <div class="column is-9 has-text-centered">
+            <img src="static/images/teaser.png" alt="Overview of our study" />
+          </div>
+        </div>
+        <div class="content is-medium">
+          <p>
+            We conduct an empirical study to evaluate the <b>generalization</b> benefits of reinforcement learning
+            (<b>RL</b>) fine-tuning versus supervised fine-tuning (<b>SFT</b>) for Vision-Language-Action (<b>VLA</b>)
+            models.
+          </p>
+          <p>
+            In out-of-distribution tests, RL enhances VLA generalization substantially in <b>Execution</b>, improves
+            moderately in <b>Semantics</b>, and performs on par with SFT for <b>Vision</b>.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+  <!-- End teaser video -->
+
+  <section class="section">
+    <div class="container is-max-desktop">
+      <h1 class="title is-4">Preliminary: Vision-Language-Action model</h1>
+      <div class="columns is-vcentered">
+        <div class="column">
+          <div class="content is-medium">
+            <p>
+              We base our study on <b>OpenVLA</b> (Kim et al., 2024), an open-source model that achieves
+              state-of-the-art
+              performance on various robot tasks.
+            </p>
+            <p>
+              At each time step the policy receives a single RGB image and an instruction, i.e., the history length
+              H=1,
+              and outputs a sequence of discretized action tokens representing the predicted control commands.
+            </p>
+          </div>
+        </div>
+        <div class="column is-three-sevenths">
+          <img src="static/images/openvla.png" alt="OpenVLA model architecture" />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container is-max-desktop">
+      <h1 class="title">1. Effective RL fine-tuning of VLA models</h1><br>
+      <div class="content">
+        <h2 class="title is-4">1.1 RL algorithms: PPO, GRPO, DPO</h2>
+        <div class="content is-medium">
+          <p>
+            We consider three representative RL algorithms: PPO, GRPO and DPO, fine-tuning the OpenVLA model with LoRA.
+          </p>
+          <p>
+            Our findings indicate that <b>PPO consistently outperforms GRPO and DPO</b>, likely due to non-stationary
+            dynamics
+            destabilizing GRPO, and sparse rewards together with distribution shifts limiting DPO.
+          </p>
+        </div>
+        <div class="is-centered">
+          <img src="static/images/rl_results2.png" alt="Overview and performance of different RL methdos" />
+        </div>
+      </div>
+
+      <br><br>
+      <div class="content">
+        <h2 class="title is-4">1.2 Design factors of PPO</h2>
+        <div class="columns is-vcentered">
+          <div class="column content is-medium">
+            <p>
+              <b>Shared actor-critic backbone</b>: saves 45% VRAM and trains 53% faster in speed.
+            </p>
+            <p>
+              <b>VLA warm-up</b>: converges with about 50% fewer environment steps.
+            </p>
+            <p>
+              <b>Minimal PPO epoch</b>: reduces wall-clock time with similar sample-efficiency.
+            </p>
+          </div>
+          <div class="column is-two-fifths">
+            <img src="static/images/vh_imple.png" alt="Actor-critic architecture of VLA RL fine-tuning" />
+          </div>
+        </div>
+        <div class="is-centered">
+          <img src="static/images/design_results.png" alt="Performance of ablating key design" />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container is-max-desktop">
+      <h1 class="title">2. Evaluating fine-tuning methods on VLA generalization</h1><br>
+      <div class="content">
+        <h2 class="title is-4">2.1 Environments and datasets</h2>
+        <div class="content is-medium">
+          <p>
+            Inspired by prior works (Fan et al., 2025; Stone et al., 2023) and the concept of Vision-Language-Action
+            models, we define three dimensions of generalization:
+          </p>
+          <p>
+            <b>Vision</b>: We include both foreground and background changes, as well as image-level dynamic noise.
+          </p>
+          <p>
+            <b>Semantics</b>: We consider unseen variations in objects, receptacles, and instruction phrasings, as well
+            as
+            several new tasks.
+          </p>
+          <p>
+            <b>Execution</b>: We investigate changes in the initial positions of object and receptacle, as well as robot
+            initial pose.
+          </p>
+          <p>
+            In the <u>training</u> setting, we randomise along three axes: 16 tables (Vision), 16 objects (Semantics),
+            and
+            perturbations of object and receptacle poses (Execution).
+          </p>
+          <p>
+            At <u>test time</u> we hold at least one of these factors out of distribution, introducing 9 novel objects,
+            16
+            unseen receptacles, 5 new table surroudings, and 16 distractor textures.
+          </p>
+        </div>
+      </div>
+
+      <br><br>
+      <div class="content">
+        <h2 class="title is-4">2.2 Comparison between SFT and RL</h2>
+        <br>
+        <div class="columns is-vcentered is-centered">
+          <div class="is-11 column">
+            <img src="static/images/rlsft_results.png"
+              alt="Performance comparison of RL and SFT w.r.t. number of demonstrations" />
+          </div>
+        </div>
+        <div class="content is-medium">
+          <p>
+            In the aspect of <b>data scale</b>, SFT saturates at 16k demonstrations.
+            At convergence, RL performs comparably to SFT-16k in the training setting and 42.6% better on unseen objects
+            and tables.
+          </p>
+        </div>
+        <br>
+        <div class="columns is-vcentered">
+          <div class="column is-8">
+            <img src="static/images/main_results.png" alt="Performance of generalization of SFT and RL" />
+          </div>
+          <div class="column content is-medium">
+            <p>
+              In the aspect of <b>generalization</b>, we find
+            </p>
+            <p> <b>Vision</b>: SFT and RL perform comparably </p>
+            <p> <b>Semantics</b>: RL improves moderately </p>
+            <p> <b>Execution</b>: RL enhances substantially </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container is-max-desktop">
+      <h1 class="title">3. Appendix: More demonstration videos</h1><br>
+      <div class="content">
+        <h2 class="title is-4">3.1 Vision tasks</h2><br>
+        <div class="columns is-vcentered">
+          <div class="column is-7">
+            <video autoplay controls muted loop height="100%">
+              <source src="static/videos/1-table.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="column content is-medium">
+            <p> <b>Vision - Unseen Table</b> </p><br>
+            <p> Case 1: both SFT and RL fail to grasp </p>
+            <p> Case 2: SFT grasps and sticks, RL succeeds </p>
+          </div>
+        </div>
+      </div>
+
+      <br><br>
+      <div class="content">
+        <div class="columns is-vcentered">
+          <div class="column is-7">
+            <video autoplay controls muted loop height="100%">
+              <source src="static/videos/2-tex03.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="column content is-medium">
+            <p> <b>Vision - Dynamic Texture (weak)</b> </p><br>
+            <p> Case 1: SFT fails to put on plate, RL fails to grasp </p>
+            <p> Case 2: SFT fails to grasp, RL succeeds </p>
+          </div>
+        </div>
+      </div>
+
+      <br><br>
+      <div class="content">
+        <div class="columns is-vcentered">
+          <div class="column is-7">
+            <video autoplay controls muted loop height="100%">
+              <source src="static/videos/3-tex05.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="column content is-medium">
+            <p> <b>Vision - Dynamic Texture (strong)</b> </p><br>
+            <p> Case 1: SFT sticks after grasping, RL fails to grasp </p>
+            <p> Case 2: SFT moves arm without holding the object, RL succeeds </p>
+          </div>
+        </div>
+      </div>
+
+      <br><br>
+      <div class="content">
+        <div class="columns is-vcentered">
+          <div class="column is-7">
+            <video autoplay controls muted loop height="100%">
+              <source src="static/videos/4-noise03.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="column content is-medium">
+            <p> <b>Vision - Dynamic Noise (weak)</b> </p><br>
+            <p> Case 1: both SFT and RL fail to grasp </p>
+            <p> Case 2: SFT moves arm without holding the object, RL succeeds </p>
+          </div>
+        </div>
+      </div>
+
+      <br><br>
+      <div class="content">
+        <div class="columns is-vcentered">
+          <div class="column is-7">
+            <video autoplay controls muted loop height="100%">
+              <source src="static/videos/5-noise05.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="column content is-medium">
+            <p> <b>Vision - Dynamic Noise (strong)</b> </p><br>
+            <p> Case 1: SFT fails to grasp, RL grasps and drops the object </p>
+            <p> Case 2: SFT fails to grasp, RL succeeds </p>
+          </div>
+        </div>
+      </div>
+
+      <br><br>
+      <div class="content">
+        <h2 class="title is-4">3.2 Semantics tasks</h2><br>
+        <div class="columns is-vcentered">
+          <div class="column is-7">
+            <video autoplay controls muted loop height="100%">
+              <source src="static/videos/6-obj.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="column content is-medium">
+            <p> <b>Semantics - Unseen Objects</b> </p><br>
+            <p> Case 1: SFT fails to grasp, RL grasps and drop the object out of the table </p>
+            <p> Case 2: SFT sticks, RL succeeds </p>
+          </div>
+        </div>
+      </div>
+
+      <br><br>
+      <div class="content">
+        <div class="columns is-vcentered">
+          <div class="column is-7">
+            <video autoplay controls muted loop height="100%">
+              <source src="static/videos/7-recep.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="column content is-medium">
+            <p> <b>Semantics - Unseen Receptacles</b> </p><br>
+            <p> Case 1: SFT grasps and idles, RL doesn't grasp </p>
+            <p> Case 2: SFT fails to put the object, RL succeeds </p>
+          </div>
+        </div>
+      </div>
+
+      <br><br>
+      <div class="content">
+        <div class="columns is-vcentered">
+          <div class="column is-7">
+            <video autoplay controls muted loop height="100%">
+              <source src="static/videos/8-ins.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="column content is-medium">
+            <p>
+              <b>Semantics - Unseen Instruction Phrasings</b>
+            </p>
+            <div class=" content is-small">
+              <p> Instruct 1: pick up kitchen shovel and set it down on plate </p>
+              <p> Instruct 2: Put banana onto plate. </p>
+            </div><br>
+            <p> Case 1: both SFT and RL fail to grasp at the first time </p>
+            <p> Case 2: SFT sticks after grasping, RL succeeds </p>
+          </div>
+        </div>
+      </div>
+
+      <br><br>
+      <div class="content">
+        <div class="columns is-vcentered">
+          <div class="column is-7">
+            <video autoplay controls muted loop height="100%">
+              <source src="static/videos/9-moind.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="column content is-medium">
+            <p>
+              <b>Semantics - Multi-Object (both seen)</b>
+            </p>
+            <div class=" content is-small">
+              <p> Instruct 1: put watering can on plate </p>
+              <p> Instruct 2: put BBQ sauce on plate </p>
+            </div><br>
+            <p> Case 1: both SFT and RL fail to grasp </p>
+            <p> Case 2: SFT sticks after grasping, RL succeeds </p>
+          </div>
+        </div>
+      </div>
+
+      <br><br>
+      <div class="content">
+        <div class="columns is-vcentered">
+          <div class="column is-7">
+            <video autoplay controls muted loop height="100%">
+              <source src="static/videos/a-moood.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="column content is-medium">
+            <p>
+              <b>Semantics - Multi-Object (both unseen)</b>
+            </p>
+            <div class=" content is-small">
+              <p> Instruct 1: put champagne glass on plate </p>
+              <p> Instruct 2: put travel cup on plate </p>
+            </div><br>
+            <p> Case 1: SFT tries to grasp the wrong object, RL puts the wrong object on plate </p>
+            <p> Case 2: SFT sticks after grasping, RL succeeds </p>
+          </div>
+        </div>
+      </div>
+
+      <br><br>
+      <div class="content">
+        <div class="columns is-vcentered">
+          <div class="column is-7">
+            <video autoplay controls muted loop height="100%">
+              <source src="static/videos/b-mpind.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="column content is-medium">
+            <p>
+              <b>Semantics - Distractive Receptacles</b>
+            </p><br>
+            <p> Case 1: SFT puts the object on the wrong receptable, RL drops the object </p>
+            <p> Case 2: SFT hovers after grasping, RL succeeds </p>
+          </div>
+        </div>
+      </div>
+
+      <br><br>
+      <div class="content">
+        <div class="columns is-vcentered">
+          <div class="column is-7">
+            <video autoplay controls muted loop height="100%">
+              <source src="static/videos/c-mpood.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="column content is-medium">
+            <p>
+              <b>Semantics - Multi-Recep. (both unseen)</b>
+            </p>
+            <div class=" content is-small">
+              <p> Instruct 1: put banana on sheet metal </p>
+              <p> Instruct 2: put plastic bottle on tomato slice </p>
+            </div><br>
+            <p> Case 1: SFT puts the object on the correct receptable, then moves it to the wrong one; RL directly put
+              the object on the wrong receptacle </p>
+            <p> Case 2: SFT hovers after grasping, RL succeeds </p>
+          </div>
+        </div>
+      </div>
+
+      <br><br>
+      <div class="content">
+        <h2 class="title is-4">3.3 Execution tasks</h2><br>
+        <div class="columns is-vcentered">
+          <div class="column is-7">
+            <video autoplay controls muted loop height="100%">
+              <source src="static/videos/d-pos.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="column content is-medium">
+            <p> <b>Execution - Unseen Position (obj. & recep.)</b> </p><br>
+            <p> Case 1: SFT fails to grasp, RL sticks </p>
+            <p> Case 2: SFT moves arm without holding the object, RL succeeds </p>
+          </div>
+        </div>
+      </div>
+
+      <br><br>
+      <div class="content">
+        <div class="columns is-vcentered">
+          <div class="column is-7">
+            <video autoplay controls muted loop height="100%">
+              <source src="static/videos/e-ee.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="column content is-medium">
+            <p> <b>Execution - Unseen Robot Init Pose</b> </p><br>
+            <p> Case 1: both SFT and RL fail to grasp </p>
+            <p> Case 2: SFT fails to grasp, RL succeeds </p>
+          </div>
+        </div>
+      </div>
+
+      <br><br>
+      <div class="content">
+        <div class="columns is-vcentered">
+          <div class="column is-7">
+            <video autoplay controls muted loop height="100%">
+              <source src="static/videos/f-mid.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="column content is-medium">
+            <p> <b>Execution - Mid-Episode Obj. Reposition</b> </p><br>
+            <p> Case 1: both SFT and RL fail to grasp </p>
+            <p> Case 2: SFT moves arm without holding the object, RL succeeds </p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+
+
+  <footer class="footer">
+    <div class="container">
+      <div class="columns is-centered">
+        <div class="column is-8">
+          <div class="content">
+            <p>
+              This page was built using the <a href="https://github.com/eliahuhorwitz/Academic-project-page-template"
+                target="_blank">Academic Project Page Template</a> which was adopted from the <a
+                href="https://nerfies.github.io" target="_blank">Nerfies</a> project page.
+              <br> This website is licensed under a <a rel="license"
+                href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank">Creative
+                Commons Attribution-ShareAlike 4.0 International License</a>.
+            </p>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Statcounter tracking code -->
+
+  <!-- You can add a tracker to track page visits by creating an account at statcounter.com -->
+
+  <!-- End of Statcounter Code -->
+
+</body>
+
+</html>

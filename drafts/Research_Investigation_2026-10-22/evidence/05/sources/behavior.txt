@@ -1,0 +1,562 @@
+=== PDF PAGE 1 ===
+                       This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                                   Except for this watermark, it is identical to the accepted version;
+                                  the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+
+        Behavioral Analysis of Vision-and-Language Navigation Agents
+
+
+           Zijiao Yang                  Arjun Majumdar                    Stefan Lee
+    Oregon State University      Georgia Institute of Technology     Oregon State University
+   yangziji@oregonstate.edu      arjun.majumdar@gatech.edu      leestef@oregonstate.edu
+
+
+
+                 Abstract                             the human-generated instruction was based on (nDTW
+                                                                     [15]). These metrics are useful for comparing agents in ag-
+  To  be  successful,  Vision-and-Language  Navigation      gregate, but take a perspective that has little to say about an
+(VLN) agents must be able to ground instructions to ac-      agent’s fine grained competencies or what sub-instructions
+tions based on their surroundings. In this work, we develop        it is able to ground appropriately.
+a methodology to study agent behavior on a skill-specific        In this work, we design an experimental paradigm based
+basis – examining how well existing agents ground instruc-     on controlled interventions to analyze fine-grained agent be-
+tions about stopping, turning, and moving towards speci-      haviors. We focus our study on an agent’s ability to ex-
+fied objects or rooms. Our approach is based on gener-     ecute unconditional instructions like stopping or turning,
+ating skill-specific interventions and measuring changes in     as well as, conditional instructions that require more vi-
+agent predictions. We present a detailed case study analyz-      sual grounding like moving towards specified objects and
+ing the behavior of a recent agent and then compare multi-     rooms. Our approach leverages annotations from RxR [13]
+ple agents in terms of skill-specific competency scores. This      to produce truncated trajectory-instruction pairs that can
+analysis suggests that biases from training have lasting ef-     then be augmented with an additional skill-specific sub-
+fects on agent behavior and that existing models are able to      instruction. We carefully filter these trajectories and gen-
+ground simple referring expressions. Our comparisons be-      erate template-based sub-instructions to build non-trivial
+tween models show that skill-specific scores correlate with      intervention episodes that evaluate an agent’s ability to
+improvements in overall VLN task performance.              ground skill-specific language to the appropriate actions.
+                                                     To demonstrate the value of this approach, we present a
+                                                            case study analyzing the behavior of a contemporary VLN
+1. Introduction                                     model [6]. While we find evidence that the model can reli-
+                                                            ably ground some skill-specific language, our analysis also
+   Following navigation instructions requires coordinating                                                                 reveals that its errors are not random. But rather, they re-
+observations and actions in accordance with the natural lan-                                                                           flect a systematic bias towards forward actions learned dur-
+guage. Stopping when told to stop. Turning when told to                                                             ing training.  For object- or room-seeking skills, we find
+turn. And appropriately grounding referring expressions                                                          only modest relationships between instructions and agent
+when an action is conditioned on some aspect of the envi-                                                                   actions.  Finally, we derive aggregate skill-specific scores
+ronment. All three of these example are required when fol-                                                      and compare across VLN models with different overall task
+lowing the instruction “Turn left then go down the hallway                                                           performance. We find that higher skill-specific scores cor-
+until you see a desk. Walk towards the desk and then stop.”                                                                      relate with higher task performance; however, not all skills
+In this work, we examine how well current instruction-                                                              share the same scale of improvement between weaker and
+following agents can execute different types of these sub-                                                               stronger VLN models – suggesting that improvements in
+behaviors which we will refer to as skills.                                      VLN may be fueled by some skills more than others.
+  We situate our study in the popular Vision-and-Language
+                                                          Contributions. To summarize this work, we:
+Navigation (VLN) paradigm [2].  In a VLN episode, an
+                                                                               - Develop  an  intervention-based  behavioral  analysisagent is spawned in a never-before-seen environment and
+                                                         paradigm for evaluating the behavior of VLN agents,1must navigate to a goal location specified by a natural
+language navigation instruction. An agent’s instruction-        - Provide a case study on a contemporary VLN agent [6],
+following capabilities are typically measured at the episode        evaluating fine-grained competencies and biases, and
+level – examining whether an agent reaches near the goal                                                                               - Examine the relationships between skill-specific metrics
+(success rate [2]), how efficiently it does so (SPL [1]), or
+how well its trajectory matches the ground truth path which       1https://github.com/Yoark/vln-behave
+
+
+
+                                                       2574
+=== PDF PAGE 2 ===
+  and overall VLN task performance.                        language processes has applied behavioral analysis to ex-
+                                                     amine specific skill capabilities. Like us, Riberio et al. [19]
+2. Related Work                                       develop an intervention paradigm wherein dataset examples
+                                                                are modified in ways such that the desired change in model
+Vision-and-Language Navigation (VLN). Since its intro-     behavior is knowable. These examples and their associated
+duction in [2], many variants of the Vision-and-Language      skills are collected into a “checklist” that can be used to
+Navigation (VLN) task have been proposed including those      evaluate models. Likewise, our work can be construed as
+in continuous simulators [12].  We refer the reader to     generating a checklist of skills for VLN. Yang et al. [22]
+[7] for a comprehensive survey.  In this work, we exam-     follow a similar paradigm and develop a method to automat-
+ine agents in the Room-Across-Room (RxR) dataset [13]      ically generate test cases using a large language models [3].
+which extends the original VLN task to a multilingual
+setting with longer, more complex trajectories and pose     3. Analyzing the Behavioral of VLN Agents
+traces which provide temporal alignment between instruc-
+                                                                 In this work, we examine fine-grained agent compe-
+tion words and visual observations.  There has also been
+                                                            tency through the lens of behavioral analysis – studying
+significant modelling work to develop instruction-following
+                                              how agent decisions change in the presence and absence
+agents [6,8,10,11,14,16,20,21] and we examine three re-
+                                                              of skill-specific language instructions. For example, con-
+cent models in our analysis [6,20,21].
+                                                                   sider object-conditional instructions like “walk towards the
+  The RxR task is situated in the MATTERPORT3D [4] en-                                                           couch”. To demonstrate sensitivity to this instruction, an
+vironments which provide an interface for agents to move                                                            agent must be more likely to face a couch when presented
+through the environment along a graph of panoramic view-                                                          with this instruction than it would otherwise across a wide
+points taken in real environments. Matterport3D also pro-                                                          range of settings.  Note that this analysis examines what
+vides region annotations for room type which we utilize in                                                             agents do rather than how they arrive at those decisions
+our experiments. We also leverage annotations from the                                                      and is thus applicable to any VLN agent. To enable this
+REVERIE [17] dataset which extends VLN settings with                                                                   analysis, we develop an intervention strategy that produces
+an additional goal of identifying an object described by a re-                                                                     trajectories-instruction pairs with and without skill-specific
+ferring expression. Specifically, using the annotations from                                                          language included. We deploy existing VLN agents on
+REVERIEv1 to identify visible objects at each viewpoint.                                                               these to examine their decisions and measure their sen-
+Evaluating VLN Agents. In standard settings, VLN agents       sitivity to the intervention.  The remainder of this sec-
+are evaluated by metrics that focus on either the agent      tion describes our overall methodology – how intervention
+reaching the goal efficiently (Success weighted by inverse     episodes are generated and how agents are evaluated – and
+Path Length [1]) or by their trajectory’s alignment with      additional skill-specific experimental details are provided in
+the ground truth path (Normalized Dynamic Time Warp-      the following section alongside example agent results.
+ing [2]). These metrics focus on the agent’s performance
+                                                               3.1. Building Intervention Episodesin aggregate and do not examine agent performance on the
+level of sub-instruction or skills.                      We consider an intervention sample to be a tuple consist-
+  Some works have examined VLN agent behavior more     ing of a trajectory τ, an instruction I that guides an agent
+closely by masking or replacing portions of the instruc-      to the end of that trajectory, and an intervention instruction
+tions [9, 23] and observing the resulting change to overall      Iint that describes some desired skill-specific behavior to be
+task metrics like those described above. Zhu et al. [23]     taken from that point. For intervened episodes, an agent will
+find that VLN agents still achieve relatively high success     be given the augmented instruction I +Iint, guided through
+rates even when all references to visual objects are masked      the trajectory τ and then its decision will be compared to
+from instructions. These findings cast doubt on the vision-      the expected behavior described in Iint. We choose this
+language alignment ability of these agents. [9] also per-      partial-path construction so we can vary pre-intervention
+form masking experiments but come to different conclu-     path length while keeping trajectory-instruction alignment
+sions, with some models relying more heavily on nouns      similar to standard VLN training settings. Fig. 1 (c) shows
+than directional words. In both works, agent performance     one such triplet with a 3-step trajectory, an instruction de-
+is measured on an episodic level that relies on a sequence of      scribing it, and an underlined intervention prompting the
+agent decisions; however, single errors in a trajectory may     agent to move “towards the bathroom”. We design different
+compound and result in misestimating the impact of masked      interventions to study fine-grained skills in Sec. 4.
+terms. In contrast to these works, we present a skill-based     Candidate Instruction-Trajectories Pairs.   To create
+analysis of VLN agents by constructing specific interven-                                                                    trajectory-instruction pairs for intervention samples, we
+tion episodes wherein the appropriate next action is known.                                                              leverage the detailed annotations in the RxR dataset [13].
+Behavioral Analysis of AI Models. Recent work in natural    RxR provides trajectory-instruction pairs along with ‘pose
+
+
+
+                                                       2575
+=== PDF PAGE 3 ===
+                       Path         Viewpoint              Truncated trajectory        Target position (intervention)
+
+
+
+
+
+   You begin looking at some shelving units, one of which has a globe   You begin looking at some shelving units, one of which has a globe   You begin looking at some shelving units, one of which has a globe
+   and an hourglass on it. Turn to your left until you see the arched   and an hourglass on it. Turn to your left until you see the arched   and an hourglass on it. Turn to your left until you see the arched
+   wooden entryway. Go ahead out of that into an atrium of sorts and   wooden entryway. Go ahead out of that.                         wooden entryway. Go ahead out of that into an atrium. Walk
+   turn to the left, taking the door immediately to the left. You're going                                                                  towards the bathroom.
+    to cut directly across it to the door just beside the mirror, and once
+   you are through there you are going to continue straight through
+    the bedroom and then stop.
+           (a) Aligned RxR Example                  (b) Intervention Candidate                     (c) Intervention Episode
+
+Figure 1. To build skill-specific interventions, we truncate existing RxR episodes based on RxR trajectory-instruction alignments (a→b).
+We can then extend the instruction with skill-specific language and identify the next step described by this new instruction (c).
+
+
+traces’ that provide temporal alignment between instruction     These templates are based on common phrases from RxR
+words and the annotator’s pose in the trajectory. This allows      instructions and may be conditioned on objects or rooms
+us to associate instruction text segments with nodes along     present in the trajectory.  For these object or room refer-
+the trajectory – writing the trajectory as a sequence of node     ences, we leverage the REVERIEv1 [17] and MATTER-
+visitations n1, n2, ..., nT with associated sub-instructions    PORT3D [5] datasets respectively. A full list of these tem-
+i1, i2, ..., iT uttered at each.  Fig. 1 (a) demonstrates this      plates is provided in the supplementary materials.
+by color-coding. For each RxR example, we form candi-
+                                                               3.2. Evaluating Agent Sensitivitydate τ, I pairs by truncation – taking the trajectory up to
+node nj (τ = {n≤j}) and instruction text prior to arriv-       To evaluate agents on a given intervention episode,
+ing at n (Ip = {i<j}). This provides a trajectory and the    we  consider both  the  truncated  (τ, I) and  intervened
+instructions delivering an agent up to the final node. An      (τ, I+Iint) trajectory-instruction pairs for that episode.
+example truncation is shown in Fig. 1 (b). For a length T                                                         For each, we provide the agent with the instruction and
+trajectory, this generates T −2 candidates; we exclude full-                                                            then force  it to follow the trajectory τ until reaching its
+length trajectories because instructions given at penultimate                                                                         final node.  Matching common teacher-forcing training
+nodes often include explicit directions to stop after mov-                                                           paradigms, the agent  is provided with the observations
+ing. Keeping these would add confusion about the appro-                                                          along the trajectory but its action predictions at each node
+priate behavior to take after intervention text is appended.                                                                are ignored in favor of the true next step.  At the final
+We consider all English trajectory-instruction pairs from the                                                           node, we then record the agent’s predicted action distribu-
+val-unseen-guide split of RxR [13] for this process.                                                                   tion P(a|τ, I) for each setting where I is either the inter-
+Filtering and Intervention Instructions. Not all candidate     vened or truncated instruction. Done over all intervention
+instruction-trajectory pairs are useful for all interventions –      episodes, this yields a set of distribution pairs P(a|τj, Ij)
+for example, it may be impossible to ”turn left and go for-     and P(a|τj, Ij + Iintj) which we can use to examine how
+ward” for a trajectory that ends on a node without a leftward     an agent’s beliefs shift under the intervention while every-
+neighbor. Likewise, an example where a leftward turn is the     thing else about the agent’s experience is held constant. We
+only option could not demonstrate differential agent behav-     examine the distributions rather than argmax actions to im-
+ior with and without such an intervention. As described in     prove sensitivity to shifts in agent belief.
+Sec. 4 below, we filter candidate trajectories for each exper-        For modern VLN agents, these predicted action distri-
+iment to ensure agents have both intervention relevant and     butions correspond to distributions over neighboring view-
+irrelevant action options in every episode.                       points in the navigation graph as well as a stop action.
+  To develop intervention instructions, we manually ex-    As such, we can map the desired behavior of most of
+amined the RxR dataset to identify common skills. In this     our interventions to a single or set of neighboring nodes
+work, we examine four common skills related to stopping,     which should have increased or decreased probability un-
+responding to directional language, and moving relative to     der the intervention. For example, telling a skillful agent
+objects or room references. For each, we develop a set of      to “turn left” rather than “go forward” should shift the pre-
+language templates to build intervention instructions Iint.      dicted probabilities towards neighboring nodes on its left.
+
+
+
+                                                       2576
+=== PDF PAGE 4 ===
+                                                                                                                                             Implicit Stop Instruction           Explicit Stop Instruction        One-step Ahead Prior
+                                                                                          1.0
+
+                                                                                          0.8
+                                                                                                                                                                                                                                                                    Probability0.6
+                                                                                               Stop                                                                                          0.4
+
+                                                                                          0.2                                                                                                                                                                      Average
+
+                                                                                          0.0                                                                                  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20
+                                                                                                                Trajectory Length
+Figure 2.  RxR Trajectory Statistics.  (Top) Absolute heading
+                                                                  Figure 3. Average Stop Probability vs Trajectory Length for “im-change between sequential nodes in training trajectories. There is
+                                                                                    plicit stop instruction”, “explicit stop instruction” and “one-stepa strong “forward” biases with 34% of the mass in the 0 to 15◦bin.
+                                                              ahead prior”. Agents respond strongly to both stop interventions(Bottom) The path length distribution of training dataset, showing
+                                                          – stopping with high probability across all trajectory lengths. Ex-agents have been exposed to varied length trajectories.
+                                                                                    plicit stop instruction produce a stronger effect than implicit.
+
+
+For some experiments, we introduce additional instruction     4.1. Stop Instructions
+modification setting to examine the effects of dataset biases
+                                                     To be successful at the VLN task, an agent must declarein addition to the truncation and interventions constructions.
+                                                                the stop action within a fixed radius of the goal locationDetails are provided in each experimental section.
+                                                             described by an instruction. As such, grounding explicit
+RxR vs. Intervention Instructions. By construction, our    (“Go to the bedroom and stop.”) and implicit (“... then go
+generated intervention instructions will tend to contain      into the bedroom. EOS”) stopping instructions to the stop
+more short trajectories and instructions than RxR; however,      action is an important skill. In this experiment, we analyze
+RxR does exhibit a significant variance in path length (see     stop behavior for explicit or implicit stop instructions. To
+Fig. 2). On the language side, we use templates that match      assess the effect of path length distributions in RxR, we ex-
+commonly used phrases in RxR to minimize differences.       amine stop behavior across a range of path lengths.
+Sample Correlation. We note that multiple intervention     Intervention Details.  All intervention candidates are vi-
+episodes may be drawn from a single trajectory and many     able for this experiment as the stop action is always an op-
+will come from each environment. As such, our measure-      tion and alternative actions (neighboring nodes) always ex-
+ments may exhibit correlations due to this sampling strat-        ist. For intervention instructions, we append a short stop
+egy. To account for these effects when discussing the sig-      instruction such as “This is your destination.” We note
+nificance of our results, we apply hierarchical bootstrap-     however that the stop experiment offers a complication –
+ping [18] when providing confidence intervals and linear     both the truncated and intervened instructions imply stop
+mixed effect models when estimating intervention effects.      actions.  The difference being whether this instruction is
+Additional details are provided in the supplementary.            implicit (truncation) or explicit (intervention). To provide
+                                                                 additional comparison with non-stop instructions, we also
+                                                             consider a one-step ahead instruction that includes the in-
+4. Case Studies on a Recent VLN Agent               struction segment from the terminal node as well (i.e. the
+                                                            agent is instructed to make the next step in the trajectory).
+  We instantiate our intervention paradigm for four com-                                                              In total, we produce 8221 intervention episodes. For each
+mon skills related to stopping and turning and show the re-                                                               episode, we measure the probability of the stop action
+sulting analysis for the recent HAMT [6] model. HAMT is                                                     from agent at the final node of the trajectory.
+near state-of-the-art agent for VLN that is based on a mul-
+                                                              Results. Fig. 3 shows average stop probabilities across dif-
+timodal transformer model that jointly encodes trajectory
+                                                                   ferent trajectory lengths for the truncated implicit stop, in-
+history and instruction text in a hierarchical fashion. HAMT
+                                                             tervened explicit stop, and one-step ahead instruction set-
+is trained in multiple stages including auxiliary losses and
+                                                                       tings. Error bars are 95% hierarchical bootstrap confidence
+joint imitation and reinforcement learning finetuning. For
+                                                                       intervals. We find average stop probability to remain fairly
+the experiments below, we use pretrained models and infer-
+                                                              constant for implicit and explicit stop instructions.2  This
+ence code provided by the authors. Like other VLN models,
+                                                             suggests agents consistently ground the stop instruction re-
+HAMT predicts a distribution over neighboring nodes in the
+navigation graph and the stop action.                                2Note that longer trajectories have fewer episodes and larger variation.
+
+
+
+                                                       2577
+=== PDF PAGE 5 ===
+                   Path         Neighboring locations          Current location and forward direction          Target direction          tive actions besides stop.  Recall that the agent’s action
+         For w ard
+                                                          space is to move to a neighbor or to stop, such that turn- Left      -15   15   Right
+                                                             ing in place is not possible. So for intervention instructions,
+     -90                  90
+                                             we                                                                   build                                                                      templates                                                                                          that                                                                                               instruct                                                                                               the                                                                                             agent                                                                                                             to                                                                                                         face                                                                                                      a direction
+                                                                           “Turn                                                                                                     right                                                                                   and                                                                                           walk                                                      and                                                                then                                                           go forward                                                                                                  (e.g.                                                                                                         forward”).             -165 165  BackRight BackLeft
+        Back ward                                                    Early experiments with only direction commands resulted           (a)                         (b)                      (c)                     (d)
+                                                                   in weaker directional effects. We generate between 3091
+Figure 4. For our directional intervention, we define six directions     and 6745 intervention episodes depending on the direction.
+on the polar axis (a) and establish filters to avoid ungroundable (c)     Results. For each episode, we record the agent’s predicted
+or trivial episodes (d) – requiring that at a neighboring node is in
+                                                                    distribution over neighboring nodes. These can be mapped
+the target direction and at least two other neighbors are not.
+                                                                   to beliefs over relative angles by associating the probability
+                                                              of visiting neighbor k with the relative angle θk between the
+                                                                agent’s heading and neighbor k. Fig. 5 shows the distribu-
+gardless of trajectory length despite biased RxR training
+                                                                   tion of these probabilities over all episodes for each inter-
+trajectory length (see Fig. 2). The plot also suggests stop
+                                                             vention as histograms on polar axes. For convenience, we
+probability is higher for explicit than implicit stop which
+                                                          denote the target direction region with a green arc.
+are both naturally higher than the one-step ahead setting.
+                                                           Across  all directions, we find the agent either stops
+  To evaluate statistical significance of the effect, we con-
+                                                            (roughly 65% of the time) or moves roughly forward in the
+sider a linear mixed effect model (lmer) where the ob-
+                                                    no intervention setting. For left and right, we see a minor
+served stop probability is assumed to be an effect of the
+                                                                bias towards the corresponding direction despite the agent
+intervention plus random effects from the environment and
+                                                             not receiving any left/right instruction. This reflects a mi-
+source trajectory. We find agents have a higher probability
+                                                          nor structural bias caused by the filtering process. All left
+of stopping when given explicit rather than implicit stop in-
+                                                                       (right) episodes include a neighbor to the left (right) and
+structions (0.72 vs. 0.65, effect: 0.07 anova: p≈0) and
+                                                       an agent with a bias towards moving roughly forward may
+that agents respond to both implicit and explicit stop in-
+                                                                    select them at a higher rate than other nodes.
+structions by increasing stop probability compared to the
+                                                           For the intervention setting, we see a strong response to
+one-step ahead baseline (effect: 0.36, p≈0).
+                                                                   directional language. In all cases, the agent stops signifi-
+Summary. We find the agent responds strongly to implicit                                                                cantly less (roughly 19% of the time on average) and we
+and explicit stops across all trajectory lengths and that ex-                                                           observe a shift in distribution towards the corresponding di-
+plicit stop instructions have a stronger effect.                                                                     rection. One outlier is the backwards setting which smears
+                                                                the probability significantly to both the back left and back
+4.2. Unconditional Directional Instructions                                                                         right. In all settings, some mass still remains in the forward
+   Another foundational skill for following navigation in-      direction – reflecting the agent’s bias towards moving for-
+structions is responding appropriately to directional lan-     ward learned from the training data as reflected in Fig. 2.
+guage. In this experiment, we examine unconditional direc-     We accumulate the probability mass into directional bins
+tional instructions which specify directions like “turn left     and evaluate the effect of intervention on the accumulated
+and go forward” without referencing entities in the environ-      probability. We again use a linear mixed effect model of
+ment. This language is frequently used to orient agents in      the same from as the previous experiment to account for
+the absence of clear landmarks. We consider language de-      potential correlations in scenes and trajectories. We find
+scribing forward/backward motions and turns. Specifically,      the agent exhibits a significantly higher accumulated prob-
+we explore six direction categories – forward, backward,      ability for the corresponding direction with directional in-
+left, right, back left, and back right. For each, we define an      struction than without – estimating intervention effects as
+angular region relative to the agent’s heading (canonically 0     increased accumulated probability for left (0.38, p ≈0),
+degrees) as shown in the top-left of Fig. 4. During our ex-      right (0.44, p ≈0), forward (0.16, p ≈0), backward (0.16,
+periment, we can examine the amount of probability placed    p ≈0), back left (0.43, p ≈0), and back right (0.48, p ≈0).
+on neighboring nodes within these regions.                Summary. We find the HAMT [6] agent strongly respond
+Intervention Details. For each direction, we filter interven-      to directional language but some dataset biases from train-
+tion candidates to ensure that a) the final node has at least     ing are still evident in a bias towards forward actions.
+one neighbor in the corresponding direction region and b)
+                                                               4.3. Object-seeking Instructions
+that there exist at least two other neighbors outside the di-
+rection region. These criteria are demonstrated in Fig. 4.       Beyond directional language, instructions also often use
+This ensures that there exists a next step that matches the     references to nearby objects as convenient landmarks, e.g.
+intervention instruction and that there are multiple alterna-    “Walk towards the fireplace”. Unlike the language studied
+
+
+
+                                                       2578
+=== PDF PAGE 6 ===
+Figure 5. We plot the agent’s next step direction probability distribution onto polar axis for easier visualization. We provide results for
+6 directions defined in 4 and contrast between “No Intervention” (red) with “Direction” (blue). The number on outer circle and middle
+dotted circle are max and max2  respectively. We found the HAMT agent is responsive to all six directional instructions: the probability mass
+of directional interventions shifts toward the area indicated by directional instructions across all directions comparing to “No Intervention”
+
+
+in the previous sections, object-seeking instructions require      tion episodes targeting the following objects in decreasing
+grounding the instruction to the visual scene. We examine     order of occurrence: chair, table, picture, cushion, curtain,
+simple “walk towards X” style object-seeking instructions.       plant, cabinet, gym equipment, stool, chest of drawers, bed,
+                                                                towel, bathtub, tv monitor, and seating.
+Intervention Details.  We leverage the object annota-
+                                                              Results. For each episode, we record the agent’s predicted
+tions from the REVERIE [17] dataset to build intervention
+                                                                    distribution over neighboring nodes at the terminal node.
+episodes. Specifically, we retain an intervention candidate
+                                        We map these to a distribution over absolute angular errors
+if a REVERIE object is visible from its terminal node, the
+                                                                      relative to the object. For each neighbor k, we compute the
+object is no more than 3m away, there exists a neighbor-
+                                                                difference in heading angle between node k and the object.
+ing node with a heading that is within 15 degrees of the
+                                        We can then associate the probability of visiting neighbor k
+object’s heading, and there at least two neighbors.  That
+                                                          with an angular distance to the target object. These prob-
+is to say, trajectories that end near a visible object and a
+                                                                          abilities are accumulated and normalized to produce Fig. 6
+non-trivial navigation action can reasonably move towards
+                                                     which presents distributions over angular distance for the
+it. We exclude common structural objects like doors, win-
+                                                                 intervention and no-intervention settings.
+dows, shelving, railings, etc. as it is often unclear which of
+multiple occurrences an agent should move towards. For in-        This intervention shows a weak effect – with the agent
+structions intervention instructions, we append the template     reducing angular error in the presence of the intervention
+“Walk towards the [object]” where object is the object      instruction somewhat (blue vs. red bars in Fig. 6). We again
+name from REVERIE. In total, we generate 839 interven-     leverage a linear mixed effect model to evaluate the effect of
+
+
+
+                                                       2579
+=== PDF PAGE 7 ===
+                         No Intervention         Object Intervention
+   0.18
+                                                                                                                                                                                        Further from Goal    Closer to Goal
+   0.16
+   0.14
+   0.12
+Density0.100.08
+   0.06
+   0.04
+   0.02
+   0.00           5  15  25  35  45  55  65  75  85  95 105 115 125 135 145 155 165 175
+           Absolute Difference: Predicted Heading vs Target Object Heading
+
+Figure 6. The distribution of absolute difference between model
+prediction and target object direction for intervention and no inter-
+                                                                   Figure 7. Distribution of delta distance to target room type. The
+vention settings.
+                                                                           delta distance difference of distance to target room (relative to
+                                                                                    start position) with or without intervention. Positive delta distance
+                                                         means the agent move closer to room of target type with inter-
+intervention on the accumulated probability within 15 de-
+                                                                    vention than otherwise. The distribution shift towards right with
+gree of absolute angular difference. We find weak fixed                                                                        intervention than otherwise, indicates the agent is responsive to
+effect of 0.069 (anova, p ≈0) for intervention vs. non-                                                               room-seeking instruction. (-0.15 vs.-0.41, p ≈0 )
+intervention. However, both settings exhibit a wide range
+of angular errors suggesting that target objects are not be-
+ing grounded accurately – recall that all trajectories have     placed with the corresponding room name from MATTER-
+neighboring nodes that would incur no more than 15 de-    PORT3D. As k-hop episodes involve agents making multi-
+grees of error. To explore this further, we also examine a      ple decisions, we also append “This is your destination.”
+baseline Forward Bias agent that places probability on     afterwards to encourage agents to stop once reaching the
+neighbors inversely proportional to their relative heading.     room. We generate 8614 intervention episodes for 1-hop
+We find this baseline exhibits a similarly shaped error distri-      setting, and 17204 to 27454 episodes for n-hop settings.
+bution – suggesting the agent may be taking forward actions                                                 1-Hop Results.  For each episode, we record the agent’s
+when uncertain about the target object. As in our other ex-                                                               predicted distribution over neighboring nodes at end of the
+periments, the no intervention setting is more likely to stop                                                                       trajectory. To measure agent progress towards nodes with
+than the intervention (65% vs. 37%).                                                                     target room type, we map these to a distribution over change
+Summary. We find evidence for only a weak tendency to      in geodesic distances to the nearest node with the target
+move towards referenced objects for this agent.             room type. This is done analogously to previous sections
+                                                         such that the probability of visiting node j from the final
+4.4. Room-seeking Instructions
+                                                                    trajectory node T is associated with the delta geodesic dis-
+   Agents may also be asked to navigate to specific rooms,     tance ∆d = dgeo(nT , nnear)−dgeo(nj, nnear) to the near-
+often without specific directional language describing how      est node with the target room type nnear. The probabilities
+to access them – e.g. “go to the kitchen.”  In this experi-      are accumulated and shown in Fig. 7 – values greater than
+ment, we examine these room-seeking instructions both in     zero represent the agent moving closer to nodes with the
+the setting where the room is likely visible and when an      target room type. We observe a right-shift in the density
+agent may need to search for it nearby. We note that this     suggesting the agent responds somewhat to the interven-
+latter task is beyond the scope of standard VLN instructions      tion. Again using a linear mixed effect model, we estimate
+and examine it as a test of generalization. Below, we denote      the effect of intervention on the delta geodesic distance as
+the case where a room is likely visible as a 1-hop setting     0.26 (anova, p ≈0) for intervention vs no intervention.
+and extensions beyond this as k-hop.                        However, the agent does not reliably place strong beliefs on
+Intervention Details.  Using MATTERPORT3D [5] room     neighbors with the target room type – negative median delta
+region annotations, we associate each node in all trajecto-      distance and significant mass to the left of zero.
+ries with a room label. For 1-hop settings, we retain inter-    k-Hop Results. For each k-hop episode, we force the agent
+vention candidates where the terminal node has at least one      to follow the trajectory until it ends at node nT and then
+neighboring node with a different room type. For k-hop, we     execute the agent by taking argmax actions until stop is
+extend this to consider neighbors that are k steps away from      called and then record the final position nend. We report
+the current node. For intervention instructions, we append      the distance to the nearest node with target room type from
+a template “Walk towards the [room].” where room is re-      here, dgeo(nend, nnear). We shows a ridgeline plot in Fig. 8
+
+
+
+                                                       2580
+=== PDF PAGE 8 ===
+                                                                Method                     Stop  Turn  Object Room    Avg.
+
+                                                                EnvDrop [21]               62.65  27.14  11.06  23.64    31.12
+
+                                                                EnvDrop (ViL CLIP) [20]    66.76  27.45  12.83  26.82    33.47
+
+                                             HAMT [6]                  71.65  43.74  12.00  26.63    38.50
+
+
+                                                                  Table 1. We report scores for each skill type for VLN models
+                                                                 with varying RxR task performance (EnvDrop < EnvDrop (ViL
+                                                          CLIP) < HAMT). We find individual skill performance tends to
+                                                             improve with overall task performance, but not equally over all
+                                                                                      skills. Object- and room-seeking instructions require further study.
+
+
+                                                                       tions, neighbors within the corresponding direction angle
+                                                          range are valid. For object-seeking, neighbors within 15◦
+                                                              of the object heading. For room-seeking, neighbors with
+                                                                     target room type.
+                                                     To compare across VLN models, we examine the aver-
+                                                        age probability mass they place on these correct actions.
+                                                        Denoting the set of correct actions as Ne for an interven-
+                                                                   tion episode e, we can write a scoring function over a set of
+                                                                 intervention episodes Es for skill s for an agent f as
+
+                                                                   )
+                                                               Score( f, s  r 1 athcal {E }_ s |}\sumP_f(a_nI_e+I_{int_e})(1)
+Figure 8. Distribution of geodesic distance to nearest target room                       =\f
+                                                                           ac { }{|\m
+location for k-hop room-seeking experiments. Stop to Goal
+is a baseline agent that always takes the stop action.               where Pf(an| · · · ) is agent f’s predicted probability for ac-
+                                                                   tion an at the end of the intervention trajectory.  Higher
+                                                              scores reflect greater certainty in selecting a grounded ac-
+comparing these distributions for 1- to 8-hops.                                                                   tion on average across all episodes.
+  We find error increases with target room distance. We                                                                 Tab. 1 shows these scores for three VLN agents of
+again leverage a linear mixed effect model to evaluate the                                                            varying RxR task performance (EnvDrop < EnvDrop (ViL
+effect of intervention on dgeo(nend, nnear). We find weak                                                    CLIP) < HAMT). We find that improved model perfor-
+fixed effect of ≤−0.1 for intervention vs. non-intervention                                                  mance on the overall RxR task tends to also leads to im-
+for 3,4, and 5 hops with 95% confidence). Note that sam-                                                        provements on skill-specific scores.  However, improve-
+ple size varies with number of hops.  Overall, this sug-                                                      ments are not uniform across the skills and agents are more
+gests agents have limited ability to search for rooms based                                                                    proficient at stopping and turning instructions than those
+on common sense exploration – perhaps unsurprising given                                                               referencing objects or rooms.
+that RxR instructions typically provide step-by-step guid-
+ance.                                                     6. Discussion
+Summary.  The HAMT [6] agent is weakly sensitive to
+                                                                 In this work, we introduced an analysis paradigm forroom type reference instructions when the room is visible
+                                                            studying fine-grained skill competency in VLN agents. To(within one hop) but lacks the ability (room type instruction
+                                                  show its value, we presented a case study on a recent VLNhave weak or none effects) to perform common sense ex-
+                                                         model. This provided insights into agent behavior includ-ploration to find further away rooms (k-hop). Overall sen-
+                                                             ing significant differences in performance on unconditionalsitivity is low, suggesting the agent may not rely on room-
+                                                                 (stop and turn) and conditional (object- and room-seeking)specifying portions of instructions when navigating.
+                                                                             skills. Finally, we presented a comparison between models
+                                                                   in terms of skill-specific scores.5. Comparing Sensitivity Across Agents
+                                                                        Skill-specific analysis like we present here can provide
+   For each skill-specific intervention, we can identify a set      insight into the types of things we can reasonable expect
+of neighbor actions (neighboring nodes or stop) that corre-     from our models and those which will require further study.
+spond to a correct grounding of the intervention instruction     Building explicit test cases for desired skills can serve as
+– matching the filtering criteria used in their constructions.      “unit tests” on our path to more complex instruction fol-
+For stop instructions, this is the stop action. For turn instruc-     lowing systems. This work is a step in that direction.
+
+
+
+                                                       2581
+=== PDF PAGE 9 ===
+References                                                       and-language navigation with synthetic instructions and im-
+                                                                                     itation learning. ArXiv, abs/2210.03112, 2022. 2
+ [1] Peter Anderson, Angel Chang, Devendra Singh Chaplot,                                                                     [12] Jacob Krantz, Erik Wijmans, Arjun Majumdar, Dhruv Batra,
+     Alexey Dosovitskiy, Saurabh Gupta, Vladlen Koltun, Jana                                                                 and Stefan Lee. Beyond the nav-graph: Vision-and-language
+     Kosecka, Jitendra Malik, Roozbeh Mottaghi, Manolis Savva,                                                                          navigation in continuous environments. In European Confer-
+      et al. On evaluation of embodied navigation agents. arXiv                                                                    ence on Computer Vision (ECCV), pages 104–120. Springer,
+     preprint arXiv:1807.06757, 2018. 1, 2                                                                     2020. 2
+ [2] Peter Anderson, Qi Wu, Damien Teney, Jake Bruce, Mark                                                                     [13] Alexander Ku, Peter Anderson, Roma Patel, Eugene Ie, and
+     Johnson, Niko S¨underhauf, Ian Reid, Stephen Gould, and                                                                      Jason Baldridge. Room-across-room: Multilingual vision-
+    Anton Van Den Hengel. Vision-and-language navigation: In-                                                                     and-language navigation with dense spatiotemporal ground-
+      terpreting visually-grounded navigation instructions in real                                                                                 ing. arXiv preprint arXiv:2010.07954, 2020. 1, 2, 3
+     environments.  In Proceedings of the IEEE conference on                                                                     [14] Jialu Li, Hao Tan, and Mohit Bansal. Envedit: Environment
+     computer vision and pattern recognition, pages 3674–3683,                                                                              editing for vision-and-language navigation. 2022 IEEE/CVF
+     2018. 1, 2                                                                    Conference on Computer Vision and Pattern Recognition
+ [3] Tom Brown, Benjamin Mann, Nick Ryder, Melanie Sub-          (CVPR), pages 15386–15396, 2022. 2
+      biah, Jared D Kaplan, Prafulla Dhariwal, Arvind Neelakan-                                                                     [15] Gabriel Ilharco Magalhaes, Vihan Jain, Alexander Ku, Eu-
+      tan, Pranav Shyam, Girish Sastry, Amanda Askell, et al. Lan-                                                                  gene Ie, and Jason Baldridge.  General evaluation for in-
+     guage models are few-shot learners. Advances in neural in-                                                                                struction conditioned navigation using dynamic time warp-
+     formation processing systems, 33:1877–1901, 2020. 2                                                                                 ing.  In NeurIPS Visually Grounded Interaction and Lan-
+ [4] Angel Chang, Angela Dai, Thomas Funkhouser, Maciej Hal-          guage (ViGIL) Workshop. 2019. 1
+      ber, Matthias Niessner, Manolis Savva, Shuran Song, Andy      [16] A. Moudgil, Arjun Majumdar, Harsh Agrawal, Stefan Lee,
+     Zeng, and Yinda Zhang. Matterport3d: Learning from rgb-          and Dhruv Batra.  Soat: A scene- and object-aware trans-
+    d data in indoor environments. International Conference on          former for vision-and-language navigation.   In NeurIPS,
+    3D Vision (3DV), 2017. 2                                         2021. 2
+ [5] Angel Chang, Angela Dai, Thomas Funkhouser, Maciej      [17] Yuankai  Qi,  Qi  Wu,   Peter  Anderson,  Xin  Wang,
+     Halber, Matthias Niessner, Manolis Savva, Shuran Song,          William Yang Wang, Chunhua Shen, and Anton van den
+    Andy Zeng, and Yinda Zhang.   Matterport3d:  Learning           Hengel.  Reverie: Remote embodied visual referring ex-
+     from rgb-d data in indoor environments.  arXiv preprint           pression in real indoor environments.  In Proceedings of
+     arXiv:1709.06158, 2017. 3, 7                                          the IEEE/CVF Conference on Computer Vision and Pattern
+ [6] Shizhe Chen, Pierre-Louis Guhur, Cordelia Schmid, and           Recognition, pages 9982–9991, 2020. 2, 3, 6
+     Ivan Laptev.   History aware multimodal transformer for      [18] Shiquan Ren, Hong Lai, Wenjing Tong, Mostafa S. Amin-
+     vision-and-language navigation. Advances in Neural Infor-           zadeh, Xuezhang Hou, and Shenghan Lai.  Nonparamet-
+     mation Processing Systems, 34:5834–5847, 2021. 1, 2, 4, 5,             ric bootstrapping for hierarchical data.  Journal of Applied
+    8                                                                                 Statistics, 37:1487 – 1498, 2010. 4
+ [7] Jing Gu, Eliana Stefani, Qi Wu, Jesse Thomason, and Xin      [19] Marco  Tulio  Ribeiro,  Tongshuang  Sherry Wu,  Carlos
+    Wang. Vision-and-language navigation: A survey of tasks,            Guestrin, and Sameer Singh. Beyond accuracy: Behavioral
+     methods, and future directions. In Proceedings of the 60th            testing of nlp models with checklist. In ACL, 2020. 2
+     Annual Meeting of the Association for Computational Lin-      [20] Sheng Shen, Liunian Harold Li, Hao Tan, Mohit Bansal,
+      guistics (Volume 1: Long Papers), pages 7606–7623, Dublin,         Anna Rohrbach, Kai-Wei Chang, Zhewei Yao, and Kurt
+      Ireland, May 2022. Association for Computational Linguis-           Keutzer. How much can clip benefit vision-and-language
+       tics. 2                                                                 tasks? In International Conference on Learning Representa-
+ [8] Pierre-Louis Guhur, Makarand Tapaswi, Shizhe Chen, Ivan             tions, 2021. 2, 8
+     Laptev, and Cordelia Schmid. Airbert: In-domain pretrain-      [21] Hao Tan, Licheng Yu, and Mohit Bansal.   Learning to
+     ing for vision-and-language navigation. 2021 IEEE/CVF In-           navigate unseen environments: Back translation with envi-
+     ternational Conference on Computer Vision (ICCV), pages           ronmental dropout.  In Proceedings of NAACL-HLT, pages
+     1614–1623, 2021. 2                                            2610–2621, 2019. 2, 8
+ [9] Meera Hahn and James M Rehg. Which way is ‘right’?: Un-      [22] Guanqun Yang, Mirazul Haque, Qiaochu Song, Wei Yang,
+     covering limitations of vision-and-language navigation mod-          and Xue-Min Liu.  Testaug: A framework for augmenting
+       els. 2                                                                 capability-based nlp tests. In COLING, 2022. 2
+[10] Yicong Hong, Qi Wu, Yuankai Qi,  Cristian Rodriguez-      [23] Wanrong Zhu et al. Diagnosing vision-and-language navi-
+     Opazo, and Stephen Gould.  Vlnbert: A recurrent vision-            gation: What really matters. In NAACL: Human Language
+     and-language bert for navigation. 2021 IEEE/CVF Confer-           Technologies, pages 5981–5993, 2022. 2
+     ence on Computer Vision and Pattern Recognition (CVPR),
+     pages 1643–1653, 2021. 2
+[11] Aishwarya Kamath, Peter Anderson, Su Wang, Jing Yu
+     Koh, Alexander Ku, Austin Waters, Yinfei Yang, Jason
+     Baldridge, and Zarana Parekh. A new path: Scaling vision-
+
+
+
+                                                       2582

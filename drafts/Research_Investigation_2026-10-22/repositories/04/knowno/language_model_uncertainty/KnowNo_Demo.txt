@@ -1,0 +1,277 @@
+=== CELL 0 (markdown) ===
+##### Copyright 2023 Google LLC. SPDX-License-Identifier: Apache-2.0
+
+=== CELL 1 (markdown) ===
+Copyright 2023 Google LLC. SPDX-License-Identifier: Apache-2.0
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at
+
+https://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+
+=== CELL 2 (markdown) ===
+# **Robots That Ask For Help: Uncertainty Alignment for Large Language Model Planners** Demo
+
+[KnowNo](https://robot-help.github.io) is a framework for measuring and aligning the uncertainty of LLM-based planners, such that they know when they don't know, and ask for help when needed. KnowNo builds on the theory of conformal prediction to provide statistical guarantees on task completion while minimizing human help.
+
+This colab shows the very basics of constructing the prediction set (possible actions in a scenario) in the Mobile Manipulation setting. The left side of the figure belore shows a sample scenario.
+
+<img src="https://robot-help.github.io/img/robot-help-teaser.png" height="280px">
+
+Note:
+* Instead of setting up the scenario distribution here, we will load a dataset sampled from a pre-defined scenario distribution involving the mobile robot, the same used in the experiments. We will also use calibration results already computed with the distribution.
+* We use [GPT-3.5](https://arxiv.org/abs/2005.14165) (text-davinci-003) as the language model here.
+* We focus on the planning part; we do not consider object detection or low-level action execution here.
+
+Disclaimer: We fine the GPT3.5 model significantly underperforms [PaLM2-L](https://ai.google/discover/palm2/) model used in our experiments, largely due to its bias towards option C and D over option A and B in multiple choice question answering. We also find such bias dependent on the context, so adjusting bias for certain options in the API call does not help significantly.
+
+=== CELL 3 (code) ===
+openai_api_key = "your-api-key"
+
+=== CELL 4 (markdown) ===
+## **Setup**
+
+=== CELL 5 (code) ===
+#@markdown A few imports
+!pip install openai tqdm
+
+import openai
+import signal
+import tqdm.notebook as tqdm
+import random
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Set OpenAI API key.
+openai.api_key = openai_api_key
+
+=== CELL 6 (code) ===
+#@markdown LLM API call
+class timeout:
+    def __init__(self, seconds=1, error_message='Timeout'):
+        self.seconds = seconds
+        self.error_message = error_message
+
+    def handle_timeout(self, signum, frame):
+        raise TimeoutError(self.error_message)
+
+    def __enter__(self):
+        signal.signal(signal.SIGALRM, self.handle_timeout)
+        signal.alarm(self.seconds)
+
+    def __exit__(self, type, value, traceback):
+        signal.alarm(0)
+
+# OpenAI only supports up to five tokens (logprobs argument) for getting the likelihood.
+# Thus we use the logit_bias argument to force LLM only consdering the five option
+# tokens: A, B, C, D, E
+def lm(prompt,
+       max_tokens=256,
+       temperature=0,
+       logprobs=None,
+       stop_seq=None,
+       logit_bias={
+          317: 100.0,   #  A (with space at front)
+          347: 100.0,   #  B (with space at front)
+          327: 100.0,   #  C (with space at front)
+          360: 100.0,   #  D (with space at front)
+          412: 100.0,   #  E (with space at front)
+      },
+       timeout_seconds=20):
+  max_attempts = 5
+  for _ in range(max_attempts):
+      try:
+          with timeout(seconds=timeout_seconds):
+              response = openai.Completion.create(
+                  model='text-davinci-003',
+                  prompt=prompt,
+                  max_tokens=max_tokens,
+                  temperature=temperature,
+                  logprobs=logprobs,
+                  logit_bias=logit_bias,
+                  stop=list(stop_seq) if stop_seq is not None else None,
+              )
+          break
+      except:
+          print('Timeout, retrying...')
+          pass
+  return response, response["choices"][0]["text"].strip()
+
+=== CELL 7 (markdown) ===
+## **Specify the instruction**
+Consider a setting where there can be a counter with three objects on top it (figure below). There are also a top drawer and a bottom drawer under the counter. There is a set of landfill, recycling, and compost bins next to the counter (not shown).
+
+<img src="https://robot-help.github.io/img/sample-mobile-manipulation.png" height="200px">
+
+The possible task instruction, for example, can be "pick up the apple", "put the apple in the drawer" (unclear about the choice of drawer), and "dispose of the apple".
+
+Besides the apple, orange, and Sprite shown in the image, we have also calibrated the LLM to perform tasks with these objects: bottled water, bottled tea, orange soda, RedBull, Coke, Pepsi, rice chips, jalapeno chips, kettle chips, multigrain chips, energy bar, dirty sponge with food residue, clean sponge, metal bowl, plastic bowl.
+
+Now you can specify the task instruction and also the three objects present on the countertop.
+
+=== CELL 8 (code) ===
+instruction = "Put the bottled water in the bin." #@param {type:"string"}
+scene_objects = "energy bar, bottled water, rice chips" #@param {type:"string"}
+
+=== CELL 9 (markdown) ===
+## **Access the LLM uncertainty**
+Next, we would like to see how uncertain the LLM is about the correct action to take in this scenario.
+
+=== CELL 10 (code) ===
+#@markdown First, we prompt the LLM to generate possible options with few-shot prompting
+demo_mc_gen_prompt = """
+We: You are a robot operating in an office kitchen. You are in front of a counter with two closed drawers, a top one and a bottom one. There is also a landfill bin, a recycling bin, and a compost bin.
+
+We: On the counter, there is an orange soda, a Pepsi, and an apple.
+We: Put that drink in the top drawer.
+You:
+A) open the top drawer and put the orange soda in it
+B) open the bottom drawer and put the Pepsi in it
+C) open the bottom drawer and put the orange soda in it
+D) open the top drawer and put the Pepsi in it
+
+We: On the counter, there is an energy bar, a banana, and a microwave.
+We: Put the snack next to the microwave.
+You:
+A) pick up the energy bar and put it next to the microwave
+B) pick up the banana and put it next to the energy bar
+C) pick up the banana and put it next to the microwave
+D) pick up the energy bar and put it next to the banana
+
+We: On the counter, there is a Coke, a Sprite, and a sponge.
+We: Can you dispose of the can? It should have expired.
+You:
+A) pick up the sponge and put it in the landfill bin
+B) pick up the Coke and put it in the recycling bin
+C) pick up the Sprite and put it in the recycling bin
+D) pick up the Coke and put it in the landfill bin
+
+We: On the counter, there is a bottled water, a bag of jalapeno chips, and a bag of rice chips.
+We: I would like a bag of chips.
+You:
+A) pick up the bottled water
+B) pick up the jalapeno chips
+C) pick up the kettle chips
+D) pick up the rice chips
+
+We: On the counter, there is {scene_objects}
+We: {task}
+You:
+"""
+
+def process_mc_raw(mc_raw, add_mc='an option not listed here'):
+  mc_all = mc_raw.split('\n')
+
+  mc_processed_all = []
+  for mc in mc_all:
+      mc = mc.strip()
+
+      # skip nonsense
+      if len(mc) < 5 or mc[0] not in [
+          'a', 'b', 'c', 'd', 'A', 'B', 'C', 'D', '1', '2', '3', '4'
+      ]:
+          continue
+      mc = mc[2:]  # remove a), b), ...
+      mc = mc.strip().lower().split('.')[0]
+      mc_processed_all.append(mc)
+  if len(mc_processed_all) < 4:
+      raise 'Cannot extract four options from the raw output.'
+
+  # Check if any repeated option - use do nothing as substitue
+  mc_processed_all = list(set(mc_processed_all))
+  if len(mc_processed_all) < 4:
+      num_need = 4 - len(mc_processed_all)
+      for _ in range(num_need):
+          mc_processed_all.append('do nothing')
+  prefix_all = ['A) ', 'B) ', 'C) ', 'D) ']
+  if add_mc is not None:
+      mc_processed_all.append(add_mc)
+      prefix_all.append('E) ')
+  random.shuffle(mc_processed_all)
+
+  # get full string
+  mc_prompt = ''
+  for mc_ind, (prefix, mc) in enumerate(zip(prefix_all, mc_processed_all)):
+      mc_prompt += prefix + mc
+      if mc_ind < len(mc_processed_all) - 1:
+          mc_prompt += '\n'
+  add_mc_prefix = prefix_all[mc_processed_all.index(add_mc)][0]
+  return mc_prompt, mc_processed_all, add_mc_prefix
+
+demo_mc_gen_prompt = demo_mc_gen_prompt.replace('{task}', instruction)
+demo_mc_gen_prompt = demo_mc_gen_prompt.replace('{scene_objects}', scene_objects)
+
+# Generate multiple choices
+_, demo_mc_gen_raw = lm(demo_mc_gen_prompt, stop_seq=['We:'], logit_bias={})
+demo_mc_gen_raw = demo_mc_gen_raw.strip()
+demo_mc_gen_full, demo_mc_gen_all, demo_add_mc_prefix = process_mc_raw(demo_mc_gen_raw)
+
+print('====== Prompt for generating possible options ======')
+print(demo_mc_gen_prompt)
+
+print('====== Generated options ======')
+print(demo_mc_gen_full)
+
+=== CELL 11 (code) ===
+#@markdown Then we evaluate the probabilities of the LLM predicting each option (A/B/C/D/E)
+
+# get the part of the current scenario from the previous prompt
+demo_cur_scenario_prompt = demo_mc_gen_prompt.split('\n\n')[-1].strip()
+
+# get new prompt
+demo_mc_score_background_prompt = """
+You are a robot operating in an office kitchen. You are in front of a counter with two closed drawers, a top one and a bottom one. There is also a landfill bin, a recycling bin, and a compost bin.
+""".strip()
+demo_mc_score_prompt = demo_mc_score_background_prompt + '\n\n' + demo_cur_scenario_prompt + '\n' + demo_mc_gen_full
+demo_mc_score_prompt += "\nWe: Which option is correct? Answer with a single letter."
+demo_mc_score_prompt += "\nYou:"
+
+# scoring
+mc_score_response, _ = lm(demo_mc_score_prompt, max_tokens=1, logprobs=5)
+top_logprobs_full = mc_score_response["choices"][0]["logprobs"]["top_logprobs"][0]
+top_tokens = [token.strip() for token in top_logprobs_full.keys()]
+top_logprobs = [value for value in top_logprobs_full.values()]
+
+print('====== Prompt for scoring options ======')
+print(demo_mc_score_prompt)
+
+print('\n====== Raw log probabilities for each option ======')
+for token, logprob in zip(top_tokens, top_logprobs):
+  print('Option:', token, '\t', 'log prob:', logprob)
+
+=== CELL 12 (markdown) ===
+## **Construct prediction set**
+With the probabilities from the LLM, we can construct the prediction set now. From calibration, we have determined the threshold to be 0.072 with a target success level of 0.8. This means the calibration set includes all options with softmax score higher than 0.072. Conformal prediction provides guarantee that the correct action is included in the set with 80% probability!
+
+When the set has more than one option, we deem the LLM is uncertain about the correct option and **triggers human help**.
+
+=== CELL 13 (code) ===
+#@title
+qhat = 0.928
+
+# get prediction set
+def temperature_scaling(logits, temperature):
+    logits = np.array(logits)
+    logits /= temperature
+
+    # apply softmax
+    logits -= logits.max()
+    logits = logits - np.log(np.sum(np.exp(logits)))
+    smx = np.exp(logits)
+    return smx
+mc_smx_all = temperature_scaling(top_logprobs, temperature=5)
+
+# include all options with score >= 1-qhat
+prediction_set = [
+          token for token_ind, token in enumerate(top_tokens)
+          if mc_smx_all[token_ind] >= 1 - qhat
+      ]
+
+# print
+print('Softmax scores:', mc_smx_all)
+print('Prediction set:', prediction_set)
+if len(prediction_set) != 1:
+  print('Help needed!')
+else:
+  print('No help needed!')

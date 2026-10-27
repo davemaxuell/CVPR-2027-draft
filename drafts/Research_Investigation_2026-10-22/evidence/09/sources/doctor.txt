@@ -1,0 +1,1227 @@
+===== PDF PAGE 1 =====
+       Finding Where the Buck Stops: An Automated Failure Attribution-Based
+                  Reflection Framework for Multi-Agent Collaboration
+
+                   Xiaoqing Wang1  Keman Huang1*   Bin Liang1  Hongyu Li2
+                                Xiaoyong Du1  Wuqiong Pan2
+                                 1Renmin University of China
+                                           2Ant Group
+
+                            {wangxiaoq, keman, liangb, duyong}@ruc.edu.cn
+
+
+                        Abstract                          TASK: Analyze the sales performance of product X on an e-commerce platform
+                                                                                                               over the past six months and propose strategies for operational improvement.
+
+               Multi-agent systems (MAS) powered by large
+                                                                                               Failure Process Replay
+              language models have shown promise for com-                                                         Forced Reflection
+                                                                                                                                                      Pollute                                                                                                        I successfully                                                                                                                                               collecting                                                                                                                                the                                                                                                                                                   I                                                                                                                                                 wonder                                                                                                                                                                                                                       if                                                                                                                                                             I                                                                                                                                                                               should                                                                                                                                                                         have                                                                                                                                                                                                   collected               plex                     tasks                          but suffer from                                       high                                                    failure                                                               rates.                                                                                                           Memory                                                                                                                six-month                                                                                                                                        sales                                                                                                                             data                                                                                                                                   of                                                                                                                                                                              sales                                                                                                                                                               data                                                                                                                                                                             at                                                                                                                                                                         a                                                                                                                                                     more                                                                                                                                                                                           granular                                                                                                                                                                                                                                           level,2026                                                                                                                 product category                                                                                                                                          X.                                                                                                                                  Data                                                                                                                                                          such                                                                                                                                                                       as daily                                                                                                                                                                                  instead                                                                                                                                                                               of monthly.              Current                          self-reflection                                methods                                                  for                             MAS                                                               re-                                                                                                                                                            Collection
+               quire all agents to reflect upon failure, over-                                                                                                         I accurately transformed                        Forced Reflection
+               looking a critical reality: failures typically stem               the collected data into a line           Pollute   I wonder if a line chart was the
+                                                                                                                chart illustrating the sales        Memory wrong choice; perhaps a bar chart orAug         from a specific agent leading the task astray,                     volume trends.          Data            another chart would have better
+             namely the decisive error agent, while oth-                                                Visualization           conveyed the sales trends.
+                                                                                                        I mistakenly                                                                                                                           concluded                                                                                                                                     that                                                                                                                                                           Precise Reflection28           ers merely fulfill their regular duties. Forcing               the                                                                                                                 minor fluctuations                                                                                                                                                                       in                                                                                                                                the
+                                                                                                                                              line chart represented a            Enrich    I should have been more critical
+               regular-behaving agents to reflect contaminates                   downward trend.           Memory  of the trend patterns I identified
+                 their memory with wrong insights. Hence, we                                                AnalysisTrend              additionaland verifiedstatisticalmy analysistechniques.through
+                                                                                                         I drafted                                                                                                                    the final                                                                                                                                   report              propose DoCtOR (Diagnose-then-Correct PPO-                                                                                                                                          Forced Reflection                                                                                                                 with                                                                                                                    misguided                                                                                                                                        operational
+              enhanced Reflection), a novel reflection frame-                   strategies to address a              Pollute   I mistakenly attributed the sales
+                                                                                                                 nonexistent decline in sales.        Memory   decline to market dynamics, when
+            work that enhances multi-agent collaboration.                                           Report           the actual causes might have been[cs.AI]
+            DoCtOR first identifies the decisive error step                                          Writer              more product-specific.
+             and decisive error agent through automated
+                                                                Figure 1: A multi-agent collaboration failure process
+                 failure attribution, then employs counterfac-
+                                                                     replay in a data analysis task and the detrimental effects
+                 tual reasoning to generate a corrected decisive
+                                                                    of forced reflection on regular-behaving agents.
+               error step, and finally engages only the deci-
+                 sive error agent to produce targeted reflections.
+              Experimental results show DoCtOR achieves
+                                                                collaboratively should leverage collective intelli-            22%, 26%, and 27% improvements over ini-
+                                                       gence to overcome challenges insurmountable for                    tial success rates on HotPotQA, ChartQAPro,
+              and Mind2Web datasets, outperforming Reflex-       single agents. However, recent empirical studies
+                ion, Retroformer, and COPPER. We further      (Wang et al., 2024b; Zhang et al., 2025a; Pan et al.,
+                establish the generalizability of our diagnose-      2025) have revealed a perplexing phenomenon:
+                then-correct paradigm and demonstrate that in        despite consuming additional computational re-
+              low-resource settings, focusing reflection on                                                                 sources, MAS frequently fail to reliably outperformarXiv:2608.28264v1          reasoning steps after the decisive error step                                                             robust single-agent baselines. Pan et al. (2025)
+               achieves comparable quality to reflecting on
+                                                                   further documents that prominent MAS, including                the complete failure trajectory.
+                                                        Chatdev (Qian et al., 2024), MetaGPT (Hong et al.,
+        1  Introduction                                2024), Magentic-One (Fourney et al., 2024), and
+                                                 AppWorld (Trivedi et al., 2024), demonstrate fail-
+          In recent years, multi-agent systems (MAS) pow-   ure rates between 60% and 86.7%, even on tasks
+          ered by large language models have attracted con-   they were specifically designed to excel at. Such
+           siderable attention and are increasingly regarded as   alarming failure rates raise fundamental concerns
+         a promising approach for tackling complex tasks    regarding the practical application of MAS.
+       (Wu et al., 2024; Qian et al., 2024; Chen et al.,     To enhance collaborative performance in MAS,
+         2023; Hong et al., 2024; Fourney et al., 2024).   a natural approach involves collecting extensive
+            Intuitively, multiple specialized agents working    collaboration data for agent fine-tuning. Neverthe-
+                    *                                                        less, this strategy may compromise the model’s             Keman Huang (keman@ruc.edu.cn) is the corresponding
+             author.                                              general capabilities (Yang et al., 2024), which con-
+
+===== PDF PAGE 2 =====
+tradicts the goal of achieving artificial general in-   soning trajectories. Inspired by Process Reward
+telligence. Therefore, a more prevalent approach   Models (PRM) (Lightman et al., 2023; Zhang et al.,
+is to optimize the collaboration process through   2025c; Song et al., 2025), we propose a Process:::
+self-reflection mechanisms (Shinn et al., 2023; Yao   reward-based Automated ::Failure Attribution::
+et al., 2024; Bo et al., 2024), which transform bi-   (ProFA) method that assigns correctness scores to
+nary or scalar rewards from the environment into    individual reasoning steps, where the first incorrect
+verbal reflections, thereby providing additional con-   step is designated as the decisive error step and
+text to improve task performance.                         its agent as the decisive error agent. Based on the
+   Existing literature has developed self-reflection    identified failure points, the ♠correction submod-
+methods for MAS, such as COPPER (Bo et al.,   ule applies counterfactual reasoning to generate
+2024), which fine-tunes a shared reflector to gen-   a corrected decisive error step, whose correctness
+erate personalized reflections according to agent     is subsequently verified by ProFA. Finally, only
+roles. Specifically, COPPER requires all partici-   the decisive error agent performs targeted reflec-
+pating agents to reflect on task trajectories when    tion through the ♥reflector model, enabling self-
+failures occur. The underlying assumption of COP-   correction and self-improvement. The reflector is
+PER is that every agent shares responsibility for the    further fine-tuned through proximal policy opti-
+failure and should reflect on its causes. However,   mization (Schulman et al., 2017).
+it overlooks an important reality: When tasks fail,     Our contributions can be concluded as follows:
+responsibility often falls on a specific agent leading
+the task astray, namely the decisive error agent,  ❶Framework Proposal. We propose DoCtOR, a
+while others merely fulfill their normal duties.         novel reflection framework that addresses limi-
+  Figure 1 illustrates this phenomenon through a      tations of existing multi-agent reflection meth-
+multi-agent collaboration failure process replay:     ods. Unlike approaches that require all agents to
+AgentA successfully collected the monthly sales      reflect upon failure, DoCtOR first identifies the
+data, while AgentB correctly generated a corre-     decisive error step through automated failure at-
+sponding line graph. However, AgentC erroneously      tribution, then employs counterfactual reasoning
+interpreted minor fluctuations as a downward trend,      to generate the corrected decisive error step, and
+leading AgentD to develop inappropriate strate-      finally engages the decisive error agent to gen-
+gies based on this misanalysis. In this scenario,      erate precise reflections while avoiding memory
+AgentC is the decisive error agent, while others are     contamination of regular-behaving agents.
+regular-behaving agents. Forced reflection can be  ❷Experimental Validation.  Experiments show
+detrimental for regular-behaving agents: AgentA                                                             that (I) DoCtOR exhibits superior reflection capa-
+might question whether daily data would have been                                                                   bilities, improving initial success rates by 22%,
+more appropriate, while AgentB might wonder if                                           26%, and 27% on HotPotQA, ChartQAPro, and
+a bar chart would have been superior to the line                                        Mind2Web datasets respectively, outperforming
+graph. Such misguided reflections contaminate the                                                       baselines including Reflexion, Retroformer, and
+memory of regular-behaving agents, providing er-                                      COPPER; (II) ProFA provides effective auto-
+roneous insights for future task execution and thus                                              mated failure attribution, achieving 4%-35% im-
+probably introducing new errors, such as AgentA                                               provement in agent-level accuracy and 9%-28%
+collecting redundant data or AgentB abandoning                                              improvement in step-level accuracy on the Who
+line chart visualization methods.                             & When dataset compared to existing methods.
+   Therefore, we propose::Diagn:ose-then-:Correc:t
+                                           ❸Practical Solution. We demonstrate the general-PP :O-enhanced ::Reflection (DoCtOR), a novel
+                                                             izability of the diagnose-then-correct paradigmframework for enhancing multi-agent collaboration.
+                                                         in enhancing existing prompt-based reflectionThe framework consists of an action module for
+                                             methods such as Reflexion.  Additionally, ourgenerating reasoning trajectories and a reflection
+                                                         analysis reveals that providing only the reasoningmodule that provides feedback and updates agent
+                                                       steps following the decisive error step achievesmemory. Within the reflection module, we intro-
+duce a lightweight ♣diagnosis submodule for     comparable reflection quality to complete tra-
+                                                              jectories, enabling efficient reflection generationautomatic failure attribution (Zhang et al., 2025b),
+                                                 under low-resource settings.which identifies the decisive error step and the cor-
+responding decisive error agent in multi-agent rea-
+
+===== PDF PAGE 3 =====
+       Action Module                     Reflection Module                          Diagnosis Submodule
+
+ TASK: Analyze the sales performance                  Failure                    Decisive       Failure
+  of product X on an e-commerce platform             Trajectory               Error Step   Trajectory
+  over the past six months and propose
+  strategies for operational improvement.                                                                                Input                                                       Output
+                                                                                                                      Step1     Step2     Step3    Step4
+                                         Diagnosis               Correction
+                                   Submodule             Submodule                                                                                                           Process Reward Model
+
+
+                                                                                                                       Score1    Score2    Score3    Score4
+             Data               Data                             Decisive                   Corrected
+              Collection            Visualization                          Error                       Decisive
+                                                      Step                    Error Step                     Correction Submodule
+                                                   Decisive                         Decisive       Failure
+                                                                                                                                                    Corrected                                                 Error                       Error Step   Trajectory                    Counterfactual                                             Agent                                                                                                                                                                   Decisive                                                                                                         Reasoning                                                                                                                                                       Error Step
+             Report                               Trend
+             Writer                                    Analysis                                    Enrich                                                                        Input                                     Corrected
+                            Memory      Precise Reflection           Reflector                                       Decisive Error              Score
+                                                                                                                                       Agent
+                                                   I should have been more critical
+      Success                Failure              ofandtheverifiedtrend patternsmy analysisI identifiedthrough           Decisive Error                         NO       Corrected Score > Correctness
+     Trajectory           Trajectory              additional statistical techniques.             Agent                   Output      YES                            Threshold
+
+Figure 2: Overview of DoCtOR framework. Our framework comprises two components: an action module for
+generating reasoning trajectories, and a reflection module that provides feedback to action module agents and
+enriches their memory. The reflection module follows a three-stage workflow: (1) diagnosis submodule identifies
+the decisive error step and agent; (2) correction submodule generates a corrected decisive error step; and (3) reflector
+model leverages the previous two stages’ outputs to produce targeted reflections for the decisive error agent.
+
+
+2  Preliminary                                     attribution and introduce the concept of decisive
+                                                    error step and decisive error agent.
+2.1  Multi-Agent Collaboration                                                 For a failed trajectory τ, we define the decisive
+In this work, we formalize the LLM-based multi-   error step t∗as the first time step where an agent’s
+agent system using a  tuple (N, S, A, Pξo, R),   action at∗is identified as incorrect. This formu-
+where N represents the number of agents, S =    lation is based on the observation that in multi-
+S1×S2×· · ·×SN denotes the joint state space, and    agent collaboration, errors often propagate sequen-
+A = A1×A2×· · ·×AN represents the joint action     tially. When one agent makes a mistake, subse-
+space. Both states S and actions A are described   quent agents may build upon this incorrect foun-
+in natural language. At each timestep, the current    dation, leading to a chain of compounding errors.
+state s is integrated into a context c, which may in-   Therefore, identifying and correcting the first error
+clude descriptions of previous states to provide his-    is more effective than attempting to fix multiple
+torical information, enabling LLMs to make more   downstream mistakes that stem from the same root
+informed decisions about the next action to take.   cause. Correspondingly, the decisive error agent
+The state transition function Pξo  : S × A →S    i∗is the agent responsible for the erroneous action
+governs the system dynamics, where ξo captures    at∗at the decisive error step t∗.
+the inherent randomness in state transitions.
+                                       3  Method  The multi-agent system executes tasks through
+sequential  interactions  with  the  environment,  As illustrated in Figure 2, our DoCtOR framework
+generating  trajectories  of  the  form  τ  =    consists of an action module and a reflection mod-
+{s0, a0, s1, a1, . . . , sT , aT }, where T denotes the    ule. While the action module comprises multiple
+trajectory length.  In the cooperative setting, all    agents based on frozen language models (GPT-4o-
+agents share a common objective and work together   mini) with inaccessible parameters, the reflection
+to maximize collective performance. Following the   module centers on a reflector model, a smaller local
+standard reinforcement learning paradigm, the ul-   language model (Llama-3.1-8B-Instruct) that can
+timate goal is to maximize the cumulative reward,   be fine-tuned in low-resource environments. De-
+or episode return: G(τ) = PTt=0 R(st, at).           tailed prompts for both the action and reflection
+                                             modules are provided in Appendix E.
+2.2  Automated Failure Attribution                                                       In the remainder of this section, we describe the
+To better address failures in multi-agent collabora-   reflection module in detail. Specifally, the reflec-
+tion, we formulate the problem of automated failure    tor model (▷Section 3.3) leverages the decisive
+
+===== PDF PAGE 4 =====
+error step identified by the diagnosis submodule (▷    corrected decisive error step, which is essential for
+Section 3.1) and the corrected decisive error step    generating informative reflections that can guide
+generated by the correction submodule (▷Section    future improvements.
+3.2), and the failed trajectory to generate targeted     Given the decisive error step t∗and decisive er-
+reflections for the decisive error agent.               ror agent i∗, we generate a counterfactual action
+                                                         ˜at∗that represents a corrected version of the deci-
+3.1  Diagnosis Submodule
+                                                        sive error step action at∗:
+Inspired by the process reward model (Lightman
+et al., 2023; Zhang et al., 2025c; Song et al., 2025),              ˜at∗= CR(st∗, τ<t∗, pi∗)          (5)
+we develop a ProFA method, which assigns correct-
+ness scores to each reasoning step in a multi-agent     where CR represents the counterfactual reason-
+collaboration trajectory.                            ing function that takes the current state, the tra-
+  Given a failed trajectory τ generated by multi    jectory history up to decisive error step t∗, and
+agents, ProFA assigns a correctness score ct ∈    the decisive error agent profile pi∗to produce an
+[0, 1] to each step t in the reasoning process:          alternative action to correct the decisive error.
+                                           To evaluate the quality of the counterfactual ac-
+              ct = ProFA ϕ(st, at, τ<t)          (1)                                                         tion ˜at∗we apply ProFA to compute a new correct-
+                                                  ness score:
+  where ProFA ϕ is a process reward model param-
+eterized by ϕ, and τ<t represents the trajectory up
+                                                          ˜ct∗= ProFA ϕ(st∗, ˜at∗, τ<t∗)        (6)
+to step t. Based on these scores, we formulate a
+binary correctness indicator Bt for each step:
+                                A successful correction should result in ˜ct∗> γ,
+             Bt = I(ct > γ)               (2)    indicating that the counterfactual action ˜at∗suc-
+                                                        cessfully addresses the error and can be considered
+  where I(·) is the indicator function, and γ is a    as the corrected decisive error step. If ˜ct∗≤γ, the
+correctness threshold set to 0.5. The rationale for    correction is deemed unsuccessful, and the coun-
+this choice and sensitivity analysis of γ are pro-    terfactual reasoning process CR would be invoked
+vided in Appendix D.3. Using this binary classifi-   again to generate a new alternative action until a
+cation, we identify the decisive error step t∗as the    satisfactory correction is achieved.
+earliest failure point in the trajectory τ:
+                                                    3.3  Reflector Model
+     t∗= min{t | Bt = 0, 0 ≤t ≤T}     (3)                                         The reflector performs targeted reflection for the
+                                                     decisive error agent, focusing on identifying the  The ProFA model is trained on the Who & When
+                                                      root causes of the decisive error step and formulat-Pro dataset, which consists of annotated reason-
+                                                    ing a completely different, concise, high-level planing trajectories D = {(τ (j), {l(j)t  }Tjt=0)}Mj=1, where
+                                            aimed at mitigating similar failures in future tasks.M denotes the total number of trajectories in the
+                                 (j)                    To enhance the quality of generated reflections, wedataset. Each trajectory τ    is paired with anno-
+tated binary labels {l(j)t  }Tjt=0, indicating the correct-    further fine-tune the reflector using proximal policy                                                   optimization (Schulman et al., 2017).
+ness of every reasoning step from t = 0 to Tj, the
+length of the j-th trajectory. More details about the    3.3.1  Instruction and Reflection Generation
+dataset are provided in Section 4.1. The training
+                                              For a given failed trajectory τ, we first use the
+objective is to minimize the Binary Cross-Entropy
+                                                  diagnosis submodule to locate the decisive error
+(BCE) loss:
+                                                     step action at∗, and identify the corresponding de-
+            M  Tj                           cisive error agent profile pi∗. After obtaining the
+     LProFA = −1      X X BCE(c(j)t   , l(j)t  )   (4)   corrected decisive error step action ˜at∗from the       M                   j=1 t=0                         correction submodule, we construct the input con-
+                                                         text x = (τ, pi∗, at∗, ˜at∗) for the reflector. The
+3.2  Correction Submodule                                                         reflector Mr then generates a targeted reflection
+Once the failure points have been identified, our    yi∗for the decisive error agent i∗:
+framework employs counterfactual reasoning (Bot-
+tou et al., 2013; Qin et al., 2019) to generate the           yi∗= Mr(τ, pi∗, at∗, ˜at∗)          (7)
+
+===== PDF PAGE 5 =====
+3.3.2  Rating Score of Reflections                2025), and Mind2Web (Deng et al., 2023) to eval-
+For a precise reflection yi∗k,e generated by decisive    uate the collaborative abilities of multi-agent sys-
+error agent i∗in episode e of task k, let Gk,e de-   tems in multi-hop question answering, chart data
+note the current episode return and Gk,e+1 repre-    analysis, and website interaction: (I) HotPotQA
+sent the subsequent episode return that incorporates     is a multi-hop question-answering dataset compris-
+reflection yi∗k,e. Since the actor agents are based    ing 113k Wikipedia-based question-answer pairs,
+on frozen language models with low temperature    specifically designed to assess web retrieval capa-
+settings (Shinn et al., 2023; Yao et al., 2024; Bo    bilities by requiring multiple reasoning steps to
+et al., 2024), the injected randomness that leads to    derive answers. (II) ChartQAPro is a comprehen-
+return variation ∆G is primarily attributed to the    sive benchmark featuring 1,341 charts encompass-
+reflection yi∗k,e. Hence, we define the rating score    ing various chart types, including infographics and
+of reflection yi∗k,e as:                               dashboards, alongside 1,948 questions spanning
+                                                    multiple-choice, hypothetical, and unanswerable
+             r(yi∗k,e) = Gk,e+1 −Gk,e          (8)    formats.  (III) Mind2Web is a dataset designed
+                                                        for evaluating execution capabilities across diverse
+3.3.3  Optimization of the Reflector              website domains through feasible interactions like
+We optimize the reflector Mr through a three-stage    clicking, selecting, and typing, based on high-level
+RLHF (Ouyang et al., 2022) pipeline. We first    user instructions.
+collect high-quality reflections with positive scores
+                                      ProFA  To develop and evaluate ProFA, we con-as demonstration examples and train a supervised
+                                                      structed a Who & When Pro dataset by extract-reflector πSFT using Supervised Fine-Tuning (SFT)
+                                                  ing 1000, 500, and 1000 tasks from HotPotQA,with standard maximum likelihood estimation:
+                                            ChartQAPro, and Mind2Web respectively, yield-
+                     h            i        LSFT(θ) = −E log πθ(yi∗| x)       (9)   ing 667, 379, and 711 failure logs. These logs
+                                             underwent initial annotation by GPT-4o followed
+  Taking construction expenses into account, in-   by thorough review by three researchers to identify
+stead of collecting pairwise responses for each in-   decisive error agent (who) and decisive error step
+put, we train a regression model to predict the rat-   (when). We partitioned this dataset in a 7:1.5:1.5
+ing scores of input prompts and reflection pairs. We    ratio for training, validation, and testing. More
+then optimize the reward model Rϕ by minimizing    details on the dataset construction and annotation
+the Mean Square Error (MSE) loss:                 process are outlined in Appendix B.2.2.
+                                           The held-in dataset corresponds to the test set                                        2
+    LRM(ϕ) = E   Rϕ(x, yi∗) −r         (10)    of our constructed Who & When Pro dataset and
+                                                   contains failure logs from the same domains used
+   Finally, we fine-tune the supervised reflector   during the training of ProFA. To assess ProFA’s
+πSFT using PPO with the trained reward model    generalization capabilities, we employed the Who
+Rϕ. The reflector learns to generate reflections that  & When dataset from (Zhang et al., 2025b) as our
+maximize the expected reward by minimizing the    held-out dataset. This held-out test set comprises
+following loss objective:                       184 failure logs from multi-agent systems with
+                                                     fine-grained annotations about failure-responsible
+                            πRLθ (yi∗| x)      agents and decisive error steps, including two sub-LPPO(θ) = −E Rϕ(x, y) −β log
+                               πSFT(yi∗| x)      sets: Algorithm-Generated and Hand-Crafted.
+                                            (11)
+  where β controls the strength of the KL diver-   4.2  Baselines
+gence regularization term, ensuring that the fine-
+                                  DoCtOR  We compare DoCtOR with the follow-
+tuned model does not deviate too far from the ref-
+                                                  ing self-reflection baselines: (I) Reflexion (Shinn
+erence model πSFT.
+                                                           et al., 2023): A prompt-based reflection method
+4  Experiments                                      that generates verbal feedback from environmental
+                                                     signals to enhance task performance. (II) Retro-
+4.1  Datasets                                           former (Yao et al., 2024): Originally designed
+DoCtOR We evaluate DoCtOR on HotPotQA    for single-agent reflection using policy gradient
+(Yang et al., 2018), ChartQAPro (Masry et al.,   optimization, we extend this approach to multi-
+
+===== PDF PAGE 6 =====
+            HotPotQA                   ChartQAPro                 Mind2Web
+     65                                           45                                    50
+
+   (%) 60                                       (%) 40                                       (%) 45
+
+     55    Rate                                                              Rate 35                                                    Rate 40
+                                           30                                    35
+     50                        DoCtOR                                              DoCtOR                                              DoCtOR
+                                COPPER                                                                                  COPPER                                                                                                 Retroformer            30                       COPPERRetroformer                                      Retroformer            25      Success                                 Reflexion (GPT-4o)              Success                                 Reflexion (GPT-4o)              Success                                 Reflexion (GPT-4o)
+     45                             Reflexion                                                  (GPT-3.5)                                                                                                        Reflexion                                                                                                                 (GPT-3.5)                                                                                                                                                                                (GPT-3.5)                                                                                  25                             Reflexion
+                                         Reflexion                                                  (Llama-3.1)      20                                                                                                        Reflexion                                                                                                                  (Llama-3.1)                                                                                                                                                                        Reflexion                                                                                                                                                                                  (Llama-3.1)
+         0      1      2      3      4          0      1      2      3      4          0      1      2      3      4
+                    Trial Number                                Trial Number                                Trial Number
+
+                Figure 3: Performance comparison of DoCtOR with baselines for self-reflection.
+
+
+agent systems by training a shared reflector with    Llama-3.1-8B-Instruct with LoRA (Hu et al., 2022)
+overall rewards as supervision signals. (III) COP-   as the reflector and use GPT-2 as the regression
+PER (Bo et al., 2024): A multi-agent adaptation   reward model, following the setup in (Bo et al.,
+of Retroformer that trains a shared reflector using    2024). More training details are provided in Ap-
+counterfactual rewards to assess the contribution   pendix B.2.
+of a single agent’s reflection within the system, al-
+                                                      4.3.3  Evaluationleviating the credit assignment problem. Detailed
+model configurations and prompts for all baselines   To  evaluate  self-reflection methods  including
+are provided in Appendix B.1 and Appendix F .     DoCtOR, we adopt the Success Rate metric fol-
+                                              lowing prior work (Shinn et al., 2023; Yao et al.,
+ProFA  We compare ProFA with four automated
+                                               2024; Bo et al., 2024). A task is considered suc-
+failure attribution baselines from (Zhang et al.,
+                                                        cessful if the generated answer sufficiently matches
+2025b) based on GPT-4o model: (I) All-at-once:
+                                                    the ground-truth answer. To quantify this match,
+An LLM analyzes the complete failure log to si-
+                                     we use the F1 score, which enables soft matching
+multaneously identify the decisive error agent and
+                                                         rather than exact binary comparison. Details of the
+decisive error step. (II) Step-by-step: An LLM
+                                        F1 score computation are provided in Appendix
+examines the failure log step-by-step, terminating
+                                                   B.3. Due to computational constraints and consis-
+upon identifying the first erroneous step as the de-
+                                                          tent with prior work (Shinn et al., 2023; Yao et al.,
+cisive error step and its agent as the decisive error
+                                               2024; Bo et al., 2024), we construct the test set by
+agent. (III) Binary search: An LLM iteratively
+                                             randomly sampling 100 tasks from each dataset.
+narrows down the failure log by half until isolating
+                                                  For assessing automated failure attribution meth-
+a single step, identifying as the decisive error step.
+                                                ods including ProFA, we employ two metrics from
+(IV) Random: A naive baseline that randomly se-
+                                             (Zhang et al., 2025b): (I) Agent-Level Accuracy,
+lects decisive error agent and decisive error step.
+                                                      the percentage of correctly identified decisive error
+4.3  Implementation Details                      agent; and (II) Step-Level Accuracy, the percent-
+                                               age of correctly identified decisive error step.4.3.1  Collaboration Setting
+We employ the Magnetic-One (Fourney et  al.,                                                    4.4  Main Results
+2024)  multi-agent  system  to  execute  tasks
+                                We evaluated the DoCtOR framework across Hot-from HotPotQA, ChartQAPro, and Mind2Web.
+                                            PotQA, ChartQAPro, and Mind2Web datasets overMagnetic-One is a general multi-agent system de-
+                                                          five trials, as illustrated in Figure 3. Our analy-signed to solve tasks such as software engineering,
+                                                            sis reveals that DoCtOR exhibited superior reflec-data analysis, scientific research, and web naviga-
+                                                        tion capabilities compared to all baseline methodstion. More details regarding Magnetic-One’s ar-
+                                                  including Reflexion, Retroformer, and COPPER.chitecture, multi-agent team configurations across
+                                      By leveraging ProFA to localize the decisive errordifferent datasets, and response formats are out-
+                                                  agent and decisive error step, then employing coun-lined in Appendix C.
+                                                          terfactual reasoning to generate the corrected deci-
+4.3.2  Training                                       sive error step, DoCtOR provides targeted auxiliary
+To develop ProFA, we conduct full-parameter fine-   information that enables the decisive error agent
+tuning on Qwen3-1.7B. Furthermore, we fine-tune    to accurately identify failure causes and formu-
+
+===== PDF PAGE 7 =====
+                                                      Held-in Dataset               Held-out Dataset
+        Baseline            Metric                                               Algorithm-   Hand-
+                                   HotPotQA  ChartQAPro  Mind2Web
+                                                                            Generated   Crafted
+
+                    Agent-Level Accuracy      0.37          0.29          0.54         0.28        0.20
+     Random
+                     Step-Level Accuracy      0.06          0.09          0.02         0.18        0.04
+
+                    Agent-Level Accuracy      0.54          0.55          0.19         0.49        0.51
+      All-at-Once
+                     Step-Level Accuracy      0.28          0.45          0.23         0.10        0.05
+
+                    Agent-Level Accuracy      0.45          0.42          0.51         0.28        0.42
+     Step-by-Step
+                     Step-Level Accuracy      0.20          0.42          0.12         0.17        0.11
+
+                    Agent-Level Accuracy      0.37          0.38          0.74         0.32        0.38
+    Binary Search
+                     Step-Level Accuracy      0.18          0.24          0.02         0.12        0.09
+
+                    Agent-Level Accuracy      0.85          0.82          0.79         0.53        0.55
+       Our
+                     Step-Level Accuracy      0.53          0.78          0.42         0.38        0.20
+
+           Table 1: Performance comparison of ProFA with baselines for automated fault attribution.
+
+             HotPotQA                   ChartQAPro                 Mind2Web
+      65                                            45                                    50
+    (%) 60                                       (%) 40                                       (%) 45
+
+                                            35     Rate 55                                                    Rate                                                                                                                          Rate 40
+                                            30                                    35      50                      DoCtOR                                              DoCtOR                                              DoCtOR
+                                       Reflexion-DC
+                                         Reflexion (GPT-4o)                                                   (GPT-4o)       25                           Reflexion-DCReflexion (GPT-4o)(GPT-4o)       30                           Reflexion-DCReflexion (GPT-4o)(GPT-4o)        Success 45                           Reflexion-DC (GPT-3.5)          Success                              Reflexion-DC (GPT-3.5)          Success                              Reflexion-DC (GPT-3.5)
+                                         Reflexion (GPT-3.5)        20                            Reflexion (GPT-3.5)        25                            Reflexion (GPT-3.5)
+         0      1      2      3      4          0      1      2      3      4          0      1      2      3      4
+                     Trial Number                                Trial Number                                Trial Number
+
+Figure 4: Generalizability of the diagnose-then-correct reflection paradigm. We evaluate the paradigm on the
+prompt-based Reflexion method to verify its generalizability beyond our fine-tuning-based implementation.
+
+
+late more effective improvement strategies. Con-   accuracy compared to all-at-once. For held-out
+sequently, DoCtOR achieved substantial improve-    datasets, ProFA maintained its advantage with 4%
+ments of 22%, 26%, and 27% over initial success   improvements in agent-level accuracy over all-at-
+rates on HotPotQA, ChartQAPro, and Mind2Web    once, while step-level accuracy improved by 20%
+datasets, respectively, demonstrating the effective-   over random on Algorithm-Generated dataset and
+ness of our diagnose-then-correct paradigm. Ad-  9% over step-by-step on Hand-Crafted dataset.
+ditional experiments on robustness and scalability
+across different model families and sizes are re-
+ported in Appendix D.2.                                               Random                                                              25        All-at-Once
+                                                                                                   Step-by-Step
+4.5  Performance of ProFA                            20       BinaryOurs  Search
+                                                              15
+As shown in Table 1, ProFA demonstrated robust
+                                                              10
+performance, achieving approximately 80% agent-
+                                                               5
+level accuracy on held-in datasets and 50% on held-
+out datasets, while step-level accuracy reached      0   HotPotQA ChartQAPro Mind2Web  Algorithm-   Hand-
+                                                                                                      Generated   Crafted
+53%, 78%, and 42% on held-in datasets and 38%
+and 20% on held-out datasets respectively.           Figure 5: The absolute distance between the predicted
+  For held-in datasets, the performance improve-   and actual decisive error step.
+ments over baselines were particularly notable on
+the HotPotQA dataset, where ProFA achieved 31%
+improvement in agent-level accuracy and 25% in      Additionally, as illustrated in Figure 5, ProFA
+step-level accuracy compared to all-at-once, and    consistently achieved the smallest absolute distance
+on the ChartQAPro dataset with 27% improve-   between predicted and actual decisive error step
+ment in agent-level accuracy and 33% in step-level    across all datasets.
+
+===== PDF PAGE 8 =====
+             HotPotQA                   ChartQAPro                 Mind2Web
+      65                                            45                                    50
+    (%) 60                                       (%) 40                                       (%) 45
+
+                                            35     Rate 55                                                    Rate                                                                                                                          Rate 40
+                                            30                                    35      50
+                                     DoCtOR                                                     (ALL)
+                                     DoCtOR                                                 (AFTER)       25                          DoCtORDoCtOR (ALL)(AFTER)       30                          DoCtORDoCtOR (ALL)(AFTER)         Success 45                          DoCtOR (BEFORE)          Success                             DoCtOR (BEFORE)          Success                             DoCtOR (BEFORE)
+                                     DoCtOR (ONLY)        20                          DoCtOR (ONLY)        25                          DoCtOR (ONLY)
+         0      1      2      3      4          0      1      2      3      4          0      1      2      3      4
+                     Trial Number                                Trial Number                                Trial Number
+
+Figure 6: Effect of failure trajectory scope on reflection quality. We investigate the impact of different scopes of
+failed reasoning trajectories on reflection quality by comparing four strategies: the full failure trajectory, steps after
+the decisive error step, steps before the decisive error step, and only the decisive error step.
+
+             HotPotQA                   ChartQAPro                 Mind2Web
+      65                                            45                                    50
+    (%) 60                                       (%) 40                                       (%) 45
+                                            35     Rate 55                                                    Rate                                                                                                                          Rate 40
+                                            30
+      50                                                                           35
+                               DoCtOR                               DoCtOR (w/o Correct)             25                   DoCtORDoCtOR (w/o Correct)                                         DoCtORDoCtOR (w/o Correct)         Success 45                   DoCtOR (w/o Diagnose & Correct)          Success                      DoCtOR (w/o Diagnose & Correct)          Success 30                   DoCtOR (w/o Diagnose & Correct)
+                               DoCtOR (w/o PPO)              20                   DoCtOR (w/o PPO)                                           DoCtOR (w/o PPO)
+         0      1      2      3      4          0      1      2      3      4          0      1      2      3      4
+                     Trial Number                                Trial Number                                Trial Number
+
+Figure 7: Ablation study. Performance comparison of DoCtOR with variants that remove the correction submodule
+(w/o correct), both diagnosis and correction submodules (w/o diagnose & correct), or proximal policy optimization
+for the reflector (w/o PPO).
+
+
+4.6  Generalizability of Diagnose-then-Correct    low-resource environments, demonstrating that ef-
+     Reflection Paradigm                           fective reflection can be achieved by strategically
+                                                      selecting reasoning steps after the decisive error
+We evaluate the generalizability of our diagnose-
+                                                         step, thereby optimizing computational efficiency
+then-correct paradigm by applying it to the prompt-
+                                                 while maintaining reflection quality.
+based Reflexion method with GPT-3.5 and GPT-
+4o as base models, as shown in Figure 4. The                                                    4.8  Ablation Study
+diagnose-then-correct paradigm yields consistent
+but modest gains for GPT-4o-based Reflexion  We conduct an ablation study to assess the contri-
+across all datasets, while achieving substantial im-   bution of each component in the DoCtOR frame-
+provements for GPT-3.5-based Reflexion on the   work. As illustrated in Figure 7, we remove the
+ChartQAPro and Mind2Web datasets. The pro-   correction submodule, both diagnosis and correc-
+nounced improvement with GPT-3.5 suggests that    tion submodules, and PPO for the reflector. The
+models with weaker intrinsic reasoning capabilities    results demonstrate that all components are cru-
+benefit more from the structured diagnostic and    cial for optimal performance, as removing any of
+corrective guidance provided by our paradigm.      them leads to consistent performance drops across
+                                                                all datasets. In particular, removing both diagno-
+4.7  Effect of Failure Trajectory Scope on          sis and correction submodules causes the largest
+     Reflection Quality                           degradation, underscoring the importance of the
+                                                   diagnose-then-correct paradigm.
+As shown in Figure 6, providing steps after the de-
+cisive error step yields comparable performance to                                       5  Conclusion
+providing a complete multi-agent trajectory. This
+indicates that steps after the decisive error step    In this work, we introduced DoCtOR, a novel reflec-
+contain sufficient information for generating high-    tion framework that significantly enhances multi-
+quality reflection, as the reflector can identify fun-   agent collaboration. Our key contribution lies in
+damental issues by analyzing error cascades. These    recognizing that failures typically stem from a de-
+insights have significant practical implications for    cisive error agent leading the task astray, while
+
+===== PDF PAGE 9 =====
+others merely fulfill their regular duties. Through   Weize Chen, Yusheng Su, Jingwei Zuo, Cheng Yang,
+automated failure attribution and targeted reflec-      Chenfei Yuan, Chi-Min Chan, Heyang Yu, Yaxi Lu,
+                                                      Yi-Hsin Hung, Chen Qian, et al. 2023. Agentverse:
+tion, DoCtOR prevents memory contamination for
+                                                                 Facilitating multi-agent collaboration and exploring
+regular-behaving agents while achieving superior      emergent behaviors.  In The Twelfth International
+reflection quality, paving the way for more effective      Conference on Learning Representations.
+multi-agent collaboration systems.
+                                               Xinyun Chen, Maxwell Lin, Nathanael Schärli, and
+                                               Denny Zhou. 2024. Teaching large language models
+Limitations                                               to self-debug. In The Twelfth International Confer-
+                                                      ence on Learning Representations.
+While the DoCtOR framework achieves promising
+                                                Xiang Deng, Yu Gu, Boyuan Zheng, Shijie Chen, Samresults, several areas remain for future exploration.
+                                                          Stevens, Boshi Wang, Huan Sun, and Yu Su. 2023.
+First, our current implementation focuses on task-                                               Mind2web: Towards a generalist agent for the web.
+oriented multi-agent collaborations with clear suc-     Advances in Neural Information Processing Systems,
+cess criteria. Extending the framework to open-      36:28091–28114.
+ended creative tasks or scenarios with subjective                                                    Yilun Du, Shuang Li, Antonio Torralba, Joshua B.
+evaluation metrics presents an interesting direction      Tenenbaum, and Igor Mordatch. 2024. Improving
+for future research.  Second, we primarily eval-       factuality and reasoning in language models through
+uated DoCtOR on English-language datasets and      multiagent debate. In Forty-first International Con-
+                                                            ference on Machine Learning.
+tasks. The framework’s performance across multi-
+lingual settings and culturally diverse collaborative   Adam Fourney, Gagan Bansal, Hussein Mozannar,
+scenarios would benefit from further investigation     Cheng Tan, Eduardo Salinas, Friederike Niedtner,
+                                                    Grace Proebsting, Griffin Bassman, Jack Gerrits, Ja-to establish broader applicability. Finally, our ex-
+                                                  cob Alber, et al. 2024. Magentic-one: A generalist
+periments primarily involve relatively small multi-                                                            multi-agent system for solving complex tasks. arXiv
+agent teams. Investigating the framework’s scala-      preprint arXiv:2411.04468.
+bility with larger multi-agent teams would provide
+                                                         Alireza Ghafarollahi and Markus J Buehler. 2025. Scia-
+valuable insights for deploying DoCtOR in more                                                               gents: automating scientific discovery through bioin-
+complex collaborative scenarios.                         spired multi-agent intelligent graph reasoning. Ad-
+                                                    vanced Materials, 37(22):2413523.
+Acknowledgments                                                            Juraj Gottweis, Wei-Hung Weng, Alexander Daryin,
+                                                 Tao  Tu,  Anil  Palepu,  Petar  Sirkovic,  Artiom
+This work was supported by the National Natu-                                                     Myaskovsky, Felix Weissenberger, Keran Rong, Ryu-
+ral Science Foundation of China under Grant Nos.       taro Tanno, et al. 2025. Towards an ai co-scientist.
+62441230, 62172425, and 62672497, the Scientific      arXiv preprint arXiv:2502.18864.
+Research Innovation Capability Support Project                                                            Sirui Hong, Mingchen Zhuge, Jonathan Chen, Xiawu
+for Young Faculty under Grant No. SRICSPYF-     Zheng, Yuheng Cheng, Jinlin Wang, Ceyao Zhang,
+ZY2025001, and the Fundamental Research Funds        Zili Wang, Steven Ka Shing Yau, Zijuan Lin, Liyang
+for the Central Universities and the Research Funds      Zhou, Chenyu Ran, Lingfeng Xiao, Chenglin Wu,
+                                                    and Jürgen Schmidhuber. 2024. MetaGPT: Meta pro-
+of Renmin University of China under Grant No.
+                                                 gramming for a multi-agent collaborative framework.
+22XNKJ04.                                                In The Twelfth International Conference on Learning
+                                                           Representations.
+
+                                             Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan
+References                                                        Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, and
+                                                 Weizhu Chen. 2022. LoRA: Low-rank adaptation ofXiaohe Bo, Zeyu Zhang, Quanyu Dai, Xueyang Feng,
+                                                              large language models. In International Conference   Lei Wang, Rui Li, Xu Chen, and Ji-Rong Wen. 2024.
+                                                  on Learning Representations.   Reflective multi-agent collaboration based on large
+  language models. Advances in Neural Information                                            Guohao Li, Hasan Hammoud, Hani Itani, Dmitrii
+   Processing Systems, 37:138595–138631.                                                           Khizbullin, and Bernard Ghanem. 2023.  Camel:
+                                                  Communicative agents for" mind" exploration of
+Léon Bottou, Jonas Peters, Joaquin Quiñonero-Candela,       large language model society. Advances in Neural
+   Denis X Charles, D Max Chickering, Elon Portugaly,      Information Processing Systems, 36:51991–52008.
+   Dipankar Ray, Patrice Simard, and Ed Snelson. 2013.
+   Counterfactual reasoning and learning systems: The    Hunter Lightman, Vineet Kosaraju, Yuri Burda, Harri-
+  example of computational advertising. The Journal      son Edwards, Bowen Baker, Teddy Lee, Jan Leike,
+   of Machine Learning Research, 14(1):3207–3260.       John Schulman, Ilya Sutskever, and Karl Cobbe.
+
+===== PDF PAGE 10 =====
+  2023. Let’s verify step by step. In The Twelfth Inter-   Mingyang Song, Zhaochen Su, Xiaoye Qu, Jiawei Zhou,
+   national Conference on Learning Representations.       and Yu Cheng. 2025. PRMBench: A fine-grained
+                                                    and challenging benchmark for process-level reward
+Aman Madaan, Niket Tandon, Prakhar Gupta, Skyler      models. In Proceedings of the 63rd Annual Meeting
+   Hallinan, Luyu Gao, Sarah Wiegreffe, Uri Alon,       of the Association for Computational Linguistics (Vol-
+  Nouha Dziri, Shrimai Prabhumoye, Yiming Yang,     ume 1: Long Papers), pages 25299–25346, Vienna,
+   et al. 2023.  Self-refine: Iterative refinement with       Austria. Association for Computational Linguistics.
+   self-feedback. Advances in Neural Information Pro-
+   cessing Systems, 36:46534–46594.                  Kyle Swanson, Wesley Wu, Nash L Bulaong, John E
+                                                          Pak, and James Zou. 2024. The virtual lab: Ai agents
+Ahmed Masry, Mohammed Saidul Islam, Mahir Ahmed,      design new sars-cov-2 nanobodies with experimental
+  Aayush  Bajaj,  Firoz  Kabir, Aaryaman  Kartha,       validation. bioRxiv, pages 2024–11.
+  Md Tahmid Rahman Laskar, Mizanur Rahman,
+  Shadikur Rahman, Mehrad Shahmohammadi, Megh    Xiangru Tang, Anni Zou, Zhuosheng Zhang, Ziming
+  Thakkar, Md Rizwan Parvez, Enamul Hoque, and       Li, Yilun Zhao, Xingyao Zhang, Arman Cohan, and
+   Shafiq Joty. 2025. ChartQAPro: A more diverse and     Mark Gerstein. 2023. Medagents: Large language
+   challenging benchmark for chart question answering.      models as collaborators for zero-shot medical reason-
+   In Findings of the Association for Computational       ing. arXiv preprint arXiv:2311.10537.
+   Linguistics: ACL 2025, pages 19123–19151, Vienna,
+                                                  Harsh Trivedi, Tushar Khot, Mareike Hartmann, Ruskin   Austria. Association for Computational Linguistics.
+                                               Manku, Vinty Dong, Edward Li, Shashank Gupta,
+                                                    Ashish Sabharwal, and Niranjan Balasubramanian.Long Ouyang, Jeffrey Wu, Xu Jiang, Diogo Almeida,
+                                                      2024. Appworld: A controllable world of apps and   Carroll Wainwright, Pamela Mishkin, Chong Zhang,
+                                                       people for benchmarking interactive coding agents.  Sandhini Agarwal, Katarina Slama, Alex Ray, et al.
+                                                          In Proceedings of the 62nd Annual Meeting of the  2022. Training language models to follow instruc-
+                                                         Association for Computational Linguistics (Volume   tions with human feedback. Advances in neural in-
+                                                           1: Long Papers), pages 16022–16076.  formation processing systems, 35:27730–27744.
+
+                                                     Lei Wang, Chen Ma, Xueyang Feng, Zeyu Zhang, Hao
+Melissa Z Pan, Mert Cemri, Lakshya A Agrawal, Shuyi
+                                                    Yang, Jingsen Zhang, Zhiyuan Chen, Jiakai Tang,
+  Yang, Bhavya Chopra, Rishabh Tiwari, Kurt Keutzer,
+                                         Xu Chen, Yankai Lin, et al. 2024a. A survey on large
+  Aditya Parameswaran, Kannan Ramchandran, Dan
+                                                        language model based autonomous agents. Frontiers
+   Klein, Joseph E. Gonzalez, Matei Zaharia, and Ion
+                                                                of Computer Science, 18(6):186345.
+   Stoica. 2025. Why do multiagent systems fail? In
+  ICLR 2025 Workshop on Building Trust in Language                                                Qineng Wang, Zihao Wang, Ying Su, Hanghang Tong,
+  Models and Applications.                                                    and Yangqiu Song. 2024b. Rethinking the bounds of
+                                                       llm reasoning: Are multi-agent discussions the key?
+Chen Qian, Wei Liu, Hongzhang Liu, Nuo Chen, Yufan                                                          In Proceedings of the 62nd Annual Meeting of the
+  Dang, Jiahao Li, Cheng Yang, Weize Chen, Yusheng                                                         Association for Computational Linguistics (Volume
+   Su, Xin Cong, et al. 2024. Chatdev: Communicative                                                           1: Long Papers), pages 6106–6131.
+   agents for software development.  In Proceedings
+   of the 62nd Annual Meeting of the Association for   Xingyao Wang, Boxuan Li, Yufan Song, Frank F. Xu,
+  Computational Linguistics (Volume 1: Long Papers),      Xiangru Tang, Mingchen Zhuge, Jiayi Pan, Yueqi
+  pages 15174–15186.                                 Song, Bowen Li, Jaskirat Singh, Hoang H. Tran,
+                                                    Fuqiang Li, Ren Ma, Mingzhang Zheng, Bill Qian,
+Lianhui Qin, Antoine Bosselut, Ari Holtzman, Chandra      Yanjun Shao, Niklas Muennighoff, Yizhe Zhang,
+   Bhagavatula, Elizabeth Clark, and Yejin Choi. 2019.     Binyuan Hui, and 5 others. 2025. Openhands: An
+   Counterfactual story reasoning and generation. In      open platform for AI software developers as gener-
+  Proceedings of the 2019 Conference on Empirical        alist agents. In The Thirteenth International Confer-
+  Methods in Natural Language Processing and the      ence on Learning Representations.
+   9th Internatyang2018hotpotqaional Joint Conference
+  on Natural Language Processing (EMNLP-IJCNLP),   Qingyun Wu, Gagan Bansal, Jieyu Zhang, Yiran Wu,
+  pages 5043–5053, Hong Kong, China. Association      Beibin Li, Erkang Zhu, Li Jiang, Xiaoyun Zhang,
+   for Computational Linguistics.                      Shaokun Zhang, Jiale Liu, et al. 2024.  Autogen:
+                                                      Enabling next-gen llm applications via multi-agent
+John Schulman,  Filip Wolski,  Prafulla Dhariwal,       conversation. In ICLR 2024 Workshop on Large Lan-
+  Alec Radford, and Oleg Klimov. 2017.   Proxi-     guage Model (LLM) Agents.
+  mal policy optimization algorithms. arXiv preprint
+  arXiv:1707.06347.                               Haoran Yang, Yumeng Zhang, Jiaqi Xu, Hongyuan Lu,
+                                                Pheng-Ann Heng, and Wai Lam. 2024. Unveiling
+Noah Shinn, Federico Cassano, Ashwin Gopinath,       the generalization power of fine-tuned large language
+  Karthik Narasimhan, and Shunyu Yao. 2023. Re-      models. In Proceedings of the 2024 Conference of
+   flexion: Language agents with verbal reinforcement       the North American Chapter of the Association for
+   learning. Advances in Neural Information Process-      Computational Linguistics: Human Language Tech-
+   ing Systems, 36:8634–8652.                             nologies (Volume 1: Long Papers), pages 884–899.
+
+===== PDF PAGE 11 =====
+Zhilin Yang, Peng Qi, Saizheng Zhang, Yoshua Bengio,
+  William Cohen, Ruslan Salakhutdinov, and Christo-
+  pher D Manning. 2018.  Hotpotqa: A dataset for
+   diverse, explainable multi-hop question answering.
+   In Proceedings of the 2018 Conference on Empiri-
+   cal Methods in Natural Language Processing, pages
+  2369–2380.
+
+Weiran Yao, Shelby Heinecke, Juan Carlos Niebles,
+  Zhiwei Liu, Yihao Feng, Le Xue, Rithesh R N,
+  Zeyuan Chen, Jianguo Zhang, Devansh Arpit, Ran
+  Xu, Phil L Mui, Huan Wang, Caiming Xiong, and Sil-
+   vio Savarese. 2024. Retroformer: Retrospective large
+  language agents with policy gradient optimization.
+   In The Twelfth International Conference on Learning
+   Representations.
+
+Hangfan Zhang, Zhiyao Cui, Xinrun Wang, Qiaosheng
+  Zhang, Zhen Wang, Dinghao Wu, and Shuyue Hu.
+  2025a. If multi-agent debate is the answer, what is
+   the question. arXiv preprint arXiv:2502.08788.
+
+Shaokun Zhang, Ming Yin, Jieyu Zhang, Jiale Liu,
+  Zhiguang Han, Jingyang Zhang, Beibin Li, Chi
+  Wang, Huazheng Wang, Yiran Chen, and Qingyun
+  Wu. 2025b. Which agent causes task failures and
+  when? on automated failure attribution of LLM multi-
+   agent systems. In Forty-second International Confer-
+  ence on Machine Learning.
+
+Wenqi Zhang, Yongliang Shen, Linjuan Wu, Qiuying
+  Peng, Jun Wang, Yueting Zhuang, and Weiming Lu.
+  2024. Self-contrast: Better reflection through incon-
+   sistent solving perspectives. In Proceedings of the
+  62nd Annual Meeting of the Association for Compu-
+   tational Linguistics (Volume 1: Long Papers), pages
+  3602–3622.
+
+Zhenru Zhang, Chujie Zheng, Yangzhen Wu, Beichen
+  Zhang, Runji Lin, Bowen Yu, Dayiheng Liu, Jin-
+  gren Zhou, and Junyang Lin. 2025c. The lessons of
+  developing process reward models in mathematical
+   reasoning. In Findings of the Association for Compu-
+   tational Linguistics: ACL 2025, pages 10495–10516,
+  Vienna, Austria. Association for Computational Lin-
+   guistics.
+
+Andrew Zhao, Daniel Huang, Quentin Xu, Matthieu
+   Lin, Yong-Jin Liu, and Gao Huang. 2024.  Expel:
+  Llm agents are experiential learners. In Proceedings
+   of the AAAI Conference on Artificial Intelligence,
+  volume 38, pages 19632–19642.
+
+===== PDF PAGE 12 =====
+A  Related Work                            (Yao et al., 2024) proposed Retroformer, which ap-
+                                                 proximates reflection rewards through differentials
+A.1  LLM-based Multi-Agent Systems
+                                             between consecutive outcomes and trains a reflec-
+Recent years have witnessed substantial attention    tor via policy optimization. More recently, (Bo
+toward Large Language Model (LLM)-based agent    et al., 2024) extended this methodology to multi-
+systems within the artificial intelligence domain    agent systems with COPPER, employing counter-
+(Wang et al., 2024a; Zhao et al., 2024). Building    factual rewards to evaluate reflection quality for
+upon single-agent architectures, LLM-based multi-   each agent and determine whether reflections merit
+agent systems have experienced rapid advancement,    inclusion in agent memory.
+demonstrating significant progress in complex task     However, existing reflection frameworks over-
+decomposition and world simulation capabilities.   look a critical nuance: when tasks fail, not every
+The growing interest in these systems stems from    agent bears responsibility for the failure. More
+their capacity to handle intricate multi-step tasks   commonly, a specific agent leads the task astray
+while dynamically interacting with diverse envi-   while others simply fulfill their normal duties. To
+ronments, making them particularly suitable for    address this limitation, we propose DoCtOR, a
+real-world applications (Li et al., 2023).  Multi-   novel reflection framework that enhances multi-
+agent systems have been increasingly explored    agent collaboration through targeted diagnostic and
+across various domains, including software engi-    corrective mechanisms.
+neering (Qian et al., 2024; Hong et al., 2024; Wang
+et al., 2025), drug discovery (Gottweis et al., 2025;  B  Implementations Details
+Swanson et al., 2024), scientific simulation (Tang
+                                              B.1  Baseline Modelset al., 2023; Ghafarollahi and Buehler, 2025), and
+general-purpose intelligence (Fourney et al., 2024;   To ensure fair comparison, all baselines employ
+Wu et al., 2024; Chen et al., 2023; Li et al., 2023).   GPT-4o-mini for their action modules, consistent
+  However, recent studies (Wang et al., 2024b;   with our DoCtOR framework’s action module. For
+Zhang et al., 2025a; Pan et al., 2025) reveal that    the reflection modules, we adopt different model
+multi-agent deliberation methods do not consis-   configurations based on each method’s training re-
+tently outperform simpler single-agent baselines,   quirements. Fine-tuning-based approaches, includ-
+even with additional computational resources for    ing Retroformer and COPPER, utilize Llama-3.1-
+reasoning. These findings suggest the need for opti-   8B-Instruct as the base model, matching the founda-
+mized collaborative mechanisms to enhance multi-    tion model of our DoCtOR reflector. For the prompt-
+agent problem-solving capabilities significantly.     based Reflexion method, we evaluate performance
+                                                   across three base models: Llama-3.1-8B-Instruct,
+A.2  Self-Reflection of Large Language Models                                            GPT-4o, and GPT-3.5, providing comprehensive
+Reflection mechanisms have gained significant at-   comparison results.
+tention as they employ self-reflection feedback to
+                                              B.2  Trainingprovide specific improvement directions for agents.
+These approaches enable agents to learn from pre-   B.2.1  DoCtOR
+vious errors, avoid recurring mistakes, and perform                                         Data Collection  To fine-tune our reflector, we
+better in subsequent attempts. Early investigations                                                    extracted 1000, 500, and 1000 tasks from each
+focused on optimizing responses based on singular                                                     dataset respectively, with a maximum of 3 trials
+feedback (Madaan et al., 2023; Chen et al., 2024)                                                   per task, yielding 3565 reflection instances.
+or comparative analysis between multiple models
+(Du et al., 2024; Zhang et al., 2024), but failed to   Training Details  We employed Low-Rank Adap-
+develop comprehensive task understanding from    tation (LoRA) for parameter-efficient fine-tuning
+past experiences. Later work (Shinn et al., 2023)   and implemented Reinforcement Learning from
+examined previous trajectories and environmen-  Human Feedback (RLHF) through HuggingFace’s
+tal rewards to generate reflections, incorporating     trl package. Our training pipeline incorporated a
+these insights into subsequent contexts. While this    three-stage approach: supervised fine-tuning, re-
+approach enables iterative enhancement, its effec-   ward modeling, and policy optimization. For su-
+tiveness depends largely on the model’s inherent    pervised fine-tuning, we conducted a grid search
+reflective capabilities. To address this limitation,   including epochs 1, 2, 3, 4, batch sizes 8, 16, 32, 64,
+
+===== PDF PAGE 13 =====
+128, and learning rates 1e-4, 2e-4, 3e-4, 4e-4, 5e-4    answer), the function assigns zero metrics when
+using a validation set of 100 instances. The reward    predictions do not match the ground truth. For stan-
+model was trained with a learning rate of 1e-5, 3   dard text responses, the algorithm tokenizes the
+epochs, and a batch size of 16. For PPO training,   normalized texts and identifies overlapping tokens.
+we utilized lower learning rates 1e-5, 2e-5, 3e-5,   Precision is calculated as the ratio of common to-
+4e-5, 5e-5 to ensure stable convergence. All mod-   kens to prediction tokens, while recall represents
+els were fine-tuned using 4-bit quantized LoRA    the ratio of common tokens to ground truth tokens.
+adapters, resulting in efficient parameter utilization   The F1 score is computed as:
+(0.015%-0.06% of base model parameters).
+                                                        2 × precision × recall
+                                        F1 =                              (12)
+B.2.2  ProFA                                                  precision + recall
+Data Collection  To develop and evaluate ProFA,     The Mind2Web benchmark, while ultimately
+we constructed a Who & When Pro dataset through    evaluated on  task-level execution  correctness,
+a systematic data collection and annotation process.   presents  challenges  analogous  to  structured
+We extracted 1000, 500, and 1000 tasks from Hot-   question-answering  tasks,  requiring agents  to
+PotQA, ChartQAPro, and Mind2Web, respectively,   generate web navigation instructions in a spe-
+yielding 667, 379, and 711 failure logs from un-    cific  format  (e.g.,  "Answer:   A/B/C/D  Ac-
+successful multi-agent collaboration attempts. The   tion:CLICK/SELECT/TYPE Value:XXX"). We
+annotation process involved a two-stage approach    selected the F1 score as our reward function be-
+to ensure data quality.                             cause it effectively balances precision and recall in
+   First, we conducted initial automated annota-   structured outputs, assessing both the accuracy of
+tion using GPT-4o to provide preliminary iden-   included elements and the comprehensiveness of re-
+tification of decisive error agents (who) and de-   sponses. This approach provides more fine-grained
+cisive error steps (when) within each failure log.   feedback than binary task-level execution correct-
+Subsequently, three experienced researchers inde-   ness metrics alone. Our preliminary experiments
+pendently reviewed and refined these annotations.   confirm this benefit, showing approximately 10.2%
+Each researcher examined the multi-agent interac-   performance improvement when using F1-based
+tion traces, analyzing causal relationships between   rewards compared to binary task-level execution
+agent actions and task failures to determine the    correctness signals.
+precise moment when the decisive error occurred
+and which agent was responsible. The three re-   B.4  Reproducibility
+searchers achieved a Fleiss’ kappa score of 0.83    All experiments were conducted on two NVIDIA
+during the annotation process, indicating substan-  A100-80G GPUs. To ensure experimental rigor,
+tial agreement, which falls into the "almost per-  we configured different temperature settings for the
+fect agreement" range (0.81-1.00) on the standard   base models in each module. For the action mod-
+Fleiss’ kappa interpretation scale.                     ule’s base model, we set the temperature to 0 and
+                                                    top-p to 1 following prior work (Shinn et al., 2023;
+Training Details We fine-tuned a Qwen3-1.7B
+                                          Yao et al., 2024; Bo et al., 2024), thereby isolating
+model using a token classification approach. We
+                                                      the randomness inherent in language model genera-
+employed the PRMTrainer from trl with the follow-
+                                                        tion from the effects of reflections. In contrast, for
+ing hyperparameters: learning rate of 5e-5, weight
+                                                      the reflection module’s base model, we employed a
+decay of 0.01, batch size of 8, maximum sequence
+                                                  temperature of 0.8 to encourage more creative and
+length of 2048, and 3 training epochs. We imple-
+                                                     diverse reflection generation.
+mented a warmup ratio of 0.1 with gradient accu-
+mulation steps set to 1.                           C  Collaboration Settings
+
+B.3  Evaluation                              C.1  Magentic-One Multi-Agent Framework
+
+Our framework employs the F1 score to evalu-   Our implementation utilizes the Magentic-One
+ate generated answer quality by balancing preci-   framework, which employs a hierarchical multi-
+sion and recall. The calculation process involves    agent structure for complex task solving. The sys-
+normalizing both prediction and ground truth re-   tem comprises several specialized agents working
+sponses. For categorical responses (yes, no, or no    in coordinated collaboration:
+
+===== PDF PAGE 14 =====
+    • Orchestrator: Functions as the central co-       • Mind2Web: For website interaction tasks, we
+     ordinator responsible for task decomposition,        developed a specialized WebAgent defined as
+     strategic planning, and adaptive management        a helpful assistant with expertise in website
+     of the agent workflow. The Orchestrator moni-        design, navigation, and task execution. This
+      tors execution progress and delegates subtasks        agent works in conjunction with the Orches-
+     to specialized agents.                                       trator, Coder, and Terminal agents to navigate
+                                               complex web interfaces and execute multi-
+    • WebSurfer: Specializes in web-based infor-        step interactions.
+     mation retrieval and browser interaction. This
+     agent navigates URLs, performs searches, in-   C.3  Response Format
+     teracts with webpage elements (clicking, typ-
+                                         To facilitate systematic evaluation and enhance      ing), and extracts relevant content through the
+                                                       analytical consistency across datasets, we imple-     browser’s accessibility tree and set-of-marks
+                                           mented standardized response formats. For Hot-    prompting techniques.
+                                       PotQA and ChartQAPro datasets, we developed a
+                                                       structured answer template, as illustrated in Figure    • Coder: Focuses on code generation, data anal-
+                                                         9. For the Mind2Web dataset, we established a     ysis, and artifact creation.  This agent pro-
+                                         more structured format that normalizes responses     cesses information collected by other agents,
+                                                      into a combination of Answer, Action, and Value    implements algorithmic solutions, and gener-
+                                               components, also depicted in Figure 8.     ates computational outputs required for task
+     completion.
+                                                                        Final answer prompt for Mind2Web
+    • ComputerTerminal: Provides system-level
+                                           We are working on the following task: {task}
+     access for executing commands, running pro-                                           We have completed the task. The above
+     grams, and installing necessary libraries. This          messages contain the conversation that took
+     agent enables the framework to interact with           place to complete the task. Based on the
+                                                                      information gathered, provide the final answer to
+     the operating environment and execute com-                                                                         the original request.
+     putational processes.
+                                                          The answer should be prefixed with <FINAL>
+                                                              and suffixed with </FINAL>. Do not include anyC.2  Dataset-Specific Collaboration Settings
+                                                                        other text after the </FINAL> tag.
+We tailored our multi-agent configurations to ad-
+                                                               Follow these rules strictly:
+dress the unique requirements of three datasets:                                                                             (1) If the correct action is not in the choice list ,
+                                                                        please select A. 'None of the above',
+    • HotPotQA: For multi-hop question answer-         and the final answer should be \"<FINAL>
+                                                              Answer: A. </FINAL>\".     ing tasks, we utilized Magentic’s predefined
+     agent ensemble consisting of the Orchestra-           (2) If you want to choose CLICK operation, the
+      tor, WebSurfer, FileSurfer, Coder, and Ter-            final answer should be \"<FINAL> Answer:
+                                                                               \{letter\}.\nAction: CLICK </FINAL>\".    minal agents. This configuration effectively
+                                                               Example: <FINAL> Answer: D.\nAction:
+     supports the information retrieval and reason-       CLICK </FINAL>
+     ing chains necessary for complex question
+     answering.                                                        (3) If you want to choose SELECT operation, the
+                                                                                  final answer should be \"<FINAL> Answer:
+                                                                               \{letter\}.\nAction: SELECT\nValue:
+    • ChartQAPro: To address chart-based analyt-          {selected_value}} </FINAL>\".
+      ical queries, we extended the base configura-         Example: <FINAL> Answer: B.\nAction:
+                                                           SELECT\nValue: New Passport Only </FINAL>     tion by implementing a custom ImageAgent
+     with specialized capabilities for visual content            (4) If you want to choose TYPE operation, the
+      interpretation. We developed two complemen-            final answer should be \"<FINAL> Answer:
+     tary tools for image question answering and            \{letter\}.\nAction: TYPE\nValue: {input_text}}
+                                                               </FINAL>\".
+     visual description generation. The resulting          Example: <FINAL> Answer: D.\nAction:
+    team composition (Orchestrator, ImageAgent,         TYPE\nValue: 60505 </FINAL>
+     Coder, and Terminal) enables comprehensive
+     chart data analysis.                                Figure 8: The final answer prompt for Mind2Web.
+
+===== PDF PAGE 15 =====
+       Final answer prompt for HotPotQA & ChartQAPro        D.2  Robustness Across Model Families and
+                                                         Sizes
+    We are working on the following task:
+      {task}We have completed the task. The above         To evaluate scalability and robustness, we tested
+      messages contain the conversation that took                                                our framework with different model families and      place to complete the task. Based on the
+      information gathered, provide the final answer to          sizes.
+       the original request.
+                                                         HotPotQA     The answer should:                                            65
+       1.directly address the original request in the
+       shortest possible form (preferably a word or a                      60                                                                         (%)
+       phrase, not a full sentence).
+                                                                  55      2.be prefixed with <FINAL> and suffixed with                           Rate
+     </FINAL>, e.g., \"<FINAL> PowerPoint
+      </FINAL>\".                                                 50
+                                                                                                              DoCtOR(Llama-3.1-8B)                                                                                                                                                                          Success                        DoCtOR(Qwen3-8b)    Do not include any other text after the                            45                       DoCtOR(Llama-3.2-1B)
+     </FINAL> tag.                                                                                  DoCtOR(Qwen3-1.7B)
+                                                                      0       1       2       3       4
+                                                                                                Trial Number
+Figure 9: The final answer prompt for HotPotQA &
+ChartQAPro .                                                ChartQAPro
+                                                                  45
+
+                                                                         (%) 40
+D  Additional Experiments                                            Rate 35
+                                                                  30
+                                                                                                              DoCtOR(Llama-3.1-8B)D.1  Effect of Test Set Size                                                                  25                                                                                                      DoCtOR(Qwen3-8b)                                                                                                                                                                          Success
+                                                                                                              DoCtOR(Llama-3.2-1B)
+                                                                  20                      DoCtOR(Qwen3-1.7B)
+To comprehensively evaluate the scalability and
+                                                                      0       1       2       3       4
+consistency of our method, we conducted extensive                                Trial Number
+experiments across different test set sizes on the
+                                                    Mind2Web
+HotPotQA benchmark.                                         50
+                                                                         (%) 45
+           HotPotQA                            40                                                                                                 Rate
+       65                                                      35
+    (%)                                                         30                       DoCtOR(Llama-3.1-8B)       60                                                                                                                                          Success                        DoCtOR(Qwen3-8b)
+                                                                  25                       DoCtOR(Llama-3.2-1B)                                                                                                         DoCtOR(Qwen3-1.7B)      Rate 55
+                                                                      0       1       2       3       4
+                                                                                                Trial Number
+       50                               Test Size = 100
+                                              Test Size = 150
+                                              Test Size = 200          Success 45                               Test Size = 250           Figure 11: Robustness Across Model Families and
+                                              Test Size = 300            Sizes.
+          0     1     2     3     4
+                    Trial Number                                        As illustrated in Figure 11, the results first vali-
+                                                     date our choice of Llama-3.1-8B while also demon-Figure 10: Performance on HotPotQA under different
+Test Set Sizes.                                           strating that our framework consistently improves
+                                              performance across diverse model families and
+                                                          sizes, with larger models (8B) generally achiev-
+                                                   ing better results than smaller ones (1-2B).  As shown in Figure 10, our method consis-
+tently improves performance across all test set
+                                             D.3  Effect of Correctness Threshold γ
+sizes throughout the trials. The stability of this
+improvement across varying scales indicates that   The parameter γ is set to 0.5 based on standard
+the method’s effectiveness is robust and generalizes    practices in PRM implementations within widely-
+well to larger evaluation sets.                      used frameworks like TRL and OpenRLHF, which
+
+===== PDF PAGE 16 =====
+use 0.5 as the threshold for evaluating step correct-  E  Prompts when Deploying DoCtOR
+ness.
+
+                                               The action module prompt for HotPotQA  Furthermore, we conducted extensive experi-
+ments to examine how the correctness threshold       Please answer the question below to the best of
+γ affects final reflection performance.                  your ability. This task may require retrieving
+                                                         information from external web pages.
+
+                                                          Carefully analyze any provided links or
+                                                              references, extract relevant information, and
+                HotPotQA                         formulate a complete and accurate response.
+            65
+                                                                         If you need to synthesize information from
+       (%) 60                                                 multiple sources, ensure your answer remains
+            55                                               coherent and directly addresses the question         Rate
+                                                        posed.
+            50
+                Success                              = 0.5               Question: <question>
+            45                             = 0.25
+                                      = 0.75
+                 0          1          2          3          4            Below is the decisive error step during your
+                          Trial Number                        previous attempt to answer this question,
+                                                       along with reflections from the relevant agents
+                ChartQAPro                    on why this step led to an incorrect final
+            45                                              answer, as well as reflections on why the final
+       (%) 40                                           answer was incorrect.
+                                                         Please carefully review these reflections and
+            35         Rate                                                 attempt to answer the question again.
+            30
+            25                                              Decisive error step:                Success                              = 0.5                                      = 0.25               {decisive_error_step}
+            20                             = 0.75
+                 0          1          2          3          4                Reflections:                          Trial Number
+                                                             {reflections}
+              Mind2Web
+            45
+                                                     Figure 13: The action module prompt for HotPotQA
+       (%) 40                                    when deploying DoCtOR.
+         Rate 35
+
+
+            30                Success                              = 0.5
+            25                             = 0.25
+                                      = 0.75
+
+                 0          1          2          3          4
+                          Trial Number
+
+    Figure 12: Effect of Correctness Threshold γ.
+
+
+
+
+
+  As shown in Figure 12, the results demonstrate
+that while γ = 0.5 generally yields the best per-
+formance across datasets, our method shows ro-
+bust improvement patterns regardless of the spe-
+cific threshold chosen.
+
+===== PDF PAGE 17 =====
+                                               The action module prompt for ChartQAPro
+   The action module prompt for Mind2Web
+                                          You are given a factoid question that you
+  You are a helpful assistant that is great at              need to answer based on the provided image.
+   website design, navigation, and executing tasks        Your answer should be a single word,
+   for the user.                                       number, or phrase.
+
+   {final_html}                                                      If the question is unanswerable based on the
+   Based on the HTML webpage above, try to              information in the provided image, your
+   complete the following task:                         answer should be unanswerable.
+   Task: {confirmed_task}
+                                        Do not generate units. But if numerical units
+   Previous actions:                                    such as million, m, billion, B, or K are
+   {previous_actions}                                       required, use the exact notation shown in the
+                                                                 chart. If there are multiple answers, put them
+  What should be the next action? Please select             in brackets using this format
+   from the following choices                            [’Answer1’, ’Answer2’]. Remember to
+    (If the correct action is not in the page above,            generate the final answer only without any
+   please select A. 'None of the above'):                     additional text!
+   {choices_text}
+                                                        Question: <question> Image Path: <image>
+  Below is the decisive error step during your
+   previous attempt to answer this question,             Below is the decisive error step during your
+   along with reflections from the relevant agents           previous attempt to answer this question,
+  on why this step led to an incorrect final                along with reflections from the relevant
+   answer, as well as reflections on why the final           agents on why this step led to an incorrect
+   answer was incorrect.                                        final answer, as well as reflections on why
+   Please carefully review these reflections and             the final answer was incorrect.
+   attempt to answer the question again.                   Please carefully review these reflections and
+                                                         attempt to answer the question again.
+   Decisive error step:
+   {decisive_error_step}                                 Decisive error step:
+                                                          {decisive_error_step}
+   Reflections:
+   {reflections}                                             Reflections:
+                                                             {reflections}
+
+Figure 14: The action module prompt for Mind2Web
+when deploying DoCtOR.                               Figure 15: The action module prompt for ChartQAPro
+                                            when deploying DoCtOR.
+
+===== PDF PAGE 18 =====
+     The counterfactual reasoning prompt
+
+    You are a member of a multi-agent team
+      tasked with answering questions.
+      In prior trials, your team was unsuccessful in
+     answering the question: {prompt}.
+      {decisive_error_step} is the decisive error
+      step that directly leads to the final wrong
+     answer.
+     Here is the dialogue history before the
+      decisive error step:
+     {previous_steps}
+
+      Please employ counterfactual reasoning to
+      analyze: if you had taken an alternative
+      action at that decisive error step, would the
+      task have succeeded?
+
+       If you can identify such a counterfactual
+      action that would lead to task success, please
+     provide this alternative action.
+
+     Requirements:
+      1) Maintain the exact original format
+      including step number and agent name (e.g.,
+      "[Step X] AgentName:")
+      2) Only modify the problematic parts while
+     keeping the rest of the structure identical
+      3) Ensure the new step would actually solve
+      the current issue
+      4) Output ONLY the complete corrected step
+     with no additional explanation
+
+
+Figure 16: The counterfactual reasoning prompt when
+deploying DoCtOR.
+
+===== PDF PAGE 19 =====
+ The reflector prompt
+
+{agent_profile}
+You are also an advanced reasoning agent that can improve based on self refection.
+
+In prior trials, the team was unsuccessful in answering the question: {question}.
+The final answers provided by the team are enclosed with the markers <FINAL> and </FINAL>.
+If <FINAL> and </FINAL> markers are found, potential failure reasons include but are not
+limited to:
+1. Misunderstanding the task objective
+2. Lack of necessary background knowledge
+3. Providing a final answer without thorough validation
+
+If no <FINAL> and </FINAL> markers are found, it indicates that the task was prematurely
+terminated. Potential reasons for this include but are not limited to:
+1. Reaching the predefined maximum number of dialogue turns
+2. Inefficiency due to repetitive task handling
+3. Restricted access to files/webpages
+4. Network interruptions
+
+Here is the multi-agent dialogue history:
+{conversation_history}
+
+{decisive_error_step} was the decisive error step that directly led to the final incorrect answer,
+and you are the agent directly associated with this step.
+This is the correct version of decisive error step :
+{correct_decisive_error_step}
+
+Now, you need to carefully analyze the multi-agent dialogue history, reflecting on why you
+produced this decisive error step, first explaining in one sentence why this decisive error step
+caused the final answer to be incorrect, then explaining in one sentence why the final answer
+provided by our team was not correct for this question, and finally proposing a completely
+different, concise, high-level plan in one sentence.
+
+# Note: If you are pretty sure that the final answer is correct, it may be that the answer can be
+expressed in multiple formats.
+For example, a birthdate can be rephrased from year-month-day to month-day; similarly, a
+person's name can be rephrased from first and last name to first, middle, and last name.
+Make a plan to rephrase your answer.
+The rephrased answer should still directly address the original request in the shortest possible
+form (preferably a word or a phrase, not a full sentence).
+
+
+
+                   Figure 17: The reflector prompt when deploying DoCtOR.
+
+===== PDF PAGE 20 =====
+F  Prompts when Deploying Reflexion,            The action module prompt for Mind2Web
+    Retroformer, and COPPER                                                 You are a helpful assistant that is great at
+                                                                website design, navigation, and executing tasks
+                                                                        for the user.
+     The action module prompt for HotPotQA
+                                                                  {final_html}
+      Please answer the question below to the best of                                                         Based on the HTML webpage above, try to
+      your ability. This task may require retrieving                                                             complete the following task:
+      information from external web pages.                                                               Task: {confirmed_task}
+
+      Carefully analyze any provided links or                                                                Previous actions:
+      references, extract relevant information, and                                                                 {previous_actions}
+      formulate a complete and accurate response.
+                                                    What should be the next action? Please select
+        If you need to synthesize information from                                                          from the following choices
+      multiple sources, ensure your answer remains                                                                                    (If the correct action is not in the page above,
+      coherent and directly addresses the question                                                                   please select A. 'None of the above'):
+      posed.                                                                  {choices_text}
+
+      Question: <question>                                                          Here are the reflections on why your previous
+                                                                  attempt to answer this question was incorrect;
+     Here are the reflections on why your previous                                                                       carefully review these reflections and try to
+      attempt to answer this question was incorrect;                                                            answer the question again:
+      carefully review these reflections and try to                                                                       {reflections}
+     answer the question again:
+      {reflections}                                     Figure 20: The action module prompt for Mind2Web
+                                            when deploying Reflexion, Retroformer, and COPPER.
+Figure 18: The action module prompt for HotPotQA
+when deploying Reflexion, Retroformer, and COPPER.
+
+
+
+     The action module prompt for ChartQAPro
+
+    You are given a factoid question that you
+     need to answer based on the provided image.
+     Your answer should be a single word,
+     number, or phrase.
+
+        If the question is unanswerable based on the
+      information in the provided image, your
+     answer should be unanswerable.
+
+    Do not generate units. But if numerical units
+      such as million, m, billion, B, or K are
+      required, use the exact notation shown in the
+       chart. If there are multiple answers, put them
+       in brackets using this format
+      [’Answer1’, ’Answer2’]. Remember to
+      generate the final answer only without any
+      additional text!
+
+      Question: <question> Image Path: <image>
+
+     Here are the reflections on why your previous
+      attempt to answer this question was incorrect;
+      carefully review these reflections and try to
+     answer the question again:
+      {reflections}
+
+Figure 19: The action module prompt for ChartQAPro
+when deploying Reflexion, Retroformer, and COPPER.
+
+===== PDF PAGE 21 =====
+The reflector prompt
+
+You are a member of a multi-agent team tasked with answering questions. You specialize in
+identifying the causes of the team's failures and enhancing the team's problem-solving
+capabilities through reflection.
+In prior trials, the team was unsuccessful in answering the question: {question}.
+
+Here is the multi-agent dialogue history:
+{conversation_history}
+
+The final answers provided by the team are enclosed with the markers <FINAL> and
+</FINAL>.
+If <FINAL> and </FINAL> markers are found, potential failure reasons include but are not
+limited to:
+1. Misunderstanding the task objective
+2. Lack of necessary background knowledge
+3. Providing a final answer without thorough validation
+
+If no <FINAL> and </FINAL> markers are found, it indicates that the task was prematurely
+terminated. Potential reasons for this include but are not limited to:
+1. Reaching the predefined maximum number of dialogue turns
+2. Inefficiency due to repetitive task handling
+3. Restricted access to files/webpages
+4. Network interruptions
+
+Now, you need to start by explaining in one sentence why the final answer provided by our
+team was not correct for this question, and then offer a completely different, concise, high-
+level plan in one sentence.
+
+# Note: If you are pretty sure that the final answer is correct, it may be that the answer can
+be expressed in multiple formats.
+For example, a birthdate can be rephrased from year-month-day to month-day; similarly, a
+person's name can be rephrased from first and last name to first, middle, and last name.
+Make a plan to rephrase your answer.
+The rephrased answer should still directly address the original request in the shortest
+possible form (preferably a word or a phrase, not a full sentence).
+
+
+    Figure 21: The reflector prompt when deploying Reflexion, Retroformer, and COPPER.

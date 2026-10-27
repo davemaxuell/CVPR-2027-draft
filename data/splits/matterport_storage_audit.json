@@ -1,0 +1,225 @@
+{
+  "checked_at": "2026-10-24T07:01:12.862361+00:00",
+  "scope": "Matterport3D original release, extracted runtime scenes and directly related shared assets; task annotations, model checkpoints and generated rollouts are additional.",
+  "units": "Bytes; decimal GB=1e9 and TB=1e12.",
+  "changes_to_existing_data": "None. No files moved, removed or relinked.",
+  "raw_scan_archives": {
+    "house_segmentations": {
+      "files": 90,
+      "payload_bytes": 16220109217,
+      "allocated_bytes": 16220590080
+    },
+    "matterport_depth_images": {
+      "files": 90,
+      "payload_bytes": 163162183533,
+      "allocated_bytes": 163162746880
+    },
+    "image_overlap_data": {
+      "files": 90,
+      "payload_bytes": 10304707091,
+      "allocated_bytes": 10305110016
+    },
+    "undistorted_color_images": {
+      "files": 90,
+      "payload_bytes": 21151295384,
+      "allocated_bytes": 21151809536
+    },
+    "undistorted_depth_images": {
+      "files": 90,
+      "payload_bytes": 140723929762,
+      "allocated_bytes": 140724473856
+    },
+    "undistorted_normal_images": {
+      "files": 90,
+      "payload_bytes": 307816966627,
+      "allocated_bytes": 307817553920
+    },
+    "undistorted_camera_parameters": {
+      "files": 90,
+      "payload_bytes": 11141026,
+      "allocated_bytes": 11333632
+    },
+    "matterport_mesh": {
+      "files": 90,
+      "payload_bytes": 5147855836,
+      "allocated_bytes": 5148131328
+    },
+    "matterport_hdr_images": {
+      "files": 90,
+      "payload_bytes": 27827097036,
+      "allocated_bytes": 27827609600
+    },
+    "region_segmentations": {
+      "files": 90,
+      "payload_bytes": 16282706106,
+      "allocated_bytes": 16283168768
+    },
+    "matterport_camera_intrinsics": {
+      "files": 90,
+      "payload_bytes": 12208655,
+      "allocated_bytes": 12406784
+    },
+    "cameras": {
+      "files": 90,
+      "payload_bytes": 40949,
+      "allocated_bytes": 368640
+    },
+    "poisson_meshes": {
+      "files": 90,
+      "payload_bytes": 27321282488,
+      "allocated_bytes": 27321827328
+    },
+    "matterport_color_images": {
+      "files": 90,
+      "payload_bytes": 61519487282,
+      "allocated_bytes": 61520015360
+    },
+    "matterport_camera_poses": {
+      "files": 90,
+      "payload_bytes": 72443674,
+      "allocated_bytes": 72601600
+    },
+    "matterport_skybox_images": {
+      "files": 90,
+      "payload_bytes": 18549602309,
+      "allocated_bytes": 18549952512
+    },
+    "sens": {
+      "files": 90,
+      "payload_bytes": 349784805873,
+      "allocated_bytes": 349785415680
+    }
+  },
+  "raw_scan_archive_count": 1530,
+  "raw_scan_archive_payload_bytes": 1165907862848,
+  "habitat_archive": {
+    "path": ".downloads/v1/tasks/mp3d_habitat.zip",
+    "payload_bytes": 16085306031
+  },
+  "directory_allocated_bytes": {
+    ".downloads/v1": 1182000807936,
+    "mattersim/v1/scans": 51304128512,
+    "scene_datasets/mp3d": 22343163904,
+    "connectivity": 24039424,
+    "img_features": 4155736064
+  },
+  "habitat_scene_assets_by_suffix": {
+    ".glb": {
+      "files": 90,
+      "payload_bytes": 6326282284
+    },
+    ".house": {
+      "files": 90,
+      "payload_bytes": 763904349
+    },
+    ".navmesh": {
+      "files": 90,
+      "payload_bytes": 8896860
+    },
+    ".ply": {
+      "files": 90,
+      "payload_bytes": 15242865351
+    }
+  },
+  "mattersim_assets_by_type": {
+    "house_segmentations": {
+      "files": 450,
+      "payload_bytes": 32568252327
+    },
+    "matterport_skybox_images": {
+      "files": 65473,
+      "payload_bytes": 18550898883
+    },
+    "undistorted_camera_parameters": {
+      "files": 90,
+      "payload_bytes": 42776398
+    }
+  },
+  "minimal_all_90_scene_navigation_payload_bytes": 6335179144,
+  "conservative_current_runtime_allocated_bytes": 73647292416,
+  "house_files_bit_identical_between_both_runtime_trees": 90,
+  "workload_dependencies": [
+    {
+      "workload": "Current continuous RGB navigation baseline",
+      "requires": [
+        "scene_datasets/mp3d/*/*.glb",
+        "scene_datasets/mp3d/*/*.navmesh",
+        "datasets/R2R_VLNCE_v1-3_preprocessed",
+        "datasets/RxR_VLNCE_v0"
+      ],
+      "source": "[OURS]/baseline-v0/sim/config.py:60",
+      "notes": "Current vanilla model config removes the depth sensor by default; optional Habitat depth is rendered from scene geometry."
+    },
+    {
+      "workload": "Local discrete DUET navigation with cached features",
+      "requires": [
+        "Task episodes",
+        "Connectivity graphs",
+        "Selected image/object feature files"
+      ],
+      "source": "[prior works]/VLN-DUET/map_nav_src/r2r/env.py:43",
+      "notes": "Rendering disabled; graph transitions and cached image features are used. Live image rendering and feature regeneration require skyboxes."
+    },
+    {
+      "workload": "MatterSim RGB rendering and panorama demos",
+      "requires": [
+        "mattersim/v1/scans/*/matterport_skybox_images",
+        "connectivity"
+      ],
+      "source": "https://github.com/peteanderson80/Matterport3DSimulator#dataset-download"
+    },
+    {
+      "workload": "MatterSim depth preprocessing",
+      "requires": [
+        "undistorted_depth_images source data",
+        "undistorted_camera_parameters",
+        "matterport_skybox_images"
+      ],
+      "notes": "Required to generate measured-depth skyboxes, unlike Habitat geometry rendering; keep the resulting depth assets if this workflow is used.",
+      "source": "https://github.com/peteanderson80/Matterport3DSimulator#depth-outputs"
+    },
+    {
+      "workload": "Current trajectory viewer 3D building meshes",
+      "requires": [
+        "mattersim/v1/scans/*/house_segmentations/*.ply",
+        "mattersim/v1/scans/*/house_segmentations/*.house",
+        "Panorama skyboxes",
+        "Connectivity"
+      ],
+      "source": "[prior works]/ScaleVLN/analysis/vln_viz/build_meshes.py:88",
+      "notes": "Full house PLY layout differs from Habitat semantic PLY, so the current loader cannot use them interchangeably."
+    },
+    {
+      "workload": "HA-VLN 2.0 continuous navigation",
+      "requires": [
+        "Habitat MP3D scenes",
+        "datasets/HA-VLN/HAPS2_0",
+        "datasets/HA-VLN/HA-R2R",
+        "datasets/HA-VLN/Multi-Human-Annotations"
+      ],
+      "source": "https://github.com/UWMILab/HA-VLN"
+    }
+  ],
+  "recommendation": {
+    "retain_on_working_storage": [
+      "scene_datasets/mp3d",
+      "mattersim/v1/scans",
+      "connectivity",
+      "All requested task annotations and required features",
+      "HA-VLN human-motion assets"
+    ],
+    "candidate_for_external_archive_storage": [
+      ".downloads/v1"
+    ],
+    "archive_directory_allocated_bytes": 1182000807936,
+    "conditions": "Existing extracted runtime trees and task-specific assets must remain available. Original archives are needed for re-extraction and original-release archive audits, but the inspected training/simulation paths do not read them. Moving to another folder on the same filesystem does not reclaim disk space.",
+    "retain_semantic_assets": "Keep the complete Habitat folder for semantic/object/map workflows; the 6.34-GB mesh/navmesh minimum is only ordinary navigation geometry.",
+    "all_90_scenes": "Retain all 90 for full split coverage, including held-out validation/test scenes; reduce file types rather than silently removing benchmark scenes."
+  },
+  "primary_sources": [
+    "https://github.com/niessner/Matterport/blob/master/data_organization.md",
+    "https://github.com/peteanderson80/Matterport3DSimulator#dataset-download",
+    "https://github.com/jacobkrantz/VLN-CE#scenes-matterport3d",
+    "https://github.com/UWMILab/HA-VLN"
+  ]
+}

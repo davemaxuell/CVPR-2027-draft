@@ -1,0 +1,272 @@
+[
+  {
+    "id": "psgnav",
+    "title": "PSG-Nav: Probabilistic Scene Graph Navigation via Multiverse Decision Making",
+    "authors": [
+      "Rufeng Chen",
+      "Yue Chang",
+      "Xiaqiang Tang",
+      "Hechang Chen",
+      "Sihong Xie"
+    ],
+    "year": 2026,
+    "venue": "ICML 2026, identified by the PMLR 306 masthead",
+    "source": "https://arxiv.org/abs/2606.01313",
+    "pages": "1,3–8",
+    "problem": "Continual open-vocabulary ObjectNav under ambiguous detections. Posed RGBD , GLIP/ Grounded-SAM , occupancy,500 steps,1 m visible goal; not R2R route instruction. Adaptive variant uses ground truth terminal success across validation episodes, unlike fixed zero-shot baselines.",
+    "method": "§3 Eqs 1–3 object counts n_t=n_(t−1)+one hot label, normalized categorical belief; group configuration probability product of object marginals assumes independence. Retain top Kg combinations; LLM prunes commonsense conflicts; room level repeats. Three sampled'deterministic worlds' drive pairwise LLM landmark preferences. GVG /frontiers carry spatial unknown coverage/(πr²) and sum proximal object entropy; U_gain=I_spatial+I_sem; prune U<.1. Semantic entropy is not expected information gain because no future observation likelihood/expected posterior is computed. Score=average pairwise win rate across worlds +.5 U(Eqs 4–8), Qwen 2.5-7 B. EEC stores positive/negative goal contexts(visual crop, group semantic, room distribution); similarity=cos visual+w 1 cos group+w 2(1− JSD room), S_final=S_det+max pos−2 max neg; stop if>.61(Eqs 9–10). This score is not probability calibration. Banks update from GT feedback after each validation episode, capacity 10; evict most average similar entry(Eq 11). No gradient training but persistent labeled experience. Independence, repeat-vote correlation and LLM hard pruning can misrepresent uncertainty; unusual layout is not logical impossibility.",
+    "novelty": "Full categorical semantic memory, world-conditioned pairwise reasoning and positive/negative context verification for ObjectNav . Negative experience and uncertainty-aware exploration must cite it. PolarMem uses negative concept retrieval; PSG-Nav uses goal-instance feedback and spatial context. Its'calibrator'is retrieval score adjustment, not conformal or probability guarantee.",
+    "results": "Table 1 correct dataset order HM3D 66.1 SR/32.1 SPL , MP3D 44.8/17.9, HSSD 67.9/33.4; abstract lists MP3D / HM3D opposite order before these values. Fixed no EEC 63.5 HM3D below ASCENT 65.4; adaptive 66.1 has extra feedback. Table 2 without probabilistic graph 58.4, without groups 58.8; Table 3 K 1→3 63.3→66.1. EEC adds 2.6 SR. Evidence supports useful uncertainty representation but not globally optimal decision or calibrated belief. Episode order/reset/ground truth availability must be reported.",
+    "bottlenecks": [
+      {
+        "id": "PSG-1",
+        "description": "Adaptation relies on labeled test outcomes and commonsense filters can reject valid unusual scenes",
+        "conditions": "Continual deployment without oracle feedback; atypical room layouts",
+        "cause": "Success/failure banks require GT; top K hard logical pruning on fallible LLM priors",
+        "evidence": "§3.4 last paragraph,§4.1 lifelong evaluation; Eq 3",
+        "followups": " EvoNav also oracle feedback; PolarMem does not have GT but perceptual negatives unreliable; calibrated self-supervision remains open",
+        "kind": "Methodological / protocol",
+        "status": "Uncertain because evidence is insufficient",
+        "confidence": "Moderate"
+      }
+    ],
+    "key_findings": [
+      {
+        "claim": "Main adaptive benchmark retains GT-labeled experience across validation episodes",
+        "evidence_type": "Author protocol",
+        "source": "Supplied PDF",
+        "locator": "§3.4/§4.1"
+      }
+    ],
+    "limitations": "No ObjectNav run. Static memory warm-up, appendix parameters and episode order still require inspection."
+  },
+  {
+    "id": "r3",
+    "title": "Run, Ruminate, and Regulate: A Dual-process Thinking System for Vision-and-Language Navigation",
+    "authors": [
+      "Yu Zhong",
+      "Zihao Zhang",
+      "Rui Zhang",
+      "Lingdong Huang",
+      "Haihan Gao",
+      "Shuo Wang",
+      "Da Li",
+      "Ruijian Han",
+      "Jiaming Guo",
+      "Shaohui Peng",
+      "Di Huang",
+      "Yunji Chen"
+    ],
+    "year": 2026,
+    "venue": "AAAI 2026 copyright in the supplied arXiv v1",
+    "source": "https://arxiv.org/abs/2511.14131",
+    "pages": "1,3–8",
+    "problem": "Use a trained fast VLN expert until anomaly, then powerful GPT-4o correction. It is not entirely training-free: GridMM runner and GNN regulator are trained. Discrete graph/pose/depth given; plans restart from initial location in some cases.",
+    "method": "Methodology: Runner GridMM~160 M stores projected RGBD features in egocentric grid and uses cross-modal transformer/ FFN . Regulator checks max node visits>4, trajectory length>20, or GNN anomaly score>.35; two edge-aware graph attention layers use position, last visit, visual embedding. Train pseudo-labels from train and val-seen trajectories: nominal if episode ultimately succeeds OR all past nodes lie on GT path; otherwise anomaly. Future outcome is privileged label not causal leak at inference. Exact supervised loss not defined in reviewed main text. Stop always verified by GPT-4o with instruction/panorama. On switch GPT-4o Ruminator takes over for the rest of episode(irreversible), shared memory, three prompts perception→long-term plan→candidate action. Critical formulation may restart from start and reset memory; return travel cost must be counted for same SPL protocol. LLM is frozen; runner has inherited VLN training, scoring model additional training. Lack of regulator equations/threshold calibration splits limits reproducibility.",
+    "novelty": "Anomaly-triggered expert/ VLM handoff and trained graph failure predictor; MapGPT already graph plans, early dual process is not generic novelty now given AdaNav / AwareVLN . R3's handoff is one-way, not per step bidirectional selective thinking.",
+    "results": "Table 1 R2R 77 SR/66 SPL , REVERIE 53.76/42.14 and RGSPL 29.86. Runner only 51.37/36.47 REVERIE ; Ruminator adds 2.39 SR/5.67 SPL . Table 2 no scorer−2.05 SR/−2.76 SPL ; no stop verifier−4.01 RGSPL . Mini GPT4 handoff worse than runner 49.39 SR/35.73 SPL , showing wrong expert choice hurts. Shared memory removal−1.19 SPL . SOTA comparison excludes stronger scaled SRDF ; claimed'all metrics'not literally true for R2R TL and some prior NE. Wall clock API versus local model comparisons mix deployment factors.",
+    "code": "Advertised GitHub URI requires exact link verification: extracted text shows navigation_R3-like suffix; initial navigation URL 404 is not proof that correct repository does not exist. Repository discovery pending.",
+    "repository_status": "Advertised repository needs exact-link resolution",
+    "bottlenecks": [
+      {
+        "id": "R3-1",
+        "description": "One-way handoff and failure detection do not measure whether deliberation will improve decisions",
+        "conditions": "Strong runner/weak VLM , false positive anomalies, repeated recovery",
+        "cause": "Anomaly proxy trained on path membership/outcomes, not counterfactual gain; no return to runner",
+        "evidence": "Table 3 Mini GPT4 worse than runner; Methodology one-way takeover",
+        "followups": " AdaNav learned gate, AwareVLN event data, SkillNav per step specialists; calibrated value-of-computation remains unproven",
+        "kind": "Methodological / protocol",
+        "status": "Partially addressed",
+        "confidence": "Moderate"
+      }
+    ],
+    "limitations": "No execution. Restart cost/reset protocol, exact repo and scorer training details need additional verification."
+  },
+  {
+    "id": "rl4vla",
+    "title": "What Can RL Bring to VLA Generalization? An Empirical Study",
+    "authors": [
+      "Jijia Liu",
+      "Feng Gao",
+      "Bingwen Wei",
+      "Xinlei Chen",
+      "Qingmin Liao",
+      "Yi Wu",
+      "Chao Yu",
+      "Yu Wang"
+    ],
+    "year": 2025,
+    "venue": "NeurIPS 2025; reviewed arXiv v4 from January 2026",
+    "source": "https://arxiv.org/abs/2505.19789",
+    "pages": "1,3–7",
+    "problem": "Systematically compare SFT / PPO / GRPO / DPO on vision, semantic and execution distribution shifts for OpenVLA manipulation. Findings are transfer hypotheses for VLN, not navigation benchmark results.",
+    "method": "§3 OpenVLA fuses SigLIP + DINOv2 with Llama2 -7 B, single image one-frame history and seven-dimensional end-effector/gripper action quantized 256 bins between 1st/99th percentiles; action-only CE. RL objective EΣγ^tr(s, l), policy gradient A logπ. ManiSkill WidowX 8 DoF pick-place uses 640×480 RGB +instruction, sparse stages.1 correct grasp and hold,1 successful placement. LoRA 32 all algorithms. PPO shared actor critic:3 layer MLP value from first action-token hidden h 0; GAE and clipped ratios. 140 demonstration warm up halves needed steps; PPO epoch 1 best wall clock. GRPO 8 rollouts from same initial state and DPO reward-derived trajectory preferences. Shared critic 44.4 GB vs separate 81.3 GB and 35%slower; single A 100 ~42 h main convergence. SFT scale up 64 K trajectories~1.26 M steps plateaus~16 K;3 seeds SFT scale,2 seeds RL design ablations. Dataset held out objects, receptacles, backgrounds, textures, positions, robot initialization and mid-episode object reposition isolate axes.",
+    "novelty": "Controlled generalization benchmark and practical PPO recipe rather than a new navigation architecture. Strong counterweight to claims GRPO universally best for embodied policies. Authors'POMDP/nonstationarity explanation is a hypothesis: state evolution does not itself make MDP transition nonstationary.",
+    "results": "Figure 3 PPO outperforms GRPO / DPO on this pick-place; Fig 6 SFT plateau and RL better OOD objects/tables. Abstract/overview claim strongest execution gains, moderate semantic, similar vision; exact Table 1 generalization numbers not yet read and not invented. Different tasks/rewards/backbones explain why this does not contradict NavGRPO as a reported observation. Memory 44.4 GB means local 8 GB GPU cannot replicate training recipe without major changes.",
+    "bottlenecks": [
+      {
+        "id": "RL4VLA-1",
+        "description": "RL's execution robustness does not imply visual or navigation semantic robustness",
+        "conditions": "Appearance change, route-language following, partial history",
+        "cause": "On-policy interaction learns recovery but reward does not guarantee perceptual invariance or instruction faithfulness",
+        "evidence": "Fig 1 and§4 PPO vs GRPO setting; single-task single-image formulation",
+        "followups": " NavGRPO studies graph VLN with different reward; controlled matched optimizer/reward perturbation study needed",
+        "kind": "Methodological / protocol",
+        "status": "Uncertain because evidence is insufficient",
+        "confidence": "Moderate"
+      }
+    ],
+    "limitations": "Manipulation only. Full generalization results/appendices pending; no code executed."
+  },
+  {
+    "id": "skillnav",
+    "title": "Breaking Down and Building Up: Mixture of Skill-Based Vision-and-Language Navigation Agents",
+    "authors": [
+      "Tianyi Ma",
+      "Yue Zhang",
+      "Zehao Wang",
+      "Parisa Kordjamshidi"
+    ],
+    "year": 2026,
+    "venue": "ACL 2026, long papers",
+    "source": "https://aclanthology.org/2026.acl-long.595/",
+    "pages": "1,3–8",
+    "problem": "Compositional generalization beyond R2R instruction styles/environments with specialized DUET experts and frozen VLM routing. Five execution experts; temporal skill is pretraining data and router reordering, not a sixth runtime expert.",
+    "method": "§4 Eq 1 DUET π(I, O, M). Synthesize 450 instruction-trajectories each for direction, vertical, stop, landmark, region, plus 2000 temporal;4–7 step paths filtered by skill heuristics, GPT-4o captions. Stage 1 DUET fine-tunes R2R + ScaleVLN (or SRDF )+temporal set; stage 2 each specialist fine-tunes its 450 set. Architecture CLIP-B/16 and BERT for ScaleVLN ; SRDF uses InternViT 6 B. Router GPT-4o reorders instruction once into execution-order clauses(Eq 2); Qwen 2.5 VL 7 B localizes current subgoal using visual history and past subgoals(Eqs 3–4), selects one expert(Eq 5). Crucially the chosen expert receives original instruction, not rewritten clause(Eq 6). Therefore instruction rewrite control is essential and must preserve original executor input when matching router reorder. Router is frozen prompted; expert loss inherits DUET BC/ DAgger (single-step CE), exact weights appendix F. Full policy is trained, not zero-shot. Five experts memory plus VLM / API calls remain cost even one active expert per step.",
+    "novelty": "Task-grounded NavNuances-derived skills, small targeted synthetic data and specialist top 1 routing; closest SAME/MoE and planner-executor agents. Explicit temporal reordering and semantic stage alignment already overlap proposed text importance ideas. Compare against single backbone trained on union data and rewriting-only, random routing, oracle/learned routing.",
+    "results": "Table 2 ScaleVLN 79/70→ SkillNav 83/77 unseen,77/68→78/70 test; SRDF 84/78 essentially unchanged and test SR−.28 absolute. GSA -N-Scene Scale 43→48 SPL ; SRDF 43→45. RxR zero-shot Scale 26.8→30.3 SR; SRDF 21.4→31.8. Random router GSA -N-Scene 43.17 SPL vs Qwen 47.96; reorder adds 2.53 SPL . Table 5 mixed skill agent landmark 48.90 SR far above specialist 31.53, so'specialists each excel'not universal. Error analysis 17 failures finds visual grounding and text prior bias. R2R headroom claim does not settle robust composition.",
+    "bottlenecks": [
+      {
+        "id": "SKILL-1",
+        "description": "Router understands words but binds wrong visual entity or chooses coarser skill",
+        "conditions": "Cluttered scenes, landmark-heavy instructions, unseen styles",
+        "cause": "Textual priors and unverified subgoal completion dominate routing",
+        "evidence": "§5.3 error analysis 17 cases; Table 5 mixed skill landmark 48.90 vs specialist 31.53",
+        "followups": " ProFocus queries missing visual evidence; Progress-Think /IDEAL alignment; grounded routing still not resolved by style decomposition",
+        "kind": "Methodological / protocol",
+        "status": "Partially addressed",
+        "confidence": "Moderate"
+      }
+    ],
+    "limitations": "Detailed appendix F/I needed for router cost, data filter,17-case analysis; no execution."
+  },
+  {
+    "id": "streamvln",
+    "title": "StreamVLN: Streaming Vision-and-Language Navigation via SlowFast Context Modeling",
+    "authors": [
+      "Meng Wei",
+      "Chenyang Wan",
+      "Xiqian Yu",
+      "Tai Wang",
+      "Yuqiang Yang",
+      "Xiaohan Mao",
+      "Chenming Zhu",
+      "Wenzhe Cai",
+      "Hanqing Wang",
+      "Yilun Chen",
+      "Xihui Liu",
+      "Jiangmiao Pang"
+    ],
+    "year": 2026,
+    "venue": "ICRA 2026 according to the official project/repository; reviewed arXiv v2 from July 2026",
+    "source": "https://arxiv.org/abs/2507.05240",
+    "pages": "1,3–7",
+    "problem": "Repeated history pre fill makes video VLA too slow; continuous stream requires bounded recent context and retained history. Distinguish RGB -only core from optional depth/odometry voxel pruning.",
+    "method": "§III interleaved(observation, action)dialogues reuse KV within N=8 turn window. Window end discards non observation prompt/action states, samples 8 memory frames; new window pre fill memory then append current frame. Slow memory retains visual tokens, fast dialogue keeps recent fine-grained context. Algorithm 1 backprojects image patches using depth/poses into 3 D voxels, keeps latest token per(stride bin, voxel), drops frame if retained fraction<θ. No learned token averaging; spatial pruning is'inference-training-free' but base VLA trained. LLaVA-Video 7 B/ Qwen 2 two-stage SFT : oracle epoch then DAgger +general VL epoch,128 clips batch, language 2 e−5 vision 5 e−6,~1500 A 100 GPU-hours . Data 450 K MP3D R2R/EnvDrop/ RxR ,300 K ScaleVLN 700 HM3D scenes,240 K DAgger,248 K VQA/ ScanQA ,230 K MMC4. Predict 4 actions, average0.27s plus network.2 s indoor/1 s outdoor. Depth/odometry only optional pruning variant, explicit Table I footnote.",
+    "novelty": "Streaming dialogue KV reuse plus bounded visual memory consolidation, and 3 D latest patch selection. NaVid / Uni-NaVid compress features but repeatedly refresh LLM context; StreamVLN changes causal prompt organization. Not all history information can be preserved under fixed 8 frame budget.",
+    "results": "Reviewed v 2 Table I extra-data RGB 56.4 SR/50.2 SPL R2R,54.4/45.4 RxR ; Prune Mem 57.4/51.1 and 53.9/45.1. Main text claims 56.9/51.9 and 52.9/46.0 which do not match Table I; cite version+table. Table IV 2 memory frames 37.3 SR→8 frames 45.5, all history 40.0. Data control Table III 45.6 oracle→50.8 DAgger +Vid QA→52.8 MMC4 →56.4 Scale; architectural gain not isolated by full number. Table III prose increment values also differ literal rows. Real 20 trials/scenario. Timing low mean and window boundary spikes must be both reported.",
+    "bottlenecks": [
+      {
+        "id": "STREAM-1",
+        "description": "Fixed memory and geometric pruning can erase decision-critical appearance or earlier actions",
+        "conditions": "Revisits, subtle objects, dynamic changes, pose/depth noise",
+        "cause": "Recent token per voxel assumes redundancy; old action states discarded; uniform 8 frames not instruction aware",
+        "evidence": "Algorithm 1; Table IV memory size;§III-B",
+        "followups": " PolarMem /HAM retrieve explicit context; NavFoM BATS recency weight; no faithful bounded memory guarantee",
+        "kind": "Methodological / protocol",
+        "status": "Uncertain because evidence is insufficient",
+        "confidence": "Moderate"
+      }
+    ],
+    "limitations": "Metrics version inconsistencies recorded; no independent runtime/benchmark. Detailed loss/config inspection pending."
+  },
+  {
+    "id": "susa",
+    "title": "Agent Journey Beyond RGB: Hierarchical Semantic-Spatial Representation Enrichment for Vision-and-Language Navigation",
+    "authors": [
+      "Xuesong Zhang",
+      "Yunbo Xu",
+      "Jia Li",
+      "Ruonan Liu",
+      "Zhenzhen Hu"
+    ],
+    "year": 2026,
+    "venue": "AAAI 2026",
+    "source": "https://github.com/HCI-LMC/VLN-SUSA",
+    "pages": "1,3–7",
+    "problem": "DUET RGB-only representations under use semantics and geometry. SUSA adds view-level caption and trajectory-level depth branch while preserving dual-scale action fusion. Requires GT simulator depth and pretrained caption features; no human annotations does not mean no extra sensors/pretraining.",
+    "method": "§3 TSU generates 36 BLIP2 FlanT5XXL captions('a photo of'), CLIP text embeddings. Static view score max word cosine similarity M∈R^(36×l); dynamic cross-attention caption→instruction;δ=.5 mix(Eqs 1–3). As printedΓ_static is 36-vector,Γ_dynamic transformer output needs projection to same shape: code inspection necessary to specify whether logits or features are fused. DSP Gibson ResNet50 depth and CLIP RGB, shared 2 layer panorama transformer, average pool into 768 D global topological node maps; cross-modal+graph attention to instruction. HAP attention pools four branches and language into R^768, sigmoid weightsβ∈R^4(not necessarily unit-sum); weighted representation contrastive alignment and weighted local/global actions(Eqs 4–9), DUET dynamic fusion. L=.2 L_expert CE+L_DAgger CE+.8 L_symmetric InfoNCE (Eqs 10–11); partial pretraining RGB base only MLM/MRC/SAP/OG 100 K iterations batch 32; fine 25 K batch 4 R2R 8 REVERIE 2 SOON 16 CE, one RTX 4090. CE uses ETPNav planner/executor transfer.",
+    "novelty": "Multi scale complementarity: local caption matching and global depth memory rather than naive feature concatenation; contrastive fusion and partial pretraining. DUET derivative with VLM preprocessing, not standalone generative VLM policy. CONSOLE already text knowledge feature enrichment; SUSA adds depth branch and caption matching.",
+    "results": "Table 1 R2R 73 SR/64.8 SPL vs DUET 72/60; test 72.5/63.8 vs 69/59. REVERIE test 41.5 SPL /27.3 RGSPL vs 36/22. Table 3 CE 52.7/43.6 vs DUET 51.9/41.2, but below ETPNav 57/49. Table 4 upgrading RGB ViT→ CLIP alone 46.9→51.5 SR; Gibson depth 52.0/39.2 versus ImageNet depth 50.1/34.6. Table 6 HAP reduces val 55→51.7 SR but improves test 51.9→54.3; this is not monotonic component benefit. §4.3 text reversesδstatic/dynamic relative Eq 3; exact config code important.",
+    "bottlenecks": [
+      {
+        "id": "SUSA-1",
+        "description": "Caption/depth branches bring pretrained-data/sensor dependence and inconsistent split gains",
+        "conditions": "Domain-shifted depth, missed caption landmarks, fusion tuning",
+        "cause": "Frozen perception and weighting can amplify semantic error; CLIP upgrade confounds module claim",
+        "evidence": "Table 4 feature ablation, Table 6 val/test tradeoff, Eq 3/proseδmismatch",
+        "followups": " CONSOLE / MapNav / SkillNav different text interfaces; sensor-matched and caption-error controlled analysis still needed",
+        "kind": "Methodological / protocol",
+        "status": "Uncertain because evidence is insufficient",
+        "confidence": "Moderate"
+      }
+    ],
+    "limitations": "Supplementary caption quality and pretraining detail spending; no execution."
+  },
+  {
+    "id": "uninavid",
+    "title": "Uni-NaVid: A Video-based Vision-Language-Action Model for Unifying Embodied Navigation Tasks",
+    "authors": [
+      "Jiazhao Zhang",
+      "Kunyu Wang",
+      "Shaoan Wang",
+      "Minghan Li",
+      "Haoran Liu",
+      "Songlin Wei",
+      "Zhongyuan Wang",
+      "Zhizheng Zhang",
+      "He Wang"
+    ],
+    "year": 2025,
+    "venue": "Robotics: Science and Systems 2025",
+    "source": "https://roboticsproceedings.org/rss21/p013.html",
+    "pages": "Alternate arXivv2pages1,3–8 (smallaction-promptparagraphoutputtruncated; notreliedupon)",
+    "versions": "LocalprovidedPDFhasnoextractabletext. Reviewedauthorarxiv2412.06224v2(6Feb2025),downloadedevidence/03/uninavid_alternate.pdf; do notassumebyteequivalencewithproceedings.",
+    "associated_files_reviewed": [
+      {
+        "file": "evidence/03/uninavid_alternate.pdf",
+        "version": "arxiv2412.06224v2",
+        "pages": "1,3–8",
+        "reason": "Text replacement for the local image-only PDF"
+      }
+    ],
+    "problem": "Unify VLN, ObjectNav , EQA and human following rather than task specific policies, while processing long video efficiently. RGB single view and text in,4 low level actions out; EQA action and answer phases explicitly separated.",
+    "method": "§IV EVA-CLIP 256 patches/frame; grid pool current 64, short-term 4/frame for B 64, old 1/frame. Incremental group boundary pooling reuses encoded frames. Long term adjacent tokens merge weighted mean(K old+new)/(K+1) if cosine>.95(Eqs 1–6); otherwise append, so worst-case memory still grows linearly with distinct frames—not a hard bound. 2 layer MLP projects into Vicuna 7 B, autoregressive 4 tokens Forward 25 cm/Left 30°/Right 30°/Stop. Stage 1 projector alignment LLaMA-VID data, stage 2 projector+ LLM fine-tune 5.9 M=3.6 M nav+2.3 M video QA, vision frozen;40 H800 ×35 h 1400 GPU-hours , one epoch. Nav 2.4 M VLN,483 K ObjectNav ,240 K EQA actions+10 K answers,544 K following,861 scenes. Embodiment height.88–1.25 m/radius.1–.6 m varied. EQA Stop then remove<NAV>and ask question using history. Real asynchronous A 100 inference.2 s/4 actions. Algorithm 1 looks for X_long[-1]before guard at first long token, a pseudocode empty-list edge case, not assumed code bug.",
+    "novelty": "Unified multi-task navigation training and online current/short/long token hierarchy; weighted adjacent merging saves real-time cost. Does not predict future observations/world states despite future action chunking. NavFoM extends cross camera/embodiment and trajectory output; StreamVLN adds KV reuse.",
+    "results": "Table II R2R^47 SR/42.7 SPL vs NaVid 37.4/35.9; Table III RxR^48.7/40.9 uses RxR training while NaVid 23.8/21.2 is R2R -only: not matched cross-dataset comparison. Table IV HM3D 73.7/37.1; Table V OVON unseen 39.5/19.8 zero-shot to OVON but trained ObjectNav . Scene overlap checked by authors§VI; no independent audit. Multi-task success does not yet isolate synergy without later ablation tables.",
+    "bottlenecks": [
+      {
+        "id": "UNINAVID-1",
+        "description": "Token merging is unbounded worst-case and may discard rare relevant detail",
+        "conditions": "Diverse visual histories, task-switches, dynamic following",
+        "cause": "Similarity threshold+global pooled old frame; only adjacent merge",
+        "evidence": "Eqs 2–6; B 64/τ.95; data/protocol Table III",
+        "followups": " StreamVLN fixed window, NavFoM BATS budget; instruction-aware utility retention not established",
+        "kind": "Methodological / protocol",
+        "status": "Uncertain because evidence is insufficient",
+        "confidence": "Moderate"
+      }
+    ],
+    "limitations": "Alternate version only; remaining task results/ablation appendix pending. No benchmark executed."
+  }
+]

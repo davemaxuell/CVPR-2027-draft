@@ -1,0 +1,89 @@
+=== PDF PAGE 1 ===
+A New Path: Scaling Vision-and-Language Navigation with Synthetic Instructions and Imitation Learning Aishwarya Kamath*1^, Peter Anderson*2, Su Wang2^, Jing Yu Koh3^, Alex Ku2, Austin Waters2, Yinfei Yang4^, Jason Baldridge2, Zarana Parekh2 *Equal contributions ^Work done while at Google Research. 1New York University 2Google Research 3Carnegie Mellon University 4Apple PAPER ID: WED-AM-246
+
+=== PDF PAGE 2 ===
+Contributions ● An automated instruction-trajectory augmentation pipeline, used to generate navigation graphs for Gibson environments ● A new synthetic dataset of 4.2M multilingual navigation instructions* ● Solely imitation learning agent trained without interaction with the environment ● New results demonstrating substantial gains in the state-of-the-art on the challenging RxR dataset *Dataset available at: github.com/google-research-datasets/RxR/tree/main/marky-mT5
+
+=== PDF PAGE 3 ===
+Key takeaways ● Aspects of language understanding that are important for instruction-following agents appear to be hard to learn from static web data - e.g. actions/verbs (“climb the stairs”), imperatives and negations (“do not enter…”), spatial expressions (“behind you”) and temporal conditions (“walk until…”). ● Recipe that works well: ○ Large-scale imitation learning with generic architectures ○ Better and more diverse synthetic instructions ● However, aligning synthetic instructions to the target domain is essential ● Opens up doors to co-training with other image-text understanding tasks Paper: A New Path: Scaling Vision-and-Language Navigation with Synthetic Instructions and Imitation Learning
+
+=== PDF PAGE 4 ===
+What is Vision and Language Navigation? ● The agent is instantiated in an environment and must follow a natural language instruction W ● At time step t, the agent receives observation ot and chooses action at that transitions it from state st to new state st+1 ● Each observation is a photorealistic panoramic image (hereafter, pano) encoded as 36 image feature vectors (K=36) ● The agent moves by choosing an action from a set of candidates (J is variable)
+
+=== PDF PAGE 5 ===
+Language-Guided Navigation Agents R2R dataset / Matterport3D simulator RxR dataset / Habitat simulator - Developing robots that follow human instructions is a long-term, formidable challenge. - Vision-and-Language Navigation is an ideal test bed for studying instruction following: - Requires grounding of language in visual perceptions and actions - Navigation can be simulated photo-realistically at scale - Evaluation is straightforward - did the agent reach the goal?
+
+=== PDF PAGE 6 ===
+● Require interacting with the environment during training ○ Slows down training ○ Require complex training set-up ○ Difﬁcult to scale up ● Focus on training on a small set of environments (61 from Matterport 3D) ○ low diversity ○ poor generalization Prior SOTA VLN agents
+
+=== PDF PAGE 7 ===
+Can scaling up pre-training using image-text data solve the problem? ● Pretraining on large image-text and text-only datasets has been thoroughly explored, but improvements are limited. Figure from: Majumdar et al, “Improving Vision-and-Language Navigation with Image-Text Pairs from the Web”
+
+=== PDF PAGE 8 ===
+● Pretraining on large image-text and text-only datasets has been thoroughly explored, but improvements are limited. ● Generic image-text data doesn’t usually have ○ Allocentric and egocentric spatial expressions near a grey console table behind you Can scaling up pre-training using image-text data solve the problem?
+
+=== PDF PAGE 9 ===
+● Pretraining on large image-text and text-only datasets has been thoroughly explored, but improvements are limited. ● Generic image-text data doesn’t usually have ○ Allocentric and egocentric spatial expressions ○ Imperatives and negations do not enter the room in front Can scaling up pre-training using image-text data solve the problem?
+
+=== PDF PAGE 10 ===
+● Pretraining on large image-text and text-only datasets has been thoroughly explored, but improvements are limited. ● Generic image-text data doesn’t usually have ○ Allocentric and egocentric spatial expressions ○ Imperatives and negations ○ Temporal conditions walk until you see an entrance on your left Can scaling up pre-training using image-text data solve the problem?
+
+=== PDF PAGE 11 ===
+● Pretraining on large image-text and text-only datasets has been thoroughly explored, but improvements are limited. ● Generic image-text data doesn’t usually have ○ Allocentric and egocentric spatial expressions ○ Imperatives and negations ○ Temporal conditions ● Text only datasets contain such language, but it is meaningless without sensorimotor context Can scaling up pre-training using image-text data solve the problem?
+
+=== PDF PAGE 12 ===
+● Pretraining on large image-text and text-only datasets has been thoroughly explored, but improvements are limited. ● Generic image-text data doesn’t usually have ○ Allocentric and egocentric spatial expressions ○ Imperatives and negations ○ Temporal conditions ● Text only datasets contain such language, but is meaningless without sensorimotor context (Answer: Not if you do it with generic image-text data) Can scaling up pre-training using image-text data solve the problem?
+
+=== PDF PAGE 13 ===
+Synthetic instruction generation Speaker-follower model: Data augmentation where speaker helps follower by synthesizing additional route-instruction pairs to expand the limited training data. Figure from Fried, Daniel, et al. "Speaker-follower models for vision-and-language navigation." NeurIPS 2018.
+
+=== PDF PAGE 14 ===
+Not much progress on using data augmentation since 2018… Possible reasons: ● Issues with quality of instructions (non-grounded and/or bad followability) ○ Human wayﬁnding success rates on R2R are 36% for Speaker-Follower generated instructions* ● Still limited in size (sticks to Matterport3D environments) ● RL based training makes it unclear how to efﬁciently use more data, even if available *Zhao et al., ‘On the Evaluation of Vision-and-Language Navigation Instructions’, EACL 2021.
+
+=== PDF PAGE 15 ===
+Building on top of MARKY ● MARKY-mT5*: A ﬁrst stage detects landmarks and a second stage generates instructions conditioned on these landmarks. ● Instructions are more ﬁne-grained and grounded ● On R2R 71% success rate (SR) vs. 75% for human instructions, 42% for previous models *Wang et al., ‘Less is More: Generating Grounded Navigation Instructions from Landmarks’, CVPR 2022.
+
+=== PDF PAGE 16 ===
+Matterport3D (Chang et al. 3DV 2017) ● 90 buildings ● We sample 330K paths, and use Marky to annotate each path with instructions in en/hi/te (1M total) Gibson (Xia et al. CVPR 2018) ● 572 buildings ● We create navigation graphs to indicate navigable paths between panoramas ● Using Marky we annotate 1.1M paths with 3.2M instructions in en/hi/te Training Environments
+
+=== PDF PAGE 17 ===
+MARVAL - Maximum Augmentation Regime for Vision And Language navigation ● Issues with quality of instructions (non-grounded, bad followability, etc) MARVAL: Marky based instruction generation Better instructions = Better follower ?
+
+=== PDF PAGE 18 ===
+MARVAL - Maximum Augmentation Regime for Vision And Language navigation ● Need a training pipeline that can be easily scaled up - existing RL based approaches are too slow to train at scale. MARVAL: Can we get rid of RL and only use imitation learning to train efﬁciently at scale?
+
+=== PDF PAGE 19 ===
+MARVAL - Maximum Augmentation Regime for Vision And Language navigation ● Generic large scale image-text data don’t contain navigation speciﬁc language & only exists on small number of environments from Matterport3D. MARVAL: Can we use a grounded instruction generator and utilize novel environments to get a more diverse dataset?
+
+=== PDF PAGE 20 ===
+● Generic agent based on an mT5 (multilingual T5) encoder ● For high throughput, we train only with Imitation Learning (BC and DAGGER) ● Pretraining is performed on all available data. ● Finetuning is on human-annotated data only and the MLM objective is dropped. MARVAL agent
+
+=== PDF PAGE 21 ===
+On RxR Val-Unseen, pretraining with synthetic instructions provides large gains over pretraining with just the human-annotated RxR and R2R datasets. Switching from mT5-base to mT5-large and ﬁnetuning is also beneﬁcial. What works?
+
+=== PDF PAGE 22 ===
+Helping the model recover from mistakes Surprisingly, MARVAL makes less mistakes (produces more perfect trajectories) than human wayﬁnders… but human Success Rate at reaching the goal is much higher. Error recovery is the difference, and a possible focus for future improvement. Humans make mistakes along the way but almost always recover to still reach the goal.
+
+=== PDF PAGE 23 ===
+Helping the model recover from mistakes
+
+=== PDF PAGE 24 ===
+Final results
+
+=== PDF PAGE 25 ===
+Final results
+
+=== PDF PAGE 26 ===
+Final results
+
+=== PDF PAGE 27 ===
+Final results
+
+=== PDF PAGE 28 ===
+Contributions ● An automated instruction-trajectory augmentation pipeline, used to generate navigation graphs for Gibson environments ● A new synthetic dataset of 4.2M multilingual navigation instructions* ● Solely imitation learning agent trained without interaction with the environment ● New results demonstrating substantial gains in the state-of-the-art on the challenging RxR dataset *Dataset available at: github.com/google-research-datasets/RxR/tree/main/marky-mT5
+
+=== PDF PAGE 29 ===
+Key takeaways ● Aspects of language understanding that are important for instruction-following agents appear to be hard to learn from static web data - e.g. actions/verbs (“climb the stairs”), imperatives and negations (“do not enter…”), spatial expressions (“behind you”) and temporal conditions (“walk until…”). ● Recipe that works well: ○ Large-scale imitation learning with generic architectures ○ Better and more diverse synthetic instructions ● However, aligning synthetic instructions to the target domain is essential ● Opens up doors to co-training with other image-text understanding tasks Paper: A New Path: Scaling Vision-and-Language Navigation with Synthetic Instructions and Imitation Learning
+
+=== PDF PAGE 30 ===
+Thank you!

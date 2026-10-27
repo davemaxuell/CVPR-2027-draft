@@ -1,0 +1,773 @@
+=== PDF PAGE 1 ===
+   Diagnosing Vision-and-Language Navigation: What Really Matters
+
+   Wanrong Zhu¶, Yuankai Qi§, Pradyumna Narayana*, Kazoo Sone*, Sugato Basu*,
+            Eric Xin Wang‡, Qi Wu§, Miguel Eckstein¶, William Yang Wang¶
+         ¶UC Santa Barbara, §University of Adelaide, *Google, ‡UC Santa Cruz
+        {wanrongzhu,migueleckstein,wangwilliamyang}@ucsb.edu, qykshr@gmail.com
+      {pradyn,sone,sugato}@google.com, xwang366@ucsc.edu, qi.wu01@adelaide.edu.au
+
+
+                Abstract                                    R2R  RxR  Touchdown
+    Vision-and-language navigation (VLN) is a       Human Performance         86    94          92
+    multimodal task where an agent follows nat-       SoTA Model Performance    78    53          17
+    ural language instructions and navigates in vi-                                                     Table 1: There exists salient gaps between machines’
+    sual environments. Multiple setups have been                                                        vision-and-language navigation (VLN) performance and
+    proposed, and researchers apply new model                                           human benchmarks. Navigation success rates are re-
+    architectures or training techniques to boost                                                        ported on the R2R (Anderson et al., 2018) and the RxR
+    navigation performance. However, there still                                                             dataset (Ku et al., 2020b) for indoor VLN and the Touch-
+     exist non-negligible gaps between machines’                                           down dataset (Chen et al., 2019) for outdoor VLN.2
+    performance and human benchmarks. More-
+    over, the agents’ inner mechanisms for navi-
+    gation decisions remain unclear. To the best                                            and accurate evaluation of agents’ performances    of our knowledge, how the agents perceive the
+                                                      in language-guided visual grounding. As the AI    multimodal input is under-studied and needs
+     investigation. In this work, we conduct a series       research community gradually shifts its attention
+    of diagnostic experiments to unveil agents’ fo-      from the static empirical analysis of datasets to
+    cus during navigation. Results show that indoor      more challenging settings that require incremental
+    navigation agents refer to both object and direc-       decision-making processes, the interactive task of
+     tion tokens when making decisions. In contrast,    VLN deserves a more in-depth analysis of why it
+    outdoor navigation agents heavily rely on di-                                            works and how it works.
+    rection tokens and poorly understand the object
+                                                     Various setups have been proposed to address to    tokens. Transformer-based agents acquire a bet-
+     ter cross-modal understanding of objects and        the VLN task. Researchers generate visual trajec-
+    display strong numerical reasoning ability than         tories and collect human-annotated instructions for
+    non-Transformer-based agents. When it comes       indoor (Anderson et al., 2018; Jain et al., 2019a;
+     to vision-and-language alignments, many mod-     Ku et al., 2020a; Chen et al., 2021) and outdoor
+     els claim that they can align object tokens with                                                environment (Chen et al., 2019; Mehta et al., 2020;
+    specific visual targets. We find unbalanced at-                                            Mirowski et al., 2018). There are also interactive    tention on the vision and text input and doubt
+                               VLN settings based on dialogues (Nguyen et al.,    the reliability of such cross-modal alignments.1
+                                                2019; Nguyen and III, 2019; Zhu et al., 2020c), and
+1  Introduction                                  task that navigates agents to localize a remote ob-
+                                                             ject (Qi et al., 2020c). However, few studies ask theA key challenge for Artificial Intelligence (AI) re-
+                                     Why and How questions: Why do these agents worksearch is to move beyond Independent and Iden-
+                                                      (or do not work)? How do agents make decisionstically Distributed (i.i.d.) data analysis: We need
+                                                        in different setups?to teach AI agents to understand multimodal input
+                                             Through the years, agents with different modeldata, and jointly learn to reason and perform incre-
+                                                      architectures and training mechanisms have beenmental and dynamic decision-making with the help
+                                              proposed for indoor VLN (Anderson et al., 2018;from humans. Vision-and-Language Navigation
+                                                  Fried et al., 2018; Hao et al., 2020; Hong et al.,(VLN) has received much attention due to its ac-
+                                                 2020a,b; Huang et al., 2019; Ke et al., 2019; Litive perception and multimodal grounding setting,
+                                                            et al., 2019; Ma et al., 2019a; Qi et al., 2020b; Tandynamic decision-making nature, rich applications,
+
+   1Code and data used in  this study are available  at      2We record the published state-of-the-art performance on
+https://github.com/VegB/Diagnose_VLN.                  R2R, RxR and Touchdown leaderboards on Dec.15th, 2021.
+
+                                        5981
+    Proceedings of the 2022 Conference of the North American Chapter of the Association for Computational Linguistics:
+                          Human Language Technologies, pages 5981 - 5993
+                            July 10-15, 2022 ©2022 Association for Computational Linguistics
+
+=== PDF PAGE 2 ===
+et al., 2019; Wang et al., 2020a, 2019, 2018, 2020b;      2. Instead of merely staring at surrounding ob-
+Zhu et al., 2020a) and outdoor VLN (Chen et al.,          jects, indoor navigation agents are able to set
+2019; Ma et al., 2019b; Mirowski et al., 2018; Xia          their sights on objects further from the current
+et al., 2020; Xiang et al., 2020; Zhu et al., 2020b).        viewpoint. (Section 5)
+Back-translation eases the urgent problem of data      3. Transformer-based agents display stronger nu-
+scarcity (Fried et al., 2018). Imitation learning and        merical reasoning ability (Section 4), and
+reinforcement learning enhance agents’ generaliza-        acquire better cross-modal understanding of
+tion ability (Wang et al., 2019, 2018). With the         objects, compared to non-Transformer-based
+rise of BERT-based models, researchers also apply         agents. (Section 6)
+Transformer and pre-training to further improve      4. Indoor agents can align object tokens to cer-
+navigation performance (Hao et al., 2020; Hong          tain targets in the visual environment to a cer-
+et al., 2020b; Zhu et al., 2020b). While apply-         tain extent, but display in-balanced attention
+ing new techniques to the navigation agents might       on text and visual input. (Section 6)
+boost their performance, we still know little about    We hope these findings reveal opportunities and
+how agents make each turning decision. Treatment    obstacles of current VLN models and lead to new
+of the agents’ processing of instructions and per-   research directions.
+ception of the visual environment as a black box
+might hinder the design of a generic model that   2  Related Work
+fully understands visual and textual input regard-                                                 Instruction Following   is a long-standing topic
+less of VLN setups. Table 1 shows non-negligible                                                      in AI studies that ask an agent to follow natural
+performance gaps between neural agents and hu-                                                language instructions and accomplish target tasks,
+mans on both indoor and outdoor VLN tasks.                                           which can be dated back to the SHRLDU (Wino-
+  Therefore, we focus on analyzing how the nav-   grad, 1971).  Efforts made to tackle this classic
+igation agents understand the multimodal input   problem spans from defining templates (Klingspor
+data in this work. We conduct our investigation    et al., 1997; Antoniol et al., 2011), designing hard-
+from the perspectives of natural language instruc-   encoded concepts to ground visual attributes and
+tion, visual environment, and the interpretation    spatial relations (Steels and Vogt, 1997; Roy, 2002;
+of vision-language alignment. We create counter-   Guadarrama et al., 2013; Kollar et al., 2013; Ma-
+factual interventions to alter the instructions and    tuszek et al., 2014), to constructing varies datasets
+the visual environment in the validation dataset,   and learning environments (Anderson et al., 1991;
+focusing on variables related to objects, direc-   Bisk et al., 2016a; Misra et al., 2018). Many meth-
+tions and numerics. More specifically, we modify   ods have been proposed to map the instructions
+the instruction by removing or replacing the ob-    into sequence of actions, such as reinforcement
+ject/direction/numeric tokens, and we adjust the    learning (Branavan et al., 2009, 2010; Vogel and
+environment by masking out visual instances or    Jurafsky, 2010; Misra et al., 2017), semantic pars-
+horizontally flipping the viewpoint images. Subse-   ing (Chen and Mooney, 2011; Artzi and Zettle-
+quently, we examine the interventions’ treatment   moyer, 2013), alignment-based model (Andreas
+effects on agents’ evaluation performance while   and Klein, 2015), and neural networks (Bisk et al.,
+keeping other variables unchanged. We set up ex-   2016b; Mei et al., 2016; Tan and Bansal, 2018).
+periments on the R2R (Anderson et al., 2018) and
+                                            Vision-and-Language  Navigation   is  a  taskthe RxR dataset (Ku et al., 2020b) for indoor VLN
+                                            where an agent comprehends the natural languageand the Touchdown dataset (Chen et al., 2019) for
+                                                      instructions and reasons through the visual envi-outdoor VLN. We examine nine VLN agents on the
+                                               ronment. Many studies aim at improving VLNthree datasets with quantitative ablation diagnostics
+                                                    agents’ performance in one way or another. To en-on the text and visual inputs.
+                                                         rich training data, a line of work (Fried et al., 2018;
+  In summary, our key findings include:                                        Zhu et al., 2020b) use back-translation to generate
+  1. Indoor navigation agents refer to both objects   augmented instructions. To enforce cross-modal
+    and directions in the instruction when mak-   grounding, RPA and RCM (Wang et al., 2018,
+     ing decisions. In contrast, outdoor navigation   2019) use reinforcement learning, SMNA (Ma
+     agents heavily rely on directions and poorly    et al., 2019a) uses a visual-textual co-grounding
+     understand visual objects. (Section 4)         module to improve cross-modal alignment, Rel-
+
+                                        5982
+
+=== PDF PAGE 3 ===
+Graph (Hong et al., 2020a) uses graphs for task       Dataset     Model                          Trans?  Visual Feature
+formulation. To address the generalizability prob-                 EnvDrop (Tan et al., 2019)        ×                                                                       FAST (Ke et al., 2019)                                                           R2R                           ×     ResNet-152lem to unseen environment, PRESS (Li et  al.,             VLN ⟳BERT (Hong et al., 2020b)   ✓
+2019) introduces a stochastic sampling scheme,              PREVALENT (Hao et al., 2020)     ✓
+                                                                                   CLIP-ViL (Shen et al., 2021)
+EnvDrop (Tan et al., 2019) proposes environment      RxR-en    VLN-HAMT (Chen et al., 2021)     ✓×    CLIP-ViT
+dropout. To utilize visual information from the             RCONCAT (Chen et al., 2019)      ×
+environment, AuxRN (Zhu et al., 2020a) uses aux-     Touchdown  ARCVLN-Transfomer(Xiang et al.,(Zhu2020)et al., 2020b)   ✓×     ResNet-18
+iliary tasks to assist semantic information extrac-                                                     Table 2: The VLN datasets and models covered in
+tion, VLN-HAMT (Chen et al., 2021) incorporates     this study. We record whether the model structure is
+panorama history with a hierarchical vision trans-    Transformer-based, and the pre-trained feature extractor
+former. FAST (Ke et al., 2019) makes use of asyn-   used to encode visual environment.
+chronous search and allows the agent to backtrack
+if it discerns a mistake after attending to global
+                                                    3.1  Vision-and-Language Navigationand local knowledge. With the success of BERT-
+related models in NLP, researchers also start to    In the vision-and-language navigation task, the nav-
+build Transformer-based navigation agents and add    igation agent is asked to find the path to reach the
+a pre-training process before fine-tuning on the    target location following the instructions X. The
+downstream VLN task (Hao et al., 2020; Hong    navigation procedure can be viewed as a sequen-
+et al., 2020b; Zhu et al., 2020b; Chen et al., 2021).    tial decision-making process. At each time step t,
+                                                     the visual environment presents an image view vt.
+                                            With reference to the instruction X and the visualModel Behavior Analysis  As multimodal stud-   view vt, the agent is expected to choose an action
+ies gain more and more attention, there are lines of    at such as turn left or stop.
+works that focus on explaining models’ behaviors
+                                               Datasets We conduct indoor navigation experi-to better understand and handle the tasks. Some
+                                              ments on the Room-to-Room (R2R) dataset (Ander-generate textual explanations by training another
+                                                son et al., 2018) and the Room-across-Room (RxR)model to mimic human explanations (Hendricks
+                                                     dataset (Ku et al., 2020b), and test outdoor VLNet al., 2016; Park et al., 2018; Wu and Mooney,
+                                           on Touchdown (Chen et al., 2019). R2R and RxR2019). Others generate visual explanations with
+                                                     are built upon real estate layouts and contain sepa-the help of attention mechanism (Lu et al., 2016) or
+                                                          rate graphs for each apartment/house. Unlike R2R,gradient analysis (Selvaraju et al., 2017). There are
+                                            which shoots for the shortest path, RxR has longeralso attempts to provide multimodal explanations,
+                                            and more variable paths. R2R only contains En-e.g., Li et al. (2018) breaks up the end-to-end VQA
+                                                        glish instructions, while RxR also includes instruc-process and examines the intermediate results by
+                                                      tions in Hindi and Telugu. In this study, we onlyextracting attributes from the visual instances. An-
+                                                  cover the English subset for RxR, and will refer toother line of work examines model performance
+                                                                              it as RxR-en in the following sections. Navigationby conducting ablation studies on input data. Re-
+                                                      in Touchdown occurs in the urban environment,cent analyses on language modelling (O’Connor
+                                             where the viewpoints form a huge connected graph.and Andreas, 2021), machine translation (Fernan-
+                                          Compared to indoor environments, Touchdown hasdes et al., 2021), and instruction following (Dan
+                                          more complicated visual environments and a moreet al., 2021) ablate/perturb both training and vali-
+                                                    extensive search space. The evaluation results aredation data. A study on multimodal models (Frank
+                                                     reported on the validation unseen sets for R2R andet al., 2021) only applies ablation during evaluation,
+                                          RxR-en and on the test set for Touchdown.which is the same as our settings.
+                                         Models  Table 2 lists out the models covered in
+                                                  our study. We use the code and trained checkpoints
+3  Background and Research Questions                                                   shared by the authors in the following experiments.
+                                                  For indoor navigation on R2R, we study a widely
+We first bring in the task of Vision-and-Language   adopted base model Envdrop (Tan et al., 2019),
+Navigation and introduce the datasets and agents   a  backtracking framework  for  self-correction
+used for comparison. Then we list out the research   FAST (Ke et al., 2019), and two SoTA models
+questions to study in this work.             VLN ⟳BERT (Hong et al., 2020b) and PREVA-
+                                        5983
+
+=== PDF PAGE 4 ===
+LENT (Hao et al., 2020).  The Envdrop intro-      Dataset                               Instruction
+duces environment dropout on top of the Speaker-                 Walk through the door by the sink into the middle of the next                                                            R2R        room. Turn right and walk down the hallway and enter the
+Follower (Fried et al., 2018) model, FAST conducts                     third door on your right.
+an asynchronous search for backtracking, PREVA-                  We’re facing towards a small picture that’s attached to the wall,
+                                                                                                         turn slightly to the right, and enter the hallway that’s in front of
+                                                                                                 you, turn to the left, take five steps further... On your right thereLENT, and VLN ⟳BERT are Transformer-based
+agents with pre-trained models.                                                    aretowardsa fewtheglasslivingdoorsroom,andturnon theslightlyleft there’sto the aleft...livingOnroom,the rightwalk
+  For navigation on RxR-en, we examine CLIP-      RxR-en       there are four chairs and a beautiful coffee table in the middle,                                                                                    on the left there’s a console table with a vase with flowers on
+ViL (Shen et al., 2021) and VLN-HAMT (Chen                      top, walk past the console table towards the back of the chair
+et al., 2021). CLIP-ViL shares the same model                         that’sand oninthedirecfrontright there’sof you...a marbleWe’reconsolenow facingtabletowardswith decorationsa lamp,
+structure with EnvDrop. The only difference is                  on top, and that’s your destination.
+that CLIP-ViL uses CLIP-ViT (Radford et  al.,                    Orienttraffic.yourselfGo straightso thatthroughyou are3 intersections.moving in theKeepsamemovingdirectionforw-as
+2021) to extract visual features, while EnvDrop                      ard, after the 3rd intersection, you should see a signs for a store
+                                                                      Touchdown  with a white background and red dots as well as a red and white
+uses ImageNet ResNet (Szegedy et al., 2017) fea-                    bullseye target. Continue going straight past this store and at the
+tures. VLN-HAMT incorporates a long-horizon                         justnextafterintersection,the wall onturnyourleft.leftGowiththroughthe purpleone intersectionzig zag patterns.and stop
+history into decision-making by encoding all the                                                     Table  3:   Instructions  from R2R, RxR-en  and
+past panoramic observations via a hierarchical vi-                                             Touchdown with object-tokens, direction-tokens and
+sion Transformer.                                                  numeric-tokens highlighed.
+  For outdoor navigation on Touchdown, we con-
+sider the common baseline RCONCAT (Chen et al.,      Dataset     #Data   Lpath   Linstr  #Object   p(tokobj)   p(tokdirec)
+2019), and two SoTA models ARC (Xiang et al.,    R2R          2.3k      6.0    29.3    0.6k     19.8%     7.3%
+2020) and VLN-Transfomer (Zhu et al., 2020b).     RxR-en       4.6k      8.5  111.3    1.4k     16.1%     6.5%                                                                 Touchdown   1.4k    34.4    92.5    1.0k     16.8%     6.8%
+RCONCAT encodes the trajectory and the instruc-
+                                                     Table 4:  Statistics of R2R, RxR-en and Touchdowntion in an LSTM-based manner. ARC improves
+                                                             datasets. #Data is the dataset size used for evaluation
+RCONCAT by paying special attention to the                                                            in this study. Lpath is the average path length, which
+stop signals. VLN-Transfomer is a Transformer-                                                                      is the number of viewpoints covered in the trajectory.
+based agent that applies pre-training on an external     Linstr is the average instruction length. #Object denotes
+dataset for outdoor navigation in urban areas.         the number of unique objects mentioned in the instruc-
+                                                                tions. p(tokobj) and p(tokdirec) indicates the percentage
+Metrics  In the following experiments, we evalu-    of object/direction tokens per instruction.
+ate navigation performance with Success Rate (SR)
+for indoor agents and Task Completion (TC) rate
+                                                  designs and explore future research directions:for outdoor agents. Both SR and TC measure the
+                                                            1. What can the agents learn from the instruc-accuracy of completing the navigation task, reflect-
+                                                         tions? Do they pay more attention to objecting the agents’ overall ability to finish navigation
+                                                        tokens or directions tokens? Do they have thecorrectly. An indoor navigation task is considered
+                                                                 ability to count? (Section 4)complete if the agent’s final position locates within
+                                                            2. What do agents see in the visual environment?3 meters of the target location. For outdoor navi-
+                                                  Are they staring at the closely surrounded ob-gation, the task is considered complete if the agent
+                                                               jects or also browsing further layout? Dostops at the target location or one of its adjacent
+                                                         they focus on individual visual instances ornodes in the environment graph.
+                                                        perceive the overall outline? (Section 5)
+3.2  Research Questions                               3. Can agents match textual tokens to visual en-
+                                                                  tities? How reliable are such connections?Current VLN studies have reached their bottleneck
+                                                         (Section 6)as only minor performance improvements have
+been achieved recently, while a significant gap still                                       4  Analysis on Instruction Understandingexists between machine and human performance.
+This motivates us to find the reasons.               This section examines whether and to what extent
+  To better understand how VLN agents make de-   the agent understands VLN instructions. We fo-
+cisions during navigation, we conduct a series of   cus on how the agent perceives object-related to-
+experiments on indoor and outdoor VLN tasks, aim-   kens, direction-related tokens, and numeric tokens,
+ing to answer the following questions that might   and their effects on final navigation performance.
+help us locate the deficiencies of current model   Table 3 shows exemplar instructions of the three
+
+                                        5984
+
+=== PDF PAGE 5 ===
+ *   Setting                                                                      Instruction
+ 1   Vanilla              Go left down the hallway toward the exit sign. Go into the door on the left and stop by the table.
+ 2  Mask Object Tokens     Go left down the [MASK] toward the [MASK] [MASK]. To into the [MASK] on the left and stop by the [MASK].
+ 3  Replace Object Tokens    Go left down the portrait toward the sofa fountains. Go into the football on the left and stop by the boats.
+ 4   Controlled Trial        Go [MASK] down the hallway [MASK] the exit sign. To into the door on [MASK] left and [MASK] by [MASK] table.
+ 5  Mask Direction Tokens   Go [MASK] down the hallway toward the exit sign. Go into the door on the [MASK] and [MASK] by the table.
+ 6  Replace Direction Tokens  Go right down the hallway toward the exit sign. Go into the door on the right and forward by the table.
+ 7   Controlled Trial        Go left down the [MASK] [MASK] the exit sign. Go into the door on the left and [MASK] by the table.
+Table 5: Example of instruction modification. In the original instruction, there are five object-related tokens, and
+three direction-related tokens. In the object token ablations, we mask out the object tokens, or replace them with
+randomly sampled object tokens. The controlled trial randomly masked out five tokens from the instruction for a
+fair comparison. Likewise the direction tokens.
+
+                                   SR ↑on R2R              SR ↑on RxR-en      TC ↑on Touchdown *  Ablation   Setting
+                            EnvDrop  FAST  VLN⟳BERT  PREVALENT  CLIPViL HAMT  RCONCAT  ARC  VLNTrans
+ 1     –       Vanilla             49.77   63.90         53.30          57.13      40.21    52.52        11.78   15.19       16.11
+ 2           Mask             -36%   -38%        -21%         -20%     -48%   -32%       -34%   -36%       -6%
+     Object
+ 3              Controlled Trial     -31%   -26%         -8%         -8%     -35%   -23%       -44%   -55%      -15%
+ 4           Mask             -23%   -23%        -15%         -11%     -39%   -28%       -73%   -90%      -45%
+     Direction
+ 5              Controlled Trial     -11%   -12%         -4%         -3%     -14%    -9%       -22%   -23%       -8%
+
+Table 6: The navigation performance for indoor and outdoor agents on object-token and direction-token ablations.
+We record the validation score in the “vanilla” setting, and report the relative performance change for each ablation
+setting. For object-token ablations, the “mask” setting masks out all the object-tokens, while the controlled trial
+masks out the same amount of random tokens. The same applies to direction-token ablations.
+
+
+datasets covered in our study. As shown in Ta-    We follow each agent’s original experiment set-
+ble 4, Touchdown’s trajectory length is significantly    ting for all the experiments in this study and train
+longer than the other two indoor datasets. RxR-en      it on the original train set. Then we apply masking
+and Touchdown have longer instructions than R2R.   to object tokens in the validation set, and report
+The ratios of object and direction tokens in all three    agents’ relative performance changes under each
+datasets are comparable, involving about two times    setting. We conduct five repetitive experiments and
+more object tokens than direction tokens.             report the average scores for settings that involve
+                                          random masking or replacing.
+4.1  The Effect of Object-related Tokens
+                                                    Table 6 presents how the agents’ navigation per-
+We first create counterfactual interventions on in-   formance change when object tokens are masked
+structions by masking out the object tokens. We use    out (#2 & #3). Intuitively, not knowing what ob-
+Stanza (Qi et al., 2020a) part-of-speech (POS) tag-    jects are mentioned in the instruction lowers all
+ger to locate object-related tokens. A token will be   models’ performance. Comparing the masking ab-
+regarded as an object token if its POS tag is NOUN    lations with the controlled trial for indoor VLN, we
+or PROPN. During masking, we replace the object    notice that masking out the object tokens result in a
+token with a specified mask token [MASK]. Then   more drastic decrease in success rate than masking
+we examine the average treatment effects of the in-   out random tokens. This holds for all indoor agents,
+tervention on agents’ performance, while keeping   which verifies that indoor agents depend on object
+other variables unchanged.                         tokens more than other tokens. However, when
+   Noticeably, when we mask out the object tokens,  we compare results on the Touchdown for outdoor
+the number of visible tokens in the provided instruc-  VLN, we notice in surprise that masking out the ob-
+tion also decreases, which is a coherent factor with    ject tokens has a weaker impact on task completion
+masking object tokens and might interfere with our    rate than masking out random tokens. This sug-
+analysis. To eliminate the effect of reducing visi-    gests that current outdoor navigation agents do not
+ble tokens, we add a controlled trial in which we    fully take object tokens into consideration when
+randomly mask out the same amount of tokens. Ta-   making decisions.  This may be caused by the
+ble 5 gives an example of masking object tokens   weak visual recognition module in current outdoor
+(#2) and its corresponding controlled trial (#4).       agents. As addressed in Table 2, all three outdoor
+
+                                        5985
+
+=== PDF PAGE 6 ===
+agents rely on visual features extracted by ResNet-                        #Data   Linstr  p(toknum)
+18, which may not be powerful enough to fully            RxR-en        2.0k  135.0      1.4%
+incorporate the complicated urban environments.             Touchdown    1.0k  100.1      2.0%
+
+                                                      Table 7: Statistics of RxR-en and Touchdown data sam-
+4.2  The Effect of Direction-related Tokens        ples with numeric tokens examined for evaluation. Linstr
+                                                                        is the average instruction length, and p(toknum) denotesWe regard the following tokens as direction-related                                                          the percentage of numeric tokens per instruction.
+tokens: left, right, back, front, forward, stop. Simi-
+lar to how we ablate the object tokens, we mask out
+                                                                   SR ↑on RxR-en      TC ↑on Touchdown                                                                                 Settingdirection tokens from the instruction and examine                    CLIPViL HAMT  RCONCAT  ARC  VLNTrans
+the impact on agents’ navigation performance. Ta-       Vanilla              36.05    47.38        11.76   14.24       16.31
+ble 5 provides examples of direction tokens mask-     Mask Number        -4%    -5%       3%   -7%       -3%
+ing (#5), and its controlled trial (#7) where the       Replace Number      -3%    -6%       1%   2%      -11%                                                                                 Controlled Trial      -6%    -3%       -5%   -4%       -6%
+same amount of random tokens are masked out.
+                                                      Table 8: Navigation performance on different numeric-Table 6 shows agents’ performance under various                                                      token ablations settings.
+direction tokens ablation settings (#4 & #5).
+  For indoor agents, masking out the direction
+tokens cause a sharper drop in success rate com-   4.3  The Effect of Numeric Tokens
+pared to masking out random tokens, which means                                  We conduct ablation studies on agents’ understand-
+the indoor navigation agents do consider the di-                                                    ing of numeric tokens on RxR-en for indoor agents
+rection tokens during navigation. We also notice                                            and Touchdown for outdoor agents. We select a
+that agents are more sensitive to the loss of di-                                                    subset of examples whose instructions contain nu-
+rection guidance on RxR-en than on R2R. Such                                               meric tokens,3 and construct ablated instructions
+difference may be caused by the way these two                                            on top. Table 7 provides the statistics of the instruc-
+datasets are designed.  R2R’s ground-truth tra-                                                       tions for numeric ablations. Table 8 lists out the
+jectories are the shortest path from start to goal.                                                           results. The VLN-HAMT on RxR-en and VLN-
+Previous studies have noted that R2R has the                                               Transformer on Touchdown have comparable per-
+danger of exposing structural bias and leaking                                              formance when masking numeric tokens over ran-
+hidden shortcuts (Thomason et al., 2019), and that                                    dom tokens, and have worse performance when
+such design encourages goal-seeking over path                                                     replacing numeric tokens. This suggests that these
+adherence (Jain et al., 2019b). RxR is crafted to                                           two Transformer-based agents have the ability to
+include longer and more variable paths to avoid                                               conduct numerical reasoning to some extent. In
+such biases. Naturally, agents on RxR-en would                                                          contrast, other non-Transformer-based agents have
+pay more attention to direction tokens since they                                                         less salient performance drops when replacing nu-
+may approach their goal indirectly.                                                meric tokens. For RCONCAT and ARC, replacing
+  For outdoor navigation agents, masking out di-   numeric tokens even leads to higher task comple-
+rection tokens leads to a drastic decline in task com-    tion rates. This implies the insufficient counting
+pletion rate, compared to random masking. This    ability of the non-Transformer-based agents.
+indicates that current outdoor navigation agents
+heavily rely on the direction tokens when making   5  Analysis on Visual Environment
+decisions. Given the complicated visual environ-
+                                                This section investigates what the agent perceivesments and instructions in the outdoor navigation
+                                                         in the visual environment. We set an eye on inspect-task, current agents fail to fully use the instructions,
+                                                  ing the agent’s understanding of the surroundingespecially ignoring the rich object-related infor-
+                                                     objects and direction-related information.mation. The ARC model shows the most salient
+performance decline of 90% to the instructions ab-
+                                                    5.1  Effect of Objects in the Environmentlated by direction token masking. Aside from the
+classifier that predicts the next direction to take,    Built upon the Matterport dataset (Chang et al.,
+ARC also uses a stop indicator to decide whether    2017), R2R and RxR obtain detailed object in-
+to stop at each step or not. Its unique mechanism    stance annotations and serve as an excellent source
+for detecting stop signals might explain why it is                                                3We consider instructions that contain cardinal numbers
+more sensitive to the existence of direction tokens.   from 1 to 20, and ordinal numbers from 1st to 20th.
+
+                                        5986
+
+=== PDF PAGE 7 ===
+                                                                                    SR ↑on R2R         SR ↑on RxR-en                                                                             *  Ablation   Setting
+                                                                                               EnvDrop  FAST   Recur  PVLT  CLIPViL HAMT
+                                                                             1   -           Vanilla     49.77   63.90   53.30   57.13      40.21    52.52
+                                                                             2        MAV      -34%   -67%   -37%   -47%     -30%   -43%
+                                                                             3   Object   MFG       -3%   -6%   -1%   -8%      -2%    -2%
+                                                                             4         CT         -5%   -10%   -6%   -9%      -3%    -5%
+                                                                             5   Direction   Flip       -41%   -30%   -48%   -59%     -36%   -47%
+                                                       Table 10: Indoor navigation performance on various ab-
+    (a) Foreground Objects        (b) All Visible Objects        lation settings on the visual environment. We compare
+ Figure 1: Accessible objects within different ranges.     three masking settings on the visual objects: mask all
+                                                                visible objects (MAV), mask foreground objects (MFG),
+                                                and the controlled trial (CT). We horizontally flip the  Setting                          R2R  RxR-en
+                                                      viewpoint to ablate direction-related visual information.
+  All Visible Objects (except wall/floor/ceiling)   35.1       35.5
+  Foreground Objects                             3.2         3.9     Recur: VLN ⟳BERT. PVLT: PREVALENT.
+  Objects Mentioned in Instruction                5.3       11.8
+
+Table 9: The average number of visual objects in the         Dataset  Visual Feature   Vanilla MAV MFG  CT
+panorama at each viewpoint under different settings.                    ResNet-152       49.77  -34%   -3%  -5%
+                                                     R2R
+                                                                         CLIP-ViT         56.36  -34%   -2%  -5%
+                                                                             ResNet-152       35.27  -42%   -1%  -3%
+                                                               RxR-en
+for our visual object studies. Touchdown is based                 CLIP-ViT         40.21  -30%   -2%  -3%
+on Google Street View and does not acquire object-   Table 11: EnvDrop’s navigation performance on R2R
+related annotations. Thus, we conduct experiments    and RxR-en with different visual object ablation settings
+on the indoor VLN environment.                 when using different visual features. MAV: mask all
+  We designed several ablation settings for visual    visible objects. MFG: mask foreground objects. CT:
+                                                           controlled trial.objects.  The “mask all visible” setting applies
+masking to all the visible visual objects in the
+environment (except for wall/ceiling/floor). The
+“mask foreground” setting ablates the visual objects    out all the visible objects has a more salient impact
+within 3 meters of the camera viewpoint, which   on the success rate for all the listed indoor agents.
+we refer to as the foreground area. The region  We study the influence of masking visual objects
+beyond 3 meters from the camera viewpoint is re-    at different depths by comparing the “mask fore-
+garded as the background area. Figure 1 shows   ground” setting with the controlled trial (#3 vs. #4).
+an example for comparison. We choose 3 meters   Noted here that the number of foreground objects is
+as the boundary because the bounding box anno-    limited. Thus only a few objects are being masked
+tations for objects within 3 meters are provided in    out in both settings. Still, all listed indoor agents
+REVERIE (Qi et al., 2020c). We denote the num-   display worse performance on the controlled trial.
+ber of visual objects within 3 meters as k, and add   Such results state that masking out further visual in-
+a controlled trial that masks out k random visual    stances in the background, even only a tiny amount,
+objects from all the visible objects at the current    will hurt navigation performance. This indicates
+viewpoint, regardless of their depth.                   that the tested agents consider all the objects in the
+                                                     visual environment during navigation, instead of   Table 9 compares the number of visual objects
+                                               merely staring at the closely surrounding objects.under various ablation settings. We mask out the
+objects in each view by filling the corresponding      Notice that the agent designs, the dataset do-
+bounding boxes with the mean color of the sur-   mains, and the visual feature extractors are three
+rounding. Then we follow original experiment set-   coherent factors that may result in performance dif-
+tings and use ResNet-152 (He et al., 2016) CNN    ferences. We further justify this by adding another
+to extract image features for R2R agents, and use    set of ablation studies, where we apply ImageNet
+CLIP-ViT-B/32 (Radford et al., 2021) to extract   ResNet-152 and CLIP-ViT to extract visual fea-
+visual features for RxR-en agents.                    tures for R2R and RxR-en, and evaluate with the
+   Results for visual object ablations are shown in   same agent model EnvDrop. Results are shown
+Table 10. We examine the influence of masking out    in Table 11. The trend of different masking set-
+different quantities of visual objects by comparing    tings aligns with our previous findings in Table 10,
+the “mask all visible” setting with the controlled   and verifies that the background information is also
+trial (#2 vs. #4). It comes naturally that masking    crucial in the visual features.
+
+                                        5987
+
+=== PDF PAGE 8 ===
+5.2  Effect of Directions in the Environment
+In this ablation setting, we randomly flip some of
+the viewpoints horizontally. The objects’ relative
+positions at the flipped viewpoints will be reversed.
+Presumably, suppose the agent can follow the in-
+struction and find the corresponding direction to                                                                                            (a) R2R
+approach. In that case, the flipped viewpoints will
+misguide the agent in the opposite direction and
+lower the navigation success rate. As shown in Ta-
+ble 10, flipping the viewpoints leads to drastic de-
+clines in the success rate for all listed indoor agents.
+This verifies our previous finding that indoor agents
+can understand directions in the instruction. We
+notice that FAST is the only listed model that is                                                                                       (b) RxR-en
+less affected by the direction flipping ablation than
+by the object masking ablation (#2 vs. #5). This
+suggests that FAST’s asynchronous backtracking
+search is able to adjust and recover from errors that
+occur when choosing directions to some extent.
+
+6  Analysis on Vision-Language
+   Alignment                                                                  (b) Touchdown
+                                                     Figure 2: Performance gap between masking and re-
+This section examines the agents’ ability to learn    placing object tokens from instructions. If ∆> 0, then
+vision-language alignment when executing the nav-    replacing object tokens leads to worse navigation per-
+                                                    formance, which suggests that the agent has a betterigation. We focus on whether the agents can un-
+                                                      understanding of the object tokens.
+derstand the objects mentioned in the instruction
+and align them to the correct visual instance in the
+                                                                          SR ↑on R2R         SR ↑on RxR-en                                                                                  Settingenvironment, which is crucial to completing this                    EnvDrop  FAST   Recur  PVLT  CLIPViL HAMT
+multimodal task. To verify the existence of vision-       Vanilla             49.77   63.90   53.30   57.13      40.21    52.52
+language alignment, we add perturbations to the      Dynamic Mask     -10%   -24%   -5%   -13%     -19%   -23%
+visual and textual input, and check how they affect       Controlled Trial      -8%   -19%   -3%   -11%     -16%   -20%
+agents’ performance.                                       Mask Tokens       -36%   -38%   -21%   -20%     -48%   -32%
+                                                      Table 12: Indoor navigation performance when dynam-
+6.1  Instruction Side Perturbation                   ically masking out the visual objects mentioned in the
+                                                             instructions. Recur: VLN ⟳BERT. PVLT: PREVA-We add noise to the textual input by randomly re-                                           LENT.
+placing object tokens with random object tokens
+in the instruction. Table 5 shows an example (#3).
+This experiment aims to verify whether the agent    the Transformer-based models are often pre-trained
+can line the object tokens up to certain visual tar-   on multimodal resources, thus displaying a slightly
+gets. The assumption is that if the agent can cor-   more vital ability to form alignment.
+rectly align objects mentioned in the instruction
+                                                    6.2  Environment Side Perturbationto some targets in the visual environment, then
+replacing the object token will confuse and mis-  We add noise to the visual input by conducting the
+guide the agent. Examining Figure 2, we notice    following ablations. In the “dynamic mask” set-
+that for all three datasets, the Transformer-based    ting, we dynamically mask out the visual object
+models have worse performance when replacing    regions mentioned in the instruction. We randomly
+the object tokens, compared to simple masking.   mask out the same amount of visual objects at each
+This indicates that Transformer-based models have   viewpoint in its controlled trial. We also compare
+a better cross-modal understanding of objects, and   with the “mask tokens” setting, where we mask
+can align object tokens to the visual targets. Such    out all the object tokens in the instruction, while
+superior performance may result from the fact that    leaving the visual environment untouched. This
+
+                                        5988
+
+=== PDF PAGE 9 ===
+experiment aims to determine if the agent aligns   were also sponsored by the U.S. Army Research
+the textual object tokens to the correct visual target.    Office, and this work was accomplished under Con-
+The assumption is that if the agent builds proper    tract Number W911NF19-D-0001 for the Institute
+vision-language alignment and we mask out visual    for Collaborative Biotechnologies. The views and
+objects mentioned in the instruction, then the agent    conclusions contained in this research are those of
+may get confused since it can not find the counter-   the authors and should not be interpreted as repre-
+part in the visual environment.                       senting the sponsors or the U.S. government’s offi-
+   Results are shown in Table 12. The success rate    cial policy, expressed or inferred. Regardless of any
+witnesses a decline when dynamically masking out    copyright notation herein, the United States gov-
+the visual objects. However, we notice in surprise   ernment is authorized to reproduce and distribute
+that when all visual objects mentioned in the in-    reprints for government purposes.
+struction are masked out, the agents can still reach
+a success rate higher than 44% on R2R and higher
+                                          Referencesthan 32% on RxR-en. This contradicts the previous
+assumption and casts doubt on the reliability of the   Anne H. Anderson, Miles Bader, Ellen Gurman Bard,
+navigation agents’ vision-language alignment.          Elizabeth Boyle, Gwyneth Doherty, Simon Garrod,
+                                                     Stephen D. Isard, Jacqueline C. Kowtko, Jan McAl-  Comparing “dynamic mask” with the “mask                                                                                lister, Jim Miller, Catherine Sotillo, Henry S. Thomp-
+tokens” setting, we notice that the visual ob-      son, and Regina Weinert. 1991. The hcrc map task
+ject ablation has much smaller impact on nav-      corpus. Language and Speech, 34:351 – 366.
+igation performance than the text object abla-                                                        Peter Anderson, Qi Wu, Damien Teney, Jake Bruce,
+tions, which suggests that current models have                                             Mark Johnson, Niko Sünderhauf,  Ian D. Reid,
+unbalanced attention on vision and text for the      Stephen  Gould,  and  Anton  van  den  Hengel.
+VLN task. Recent studies on pre-trained vision-      2018.  Vision-and-language navigation:  Interpret-
+                                                           ing visually-grounded navigation instructions in realand-language models (Frank et al., 2021) reveal
+                                                        environments. In 2018 IEEE Conference on Com-
+that such asymmetry is also witnessed in other mul-                                                          puter Vision and Pattern Recognition, CVPR 2018,
+timodal tasks. Future studies may follow the line       Salt Lake City, UT, USA, June 18-22, 2018, pages
+of constructing a more balanced VLN agent.           3674–3683. IEEE Computer Society.
+
+                                                    Jacob Andreas and Dan Klein. 2015. Alignment-based7  Conclusion                                                        compositional semantics for instruction following.
+                                                          In Proceedings of the 2015 Conference on Empiri-In this paper, we inspect how the navigation agents                                                             cal Methods in Natural Language Processing, pages
+understand the multimodal information by conduct-     1165–1174, Lisbon, Portugal. Association for Com-
+ing ablation diagnostics input data. We find out       putational Linguistics.
+that indoor navigation agents refer to both object                                                     Giuliano Antoniol, Roldano Cattoni, and Mauro Cet-
+tokens and direction tokens in the instruction when                                                                   tolo. 2011. Robust speech understanding for robot
+making decisions. In contrast, outdoor navigation       telecontrol.
+agents heavily rely on direction tokens and poorly
+                                              Yoav Artzi and Luke Zettlemoyer. 2013. Weakly su-
+understand the object tokens. When it comes to                                                         pervised learning of semantic parsers for mapping
+vision-and-language alignments, we witness unbal-       instructions to actions. Transactions of the Associa-
+anced attention on text and vision, and doubt the       tion for Computational Linguistics, 1:49–62.
+reliability of cross-modal alignments. We hope this                                                  Yonatan Bisk, Deniz Yuret, and Daniel Marcu. 2016a.
+work encourages more investigation and research      Natural language communication with robots.  In
+into understanding neural VLN agents’ black-box     NAACL.
+and improves the task setups and navigation agents’
+                                                  Yonatan Bisk, Deniz Yuret, and Daniel Marcu. 2016b.
+capacity for future studies.                                                         Natural language communication with robots.  In
+                                                      Proceedings of the 2016 Conference of the North
+Acknowledgement                               American Chapter of the Association for Computa-
+                                                              tional Linguistics: Human Language Technologies,
+We would like to show our gratitude to the anony-      pages 751–761, San Diego, California. Association
+mous reviewers for their thought-provoking com-       for Computational Linguistics.
+ments. We would like to thank the Robert N. Noyce                                                    S.R.K. Branavan, Harr Chen, Luke Zettlemoyer, and
+Trust for their generous gift to the University of Cal-     Regina Barzilay. 2009. Reinforcement learning for
+ifornia via the Noyce Initiative. The UCSB authors     mapping instructions to actions. In Proceedings of
+
+                                        5989
+
+=== PDF PAGE 10 ===
+   the Joint Conference of the 47th Annual Meeting      and Trevor Darrell. 2018.  Speaker-follower mod-
+   of the ACL and the 4th International Joint Confer-       els for vision-and-language navigation. In Advances
+  ence on Natural Language Processing of the AFNLP,       in Neural Information Processing Systems 31: An-
+  pages 82–90, Suntec, Singapore. Association for      nual Conference on Neural Information Processing
+  Computational Linguistics.                            Systems 2018, NeurIPS 2018, December 3-8, 2018,
+                                                        Montréal, Canada, pages 3318–3329.
+S.R.K. Branavan, Luke Zettlemoyer, and Regina Barzi-
+   lay. 2010. Reading between the lines: Learning to    Sergio Guadarrama, Lorenzo Riano, David Hamilton
+  map high-level instructions to commands. In Pro-      Golland, Daniel Goehring, Yangqing Jia, Dan Klein,
+  ceedings of the 48th Annual Meeting of the Asso-       P. Abbeel, and Trevor Darrell. 2013.  Grounding
+   ciation for Computational Linguistics, pages 1268–       spatial relations for human-robot interaction. 2013
+  1277, Uppsala, Sweden. Association for Computa-     IEEE/RSJ International Conference on Intelligent
+   tional Linguistics.                                   Robots and Systems, pages 1640–1647.
+                                                  Weituo Hao, Chunyuan Li, Xiujun Li, Lawrence Carin,Angel X. Chang, Angela Dai, Thomas A. Funkhouser,
+                                                    and Jianfeng Gao. 2020. Towards learning a generic  Maciej Halber, Matthias Nießner, Manolis Savva,
+                                                        agent for vision-and-language navigation via pre-  Shuran Song, Andy Zeng, and Yinda Zhang. 2017.
+                                                                 training. In 2020 IEEE/CVF Conference on Com-   Matterport3d: Learning from RGB-D data in indoor
+                                                         puter Vision and Pattern Recognition, CVPR 2020,   environments. In 2017 International Conference on
+                                                                 Seattle, WA, USA, June 13-19, 2020, pages 13134–  3D Vision, 3DV 2017, Qingdao, China, October 10-
+                                                      13143. IEEE.  12, 2017, pages 667–676. IEEE Computer Society.
+                                               Kaiming He, Xiangyu Zhang, Shaoqing Ren, and JianDavid L. Chen and Raymond J. Mooney. 2011. Learn-
+                                                        Sun. 2016. Deep residual learning for image recogni-   ing to interpret natural language navigation instruc-
+                                                                    tion. In 2016 IEEE Conference on Computer Vision   tions from observations. In AAAI 2011.
+                                                and Pattern Recognition, CVPR 2016, Las Vegas,
+                                                    NV, USA, June 27-30, 2016, pages 770–778. IEEEHoward Chen, Alane Suhr, Dipendra Misra, Noah
+                                                 Computer Society.   Snavely, and Yoav Artzi. 2019. TOUCHDOWN:
+   natural language navigation and spatial reasoning                                                        Lisa Anne Hendricks, Zeynep Akata, Marcus Rohrbach,
+   in visual street environments. In IEEE Conference                                                                  Jeff Donahue, Bernt Schiele, and Trevor Darrell.
+  on Computer Vision and Pattern Recognition, CVPR                                                       2016. Generating visual explanations. In Computer
+  2019, Long Beach, CA, USA, June 16-20, 2019, pages                                                          Vision - ECCV 2016 - 14th European Conference,
+  12538–12547. Computer Vision Foundation / IEEE.                                                   Amsterdam, The Netherlands, October 11-14, 2016,
+                                                         Proceedings, Part IV, volume 9908 of Lecture NotesShizhe Chen, Pierre-Louis Guhur, Cordelia Schmid,
+                                                                in Computer Science, pages 3–19. Springer.  and Ivan Laptev. 2021. History aware multimodal
+   transformer for vision-and-language navigation. In                                                Yicong Hong, Cristian Rodriguez Opazo, Yuankai Qi,
+  NeurIPS.                                                Qi Wu, and Stephen Gould. 2020a. Language and
+                                                              visual entity relationship graph for agent navigation.
+Soham Dan, Michael Zhou, and Dan Roth. 2021. Gen-                                                          In Advances in Neural Information Processing Sys-
+   eralization in instruction following systems. In Pro-                                                      tems 33: Annual Conference on Neural Information
+  ceedings of the 2021 Conference of the North Amer-                                                        Processing Systems 2020, NeurIPS 2020, December
+  ican Chapter of the Association for Computational                                                           6-12, 2020, virtual.
+   Linguistics: Human Language Technologies, pages
+  976–981, Online. Association for Computational Lin-   Yicong Hong, Qi Wu, Yuankai Qi, Cristian Rodriguez
+   guistics.                                          Opazo, and Stephen Gould. 2020b. A recurrent
+                                                        vision-and-language BERT for navigation. CoRR,
+Patrick Fernandes, Kayo Yin, Graham Neubig, and An-                                                        abs/2011.13922.
+   dré F. T. Martins. 2021. Measuring and increasing
+   context usage in context-aware machine translation.   Haoshuo Huang, Vihan Jain, Harsh Mehta, Alexander
+   In Proceedings of the 59th Annual Meeting of the      Ku, Gabriel Magalhães, Jason Baldridge, and Eugene
+  Association for Computational Linguistics and the        Ie. 2019.  Transferable representation learning in
+  11th International Joint Conference on Natural Lan-      vision-and-language navigation. In 2019 IEEE/CVF
+  guage Processing (Volume 1: Long Papers), pages       International Conference on Computer Vision, ICCV
+  6467–6478, Online. Association for Computational      2019, Seoul, Korea (South), October 27 - November
+   Linguistics.                                                  2, 2019, pages 7403–7412. IEEE.
+
+Stella Frank, Emanuele Bugliarello, and Desmond    Vihan Jain, Gabriel Magalhães, Alexander Ku, Ashish
+   Elliott. 2021.  Vision-and-language or vision-for-      Vaswani, Eugene Ie, and Jason Baldridge. 2019a.
+  language? on cross-modal influence in multimodal      Stay on the path: Instruction fidelity in vision-and-
+   transformers. In EMNLP.                             language navigation.  In Proceedings of the 57th
+                                                       Conference of the Association for Computational Lin-
+Daniel Fried, Ronghang Hu, Volkan Cirik, Anna        guistics, ACL 2019, Florence, Italy, July 28- August
+  Rohrbach, Jacob Andreas, Louis-Philippe Morency,       2, 2019, Volume 1: Long Papers, pages 1862–1872.
+  Taylor Berg-Kirkpatrick, Kate Saenko, Dan Klein,      Association for Computational Linguistics.
+
+                                        5990
+
+=== PDF PAGE 11 ===
+Vihan Jain, Gabriel Magalhães, Alexander Ku, Ashish    Chih-Yao Ma, Jiasen Lu, Zuxuan Wu, Ghassan AlRegib,
+  Vaswani, Eugene Ie, and Jason Baldridge. 2019b.      Zsolt Kira, Richard Socher, and Caiming Xiong.
+  Stay on the path: Instruction fidelity in vision-and-      2019a. Self-monitoring navigation agent via auxil-
+  language navigation. ArXiv, abs/1905.12255.              iary progress estimation. In 7th International Confer-
+                                                      ence on Learning Representations, ICLR 2019, New
+Liyiming Ke, Xiujun Li, Yonatan Bisk, Ari Holtzman,      Orleans, LA, USA, May 6-9, 2019. OpenReview.net.
+  Zhe Gan, Jingjing Liu, Jianfeng Gao, Yejin Choi, and
+   Siddhartha S. Srinivasa. 2019. Tactical rewind: Self-   Chih-Yao Ma, Zuxuan Wu, Ghassan AlRegib, Caiming
+   correction via backtracking in vision-and-language      Xiong, and Zsolt Kira. 2019b. The regretful agent:
+   navigation. In IEEE Conference on Computer Vision       Heuristic-aided navigation through progress estima-
+  and Pattern Recognition, CVPR 2019, Long Beach,       tion. In IEEE Conference on Computer Vision and
+  CA, USA, June 16-20, 2019, pages 6741–6749. Com-      Pattern Recognition, CVPR 2019, Long Beach, CA,
+   puter Vision Foundation / IEEE.                     USA, June 16-20, 2019, pages 6732–6740. Computer
+                                                         Vision Foundation / IEEE.
+Volker Klingspor, John Demiris, and Michael Kaiser.
+  1997.  Human-robot-communication and machine                                                    Cynthia Matuszek, Liefeng Bo, Luke Zettlemoyer, and
+   learning. APPLIED ARTIFICIAL INTELLIGENCE                                                          Dieter Fox. 2014. Learning from unscripted deictic
+  JOURNAL, 11(11):719–746.                                                           gesture and language for human-robot interactions.
+                                                           In AAAI.Thomas Kollar, Jayant Krishnamurthy, and Grant P.
+   Strimel. 2013. Toward interactive grounded language                                                 Harsh Mehta, Yoav Artzi, Jason Baldridge, Eugene Ie,
+   acqusition. In Robotics: Science and Systems.                                                  and Piotr Mirowski. 2020. Retouchdown: Adding
+                                                  touchdown to streetlearn as a shareable resource forAlexander Ku, Peter Anderson, Roma Patel, Eugene
+                                                      language grounding tasks in street view.  CoRR,   Ie, and Jason Baldridge. 2020a. Room-across-room:
+                                                        abs/2001.03671.   Multilingual vision-and-language navigation with
+  dense spatiotemporal grounding. In Proceedings of
+                                             Hongyuan Mei, Mohit Bansal, and Matthew R. Walter.   the 2020 Conference on Empirical Methods in Nat-
+                                                      2016.  Listen, attend, and walk: Neural mapping   ural Language Processing, EMNLP 2020, Online,
+                                                          of navigational instructions to action sequences. In  November 16-20, 2020, pages 4392–4412. Associa-
+                                                   AAAI.   tion for Computational Linguistics.
+                                                            Piotr Mirowski, Matthew Koichi Grimes, MateuszAlexander Ku, Peter Anderson, Roma Patel, Eugene Ie,
+                                                     Malinowski, Karl Moritz Hermann, Keith Ander-  and Jason Baldridge. 2020b. Room-Across-Room:
+                                                           son, Denis Teplyashin, Karen Simonyan, Koray   Multilingual vision-and-language navigation with
+                                                     Kavukcuoglu, Andrew Zisserman, and Raia Hadsell.  dense spatiotemporal grounding. In Conference on
+                                                      2018. Learning to navigate in cities without a map.  Empirical Methods for Natural Language Processing
+                                                          In Advances in Neural Information Processing Sys-  (EMNLP).
+                                                      tems 31: Annual Conference on Neural Information
+Qing Li, Jianlong Fu, Dongfei Yu, Tao Mei, and Jiebo      Processing Systems 2018, NeurIPS 2018, December
+  Luo. 2018. Tell-and-answer: Towards explainable       3-8, 2018, Montréal, Canada, pages 2424–2435.
+   visual question answering using attributes and cap-
+   tions.  In Proceedings of the 2018 Conference on    Dipendra Misra, Andrew Bennett, Valts Blukis, Eyvind
+  Empirical Methods in Natural Language Processing,      Niklasson, Max Shatkhin, and Yoav Artzi. 2018.
+   Brussels, Belgium, October 31 - November 4, 2018,     Mapping instructions to actions in 3d environments
+  pages 1338–1346. Association for Computational      with visual goal prediction. In EMNLP.
+   Linguistics.
+                                                    Dipendra Kumar Misra, John Langford, and Yoav Artzi.
+Xiujun Li, Chunyuan Li, Qiaolin Xia, Yonatan Bisk,      2017. Mapping instructions and visual observations
+   Asli Celikyilmaz, Jianfeng Gao, Noah A. Smith, and       to actions with reinforcement learning. In EMNLP.
+  Yejin Choi. 2019. Robust navigation with language
+   pretraining and stochastic sampling. In Proceedings   Khanh Nguyen, Debadeepta Dey, Chris Brockett, and
+   of the 2019 Conference on Empirical Methods in Nat-       Bill Dolan. 2019.  Vision-based navigation with
+   ural Language Processing and the 9th International      language-based assistance via imitation learning with
+   Joint Conference on Natural Language Processing,       indirect intervention. In IEEE Conference on Com-
+  EMNLP-IJCNLP 2019, Hong Kong, China, Novem-      puter Vision and Pattern Recognition, CVPR 2019,
+  ber 3-7, 2019, pages 1494–1499. Association for     Long Beach, CA, USA, June 16-20, 2019, pages
+  Computational Linguistics.                          12527–12537. Computer Vision Foundation / IEEE.
+
+Jiasen Lu, Jianwei Yang, Dhruv Batra, and Devi Parikh.   Khanh Nguyen and Hal Daumé  III. 2019.   Help,
+  2016. Hierarchical question-image co-attention for      anna! visual navigation with natural multimodal as-
+   visual question answering. In Advances in Neural       sistance via retrospective curiosity-encouraging imi-
+  Information Processing Systems 29: Annual Con-       tation learning. In Proceedings of the 2019 Confer-
+   ference on Neural Information Processing Systems      ence on Empirical Methods in Natural Language Pro-
+  2016, December 5-10, 2016, Barcelona, Spain, pages       cessing and the 9th International Joint Conference
+  289–297.                                       on Natural Language Processing, EMNLP-IJCNLP
+
+                                        5991
+
+=== PDF PAGE 12 ===
+  2019, Hong Kong, China, November 3-7, 2019, pages   Luc L. Steels and Paul Vogt. 1997. Grounding adaptive
+  684–695. Association for Computational Linguistics.      language games in robotic agents.
+
+Joe O’Connor and Jacob Andreas. 2021. What context    Christian Szegedy, Sergey Ioffe, Vincent Vanhoucke,
+   features can transformer language models use?  In      and Alexander Amir Alemi. 2017.  Inception-v4,
+  ACL/IJCNLP.                                            inception-resnet and the impact of residual connec-
+                                                                tions on learning. In AAAI.
+Dong Huk Park, Lisa Anne Hendricks, Zeynep Akata,
+  Anna Rohrbach, Bernt Schiele, Trevor Darrell, and   Hao Tan and Mohit Bansal. 2018. Source-target infer-
+  Marcus Rohrbach. 2018. Multimodal explanations:      ence models for spatial instruction understanding. In
+   Justifying decisions and pointing to the evidence. In      AAAI.
+  2018 IEEE Conference on Computer Vision and Pat-
+   tern Recognition, CVPR 2018, Salt Lake City, UT,   Hao Tan, Licheng Yu, and Mohit Bansal. 2019. Learn-
+  USA, June 18-22, 2018, pages 8779–8788. IEEE      ing to navigate unseen environments: Back transla-
+  Computer Society.                                         tion with environmental dropout. In Proceedings of
+                                                           the 2019 Conference of the North American Chap-
+Peng Qi, Yuhao Zhang, Yuhui Zhang, Jason Bolton, and        ter of the Association for Computational Linguistics:
+   Christopher D. Manning. 2020a. Stanza: A python     Human Language Technologies, NAACL-HLT 2019,
+   natural language processing toolkit for many human      Minneapolis, MN, USA, June 2-7, 2019, Volume 1
+   languages. In Proceedings of the 58th Annual Meet-     (Long and Short Papers), pages 2610–2621. Associa-
+   ing of the Association for Computational Linguistics:       tion for Computational Linguistics.
+  System Demonstrations, ACL 2020, Online, July 5-10,
+  2020, pages 101–108. Association for Computational    Jesse Thomason, Daniel Gordon, and Yonatan Bisk.
+   Linguistics.                                          2019. Shifting the baseline: Single modality perfor-
+                                               mance on visual navigation & qa. In NAACL.
+Yuankai Qi, Zizheng Pan, Shengping Zhang, Anton
+  van den Hengel, and Qi Wu. 2020b.  Object-and-  Adam Vogel and Daniel Jurafsky. 2010. Learning to
+   action aware model for visual language navigation.      follow navigational directions. In Proceedings of the
+   In Computer Vision - ECCV 2020 - 16th European      48th Annual Meeting of the Association for Computa-
+  Conference, Glasgow, UK, August 23-28, 2020, Pro-       tional Linguistics, pages 806–814, Uppsala, Sweden.
+   ceedings, Part X, volume 12355 of Lecture Notes in      Association for Computational Linguistics.
+  Computer Science, pages 303–317. Springer.                                      Hu Wang, Qi Wu, and Chunhua Shen. 2020a.  Soft
+Yuankai Qi, Qi Wu,  Peter Anderson, Xin Wang,      expert reward learning for vision-and-language nav-
+  William Yang Wang, Chunhua Shen, and Anton       igation.  In Computer Vision - ECCV 2020 - 16th
+  van den Hengel. 2020c. REVERIE: remote embod-     European Conference, Glasgow, UK, August 23-28,
+   ied visual referring expression in real indoor environ-      2020, Proceedings, Part IX, volume 12354 of Lecture
+   ments. In 2020 IEEE/CVF Conference on Computer      Notes in Computer Science, pages 126–141. Springer.
+  Vision and Pattern Recognition, CVPR 2020, Seat-                                                Xin Wang, Qiuyuan Huang, Asli Celikyilmaz, Jianfeng   tle, WA, USA, June 13-19, 2020, pages 9979–9988.                                                     Gao, Dinghan Shen, Yuan-Fang Wang, William Yang  IEEE.                                                 Wang, and Lei Zhang. 2019. Reinforced cross-modal
+Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya      matching and self-supervised imitation learning for
+  Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sas-      vision-language navigation. In IEEE Conference on
+   try, Amanda Askell, Pamela Mishkin, Jack Clark,     Computer Vision and Pattern Recognition, CVPR
+  Gretchen Krueger, and Ilya Sutskever. 2021. Learn-      2019, Long Beach, CA, USA, June 16-20, 2019, pages
+   ing transferable visual models from natural language      6629–6638. Computer Vision Foundation / IEEE.
+   supervision. In ICML.                                              Xin Wang, Wenhan Xiong, Hongmin Wang, and
+Deb K. Roy. 2002. Learning visually grounded words      William Yang Wang. 2018. Look before you leap:
+  and syntax for a scene description task.  Comput.      Bridging model-free and model-based reinforcement
+  Speech Lang., 16:353–385.                               learning for planned-ahead vision-and-language nav-
+                                                                igation.  In Computer Vision - ECCV 2018 - 15th
+Ramprasaath R. Selvaraju, Michael Cogswell, Ab-     European Conference, Munich, Germany, September
+  hishek Das, Ramakrishna Vedantam, Devi Parikh,      8-14, 2018, Proceedings, Part XVI, volume 11220
+  and Dhruv Batra. 2017. Grad-cam: Visual expla-      of Lecture Notes in Computer Science, pages 38–55.
+   nations from deep networks via gradient-based lo-       Springer.
+   calization.  In IEEE International Conference on
+  Computer Vision, ICCV 2017, Venice, Italy, Octo-   Xin Eric Wang, Vihan Jain, Eugene Ie, William Yang
+  ber 22-29, 2017, pages 618–626. IEEE Computer     Wang, Zornitsa Kozareva, and Sujith Ravi. 2020b.
+   Society.                                              Environment-agnostic multitask learning for natural
+                                                       language grounded navigation. In Computer Vision -
+Sheng Shen, Liunian Harold Li, Hao Tan, Mohit Bansal,    ECCV 2020 - 16th European Conference, Glasgow,
+  Anna Rohrbach, Kai-Wei Chang, Zhewei Yao, and     UK, August 23-28, 2020, Proceedings, Part XXIV,
+  Kurt Keutzer. 2021. How much can clip benefit      volume 12369 of Lecture Notes in Computer Science,
+  vision-and-language tasks? ArXiv, abs/2107.06383.      pages 413–430. Springer.
+
+                                        5992
+
+=== PDF PAGE 13 ===
+Terry Winograd. 1971. Procedures as a representation
+   for data in a computer program for understanding
+   natural language.
+
+Jialin Wu and Raymond Mooney. 2019. Faithful mul-
+  timodal explanation for visual question answering.
+   In Proceedings of the 2019 ACL Workshop Black-
+  boxNLP: Analyzing and Interpreting Neural Net-
+  works for NLP, pages 103–112, Florence, Italy. As-
+   sociation for Computational Linguistics.
+
+Qiaolin Xia, Xiujun Li, Chunyuan Li, Yonatan Bisk,
+  Zhifang Sui, Jianfeng Gao, Yejin Choi, and Noah A.
+  Smith. 2020.  Multi-view learning for vision-and-
+  language navigation. CoRR, abs/2003.00857.
+
+Jiannan Xiang, Xin Wang, and William Yang Wang.
+  2020.  Learning to stop: A simple yet effective
+  approach to urban vision-language navigation.  In
+  Proceedings of the 2020 Conference on Empirical
+  Methods in Natural Language Processing: Findings,
+  EMNLP 2020, Online Event, 16-20 November 2020,
+  pages 699–707. Association for Computational Lin-
+   guistics.
+
+Fengda Zhu, Yi Zhu, Xiaojun Chang, and Xiaodan
+  Liang. 2020a.   Vision-language navigation with
+   self-supervised auxiliary reasoning tasks. In 2020
+  IEEE/CVF Conference on Computer Vision and Pat-
+   tern Recognition, CVPR 2020, Seattle, WA, USA,
+  June 13-19, 2020, pages 10009–10019. IEEE.
+
+Wanrong Zhu, Xin Wang,  Tsu-Jui Fu, An Yan,
+  Pradyumna Narayana, Kazoo Sone, Sugato Basu, and
+  William Yang Wang. 2020b. Multimodal text style
+   transfer for outdoor vision-and-language navigation.
+  CoRR, abs/2007.00229.
+
+Yi Zhu, Fengda Zhu, Zhaohuan Zhan, Bingqian Lin,
+   Jianbin Jiao, Xiaojun Chang, and Xiaodan Liang.
+  2020c. Vision-dialog navigation by exploring cross-
+  modal memory. In 2020 IEEE/CVF Conference on
+  Computer Vision and Pattern Recognition, CVPR
+  2020, Seattle, WA, USA, June 13-19, 2020, pages
+  10727–10736. IEEE.
+
+
+
+
+
+                                        5993

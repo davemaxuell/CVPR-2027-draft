@@ -1,0 +1,1177 @@
+Seek Before You Move: Evidence Seeking for Progress Grounding in Vision-Language Navigation
+Report GitHub Issue
+×
+Title:
+Content selection saved. Describe the issue below:
+Description:
+Submit without GitHub
+Submit in GitHub
+arXiv is now an independent nonprofit!
+Learn more
+×
+Back to arXiv
+Why HTML?
+Report Issue
+Back to Abstract
+Download PDF
+Abstract
+1 Introduction
+2 Related Works
+2.1 VLM-based Vision-Language Navigation
+2.2 Progress Reasoning and Grounding in Embodied Navigation
+2.3 Reinforcement Learning for Vision-Language Navigation
+3 Methodology
+3.1 Evidence-Seeking Navigation Framework
+Problem formulation.
+Dual-mode navigation.
+Evidence-seeking interaction.
+3.2 Future-Guided Reverse Generation
+Evidence-seeking targets.
+Progress-reasoning targets.
+Prior dataset construction.
+3.3 Counterfactual Contrastive Policy Optimization
+Counterfactual branch sampling.
+Dual-granularity reward.
+4 Experiment
+4.1 Experimental Setting
+Simulation Environments and Metrics.
+Model training.
+Action space.
+4.2 Main Results
+FRG-SFT results.
+Gains from C2PO-RFT.
+Ablation studies.
+4.3 Deep Dive into Evidence-Seeking Behavior
+Adaptive Evidence-Seeking Triggering.
+Effectiveness of Evidence Seeking.
+Human-Like Evidence-Seeking Behavior.
+5 Conclusion
+References
+A Detailed Analysis of Progress Myopia
+A.1 Selected Representative Navigation Agents
+A.2 Success and Failure Segments Extraction
+A.3 Decision Confidence.
+B Future-Guided Reverse Generation
+B.1 Candidate-State Construction
+B.2 Progress Reasoning Annotation
+B.3 Evidence Seeking Annotation
+B.4 Dataset Construction
+Seek mode example.
+B.5 Annotation Prompts
+B.5.1 Progress Reasoning Stage-1 Prompt
+B.5.2 Progress Reasoning Stage-2 Prompt
+B.5.3 Evidence Seeking Annotation Prompt
+C Training Details
+C.1 Supervised Fine-Tuning (FRG-SFT)
+Objective.
+C.2 Reinforcement Fine-Tuning (C2PO)
+D Ablation Study
+D.1 Analysis of FRG
+D.2 Analysis of C2PO
+E Real-World Deployment
+License: arXiv.org perpetual non-exclusive license
+arXiv:2609.37353v1 [cs.AI] 29 Sep 2026
+Seek Before You Move: Evidence Seeking for Progress Grounding in Vision-Language Navigation
+Zhimin Wang1,2, Meiyuan Zhu1, Duo Wu1,2, Linjia Kang1
+Yajun Wang3,4, Yuan Ni5, Xiaohang Wang5, Tianlu Pan2
+Jingyan Jiang1, Yaowei Wang6,2,†, Zhi Wang1,†
+1Tsinghua University  2Pengcheng Laboratory
+3South China University of Technology  4International Digital Economy Academy
+5Ping An Technology (Shenzhen) Co., Ltd., Shenzhen, China
+6Harbin Institute of Technology (Shenzhen)
+†Corresponding authors
+Abstract
+Vision-Language Navigation (VLN) requires agents to continuously ground task progress from long-horizon instructions and partial egocentric observations. Existing VLM-based navigation agents typically reason only over available observations and may remain confident even when task-relevant evidence is missing. For example, an agent may confidently proceed forward and get lost even though the landmark indicating the next turn lies outside its current field of view. We term this failure mode Progress Myopia: the agent fails to recognize unreliable progress grounding and continues acting on insufficient evidence. To address it, we propose SeekVLN, an evidence-seeking framework that couples semantic progress reasoning with active acquisition of task-relevant observations. SeekVLN is trained in two stages: First, Future-guided Reverse Generation (FRG) uses future expert actions to augment offline expert trajectories with supplementary views and evidence annotations. Supervised fine-tuning on these trajectories establishes a prior for evidence seeking and progress reasoning without additional expert interaction. However, imitation alone does not reveal whether seeking improves subsequent navigation. We therefore introduce Counterfactual Contrastive Policy Optimization (C2PO) for reinforcement fine-tuning. By comparing each evidence-seeking branch with a counterfactual direct-navigation branch from the same state, C2PO uses a contrastive reward to assign credit to seeking decisions based on subsequent navigation benefit. Experiments on simulated benchmarks show that SeekVLN achieves state-of-the-art performance, improving success rate by 12.7% and 7.5% over the base model on R2R-CE and RxR-CE, respectively. Both simulated and real-world evaluations exhibit human-like evidence-seeking behaviors for more reliable progress grounding.
+1 Introduction
+Vision-Language navigation (VLN) requires an embodied agent to follow natural-language instructions over long horizons and reach a specified goal (Anderson et al., 2018; Gu et al., 2022; Wu et al., 2024). Despite substantial progress (Hong et al., 2021; An et al., 2024; Zhang et al., 2024), reliable navigation remains challenging, because success requires continuously grounding the agent’s progress: determining completed subgoals and where to go next. In realistic environments, instruction ambiguity and partial egocentric observations often leave the agent with insufficient evidence, introducing substantial uncertainty into progress grounding.
+As illustrated in Fig. 1, progress uncertainty often arises at critical decision points. In case (a), the next landmark falls outside the agent’s field of view and therefore cannot be verified from the current observation. At the fork in case (b), neither the instruction nor the current observation provides sufficient evidence to determine the correct direction. These cases illustrate how instruction ambiguity and partial observations introduce uncertainty into progress grounding: the available evidence may be insufficient to determine the agent’s current progress and the next navigation action.
+Figure 1: Illustration of Progress Myopia. Left: out-of-view landmarks (a) and ambiguous instructions (b) make the current observation insufficient to determine the correct decision. Right: representative navigation agents show similar decision confidence and action entropy on both successful and failed segments, indicating that unreliable decisions can remain highly confident.
+Recent advances in vision-language models (VLMs) have improved visual understanding and long-horizon planning, motivating their use in autonomous navigation agents (Zhang et al., 2025b; Zhang et al., 2025a; Gao et al., 2025). Existing agents either directly predict navigation actions from historical context (Cheng et al., 2025; Wei et al., 2025; Zhang et al., 2025b), or improve progress grounding through linguistic reasoning (Wang et al., 2026) and landmark-centric representations (Wu et al., 2026). However, these methods primarily focus on improving navigation decisions from available observations, with limited attention to assessing the uncertainty in progress grounding.
+When task-relevant evidence is insufficient, as in cases (a) and (b) of Fig. 1, stronger visual understanding and reasoning do not necessarily enable an agent to recognize that its progress grounding is unreliable.
+To examine whether existing agents can recognize this uncertainty, we compare their decision confidence on failed trajectories and success trajectories (detailed in Appendix A). If their decision confidence reflects the reliability of progress grounding, it should decrease when the agent begins to deviate from the goal. As shown in Fig. 1(c), however, three representative navigation models exhibit similar confidence in both cases. This indicates that they remain confident even after deviating from the goal. We formulate this failure mode as Progress Myopia: navigation agents fail to recognize unreliable progress grounding and continue to act based on insufficient evidence.
+To address this issue, we propose SeekVLN, an evidence-seeking framework that improves progress grounding by combining semantic progress reasoning with visual evidence seeking. Rather than grounding progress based on the historical observations, SeekVLN enables the agent to recognize when the available evidence is insufficient and acquire additional task-relevant observations before executing the next navigation action. In this way, SeekVLN shifts VLN from passive reasoning to active evidence seeking for reliable progress grounding. To learn this behavior, we first introduce Future-guided Reverse Generation (FRG), which augments offline expert trajectories with supplementary views and evidence annotations. FRG reasons backward from future expert actions to determine where to seek evidence and annotate what key evidence is. Supervised fine-tuning (SFT) on the resulting trajectories establishes a prior for evidence seeking and progress reasoning without additional expert interaction. However, imitation alone does not reveal whether seeking improves subsequent navigation. We therefore introduce Counterfactual Contrastive Policy Optimization (C2PO) for reinforcement fine-tuning. When the agent chooses to seek evidence, C2PO additionally rolls out a counterfactual direct-navigation branch from the same state. By comparing the two branches, a contrastive reward assigns credit to the seeking decision based on its subsequent navigation benefit. This signal is combined with an adaptive outcome reward to jointly optimize evidence seeking and navigation.
+Our main contributions are summarized as follows:
+•
+We identify and formulate Progress Myopia, a failure mode in which VLN agents fail to recognize unreliable progress grounding under insufficient evidence.
+•
+We propose SeekVLN, which combines semantic progress reasoning with active acquisition of task-relevant observations. FRG converts offline demonstrations into evidence-seeking supervision, and supervised fine-tuning establishes an initial evidence-seeking prior. C2PO then applies reinforcement fine-tuning, comparing evidence-seeking and direct-navigation branches from the same state to assign credit to seeking decisions.
+•
+SeekVLN sets a new state of the art for VLN agents, improving success rate by 12.7% and 7.5% over the base model on R2R-CE and RxR-CE, respectively. Simulated and real-world evaluations further demonstrate its human-like ability to actively seek task-relevant evidence for reliable progress grounding.
+2 Related Works
+2.1 VLM-based Vision-Language Navigation
+The concept of VLN was introduced as a visually grounded instruction-following problem in real 3D environments (Anderson et al., 2018). Before the recent adoption of Vision-Language Models (VLMs), representative VLN agents (Hong et al., 2021; Chen et al., 2021; Chen et al., 2022b; An et al., 2024) improved cross-modal state modeling and long-horizon planning through traditional deep learning. Recent VLM-based approaches (Zhang et al., 2025b; Cheng et al., 2025; Wei et al., 2025; Xue et al., 2026; Gao et al., 2025; Zhang et al., 2025a) further broaden the capabilities of navigation agents by leveraging video understanding and action modeling.
+However, existing VLM policies passively reason and navigate from available observations, creating an information bottleneck when task-relevant evidence is missing. SeekVLN instead actively seeks additional evidence before navigation.
+2.2 Progress Reasoning and Grounding in Embodied Navigation
+Progress grounding has long been a concern in VLN: agents must determine both where to move and which subgoals have been completed. Early agents used progress estimates for visual-textual grounding, backtracking, and action selection (Ma et al., 2019a; Ma et al., 2019b), and explored surrounding viewpoints to reduce ambiguity before navigation (Wang et al., 2020). Recent work revisits this issue with richer reasoning mechanisms. Progress-Think (Wang et al., 2026) predicts semantic progress, Dual-Anchoring (Wu et al., 2026) addresses progress and memory drift, and AdaNav (Ding et al., 2025) and AwareVLN (Guo et al., 2026) introduce uncertainty-aware or self-aware reasoning.
+These approaches improve progress grounding through interpretable evaluation modules, but overlook the unreliability caused by environmental uncertainty. SeekVLN formulates this limitation as Progress Myopia and introduces an evidence-seeking framework for more reliable progress grounding.
+2.3 Reinforcement Learning for Vision-Language Navigation
+Unlike imitation learning, RL optimizes VLN policies on their own rollouts, exposing recovery and exploration actions to task-level feedback (Zhang et al., 2025c; Li et al., 2026). Recent methods apply RL to VLM navigation: VLN-R1 (Qi et al., 2025) uses GRPO-style training, Nav-R1 (Liu et al., 2025b) emphasizes embodied reasoning, and ETP-R1 (Ye et al., 2025) and ActiveVLN (Zhang et al., 2025c) extend RL to topological planning and active exploration. To address sparse feedback, Li et al. (2026) introduce step-level contrastive rewards, while SeeNav-Agent (Wang et al., 2025b) combines visual prompting with step-level policy optimization.
+Evidence seeking poses a credit-assignment challenge because its benefit emerges through later navigation. C2PO addresses this by comparing matched evidence-seeking and direct-navigation branches and rewarding the difference in short-horizon progress.
+3 Methodology
+We propose SeekVLN, an evidence-seeking framework for reliable progress grounding in VLN. As illustrated in Fig. 2, SeekVLN assesses whether the current visual context is sufficient and acquires supplementary views when needed before reasoning about progress and acting. We train this behavior in two stages. First, Future-guided Reverse Generation (FRG) constructs evidence-seeking supervision from offline expert trajectories, establishing a behavior prior. Second, Counterfactual Contrastive Policy Optimization (C2PO) jointly optimizes evidence seeking and navigation through reinforcement fine-tuning.
+3.1 Evidence-Seeking Navigation Framework
+Problem formulation.
+We study monocular Vision-and-Language Navigation in Continuous Environments (VLN-CE) (Krantz et al., 2020), where an agent navigates through a continuous 3D environment according to a natural-language instruction II. At decision step tt, the agent receives the current observation oto_{t} and a sampled visual history ℋt={oim}m=1M\mathcal{H}_{t}=\{o_{i_{m}}\}_{m=1}^{M} comprising MM historical frames. The policy directly conditions on these inputs to generate the decision sequence
+yt=πθ​(I,ot,ℋt).y_{t}=\pi_{\theta}\!\left(I,o_{t},\mathcal{H}_{t}\right).
+(1)
+Dual-mode navigation.
+A conventional VLN policy directly predicts a navigation action at every state. SeekVLN instead begins each decision by determining whether the available observations provide sufficient evidence for reliable progress grounding. As illustrated in Fig. 2(1), the first control token selects one of two modes:
+mt={SEEK,yt(1)=<seek>,NAV,yt(1)=<nav>.m_{t}=\begin{cases}\mathrm{SEEK},&y_{t}^{(1)}=\texttt{<seek>},\\
+\mathrm{NAV},&y_{t}^{(1)}=\texttt{<nav>}.\end{cases}
+(2)
+Here, yt(1)y_{t}^{(1)} denotes the first token of the response. If the agent selects NAV, it directly predicts the navigation action, yt=<nav>⊕ytnavy_{t}=\texttt{<nav>}\oplus y_{t}^{\mathrm{nav}}, where ⊕\oplus denotes token concatenation. If the agent selects SEEK, it first acquires supplementary views and reasons over them to seek evidence and estimate progress before predicting the navigation action.
+Evidence-seeking interaction.
+After the policy predicts <seek>, the environment appends left, front, and right views at fixed relative headings, forming the interaction prefix
+ytseek=<seek>⊕[ot−90∘,ot0∘,ot90∘]⊕</seek>,y_{t}^{\mathrm{seek}}=\texttt{<seek>}\oplus\left[o_{t}^{-90^{\circ}},o_{t}^{0^{\circ}},o_{t}^{90^{\circ}}\right]\oplus\texttt{</seek>},
+(3)
+Conditioned on the supplementary views, the policy generates <think> to begin the progress-reasoning segment
+ytprog=<think>⊕(gt−,gt+,et)⊕</think>,y_{t}^{\mathrm{prog}}=\texttt{<think>}\oplus\left(g_{t}^{-},g_{t}^{+},e_{t}\right)\oplus\texttt{</think>},
+(4)
+where gt−g_{t}^{-} summarizes completed instruction subgoals, gt+g_{t}^{+} specifies the next subgoal, and ete_{t} identifies the visual evidence supporting progress grounding. Fig. 2(1) shows a concrete example of these three parts. The complete SEEK-mode sequence is
+yt=ytseek⊕ytprog⊕<nav>⊕ytnav.y_{t}=y_{t}^{\mathrm{seek}}\oplus y_{t}^{\mathrm{prog}}\oplus\texttt{<nav>}\oplus y_{t}^{\mathrm{nav}}.
+(5)
+Figure 2: Overview of SeekVLN. (1) The policy decides whether to navigate or seek evidence. (2) FRG reasons backward from future expert actions to determine where to seek evidence and annotate key evidence, while using historical context for progress annotation. (3) C2PO compares evidence-seeking and direct-navigation branches and jointly optimizes evidence-seeking and navigation.
+3.2 Future-Guided Reverse Generation
+Learning evidence seeking requires supervision for when to acquire additional observations and what task-relevant evidence they provide. However, such annotations are not explicitly available in offline expert trajectories. We therefore introduce Future-guided Reverse Generation (FRG), which reasons backward from future expert actions to construct evidence-seeking supervision without additional expert interaction. Specifically, FRG addresses two questions: (1) When and where should the agent seek evidence? (2) What is the key evidence in the selected views?
+Evidence-seeking targets.
+Future expert actions provide a cue for when and where additional evidence may be useful. For example, a side view may help ground an upcoming turn, whereas the front view is enough for moving along a straight hallway. Based on this observation, FRG assigns action-dependent target proportions and deterministically selects decisions for SEEK supervision, producing the mode plan 𝐦∗\mathbf{m}^{*} (detailed in Appendix B).
+For each selected SEEK state, FRG uses the upcoming expert action to determine where to look for evidence. The annotator VLM then receives the corresponding subset of current views, together with the instruction and observed history, and identifies the task-relevant evidence:
+et=fVLMev​(I,ℋt∗,𝒱t​(at∗)),e_{t}=f^{\mathrm{ev}}_{\mathrm{VLM}}\!\left(I,\mathcal{H}_{t}^{*},\mathcal{V}_{t}(a_{t}^{*})\right),
+(6)
+where 𝒱t​(at∗)\mathcal{V}_{t}(a_{t}^{*}) denotes the current views selected according to the expert action at∗a_{t}^{*}.
+Progress-reasoning targets.
+As illustrated in Fig. 2 (2), given the instruction, the historical
+and current observations, and the provided subgoal list 𝒮⁡(I)\mathcal{S}(I), the annotator VLM first analyzes the current task progress, then distills the analysis into structured progress fields:
+(gt−,gt+)=fVLMprog​(I,ℋt∗,ot∗,𝒮⁡(I)),\left(g_{t}^{-},\,g_{t}^{+}\right)=f^{\mathrm{prog}}_{\mathrm{VLM}}\!\left(I,\mathcal{H}_{t}^{*},o_{t}^{*},\mathcal{S}(I)\right),
+(7)
+Together with ete_{t}, the annotation is serialized into
+ytprog=<think>⊕(gt−,gt+,et)⊕</think>y_{t}^{\mathrm{prog}}=\texttt{<think>}\oplus(g_{t}^{-},g_{t}^{+},e_{t})\oplus\texttt{</think>}.
+Prior dataset construction.
+Given the input context
+xt∗=(I,ot∗,ℋt∗)x_{t}^{*}=(I,o_{t}^{*},\mathcal{H}_{t}^{*}), a NAV state is paired
+with the expert navigation action ytnav,∗y_{t}^{\mathrm{nav},*}, and a SEEK state
+with the full response of evidence seeking, progress reasoning, and navigation action. The prior
+dataset is
+𝒟prior\displaystyle\mathcal{D}_{\mathrm{prior}}
+=𝒟nav∪𝒟seek,\displaystyle=\mathcal{D}_{\mathrm{nav}}\cup\mathcal{D}_{\mathrm{seek}},
+(8)
+𝒟nav\displaystyle\mathcal{D}_{\mathrm{nav}}
+={(xt∗,<nav>⊕ytnav,∗)∣mt∗=NAV},\displaystyle=\{(x_{t}^{*},\texttt{<nav>}\oplus y_{t}^{\mathrm{nav},*})\mid m_{t}^{*}=\mathrm{NAV}\},
+𝒟seek\displaystyle\mathcal{D}_{\mathrm{seek}}
+={(xt∗,ytseek⊕ytprog⊕<nav>⊕ytnav,∗)∣mt∗=SEEK}.\displaystyle=\{(x_{t}^{*},y_{t}^{\mathrm{seek}}\oplus y_{t}^{\mathrm{prog}}\oplus\texttt{<nav>}\oplus y_{t}^{\mathrm{nav},*})\mid m_{t}^{*}=\mathrm{SEEK}\}.
+𝒟prior\mathcal{D}_{\mathrm{prior}} thus jointly supervises direct navigation,
+evidence seeking, and progress reasoning.
+3.3 Counterfactual Contrastive Policy Optimization
+Supervised fine-tuning on 𝒟prior\mathcal{D}_{\mathrm{prior}} initializes a basic behavior prior for triggering evidence seeking and reasoning over acquired views. However, imitation alone does not reveal whether a seeking decision improves subsequent navigation under on-policy interaction.
+We therefore introduce Counterfactual Contrastive Policy Optimization (C2PO) to address two coupled questions: (1) How can a policy recognize insufficient evidence and trigger evidence seeking adaptively? (2) How can evidence seeking and navigation be optimized jointly? C2PO compares evidence-seeking and direct-navigation branches from the same state to assign credit to a seeking decision. The resulting contrastive reward is combined with an adaptive outcome reward, providing dual-granularity feedback to jointly optimize evidence seeking and navigation.
+Counterfactual branch sampling.
+A sampled trajectory reveals the outcome of the chosen mode, but not what would have happened under the alternative. To assess the benefit of a seeking decision, we therefore compare evidence seeking with direct navigation from the same state. As illustrated in
+Fig. 2 (3), when the main rollout selects SEEK under context (I,ot,ℋt)(I,o_{t},\mathcal{H}_{t}), we clone the simulator state, observation history, and model context, then compare the factual evidence-seeking branch
+τt:t+Hseek∼πθ(⋅∣I,ot,ℋt,mt=SEEK).\tau_{t:t+H}^{\mathrm{seek}}\sim\pi_{\theta}\!\left(\cdot\mid I,o_{t},\mathcal{H}_{t},m_{t}=\mathrm{SEEK}\right).
+(9)
+The counterfactual branch starts from the same state, with the first mode decision forced to NAV:
+τt:t+Hnav∼πθ(⋅∣I,ot,ℋt,mt=NAV).\tau_{t:t+H}^{\mathrm{nav}}\sim\pi_{\theta}\!\left(\cdot\mid I,o_{t},\mathcal{H}_{t},m_{t}=\mathrm{NAV}\right).
+(10)
+Both branches are rolled out with the same policy for HH primitive actions, isolating the local benefit of evidence seeking while controlling for the initial state and context.
+Dual-granularity reward.
+We combine a decision-level counterfactual reward with an episode-level adaptive outcome reward to jointly optimize evidence seeking and navigation. At decision tt, the total reward is
+rt=rtcf+rtout.r_{t}=r_{t}^{\mathrm{cf}}+r_{t}^{\mathrm{out}}.
+(11)
+The counterfactual reward measures the short-horizon navigation benefit of an evidence-seeking decision. Let Δ​dhb\Delta d_{h}^{b} denote the normalized reduction in geodesic distance to the goal at primitive action hh in branch b∈{seek,nav}b\in\{\mathrm{seek},\mathrm{nav}\}. We compute the discounted progress difference between the two branches and define
+rtcf={w​clip⁡(∑h=1Hγcfh−1​(Δ​dhseek−Δ​dhnav),−0.2, 0.2),mt=SEEK,0,mt=NAV,r_{t}^{\mathrm{cf}}=\begin{cases}w\,\operatorname{clip}\!\left(\displaystyle\sum_{h=1}^{H}\gamma_{\mathrm{cf}}^{h-1}\left(\Delta d_{h}^{\mathrm{seek}}-\Delta d_{h}^{\mathrm{nav}}\right),-0.2,\,0.2\right),&m_{t}=\mathrm{SEEK},\\[6.0pt]
+0,&m_{t}=\mathrm{NAV},\end{cases}
+(12)
+where γcf\gamma_{\mathrm{cf}} discounts later progress and ww controls the contribution of the counterfactual reward.
+The adaptive outcome reward is given once at episode termination:
+rtout=𝕀[t=T]{1+0.2​SPL,if success,−0.5,otherwise,r_{t}^{\mathrm{out}}=\mathbb{I}[t=T]\begin{cases}1+0.2\,\mathrm{SPL},&\text{if success},\\
+-0.5,&\text{otherwise},\end{cases}
+(13)
+where TT denotes the terminal decision.
+We use the combined rewards to estimate advantages and optimize the policy and value function with PPO (Schulman et al., 2017). Counterfactual branches are sampled only during reinforcement fine-tuning and require no additional branch rollouts during evaluation.
+4 Experiment
+Table 1:
+Comparison of different methods on the R2R-CE and RxR-CE Val-Unseen splits.
+Observations include a single RGB camera (S.RGB) and depth sensor (Depth).
+†\dagger indicates methods without using LLMs.
+Method
+Observation
+R2R-CE Val-Unseen
+RxR-CE Val-Unseen
+S.RGB
+Depth
+NE↓\downarrow
+OSR↑\uparrow
+SR↑\uparrow
+SPL↑\uparrow
+NE↓\downarrow
+SR↑\uparrow
+SPL↑\uparrow
+nDTW↑\uparrow
+BEVBert† An et al. (2022)
+✓
+4.57
+67.0
+59.0
+50.0
+–
+–
+–
+–
+ETPNav† An et al. (2024)
+✓
+4.71
+65.0
+57.0
+49.0
+5.64
+54.8
+44.9
+61.9
+ENP-ETPNav† Liu et al. (2024)
+✓
+4.69
+65.0
+58.0
+50.0
+5.51
+55.3
+45.1
+63.0
+Seq2Seq† Krantz et al. (2020)
+✓
+✓
+7.77
+37.0
+25.0
+22.0
+12.10
+13.9
+11.9
+–
+CMA† Krantz et al. (2020)
+✓
+✓
+7.37
+40.0
+32.0
+30.0
+–
+–
+–
+–
+LAW† Raychaudhuri et al. (2021)
+✓
+✓
+6.83
+44.0
+35.0
+31.0
+10.90
+8.0
+8.0
+–
+CM2† Georgakis et al. (2022)
+✓
+✓
+7.02
+41.0
+34.0
+27.0
+8.98
+14.4
+9.2
+–
+WS-MGMap† Chen et al. (2022a)
+✓
+✓
+6.28
+47.0
+38.0
+34.0
+–
+–
+–
+–
+sim2real† Wang et al. (2024)
+✓
+✓
+5.95
+55.8
+44.9
+30.4
+–
+–
+–
+–
+NavMorph† Yao et al. (2025)
+✓
+✓
+5.75
+56.9
+47.9
+33.2
+8.85
+30.8
+22.8
+44.2
+NaVid-4D Liu et al. (2025a)
+✓
+✓
+5.99
+55.7
+43.8
+37.1
+–
+–
+–
+–
+NaVid Zhang et al. (2024)
+✓
+5.47
+49.1
+37.4
+35.9
+–
+–
+–
+–
+Uni-NaVid Zhang et al. (2025b)
+✓
+5.58
+53.5
+47.0
+42.7
+6.24
+48.7
+40.9
+–
+NaVILA Cheng et al. (2025)
+✓
+5.22
+62.5
+54.0
+49.0
+6.77
+49.3
+44.0
+58.8
+NavFoM Zhang et al. (2025a)
+✓
+5.01
+64.9
+56.2
+51.2
+5.51
+57.4
+49.4
+60.2
+StreamVLN Wei et al. (2025)
+✓
+4.98
+64.2
+56.9
+51.9
+6.22
+52.9
+46.0
+61.9
+Progress-Think Wang et al. (2026)
+✓
+4.68
+63.6
+60.1
+53.6
+–
+–
+–
+–
+Aux-Think Wang et al. (2025a) (base model)
+✓
+6.08
+60.0
+54.8
+46.9
+6.24
+52.2
+40.2
+–
+SeekVLN-FRG-SFT (ours)
+✓
+4.7
+68.4
+61.0
+55.9
+5.8
+55.7
+47.4
+62.3
+SeekVLN-C2PO-RFT (ours)
+✓
+3.7
+75.2
+67.5
+61.4
+4.9
+59.7
+50.3
+63.6
+4.1 Experimental Setting
+Simulation Environments and Metrics.
+We conduct experiments in the Habitat simulator (Savva et al., 2019) using Matterport3D scenes (Chang et al., 2017), and evaluate on the val-unseen splits of R2R-CE (Krantz et al., 2020) and RxR-CE (Ku et al., 2020). Following their standard protocols, we report Navigation Error (NE), Oracle Success Rate (OSR), Success Rate (SR), and Success weighted by Path Length (SPL) on R2R-CE, and NE, SR, SPL, and normalized Dynamic Time Warping (nDTW) on RxR-CE. NE measures the final geodesic distance to the goal; OSR measures the fraction of trajectories that enter the success radius; SR evaluates success at the final position; SPL measures success weighted by navigation efficiency; and nDTW measures fidelity to the reference trajectory.
+Model training.
+We initialize SeekVLN from the pretrained Aux-Think model (Wang et al., 2025a) and train it in two stages: SFT on the FRG prior dataset, constructed from 4K R2R-CE train split episodes with Qwen-VL-Max (Bai et al., 2023), followed by C2PO reinforcement fine-tuning on 640 sampled R2R-CE training episodes. Details of both stages are provided in Appendix C.
+Action space.
+We use the same action space as NaVILA (Cheng et al., 2025). It formulates continuous navigation using a discrete high-level action space consisting of {move forward, turn left, turn right, stop}. Forward actions move the agent by 25, 50, or 75 centimeters, whereas left and right turns rotate it by 15∘15^{\circ}, 30∘30^{\circ}, or 45∘45^{\circ}.
+4.2 Main Results
+Table 1 compares SeekVLN with representative VLN methods on the R2R-CE and RxR-CE Val-Unseen splits. Both training stages contribute: FRG-SFT already surpasses the base model and most prior methods, and C2PO-RFT further sets a new state of the art on both benchmarks.
+FRG-SFT results.
+Fine-tuning on the FRG prior dataset alone brings clear gains over the base model. On R2R-CE, SeekVLN-FRG-SFT raises SR from 54.8 to 61.0 and SPL from 46.9 to 55.9; on RxR-CE, SR improves from 52.2 to 55.7 and SPL from 40.2 to 47.4. These gains come from offline supervision only, requiring no additional environment interaction or expert queries. Notably, SPL gains exceed SR gains on both benchmarks, suggesting that evidence seeking primarily improves path efficiency by reducing unnecessary actions caused by unreliable decisions. With SFT alone, SeekVLN already outperforms prior VLM agents such as NaVILA, StreamVLN, and NavFoM on R2R-CE, and exceeds Progress-Think, which likewise adds explicit progress reasoning.
+Gains from C2PO-RFT.
+Reinforcement fine-tuning with C2PO improves all metrics on both benchmarks.
+On R2R-CE, SR increases from 61.0 to 67.5 (+6.5+6.5) and SPL from 55.9 to 61.4
+(+5.5+5.5) over the SFT checkpoint, achieving the best among all compared
+methods. On RxR-CE, SR reaches 59.7 (+4.0+4.0) and SPL 50.3 (+2.9+2.9),
+surpassing NavFoM (Zhang et al., 2025a), the strongest prior VLM agent, by 2.3 and 0.9 points.
+Since SFT has already established basic evidence-seeking behavior, these
+gains indicate that C2PO mainly improves when to seek and how
+to use the acquired evidence. The counterfactual reward plays a key role: it
+credits a seeking decision only when the acquired evidence improves
+subsequent navigation, which discourages unnecessary triggers and reinforces
+useful ones. RxR-CE benefits particularly from this credit assignment, as
+its longer and more fine-grained instructions require reliable progress
+grounding over longer horizons.
+Overall, compared with the base model, the full two-stage training yields total gains of +12.7+12.7 SR and +14.5+14.5 SPL on R2R-CE, and +7.5+7.5 SR and +10.1+10.1 SPL on RxR-CE, establishing a new state of the art among VLM-based agents on both benchmarks.
+Ablation studies.
+Appendix D presents controlled ablation studies to isolate the respective contributions of FRG supervision and the C2PO counterfactual reward to navigation performance.
+4.3 Deep Dive into Evidence-Seeking Behavior
+Beyond aggregate navigation metrics, we organize the behavioral analysis around three questions: (1) Does adaptive triggering outperform fixed triggering strategies? (2) Does the acquired evidence improve subsequent navigation decisions? (3) Does SeekVLN exhibit human-like evidence-seeking behavior? We answer these questions through inference-time interventions, direct behavioral metrics, and qualitative rollout visualizations, respectively.
+Figure 3: Deep analysis of evidence-seeking behavior.
+Left: navigation success and path efficiency under three trigger strategies, highlighting the effectiveness of adaptive evidence seeking.
+Center: beneficial action change rate (BACR) during reinforcement fine-tuning, measuring the proportion of beneficial action changes. Right: mean short-horizon progress gain of the evidence-seeking branch over the direct-navigation branch, quantifying the navigation benefit of acquired evidence.
+Adaptive Evidence-Seeking Triggering.
+All triggering experiments are conducted on a 100-episode subset sampled
+from the R2R-CE Val-Unseen split, covering diverse scenes and trajectories
+with varied task complexity. The strategies are realized by manually
+prefilling the mode token of the same trained policy (SeekVLN-C2PO-RFT):
+Never Seek forces <nav> at every decision, Periodic
+Seek prefills <seek> every two steps with <nav> at all
+remaining decisions, and Adaptive Seek lets the policy make its own
+mode decision.
+We compare their seek rates and navigation performance in
+Fig. 3 (left): Adaptive Seek (29.8% seek rate) achieves
+73% SR and 67% SPL, versus 52%/48% for Never Seek (0% seek rate) and 62%/53% for
+Periodic Seek (50% seek rate). These results indicate that C2PO-trained SeekVLN
+learns when evidence seeking is needed, achieving the strongest navigation performance among the tested triggering strategies without
+relying on more frequent seeking.
+Effectiveness of Evidence Seeking.
+Evidence seeking is useful only if the subsequent navigation decisions are improved, rather than merely changing the agent’s response. We therefore define the Beneficial Action Change Rate (BACR) as
+BACR=NbeneficialNseek,\mathrm{BACR}=\frac{N_{\mathrm{beneficial}}}{N_{\mathrm{seek}}},
+(14)
+where NseekN_{\mathrm{seek}} is the number of triggered states, and NbeneficialN_{\mathrm{beneficial}} counts those at which seeking changes the next action and yields greater short-horizon progress than direct navigation from the same state. Figure 3 (center) shows BACR increasing from 45.6% to 55.9% over the RL updates. To measure the magnitude of this benefit, we define the progress gain at a triggered state as
+Δ​Gt=∑h=1H(Δ​dhseek−Δ​dhnav),\Delta G_{t}=\sum_{h=1}^{H}\left(\Delta d_{h}^{\mathrm{seek}}-\Delta d_{h}^{\mathrm{nav}}\right),
+(15)
+where Δ​dhb\Delta d_{h}^{b} denotes normalized geodesic progress at primitive action hh in branch bb, as defined in Section 3.3. The mean Δ​Gt\Delta G_{t} across triggered states rises from 6.4×10−36.4\times 10^{-3} to 16.1×10−316.1\times 10^{-3} (right). Together, the two trends suggest that C2PO learns not only to make more beneficial action changes after seeking, but also to increase their subsequent navigation advantage.
+Figure 4: Evidence seeking in simulated navigation. Two SEEK decisions along a representative trajectory. SeekVLN first identifies the dining area on the left; after completing that subgoal, it locates the hallway beyond the kitchen island on the right. In both cases, evidence seeking resolves uncertainty about instruction progress and grounds the next navigation action.
+Figure 5: Evidence seeking in real-world navigation. At the end of the hallway, the destination is not visible ahead and the instruction leaves the turn direction unspecified. SeekVLN seeks task-relevant evidence, identifies the chair to its left, and completes the task.
+Human-Like Evidence-Seeking Behavior.
+Figure 4 shows two targeted evidence-seeking decisions. When the dining area is outside the current view, SeekVLN finds its table and chairs to the left and turns toward it. After completing that subgoal, it locates the hallway beyond the kitchen island on the right and turns accordingly. In both cases, supplementary views resolve a specific uncertainty in progress grounding before action.
+Figure 5 illustrates the same behavior in real-world navigation. At the end of the hallway, the forward view does not reveal the chair, and the instruction does not explicitly specify the left turn. SeekVLN acquires a side view, grounds the destination using the chair on its left, and completes the task. This qualitative success shows that evidence seeking can support navigation under partial observation and instruction ambiguity. The deployment protocol is detailed in Appendix E.
+5 Conclusion
+We introduced SeekVLN to address Progress Myopia through active evidence seeking for reliable progress grounding. FRG derives a cold-start prior from offline demonstrations, and C2PO learns evidence-seeking decisions through counterfactual credit assignment. Experiments on R2R-CE and RxR-CE demonstrate improved navigation, while simulated and real-world rollouts show targeted evidence-seeking behavior. These results highlight the value of learning when to acquire evidence and how to use it for reliable progress grounding and navigation under partial observation.
+References
+An et al. (2022)
+D. An, Y. Qi, Y. Li, Y. Huang, L. Wang, T. Tan, and J. Shao
+Bevbert: multimodal map pre-training for language-guided navigation.
+arXiv preprint arXiv:2212.04385.
+Cited by: Table 1.
+An et al. (2024)
+D. An, H. Wang, W. Wang, Z. Wang, Y. Huang, K. He, and L. Wang
+Etpnav: evolving topological planning for vision-language navigation in continuous environments.
+IEEE Transactions on Pattern Analysis and Machine Intelligence.
+Cited by: §1,
+§2.1,
+Table 1.
+Anderson et al. (2018)
+P. Anderson, Q. Wu, D. Teney, J. Bruce, M. Johnson, N. Sünderhauf, I. Reid, S. Gould, and A. Van Den Hengel
+Vision-and-language navigation: interpreting visually-grounded navigation instructions in real environments.
+In Proceedings of the IEEE conference on computer vision and pattern recognition,
+pp. 3674–3683.
+Cited by: §1,
+§2.1.
+Bai et al. (2023)
+J. Bai, S. Bai, S. Yang, S. Wang, S. Tan, P. Wang, J. Lin, C. Zhou, and J. Zhou
+Qwen-vl: a versatile vision-language model for understanding, localization, text reading, and beyond.
+External Links: 2308.12966,
+Link
+Cited by: §4.1.
+Chang et al. (2017)
+A. X. Chang, A. Dai, T. A. Funkhouser, M. Halber, M. Nießner, M. Savva, S. Song, A. Zeng, and Y. Zhang
+Matterport3D: learning from RGB-D data in indoor environments.
+In 2017 International Conference on 3D Vision, 3DV 2017, Qingdao, China,
+October 10-12, 2017,
+pp. 667–676.
+External Links: Link,
+Document
+Cited by: §4.1.
+Chen et al. (2022a)
+P. Chen, D. Ji, K. Lin, R. Zeng, T. Li, M. Tan, and C. Gan
+Weakly-supervised multi-granularity map learning for vision-and-language navigation.
+Advances in Neural Information Processing Systems 35, pp. 38149–38161.
+Cited by: Table 1.
+Chen et al. (2021)
+S. Chen, P. Guhur, C. Schmid, and I. Laptev
+History aware multimodal transformer for vision-and-language navigation.
+Advances in Neural Information Processing Systems 34, pp. 5834–5847.
+Cited by: §2.1.
+Chen et al. (2022b)
+S. Chen, P. Guhur, M. Tapaswi, C. Schmid, and I. Laptev
+Think global, act local: dual-scale graph transformer for vision-and-language navigation.
+In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR),
+pp. 16537–16547.
+Cited by: §2.1.
+Cheng et al. (2025)
+A. Cheng, Y. Ji, Z. Yang, Z. Gongye, X. Zou, J. Kautz, E. Bıyık, H. Yin, S. Liu, and X. Wang
+Navila: legged robot vision-language-action model for navigation.
+In RSS,
+Cited by: §A.1,
+§1,
+§2.1,
+§4.1,
+Table 1.
+Ding et al. (2025)
+X. Ding, J. Wei, Y. Yang, S. Jiang, Q. Zhang, H. Wu, F. Jia, L. Mi, Y. Yan, W. Wang, Y. Liu, Z. Chen, and T. Cao
+AdaNav: adaptive reasoning with uncertainty for vision-language navigation.
+External Links: 2509.24387,
+Link
+Cited by: §2.2.
+Gao et al. (2025)
+C. Gao, L. Jin, X. Peng, J. Zhang, Y. Deng, A. Li, H. Wang, and S. Liu
+OctoNav: towards generalist embodied navigation.
+External Links: 2506.09839,
+Link
+Cited by: §1,
+§2.1.
+Georgakis et al. (2022)
+G. Georgakis, K. Schmeckpeper, K. Wanchoo, S. Dan, E. Miltsakaki, D. Roth, and K. Daniilidis
+Cross-modal map learning for vision and language navigation.
+In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition,
+pp. 15460–15470.
+Cited by: Table 1.
+Gu et al. (2022)
+J. Gu, E. Stefani, Q. Wu, J. Thomason, and X. E. Wang
+Vision-and-language navigation: a survey of tasks, methods, and future directions.
+In Proceedings of the 60th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers),
+pp. 7606–7623.
+Cited by: §1.
+Guo et al. (2026)
+W. Guo, X. Xu, Y. Liu, X. Li, H. Yin, H. Chen, W. Zheng, J. Feng, J. Zhou, and J. Lu
+AwareVLN: reasoning with self-awareness for vision-language navigation.
+External Links: 2605.22816,
+Link
+Cited by: §2.2.
+Hong et al. (2021)
+Y. Hong, Q. Wu, Y. Qi, C. Rodriguez-Opazo, and S. Gould
+Vln bert: a recurrent vision-and-language bert for navigation.
+In Proceedings of the IEEE/CVF conference on Computer Vision and Pattern Recognition,
+pp. 1643–1653.
+Cited by: §1,
+§2.1.
+Krantz et al. (2020)
+J. Krantz, E. Wijmans, A. Majumdar, D. Batra, and S. Lee
+Beyond the nav-graph: vision-and-language navigation in continuous environments.
+In Computer Vision - ECCV 2020 - 16th European Conference, Glasgow,
+UK, August 23-28, 2020, Proceedings, Part XXVIII,  A. Vedaldi, H. Bischof, T. Brox, and J. Frahm (Eds.),
+Lecture Notes in Computer Science, Vol. 12373, pp. 104–120.
+External Links: Link,
+Document
+Cited by: §3.1,
+§4.1,
+Table 1,
+Table 1.
+Ku et al. (2020)
+A. Ku, P. Anderson, R. Patel, E. Ie, and J. Baldridge
+Room-across-room: multilingual vision-and-language navigation with dense spatiotemporal grounding.
+In Proceedings of the 2020 Conference on Empirical Methods in Natural
+Language Processing, EMNLP 2020, Online, November 16-20, 2020,  B. Webber, T. Cohn, Y. He, and Y. Liu (Eds.),
+pp. 4392–4412.
+External Links: Link,
+Document
+Cited by: §4.1.
+Li et al. (2026)
+H. Li, R. Liu, H. Fan, and Y. Yang
+Let’s reward step-by-step: Step-Aware contrastive alignment for vision-language navigation in continuous environments.
+External Links: 2603.09740,
+Link
+Cited by: §2.3.
+Liu et al. (2025a)
+H. Liu, W. Wan, X. Yu, M. Li, J. Zhang, B. Zhao, Z. Chen, Z. Wang, Z. Zhang, and H. Wang
+Na vid-4d: unleashing spatial intelligence in egocentric rgb-d videos for vision-and-language navigation.
+In 2025 IEEE International Conference on Robotics and Automation (ICRA),
+pp. 10607–10615.
+Cited by: Table 1.
+Liu et al. (2025b)
+Q. Liu, T. Huang, Z. Zhang, and H. Tang
+Nav-R1: reasoning and navigation in embodied scenes.
+External Links: 2509.10884,
+Link
+Cited by: §2.3.
+Liu et al. (2024)
+R. Liu, W. Wang, and Y. Yang
+Vision-language navigation with energy-based policy.
+Advances in Neural Information Processing Systems 37, pp. 108208–108230.
+Cited by: Table 1.
+Ma et al. (2019a)
+C. Ma, J. Lu, Z. Wu, G. AlRegib, Z. Kira, R. Socher, and C. Xiong
+Self-monitoring navigation agent via auxiliary progress estimation.
+In International Conference on Learning Representations,
+Cited by: §2.2.
+Ma et al. (2019b)
+C. Ma, Z. Wu, G. AlRegib, C. Xiong, and Z. Kira
+The regretful agent: heuristic-aided navigation through progress estimation.
+In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR),
+pp. 6732–6740.
+Cited by: §2.2.
+Qi et al. (2025)
+Z. Qi, Z. Zhang, Y. Yu, J. Wang, and H. Zhao
+VLN-R1: vision-language navigation via reinforcement fine-tuning.
+External Links: 2506.17221,
+Link
+Cited by: §2.3.
+Raychaudhuri et al. (2021)
+S. Raychaudhuri, S. Wani, S. Patel, U. Jain, and A. Chang
+Language-aligned waypoint (law) supervision for vision-and-language navigation in continuous environments.
+In Proceedings of the 2021 conference on empirical methods in natural language processing,
+pp. 4018–4028.
+Cited by: Table 1.
+Savva et al. (2019)
+M. Savva, J. Malik, D. Parikh, D. Batra, A. Kadian, O. Maksymets, Y. Zhao, E. Wijmans, B. Jain, J. Straub, J. Liu, and V. Koltun
+Habitat: A platform for embodied AI research.
+In 2019 IEEE/CVF International Conference on Computer Vision, ICCV
+2019, Seoul, Korea (South), October 27 - November 2, 2019,
+pp. 9338–9346.
+External Links: Link,
+Document
+Cited by: §4.1.
+Schulman et al. (2017)
+J. Schulman, F. Wolski, P. Dhariwal, A. Radford, and O. Klimov
+Proximal policy optimization algorithms.
+External Links: 1707.06347,
+Link
+Cited by: §C.2,
+§3.3.
+Wang et al. (2020)
+H. Wang, W. Wang, T. Shu, W. Liang, and J. Shen
+Active visual information gathering for vision-language navigation.
+In European Conference on Computer Vision,
+pp. 307–322.
+Cited by: §2.2.
+Wang et al. (2025a)
+S. Wang, Y. Wang, W. Li, X. Cai, F. Wang, M. Chen, K. Wang, Z. Su, D. Li, and Z. Fan
+Aux-think: exploring reasoning strategies for data-efficient vision-language navigation.
+CoRR abs/2505.11886.
+External Links: Link,
+Document,
+2505.11886
+Cited by: §A.1,
+§C.1,
+Table 3,
+§4.1,
+Table 1.
+Wang et al. (2026)
+S. Wang, Y. Wang, G. Lian, Y. Wang, M. Chen, K. Wang, B. Zhang, Z. Su, Y. Zhou, W. Li, et al.
+Progress-think: semantic progress reasoning for vision-language navigation.
+In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition,
+pp. 4076–4086.
+Cited by: §1,
+§2.2,
+Table 1.
+Wang et al. (2025b)
+Z. Wang, Z. Lin, Y. Yang, H. Fu, and D. Ye
+SeeNav-Agent: enhancing vision-language navigation with visual prompt and step-level policy optimization.
+External Links: 2512.02631,
+Link
+Cited by: §2.3.
+Wang et al. (2024)
+Z. Wang, X. Li, J. Yang, Y. Liu, and S. Jiang
+Sim-to-real transfer via 3d feature fields for vision-and-language navigation.
+arXiv preprint arXiv:2406.09798.
+Cited by: Table 1.
+Wei et al. (2025)
+M. Wei, C. Wan, X. Yu, T. Wang, Y. Yang, X. Mao, C. Zhu, W. Cai, H. Wang, Y. Chen, X. Liu, and J. Pang
+StreamVLN: streaming vision-and-language navigation via SlowFast context modeling.
+External Links: 2507.05240,
+Link
+Cited by: §A.1,
+§1,
+§2.1,
+Table 1.
+Wu et al. (2026)
+K. Wu, P. Li, K. Lyu, X. Lin, L. Zhao, Q. He, J. Wang, and J. Liu
+Dual-Anchoring: addressing state drift in vision-language navigation.
+External Links: 2604.17473,
+Link
+Cited by: §1,
+§2.2.
+Wu et al. (2024)
+W. Wu, T. Chang, X. Li, Q. Yin, and Y. Hu
+Vision-language navigation: a survey and taxonomy.
+Neural Computing and Applications 36 (7), pp. 3291–3316.
+Cited by: §1.
+Xue et al. (2026)
+X. Xue, J. Hu, M. Luo, X. Shichao, J. Chen, Z. Xie, Q. Kuichen, GuoWei, Z. Chu, M. Xu, and Z. Zhu
+OmniNav: a unified framework for prospective exploration and visual-language navigation.
+In The Fourteenth International Conference on Learning Representations,
+External Links: Link
+Cited by: §2.1.
+Yao et al. (2025)
+X. Yao, J. Gao, and C. Xu
+Navmorph: a self-evolving world model for vision-and-language navigation in continuous environments.
+In Proceedings of the IEEE/CVF International Conference on Computer Vision,
+pp. 5536–5546.
+Cited by: Table 1.
+Ye et al. (2025)
+S. Ye, S. Mao, Y. Cui, X. Yu, S. Zhai, W. Chen, S. Zhou, R. Xiong, and Y. Wang
+ETP-R1: evolving topological planning with reinforcement fine-tuning for vision-language navigation in continuous environments.
+External Links: 2512.20940,
+Link
+Cited by: §2.3.
+Zhang et al. (2025a)
+J. Zhang, A. Li, Y. Qi, M. Li, J. Liu, S. Wang, H. Liu, G. Zhou, Y. Wu, X. Li, Y. Fan, W. Li, Z. Chen, F. Gao, Q. Wu, Z. Zhang, and H. Wang
+Embodied navigation foundation model.
+External Links: 2509.12129,
+Link
+Cited by: §1,
+§2.1,
+§4.2,
+Table 1.
+Zhang et al. (2025b)
+J. Zhang, K. Wang, S. Wang, M. Li, H. Liu, S. Wei, Z. Wang, Z. Zhang, and H. Wang
+Uni-navid: a video-based vision-language-action model for unifying embodied navigation tasks.
+Cited by: §1,
+§2.1,
+Table 1.
+Zhang et al. (2024)
+J. Zhang, K. Wang, R. Xu, G. Zhou, Y. Hong, X. Fang, Q. Wu, Z. Zhang, and H. Wang
+Navid: video-based vlm plans the next step for vision-and-language navigation.
+arXiv preprint arXiv:2402.15852.
+Cited by: §1,
+Table 1.
+Zhang et al. (2025c)
+Z. Zhang, W. Zhu, H. Pan, X. Wang, R. Xu, X. Sun, and F. Zheng
+ActiveVLN: towards active exploration via multi-turn RL in vision-and-language navigation.
+External Links: 2509.12618,
+Link
+Cited by: §2.3.
+Appendix Contents
+Appendix A Detailed Analysis of Progress Myopia
+This section provides the analysis underlying Fig. 1 (c). The analysis asks whether a navigation model’s own decision confidence can distinguish reliable decisions on successful trajectories from unreliable decisions on failed trajectories at comparable critical segments.
+A.1 Selected Representative Navigation Agents
+We analyze three representative VLM-based navigation agents with different decision mechanisms. NaVILA (Cheng et al., 2025) directly predicts high-level navigation actions; StreamVLN (Wei et al., 2025) performs streaming action prediction from observation and action histories; and Aux-Think (Wang et al., 2025a) augments direct navigation with explicit reasoning supervision. Together, these models cover direct action prediction, history-aware navigation, and reasoning-enhanced navigation.
+A.2 Success and Failure Segments Extraction
+We analyze 100 failed rollouts and use their corresponding expert trajectories to construct matched successful counterparts. For each failed rollout, we locate the first segment whose path similarity to the expert route falls below a predefined threshold, focusing the analysis on the onset of deviation rather than its downstream consequences. We align this segment with an equal-length segment at the corresponding position on the expert route. Decision confidence on the latter is measured under teacher forcing, allowing us to compare the model’s confidence along its failed continuation with confidence at the matched expert-guided states.
+A.3 Decision Confidence.
+To compare models with different textual output formats, we score each candidate high-level action a∈𝒜a\in\mathcal{A} by its length-normalized sequence log-likelihood,
+ℓt​(a)=1|a|​∑i=1|a|log⁡p⁡(ai∣st,a<i),\ell_{t}(a)=\frac{1}{|a|}\sum_{i=1}^{|a|}\log p\!\left(a_{i}\mid s_{t},a_{<i}\right),
+(16)
+and normalize these scores over the shared action set 𝒜\mathcal{A}:
+pt​(a)=exp⁡(ℓt​(a))∑a′∈𝒜exp⁡(ℓt​(a′)).p_{t}(a)=\frac{\exp(\ell_{t}(a))}{\sum_{a^{\prime}\in\mathcal{A}}\exp(\ell_{t}(a^{\prime}))}.
+(17)
+Decision confidence is the top-two margin. Let a(1)a_{(1)} and a(2)a_{(2)} be the actions with the highest and second-highest normalized probabilities, respectively:
+ct=pt​(a(1))−pt​(a(2)).c_{t}=p_{t}(a_{(1)})-p_{t}(a_{(2)}).
+(18)
+We additionally report normalized action entropy as a complementary uncertainty measure. We aggregate both quantities over matched critical windows separately for successful and failed rollouts, and compute confidence intervals by resampling matched windows. Thus, similar confidence and entropy across the two outcomes indicate that the model does not reliably recognize when its progress grounding has become unreliable.
+Appendix B Future-Guided Reverse Generation
+B.1 Candidate-State Construction
+FRG retains every macro decision in an offline expert trajectory and assigns
+an action-aware target proportion of SEEK states (Table 2).
+For a turn, the proportion depends on the total rotation of its maximal
+contiguous run of turns in the same direction, rather than on the individual
+turn angle. For example, two consecutive 15∘15^{\circ} right turns form a
+30∘30^{\circ} run, so each receives a target proportion of 50%50\%.
+Table 2: Target SEEK proportions by expert action. For turns, the angle
+denotes the cumulative rotation of consecutive turns in the same direction.
+Expert action
+SEEK proportion
+Move forward
+30%30\%
+Turn left/right (15∘15^{\circ})
+30%30\%
+Turn left/right (30∘30^{\circ})
+50%50\%
+Turn left/right (45∘45^{\circ})
+75%75\%
+Turn left/right (other angles)
+100%100\%
+Stop
+0%0\%
+We then construct a deterministic mode plan. Decisions are grouped by action
+detail: forward distance for MoveForward, or direction and individual
+turn angle for turns. Each group initially receives the integer part of its
+expected SEEK count. Remaining quotas are assigned to groups with
+the largest fractional remainders until the total matches the rounded
+expected count across all groups. Within each group, cumulative allocation
+selects the required number of SEEK decisions; the rest are labeled
+NAV. This preserves the action-conditioned proportions without
+random sampling.
+B.2 Progress Reasoning Annotation
+Progress labels are generated only for planned SEEK states. The VLM annotator receives the instruction, the provided subgoal list, the stride-two history, and the current front observation. It identifies the completed instruction prefix and the first unfinished subgoal, then refines them into the fields completed_tasks and next_task. The validation step requires the completed field to be a contiguous prefix of the instruction and the next-task field to be the subsequent unfinished subgoal.
+B.3 Evidence Seeking Annotation
+Evidence is annotated separately from progress. The annotator receives the instruction, history, and an action-conditioned subset of current replay views: the front view for forward actions and 15∘15^{\circ} turns, and the front view plus the corresponding side view for 30∘30^{\circ} and 45∘45^{\circ} turns. It outputs a single concise key_evidence statement.
+B.4 Dataset Construction
+We serialize each expert decision as one training example. A NAV
+example pairs the instruction and visual context with the expert navigation
+action. A SEEK example additionally includes the evidence-seeking
+interaction and a <think> block containing
+completed_tasks, next_task, and
+key_evidence, followed by the expert navigation action. The
+resulting 4K FRG prior dataset contains 111,141 decision-level examples
+from 4,162 R2R-CE episodes: 68,795 NAV examples and
+42,346 SEEK examples.
+Seek mode example.
+The following record illustrates a SEEK training example.
+Image placeholders denote attached images.
+Instruction:
+Go around the right side of the center unit and stop by the right-side doorway
+with the dining table and mirror.
+Initial mode:
+SEEK (assigned by the macro-action quota plan)
+Progress annotation input:
+historical observations: <image> … <image>
+current front observation: <image>
+Evidence annotation input:
+front observation: <image>   right observation: <image>
+Validated annotations:
+{"completed_tasks": "None.",
+"next_task": "Go around the right side of the center unit.",
+"key_evidence": "A dining area and large framed wall decor are visible on the right."}
+Final serialized training sample:
+assistant: <seek>
+environment: left view:<image> forward view:<image> right view:<image></seek>
+assistant: <think>Completed tasks: None. Next task: Go around the right side of the
+center unit. Key Evidence: A dining area and large framed wall decor are visible
+on the right.</think><nav>The next action is turn right 45 degree.
+B.5 Annotation Prompts
+B.5.1 Progress Reasoning Stage-1 Prompt
+The following is the first prompt used for progress annotation, with instance-specific fields replaced by placeholders. Historical images are attached in chronological order before the current front observation.
+You are a vision-language navigation progress analyzer.
+Determine the agent’s semantic progress at the CURRENT observation.
+Input:
+- Historical observations are sampled every 2 primitive steps before the current
+observation and are provided in chronological order.
+- The current observation is provided after the historical observations and is
+the only observation to label.
+- The provided sub-goal list defines the only valid instruction boundaries.
+- <HISTORY_COUNT> historical frame(s) will be attached before the current observation.
+Navigation instruction:
+<INSTRUCTION>
+Provided sub-goals:
+<SUBGOAL_LIST>
+Task:
+1. Compare the instruction with the visual evidence from the historical and
+current observations.
+2. Determine which provided sub-goals form a fully completed contiguous prefix.
+3. Determine the first unfinished provided sub-goal after that completed prefix.
+Progress rules:
+- Completed tasks must be None or the exact text of the completed contiguous
+prefix from the provided sub-goal list.
+- Next task must be the first provided sub-goal not included in Completed tasks.
+- If all provided sub-goals are completed, Next task must be Stop.
+- Do not split a provided sub-goal further, even if it contains multiple actions.
+- Do not skip an earlier unfinished sub-goal.
+- Use the original wording from the provided sub-goal list whenever possible.
+- Partial completion does not count as completion.
+Output format (MUST follow exactly):
+<Analysis>
+- Briefly state only the instruction-relevant historical/current visual evidence.
+- State which provided sub-goals are fully completed, if any.
+- State why the next sub-goal is the first unfinished one.
+</Analysis>
+<Answer>
+Completed tasks: <None or the exact completed sub-goal prefix>
+Next task: <the first unfinished sub-goal or Stop>
+</Answer>
+Important constraints:
+- No markdown headings.
+- No extra text outside the tags.
+B.5.2 Progress Reasoning Stage-2 Prompt
+The second prompt refines the stage-1 response into the canonical progress fields used for serialization.
+You are an expert navigation progress summarizer.
+You will receive a navigation instruction and a previous model output describing
+the agent’s progress from the historical observations to the current observation.
+Your task is to refine that previous output into two structured labels aligned
+with the navigation instruction.
+Navigation instruction:
+<INSTRUCTION>
+Previous model analysis:
+<STAGE1_ANALYSIS>
+Previous model answer:
+Completed tasks: <STAGE1_COMPLETED_TASKS>
+Next task: <STAGE1_NEXT_TASK>
+Rules:
+- Treat the previous model analysis and answer only as evidence to be checked
+against the navigation instruction.
+- Use the navigation instruction as the only textual task reference.
+- Preserve only progress that is both visually supported by the previous model
+output and consistent with the navigation instruction.
+- Do not add new actions, landmarks, rooms, objects, or interpretations.
+- Do not split the navigation instruction into new sub-goals.
+- Do not merge unrelated instruction clauses.
+- Do not repeat the visual analysis or describe observations in the final output.
+- Preserve the original wording of the navigation instruction whenever possible.
+- Completed tasks must be None or the completed instruction clauses already
+supported by the previous model output, starting from the beginning of the instruction.
+- Next task must be the first unfinished instruction clause after the completed prefix.
+- Do not treat a partially completed instruction clause as completed.
+- Do not infer completion from a future action or from a landmark merely being visible.
+- If no instruction clause is complete, use "None" for completed_tasks.
+- If all instruction steps are complete, use "Stop" for next_task.
+- If the previous model output is ambiguous, incomplete, or conflicts with the
+navigation instruction, choose the most conservative completed prefix.
+- Do not output sub-goal indexes, explanations, Markdown, or any extra fields.
+Output JSON only, without Markdown fences:
+{
+"completed_tasks": "None or the completed instruction prefix",
+"next_task": "The first unfinished instruction clause or Stop"
+}
+B.5.3 Evidence Seeking Annotation Prompt
+The following prompt is used for action-conditioned evidence annotation. The view names and the final directional phrase are instantiated from the target macro action.
+Imagine you are a robot programmed for navigation tasks. We provide you with
+the historical observations, the current views and navigation instruction
+listed below.
+Input:
+Navigation instruction:
+<INSTRUCTION>
+Historical observations:
+<HISTORY>
+Current views:
+<ACTION_CONDITIONED_VIEWS>
+Each entry is a view name followed by its corresponding image. Only the views
+listed above are provided for this sample.
+Task:
+You need to describe concise, task-relevant visual evidence based on the
+navigation instruction and current view. The historical observations are
+provided to indicate the task progress to help you describe more reliably.
+<DIRECTION_QUESTION>
+Evidence rules:
+- Describe only the visible evidence that is relevant to the navigation instruction.
+- Focus on landmarks, objects, doorways, corridors, rooms, targets, or spatial
+relations that help interpret the instruction.
+- Do not describe the entire scene.
+- Do not predict the next action.
+- Do not infer objects or locations that are not visibly supported.
+- Keep the evidence concise: describe at most one or two instruction-relevant
+visual elements.
+- Output exactly one line in the form "Reasoning: <brief reasoning>. Key Evidence:
+I see <one concise instruction-relevant visual description> <DIRECTION>.".
+- The final Key Evidence segment must end exactly with <DIRECTION>.
+Response strictly in this format:
+Reasoning: <brief reasoning>. Key Evidence: I see <one concise
+instruction-relevant visual description> <DIRECTION>.
+If no clear instruction-relevant evidence is visible, output:
+Reasoning: <brief reasoning>. Key Evidence: I see no clear instruction-relevant
+evidence <DIRECTION>.
+These annotations are serialized into 𝒟nav\mathcal{D}_{\mathrm{nav}} and 𝒟seek\mathcal{D}_{\mathrm{seek}} following Eq. 8, and the resulting 𝒟prior\mathcal{D}_{\mathrm{prior}} is used for the supervised cold-start training described in Appendix C.1.
+Appendix C Training Details
+C.1 Supervised Fine-Tuning (FRG-SFT)
+We initialize SeekVLN from the pretrained Aux-Think (Wang et al., 2025a) model by supervised fine-tuning on 𝒟prior\mathcal{D}_{\mathrm{prior}}. Cold-start training learns the restricted first-token decision between <nav> and <seek>, while also learning the direct navigation response or, after evidence acquisition, the structured progress reasoning and navigation response.
+Objective.
+We optimize a restricted mode loss together with a weighted response loss:
+ℒSFT=λmode​ℒmode+ℒresp.\mathcal{L}_{\mathrm{SFT}}=\lambda_{\mathrm{mode}}\mathcal{L}_{\mathrm{mode}}+\mathcal{L}_{\mathrm{resp}}.
+(19)
+For the target mode mt∗∈{<nav>,<seek>}m_{t}^{*}\in\{\texttt{<nav>},\texttt{<seek>}\}, the mode loss is
+ℒmode=−1|𝒟prior|∑tlogexp⁡zt,mt∗exp⁡zt,<nav>+exp⁡zt,<seek>,\mathcal{L}_{\mathrm{mode}}=-\frac{1}{|\mathcal{D}_{\mathrm{prior}}|}\sum_{t}\log\frac{\exp z_{t,m_{t}^{*}}}{\exp z_{t,\texttt{<nav>}}+\exp z_{t,\texttt{<seek>}}},
+(20)
+where zt,⋅z_{t,\cdot} are the logits at the first assistant generation position. This restricted normalization prevents the rare mode decision from being diluted by the much longer free-form response.
+For response tokens, we use
+ℒresp=−1Nvalid∑t∑iμt,iωt,ilogπθ(yt,i∣xt,yt,<i),\mathcal{L}_{\mathrm{resp}}=-\frac{1}{N_{\mathrm{valid}}}\sum_{t}\sum_{i}\mu_{t,i}\omega_{t,i}\log\pi_{\theta}(y_{t,i}\mid x_{t},y_{t,<i}),
+(21)
+Here, μt,i\mu_{t,i} selects supervised tokens and ωt,i\omega_{t,i} upweights structural tokens. The environment content strictly between <seek> and </seek> is masked. During interaction, the environment prefills </seek> after the supplementary views, and the policy generates <think> to begin reasoning. Both </seek> and <think> remain supervised during SFT.
+The cold-start training configuration is summarized in
+Table 3.
+Table 3: FRG SFT training configuration.
+Component
+Setting
+Base model
+Pretrained Aux-Think (Wang et al., 2025a)
+Trainable modules
+Language model and multimodal projector; visual encoder frozen
+Maximum sequence length
+512 tokens
+Learning rate
+2×10−52\times 10^{-5}
+Special tokens
+<nav>, <seek>, </seek>,
+<think>, </think>
+Observations input
+Current observation and up to eight sampled historical frames;
+left, front, and right views are added in SEEK mode
+C.2 Reinforcement Fine-Tuning (C2PO)
+Starting from the FRG-SFT checkpoint, we optimize SeekVLN with
+decision-level PPO (Schulman et al., 2017):
+the complete response at each navigation decision is treated as one policy
+action. The environment reward combines the counterfactual and adaptive
+outcome terms defined in Sec. 3.3, with no per-decision action penalty.
+We additionally use adaptive KL regularization against the frozen SFT
+reference policy. Training settings are summarized in
+Table 4.
+Table 4: C2PO RFT training configuration.
+Component
+Setting
+Model and data
+Initialization
+SeekVLN-FRG-SFT
+Trainable modules
+Language model and multimodal projector; visual encoder frozen
+Value function
+Separate model initialized from the SFT checkpoint
+Visual context
+Nine frames per decision
+Training data
+640 episodes sampled from the R2R-CE train split
+Rollout and PPO
+Episode workers
+16, asynchronous
+Episodes per update
+32
+Total updates
+20
+Advantage estimation
+Decision-level GAE; γ=1.0\gamma=1.0, λ=1.0\lambda=1.0
+Advantage normalization
+Per-update RMS, floor 1.01.0
+PPO clip ratio / epochs
+0.20.2 / 11
+Actor / critic learning rate
+4×10−64\times 10^{-6} / 1×10−51\times 10^{-5}
+Mini-batch size
+128 decisions
+Micro-batch per GPU
+4 decisions
+Reward and regularization
+Counterfactual reward
+Applied only at SEEK decisions; ww times a contrast clipped to [−0.2,0.2][-0.2,0.2]
+Adaptive outcome reward
+1+0.2​SPL1+0.2\,\mathrm{SPL} on success; −0.5-0.5 on failure
+KL reference
+Frozen FRG-SFT policy
+Initial KL coefficient / target
+0.20.2 / 0.30.3 per response
+KL update horizon
+10410^{4}
+Hardware
+8 NVIDIA RTX 6000D GPUs, FSDP2
+Table 4: C2PO RFT training configuration (continued).
+Appendix D Ablation Study
+We ablate the two training stages separately: Future-guided Reverse Generation (FRG), which supplies progress-reasoning and evidence-seeking supervision, and Counterfactual Contrastive Policy Optimization (C2PO), which optimizes the policy through counterfactual branch comparison. Within each comparison, variants share the same backbone, training budget, and optimization settings except for the component under study.
+We evaluate all ablations on a trajectory-deduplicated subset of R2R-CE Val-Unseen: one instruction is retained for each of the 613 unique expert trajectories. The subset preserves all 11 unseen Matterport3D scenes while avoiding repeated evaluation of the same route under multiple instructions.
+D.1 Analysis of FRG
+FRG provides two complementary supervision signals: progress reasoning tracks completed and upcoming instruction subgoals, while evidence-seeking examples associate trigger decisions with task-relevant visual evidence. We remove each signal independently to assess its contribution.
+R2R-CE Val-Unseen-613
+NE ↓\downarrow
+SR ↑\uparrow
+SPL ↑\uparrow
+Aux-Think (base model)
+5.80
+52.0
+45.0
+w/o Evidence Seeking
+4.86
+58.6
+53.3
+w/o Progress Reasoning
+4.99
+58.7
+53.0
+Full FRG
+4.84
+60.7
+55.8
+Table 5: FRG ablations on the R2R-CE Val-Unseen-613 subset.
+R2R-CE Val-Unseen-613
+NE ↓\downarrow
+SR ↑\uparrow
+SPL ↑\uparrow
+Seek Rate (%)
+SeekVLN-FRG-SFT
+4.84
+60.7
+55.8
+15.9
+w/o CF Reward
+3.94
+65.1
+60.4
+34.3
+Full C2PO
+3.66
+68.5
+62.4
+29.3
+Table 6: C2PO ablations on the R2R-CE Val-Unseen-613 subset.
+Table 5 shows that removing progress reasoning lowers SR by 1.96 points and SPL by 2.84 points; removing evidence-seeking supervision lowers them by 2.13 and 2.54 points, respectively. NE also rises in both variants. The consistent degradation indicates that both signals contribute to navigation performance.
+D.2 Analysis of C2PO
+To isolate the contribution of branch-level credit assignment in C2PO, we remove the counterfactual reward while retaining the FRG-SFT initialization, adaptive outcome reward, and all other reinforcement fine-tuning settings.
+As shown in Table 6, adding the counterfactual reward raises SR from 65.09% to 68.52% and SPL from 60.40% to 62.36%, while reducing NE from 3.94 m to 3.66 m. The seek rate also falls from 34.3% to 29.3%. Together, these results suggest that counterfactual credit assignment improves navigation through more selective and effective evidence-seeking decisions.
+Figure 6: Real-world SeekVLN deployment. The Go2 robot handles sensing and
+motion, while a remote GPU server performs policy inference. The hardware
+setup is shown on the right.
+Appendix E Real-World Deployment
+We deploy SeekVLN-C2PO-RFT on a Unitree Go2 using the client–server architecture in
+Fig. 6. The robot handles RGB observation, view
+acquisition, and motion execution, while the policy runs on a remote GPU
+server. An SSH tunnel and HTTP interface carry image observations to the
+server and return discrete actions to the robot.
+At each decision, the model selects either a navigation or visual-search mode.
+For visual search, the robot acquires left, forward, and right views by turning
+in place. The model output is mapped to a finite set of Go2 commands: forward
+motion in 25 cm increments, discrete left or right turns, or stop. The local
+controller validates the output and executes one command before acquiring the
+next observation. A stop prediction indicates model-declared completion; it
+does not independently verify that the goal has been reached.
+Camera images are converted to RGB and resized to 448×448448\times 448 pixels for
+the vision encoder. Up to nine real observations are provided as history;
+shorter histories are not padded. For reproducibility, each run records the
+source images, model inputs and outputs, robot states, actions, and timing
+information. Motion commands are bounded, and the robot stops on inference,
+communication, observation, or control failure.
+Experimental support, please
+view the build logs
+for errors. Generated by
+L
+A
+T
+E
+xml
+.
+Instructions for reporting errors
+We are continuing to improve HTML versions of papers, and your feedback helps enhance accessibility and mobile
+support. To report errors in the HTML that will help us improve conversion and rendering, choose any of the
+methods listed below:
+Click the "Report Issue" (
+) button, located in the page header.
+Tip: You can select the relevant text first, to include it in your report.
+Our team has already identified the following issues. We appreciate your time reviewing and reporting rendering errors we
+may not have found yet. Your efforts will help us improve the HTML versions for all readers, because disability
+should not be a barrier to accessing research. Thank you for your continued support in championing open access for
+all.
+Have a free development cycle? Help support accessibility at arXiv! Our collaborators at LaTeXML maintain a list of packages that need conversion, and welcome developer contributions.
+We gratefully acknowledge support from
+our major funders,
+member institutions, ,
+and all contributors.
+About
+·
+Help
+·
+Contact
+·
+Subscribe
+·
+Copyright
+·
+Privacy
+·
+Accessibility
+·
+Operational Status (opens in new tab)
+Major funding support from

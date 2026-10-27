@@ -1,0 +1,20 @@
+defaults:
+  - actor: td3
+
+critic:
+  _target_: mad_td.nn.critic.TDMPC2Critic
+
+  feature_dim: [512, 512]
+  single_critic: False
+
+encoder:
+  _target_: mad_td.nn.model.TDMPC2ContinuousDeterministicEncoder
+
+  hidden_dim: [512]
+  feature_dim: 512
+
+latent_model:
+  _target_: mad_td.nn.model.TDMPC2ContinuousDeterministicLatentModel
+
+  feature_dim: [512, 512]
+  output_dim: ${models.encoder.feature_dim}

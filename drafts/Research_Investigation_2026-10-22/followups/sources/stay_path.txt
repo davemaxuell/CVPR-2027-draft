@@ -1,0 +1,699 @@
+=== PDF PAGE 1 ===
+Stay on the Path: Instruction Fidelity in Vision-and-Language Navigation
+
+
+         Vihan Jain∗  Gabriel Magalhaes∗  Alexander Ku∗  Ashish Vaswani
+                        Eugene Ie   Jason Baldridge
+                                Google Research
+ {vihan, gamaga, alexku, avaswani, eugeneie, jridge}@google.com
+
+
+
+
+
+                Abstract
+
+    Advances in learning and representations have
+    reinvigorated work  that connects language
+    to other modalities. A particularly exciting
+    direction is Vision-and-Language Navigation
+   (VLN), in which agents interpret natural lan-
+    guage instructions and visual scenes to move
+    through environments and reach goals.  De-
+     spite recent progress, current research leaves
+    unclear how much of a role language un-
+    derstanding plays in this task, especially be-
+                                                      Figure 1: It’s the journey, not just the goal. To give lan-    cause dominant evaluation metrics have fo-
+                                                  guage its due place in VLN, we compose paths in the    cused on goal completion rather than the se-
+                                       R2R dataset to create longer, twistier R4R paths (blue).    quence of actions corresponding to the instruc-
+                                               Under standard metrics, agents that head straight to     tions. Here, we highlight shortcomings of cur-
+                                                          the goal (red) are not penalized for ignoring the lan-    rent metrics for the Room-to-Room dataset
+                                                  guage instructions: for instance, SPL yields a perfect    (Anderson et al., 2018b) and propose a new
+                                                         1.0 score for the red and only 0.17 for the orange path.    metric, Coverage weighted by Length Score
+                                                         In contrast, our proposed CLS metric measures ﬁdelity    (CLS). We also show that the existing paths in
+                                                             to the reference path, strongly preferring the agent with    the dataset are not ideal for evaluating instruc-
+                                                          the orange path (0.87) over the red one (0.23).    tion following because they are direct-to-goal
+    shortest paths. We join existing short paths to
+    form more challenging extended paths to cre-
+                                                 language modalities – such as image and video cap-    ate a new data set, Room-for-Room (R4R). Us-
+    ing R4R and CLS, we show that agents that        tioning (Donahue et al., 2017; Fang et al., 2015;
+    receive rewards for instruction ﬁdelity outper-       Vinyals et al., 2015; Wang et al., 2018; Yu et al.,
+    form agents that focus on goal completion.          2016), visual question answering (VQA) (Antol
+                                                           et al., 2015; Yang et al., 2016), and visual dia-
+1  Introduction                                 log (Das et al., 2017) – VLN additionally requires
+                                                    agents to plan their actions, move, and dynamically
+In Vision-and-Language Navigation (VLN) tasks,
+                                                respond to changes in their visual ﬁeld.
+agents must follow natural language navigation
+                                                         Photo-realistic simulations for VLN are espe-
+instructions through either simulated (Macmahon
+                                                         cially promising: they retain messy, real world
+et al., 2006; Yan et al., 2018; Bisk et al., 2018; Shah
+                                               complexity and can draw on pre-trained models
+et al., 2018), simulations of realistic (Blukis et al.,
+                                              and rich data about the world, but do not require in-
+2018; Misra et al., 2018) and real environments
+                                                 vestment in and maintenance of physical robots and
+(Anderson et al., 2018b; de Vries et al., 2018; Chen
+                                                   spaces for them. Given this, we focus on the Room-
+et al., 2019; Cirik et al., 2018), or actual physi-
+                                           to-Room (R2R) task (Anderson et al., 2018b). De-
+cal environments (Skoˇcaj et al., 2016; Thomason
+                                                        spite signiﬁcant recent progress on R2R since its
+et al., 2018; Williams et al., 2018). Compared to
+                                                    introduction (Fried et al., 2018; Ma et al., 2019;
+other tasks involving co-grounding in visual and
+                                     Wang et al., 2019), the structure of the dataset and
+     ∗Authors contributed equally.                         current evaluation metrics greatly diminish the im-
+
+                                        1862
+
+        Proceedings of the 57th Annual Meeting of the Association for Computational Linguistics, pages 1862–1872
+                Florence, Italy, July 28 - August 2, 2019. c⃝2019 Association for Computational Linguistics
+=== PDF PAGE 2 ===
+portance of language understanding for the task.   goal-oriented rewards obtains the same CLS (20.4)
+The core problems are that paths in R2R are all   on R4R regardless of whether the full instruction
+direct-to-goal shortest paths and metrics are mostly    or only the last ﬁve tokens are provided to it. In
+based on goal completion rather than ﬁdelity to the    contrast, the CLS-rewarded agent drops from CLS
+described path. To address this, we deﬁne a new    of 34.6 to 25.3 when given only the last ﬁve tokens.
+metric, Coverage weighted by Length Score (CLS),
+and compose path pairs of R2R to create Room-for-   2  Extending R2R to create R4R
+Room (R4R), an algorithmically produced exten-
+                                                      Instructions such as “Turn left, walk up the stairs.
+sion of R2R. Figure 1 illustrates path composition
+                                                Enter the bathroom.” are easy for people but chal-
+and the scores of two agent paths for both CLS and
+                                                 lenging for computational agents. Agents must
+Success weighted by Path Length (SPL), a metric
+                                               segment instructions, set sub-goals based on under-
+recently proposed by Anderson et al. (2018a). In
+                                                  standing them and ground the language and their
+the example, an agent which ignores the language
+                                                    actions in real world objects and dynamics. An
+but gets to the goal receives a perfect SPL score.
+                                                   agent may need expectations for how spatial scenes
+  Language is not irrelevant for R2R. Thomason   change when turning. Additionally, it must recog-
+et al. (2019) ablate visual and language inputs and    nize visual and environmental features that indicate
+ﬁnd that withholding either from an action sam-     it has entered or encountered something referred to
+pling agent reduces performance on unseen houses.   as “the bathroom” and know to stop.
+Also, the generated instructions in the augmented
+paths of Fried et al. (2018) improved performance    2.1  Room-to-Room (R2R)
+for several models. However, while many of these                                         Room-to-Room (R2R) supports visually-grounded
+augmented instructions have clear starting or end-                                                     natural language navigation in a photo-realistic
+ing descriptions, the middle portions are often dis-                                              environment (Anderson et al., 2018b). R2R con-
+connected from the path they are paired with (see                                                              sists of an environment and language instructions
+Huang et al. (2019) for in depth analysis of aug-                                                     paired to reference paths. The environment deﬁnes
+mented path instructions). That these low-ﬁdelity                                                  a graph where nodes are possible positions an agent
+augmented instructions improve results indicates                                     may inhabit. Edges indicate that a direct path be-
+that current metrics are insensitive to instruction                                              tween two nodes is navigable. For each node, R2R
+ﬁdelity. Our new CLS metric measures how closely                                                   provides an egocentric panoramic view. All images
+an agent’s trajectory conforms with the entire refer-                                                    are collected from buildings and house interiors.
+ence path, not just goal completion.                                         The paths paired with language instructions are
+  Because the reference paths in R2R are all direct-   composed by sequences of nodes in this graph.
+to-goal, the importance of the actual journey taken     For data collection, starting and goal nodes are
+from start to ﬁnish is diminished; as a result, ﬁ-   sampled from the graph and the shortest path be-
+delity between instructions and their corresponding   tween those nodes is taken, provided it is no shorter
+paths is harder to evaluate. In longer, twistier paths,   than 5m and contains between 4 and 6 edges. Each
+the importance of not always going directly to the    path has 3 associated natural language instructions,
+goal becomes much clearer. We take advantage of   with an average length of 29 words and a total vo-
+the fact that the original R2R data contains many    cabulary of 3.1k words. Apart from the training set,
+paths that have goals that coincide with the start    the dataset includes two validation sets and a test
+points of other paths. By concatenating pairs of     set. One of the validation sets includes new instruc-
+paths and their corresponding instructions, we cre-    tions on environments overlapping with the train-
+ate longer paths that allow us to better gauge the    ing set (Validation Seen), and the other is entirely
+ability of an agent to stick to the path as described.    disjoint from the training set (Validation Unseen).
+With this data, Reinforced Cross-modal Matching      Fried et al. (2018) propose a follower model
+models (Wang et al., 2019) that use CLS as a re-   which is trained using student forcing, where ac-
+ward signal dramatically improve not only CLS    tions are sampled from the agent’s decisions, but
+(from 20.4% for the agent with goal-oriented re-   supervised using the action that takes the agent
+wards to 34.6%), but navigation error also reduces    closest to the goal. During inference, the follower
+from 8.45m to 8.08m on the the Validation Unseen    generates candidate paths which are then scored by
+dataset. Furthermore, we ﬁnd that the agent with    a speaker model. The speaker model was also used
+
+                                        1863
+=== PDF PAGE 3 ===
+                                                               #samples PL(R) d(r1, r|R|)
+                                                         Train       14039    9.91     9.91
+                                    R2R Val. seen     1021    10.2     10.2
+                                                             Val. unseen   2249    9.50     9.50
+                                                         Train       233613   20.6     10.5
+                                    R4R Val. seen     1035    20.4     11.1
+                                                             Val. unseen  45162    20.2     10.1
+
+Figure 2: An example of an extended path in the R4R                                                      Table 1: Comparison of R2R to R4R. PL(R) repre-
+dataset, where the dotted blue arrow connects two blue                                                           sents the mean path length of the reference paths and
+paths with solid arrows, corresponding to the instruc-                                                         d(r1, r|R|) is mean length of the shortest-to-goal path.
+tions “Make a left down at the narrow hall beside the
+ofﬁce and walk straight to the exit door. Go out the door
+and wait.” and “Turn around and enter the bedroom.    structions in their entirety becomes clearer, and
+Walk to the other side of the room and turn left. Walk
+                                                 proper evaluation of this conformity can be bet-
+into the doorway leading out and stop.”. The shortest-
+                                                            ter studied. Additionally, the fact that the largestto-goal path from the starting point is shown in orange.
+                                                   path in the dataset has only 6 edges exacerbates the
+                                                  challenge of properly evaluating conformity. This
+                                                  motivates the need for a dataset with larger and
+for creating an augmented dataset that is used as   more diverse reference paths.
+an extension of training data by the follower model     To address the lack of path variety, we propose
+as well as by many subsequently published models.   a data augmentation strategy1  that introduces
+Wang et al. (2019) train their agents using policy    long, twisty paths without additional human or
+gradients. At every step, the agent is rewarded for    low-ﬁdelity machine annotations (e.g. those from
+getting closer to the target location (extrinsic re-   Fried et al. (2018)). Existing paths in the dataset
+ward) as well as for choosing an action that reduces   can be extended by joining them with other paths
+cycle-reconstruction error between instruction gen-    that start within some threshold of where they end.
+erated by a matching critic and ground-truth instruc-   Formally, two paths A=(a1, a2, · · · , a|A|) and
+tion (intrinsic reward). In both papers, there is little   B=(b1, b2, · · · , b|B|) are joined if d(a|A|, b1)<dth.
+analysis presented about the generative models.     The   resulting   extended   paths   are   thus
+   Recently, Anderson et al. (2018a) pointed out   R=(a1, · · · , a|A|, c1, · · · , c|C|, b1, · · · , b|B|),
+weaknesses in the commonly used metrics for eval-   where C = (c1, c2, · · · , c|C|) is the shortest path
+uating the effectiveness of agents trained on these   between a|A| and b1. (If a|A|=b1, C is empty.)
+tasks. A new metric, Success weighted by Path                                            Each combination of instructions correspond-
+Length (SPL) was proposed that penalized agents    ing to paths A and B is included in R4R. Since
+for taking long paths. Any agent using beam search   each path maps to multiple human-annotated in-
+(e.g. Fried et al. (2018)), is penalized heavily by    structions, each extended path will map to NA ·NB
+this metric. There have also been concerns about    joined instructions, where NA and NB are the num-
+structural biases present in these datasets which                                                  ber of annotations associated with paths A and B,
+may provide hidden shortcuts to agents training on                                                       respectively.  Figure 2 shows an example of an
+these problems. Thomason et al. (2019) presented   extended path and the corresponding instructions,
+an analysis on R2R dataset, where the trained agent   compared to the shortest-to-goal path.
+continued to perform surprisingly well in the ab-
+sence of language inputs.                     3  Evaluation Metrics in VLN
+
+2.2  Room-for-Room (R4R)                         Historically, the performance of VLN models has
+                                             been evaluated with respect to the objective ofDue to the process by which the data are gener-
+                                                  reaching the goal location. The nature of the pathated, all R2R reference paths are shortest-to-goal
+                                               an agent takes, however, is of clear practical impor-paths. Because of this property, conformity to the
+                                                       tance: it is undesirable for any robotic agent in theinstructions is decoupled from reaching the de-
+                                                    physical world to reach the destination by taking asired destination – and this short-changes the lan-
+guage perspective. In a broader scope of reference                                                       1R2R-to-R4R  code  is  at  https://github.com/google-
+paths, the importance of following language in-    research/google-research/tree/master/r4r
+
+                                        1864
+=== PDF PAGE 4 ===
+Figure 3: From left to right, the distribution of the number of steps, path lengths, direct-to-goal path lengths and
+instruction lengths in the original R2R and extended R4R datasets.
+
+
+different path than what it was instructed to follow;    the graph. This ensures that larger discrepancies
+failure to comply with instructions might lead to    are penalized more severely than smaller ones and
+navigating unwanted and potentially dangerous lo-    that metrics should not rely only on dichotomous
+cations. Here, we propose a series of desiderata for   views of intersection. For instance, a predicted path
+VLN metrics and introduce Coverage weighted by    that has no intersection to the reference path, but
+Length Score (CLS). Table 2 provides a high level    follows it closely, as illustrated in Figure 1 should
+summary of this section’s contents.                  not be penalized too severely.
+                                                       (3) Unique optimum. Metrics should yield a perfect
+3.1  Desiderata                                                  score if and only if the reference and predicted
+Commonly, navigation tasks are deﬁned in a dis-   paths are an exact match. This ensures that the
+crete space: the environment determines a graph    perfect score is unambiguous: the reference path R
+where each node is a position the agent could be     is therefore treated as a golden standard. No other
+in and each edge between two nodes represents    path should have the same or higher score as the
+that there is a navigable step between them. Let    reference path itself.
+the predicted path P = (p1, p2, p3, ..., p|P|) be the    (4) Scale invariance. Metrics should be consistent
+sequence of nodes visited by the agent and refer-   over different datasets.
+ence path R = (r1, r2, r3, ..., r|R|) be the sequence    (5) Computational tractability. Metrics should be
+of nodes in the reference trajectory.  Generally,   pragmatic, allowing fast automated evaluation of
+p1 = r1, since in many VLN tasks, the agent begins   performance in navigation tasks.
+at the reference path’s start node. The following
+                                                    3.2  Existing Navigation Metricsdesiderata characterize metrics that gauge the ﬁ-
+delity of P with respect to R rather than just goal   Table 2 deﬁnes previous navigation metrics and
+completion. Throughout the paper, we refer to the   how they match our desiderata. We denote by
+subsequent desired properties as Desideratum (i).    d(n, m) the shortest distance between two nodes
+(1) Path similarity measure. Metrics should char-   along the edges of the graph and d(n, P) =
+acterize a notion of similarity between a predicted   minp∈P d(n, p) the shortest distance between a
+path P and a reference path R. This implies that   node and a path. All distances are computed along
+metrics should depend on all nodes in P and all    the edges of the graph determined by the environ-
+nodes in R, which contrasts with many common   ment, which are not necessarily equal to the eu-
+metrics which only consider the last node in the    clidean distance between the nodes.
+reference path (see Section 3.2). Metrics should      Path Length (PL) measures the total length of
+penalize deviations from the reference path, even if    the predicted path, which has the optimal value
+they lead to the same goal. This is not only prudent,   equal to the length of the reference path. Naviga-
+as agents might wander around undesired terrain    tion Error (NE) measures the distance between the
+if this is not enforced, but also explicitly gauges    last node in the predicted path and the last refer-
+the ﬁdelity of the predictions with respect to the   ence path node. Oracle Navigation Error (ONE)
+provided language instructions.                   measures the shortest distance from any node in
+(2) Soft penalties. Metrics should penalize differ-   the predicted path to the last reference path node.
+ences from the reference path according to a soft    Success Rate (SR) measures how often the last node
+notion of dissimilarity that depends on distances in    in the predicted path is within a threshold distance
+
+                                        1865
+=== PDF PAGE 5 ===
+                                                                                      Desiderata coverage
+  Metric                           ↑↓Deﬁnition
+                                                                                              (1)  (2)  (3)  (4)  (5)
+  Path Length (PL)                                 - P1≤i<|P| d(pi, pi+1)
+  Navigation Error (NE)                  ↓   d(p|P|, r|R|)
+  Oracle Navigation Error (ONE)          ↓  minp∈P d(p, r|R|)
+  Success Rate (SR)                     ↑  1[NE(P, R) ≤dth]
+  Oracle Success Rate (OSR)              ↑  1[ONE(P, R) ≤dth]
+                                                                   d(p1, r|R|)
+  Success weighted by PL (SPL)           ↑  SR(P, R) ·
+                                               max{PL(P), d(p1, r|R|)}
+                                                       ED(P, R)
+  Success weighted by Edit Distance (SED)  ↑  SR(P, R)  1 −
+                                            max {|P|, |R|} −1
+  Coverage weighted by LS (CLS)          ↑  PC(P, R) · LS(P, R)
+
+                     Table 2: Deﬁnition and desiderata coverage of navigation metrics.
+
+
+dth of the last reference path node. Oracle Success
+Rate (OSR) measures how often any node in the
+predicted path is within a threshold distance dth of
+the last node in the reference path.
+
+  Success weighted by Path Length (SPL) (Ander-
+son et al., 2018a) takes into account both Success
+Rate and the normalized path length. It was pro-                                                      Figure 4: With respect to the blue path, SED yields zero
+posed as a single summary measure for navigation    for both the orange and red paths, while CLS yields a
+tasks. Note that the agent should maximize this    score of 0.89 for orange and 0.48 for red.
+metric, and it is only greater than 0 if the success
+criteria was met. While this metric is ideally suited
+                                                            (5). Desideratum (2), however, is left unsatisﬁed,when the evaluating whether the agent successfully
+                                                     as SED does not take into account how two actionsreached the desired destination, it does not take into
+                                                          differ from each other (considering, for instance,account any notion of similarity between the pre-
+                                                    the graph distance between their end nodes), butdicted and reference trajectories and fails to take
+                                                only if they are the same or not. This subtle butinto account the intermediary nodes in the refer-
+                                                  important difference is illustrated in Figure 4.ence path. As such, it violates Desideratum (1).
+Since there could exist more than one path with                                                    3.3  Coverage weighted by Length Score
+optimal length to the desired destination, it also
+                                 We introduce Coverage weighted by Length Scoreviolates Desideratum (3).
+                                              (CLS) as a single summary measure for VLN. CLS
+  Success weighted by Edit Distance (SED) (Chen                                                                is the product of the Path Coverage (PC) and
+et al., 2019) is based on the edit distance ED(P, R)                                             Length Score (LS) of the agent’s path P with re-
+between the two paths, equal to the Levenshtein                                                     spect to reference path R:
+distance between the two sequences of actions
+AP =  ((p1, p2), (p2, p3), ..., (p|P|−1, p|P|)) and
+AR = ((r1, r2), (r2, r3), ..., (r|R|−1, r|R|)). The        CLS(P, R) = PC(P, R) · LS(P, R)    (1)
+Levenshtein distance is the minimum number of
+edit operations (insertion, deletion and substitu-    PC replaces SR as a non-binary measure of how
+tion of actions) that can transform path AR into   well the reference path is covered by the agent’s
+AP . Similarly to SPL, SED is also multiplied by    path. It is the average coverage of each node in the
+SR(P, R), so only paths that meet the success crite-   reference path R with respect to path P:
+ria receive a score greater than 0. This metric natu-
+rally satisﬁes Desideratum (1), (3) and (4). Further,
+                                                          1             P)it is possible to compute it using dynamic program-                                             PC(P, R) = X exp  −d(r,          (2)
+ming in O(|P||R|), further satisfying Desideratum                   |R|               dth                                                             r∈R
+
+                                        1866
+=== PDF PAGE 6 ===
+where d(r, P)= minp∈P d(r, p) is the distance to   4  Agent
+reference path node r from the nearest node in
+                                We reimplement the Reinforced Cross-ModalP. The coverage contribution for each node r is
+                                             Matching (RCM) agent of Wang et al. (2019) and
+an exponential decay of this distance. (1/dth is a
+                                                extend it to use a reward function based on bothdecay constant to account for graph scale.)
+                                   CLS (Section 3.3) as well as success rate.
+  LS compares the predicted path length PL(P) to
+EPL, the expected optimal length given R’s cov-                                                    4.1  Navigator
+erage of P. If say, the predicted path covers only
+                                         The reasoning navigator of Wang et al. (2019)
+half of the reference path (i.e., PC = 0.5), then
+                                                     learns a policy πθ over parameters θ that map thewe expect the optimal length of the predicted path
+                                                     natural language instruction X and the initial vi-
+to be half of the length of the reference path. As a
+                                                     sual scene v1 to a sequence of actions a1..T . Atresult, EPL is given by:
+                                                time step t, the agent state is modeled using a
+                                 LSTM (Hochreiter and Schmidhuber, 1997) that en-
+       EPL(P, R) = PC(P, R) · PL(R)      (3)   codes the trajectory of past visual scenes and agent
+                                                       actions, ht=LSTM([vt; at−1], ht−1), where vt is
+  LS for a predicted path P  is optimal only if    the output of visual encoder as described below.
+PL(P) is equal to the expected optimal length –
+                                         Language Encoder Language instructions X =
+it is penalized when the predicted path length is
+                                                          x1..n are initialized with pre-trained GloVe word
+shorter or longer than the expected path length:
+                                             embeddings (Pennington et al., 2014) that are ﬁne-
+                                                  tuned during training. We restrict the GloVe vocab-
+                                                    ulary to tokens that occur at least ﬁve times in the
+                    EPL(P, R)
+LS(P, R) =                                          instruction data set. All out of vocabulary tokens
+          EPL(P, R) + |EPL(P, R) −PL(P)|                                                    are mapped to a single OOV identiﬁer. Using a
+                                                 (4)
+                                                        bidirectional recurrent network (Schuster and Pali-
+  There is a clear parallel between the terms of
+                                                    wal, 1997) we encode the instruction into language
+CLS and SPL. CLS replaces success rate, the ﬁrst
+                                                    contextual representations w1..n.
+term of SPL, with path coverage, a continuous in-
+dicator for measuring how well the predicted path   Visual Features As in Fried et al. (2018), at each
+covered the nodes on the reference path. Unlike SR,   time step  t, the agent perceives a 360-degree
+PC is sensitive to the intermediary nodes in the ref-   panoramic view of its surroundings from the cur-
+erence path R. The second term of SPL penalizes    rent location. The view is discretized into m view
+the path length PL(P) of the predicted path against    angles (m = 36 in our implementation, 3 eleva-
+the optimal (shortest) path length d(p1, r|R|); CLS    tions x 12 headings at 30-degree intervals). The
+replaces that with length score LS, which penal-   image at view angle i, heading angle φ and ele-
+izes the agent path length PL(P) against EPL, the    vation angle θ is represented by a concatenation
+expected optimal length for its coverage of R.       of the pre-trained CNN image features with the
+                                                  4-dimensional orientation feature [sin φ; cos φ; sin  CLS naturally covers Desideratum (1) and (2).
+                                                       θ; cos θ] to form vt,i. The visual encoder poolsAssuming that the reference path is acyclic and that
+                                                    the representation of all view angles vt,1..m usingp1 = r1, i.e., reference and predicted path start
+                                                        attention over the previous agent state ht−1.at the same node, Desideratum (3) is also satis-
+ﬁed. Additionally, CLS also covers Desideratum
+                                                                   vt = Attention(ht−1, vt,1..m)        (5)(4) because PC and LS are both invariant to the
+graph scale (due to the term dth). Finally, the dis-
+                                         The actions available to the agent at time t are
+tances from each pair of nodes in the graph can
+                                               denoted as ut,1..l, where ut,j is the representationbe pre-computed using Dijkstra’s algorithm (Dijk-
+                                                   of navigable direction j from the current location
+stra, 1959) for each node, resulting in a complexity
+                2                                   obtained similarly to vt,i (Fried et al., 2018). Theof O(EV + V  log(V )), where V and E are the
+                                          number of available actions, l, varies for different
+number of vertices and edges in the graph, respec-
+                                                       locations, since nodes in the graph have different
+tively. PC(P, R) can be computed in O(|P||R|),
+                                          number of connections.
+and LS(P, R) can be computed in O(|P| + |R|),
+making CLS satisfy Desideratum (5).              Action Predictor As in Wang et al. (2019), the
+
+                                        1867
+=== PDF PAGE 7 ===
+model predicts the probability pk of each navigable    4.3  Reward
+direction k using a bilinear dot product.                                              For consistency with the established benchmark
+                                         (Wang et al., 2019), we implemented a dense goal-
+      pk = softmax([ht; ctextt    ; cvisualt   ]Wc(ut,kWu)T )    (6)
+                                                     oriented reward function that optimizes the success
+        ctextt = Attention(ht, w1..n)                          (7)
+                                                      rate metric. This includes an immediate reward at
+      cvisualt  = Attention(ctextt   , vt,1..m)                       (8)                                                 time step t in an episode of length T, given by:
+
+
+4.2  Learning                                                                                               d(st, r|R|)−
+                               
+Training is performed using two separate phases,      r(st, at) = d(st+1, r|R|)             if t < T
+(1) behavioral cloning (Bain and Sammut, 1999;                                                              1[d(sT , r|R|) ≤dth]   if t = T
+Wang et al., 2019; Daftry et al., 2016) and (2) REIN-                                                                                                (11)
+FORCE policy gradient updates (Williams, 1992).
+                                           where d(st, r|R|) is the distance between st and
+  As is common in cases where expert demonstra-                                                        target location r|R|, 1[·] is the indicator function,
+tions are available, the agent’s policy is initialized
+                                                    dth is the maximum distance from r|R| that the
+using behavior cloning to constrain the learning
+                                                  agent is allowed to terminate for success.
+algorithm to ﬁrst model state-action spaces that are
+                                           To incentivize the agent to not only reach the
+most relevant to the task, effectively warm starting
+                                                        target location but also to conform to the refer-
+the agent with a good initial policy. No reward
+                                               ence path, we also train our agents with following
+shaping is required during this phase as behav-
+                                                      ﬁdelity-oriented sparse reward:
+ior cloning corresponds to solving the following
+maximum-likelihood problem,
+                              0                               if t < T
+         max X  log πθ(a|s)           (9)                         θ                                         r(st, at) =   1[d(sT , r|R|) ≤dth]+                   (s,a)∈D
+                                                            CLS(s1...T , R)            if t = Twhere D is the demonstration data set.
+                                                                                                (12)  After warm starting the model with behavioral
+                                             where R is the reference path in the dataset associ-cloning, we obtain standard policy gradient updates
+                                                   ated with the instruction X. This rewards actionsby sampling action sequences from the agent’s be-
+                                                          that are consistent both with reaching the goal andhavior policy. As in standard policy gradient up-
+                                                 following the path corresponding to the languagedates, the model is optimized by minimizing the
+loss function LPG whose gradient is the negative    instructions. It is worth noting here that, similar to
+                                               Equation 11, a relative improvement in CLS canpolicy gradient estimator (Williams, 1992).
+                                             be added as a reward-shaping term for time steps
+        LPG = −ˆEt[log πθ(at|st)ˆAt]      (10)    t < T, however empirically we did not ﬁnd notice-
+                                                     able difference in the performance of agents trained
+where the expectation ˆEt is taken over a ﬁnite batch                                                with or without the shaping term. For simplicity,
+of sample trajectories generated by the agent’s
+                                                                all of the experiments involving ﬁdelity-oriented
+stochastic policy πθ.  To reduce variance, we                                               reward use the sparse reward in Equation 12.
+scale the gradient using the advantage function
+ˆAt=Rt−ˆbt. (Rt= P∞i=t γi−tri is the observed γ-                                       5  Results
+discounted episodic return and ˆbt is the estimated
+value of the agent’s current state at time t.)       We obtain the performance of models trained under
+  The models are trained using mini-batch gradi-   two training objectives. The ﬁrst is goal oriented
+ent descent. Our experiments show that interleav-   (Equation 11): agents trained using this reward are
+ing behavioral cloning and policy gradient training   encouraged to pursue only the last node in the refer-
+phases improves performance on the validation set.   ence path. The second is ﬁdelity oriented (Equation
+Speciﬁcally we interleaved each policy gradient    12): agents trained using this reward receive credit
+update batch with K behaviour cloning batches,   not only for reaching the target location success-
+with the value of K decaying exponentially, such    fully but also for conforming to the reference path.
+that the training strategy asymptotically becomes  We report the performance on standard metrics (PL,
+only policy gradient updates.                   NE, SR, SPL) as well as the new CLS metric.
+
+                                        1868
+=== PDF PAGE 8 ===
+  To further explore the role of language, we per-    target destination may incidentally appear to be
+form ablation studies, where agents are trained us-   conforming to the instructions. The results shown
+ing the full language instructions and evaluated    in Section 5.2 further conﬁrm this hypothesis by
+on partial (last 5 tokens) or no instructions. With    training and evaluate goal oriented and target ori-
+no instructions, the agent only has the full visual    ented agents on R4R dataset.
+input, similar to the unimodal ablation studies of     As evidenced by the ablation studies, models
+Thomason et al. (2019). To eliminate the effect   draw some signal from the language instructions.
+observed due to distribution shift during evaluation   However, having the last ﬁve tokens makes up for
+and preserve the length distribution of the input    a signiﬁcant portion of the gap between no instruc-
+instructions, we further conducted studies where    tions and full instructions, again highlighting prob-
+agents are given arbitrary instructions from the val-   lems with R2R and the importance in R2R of iden-
+idation set, with the reference path remaining unal-    tifying the right place to stop rather than following
+tered. We observed that experiments with arbitrary    the path. The performance of both the agents de-
+instruction had similar results to studies where in-   grade in similar proportions when instructions are
+structions where fully removed.                        partially or fully removed.
+  On the R4R dataset, the ﬁdelity oriented agent       Finally, as expected, the SPL metric appears con-
+signiﬁcantly outperforms the goal oriented agent    sistent with CLS on R2R, since all reference paths
+(> 14% absolute improvement in CLS), demon-   are shortest-to-goal. As highlighted in Section 5.2,
+strating that including CLS in the reward signal    this breaks in settings where paths twist and turn.
+successfully produces better conformity to the ref-
+erence trajectories. Furthermore, on Validation Un-   5.2  R4R Performance
+seen, when all but the last 5 tokens of instructions
+                                                Table 4 shows the results on R4R. Overall, theare removed, the goal oriented agent yields the
+                                                   scores for all model variants on R4R are muchsame CLS as with the full instructions, while the ﬁ-
+                                               lower than R2R, which highlights the additionaldelity oriented agent suffers signiﬁcantly, decaying
+                                                  challenge of following longer instructions forfrom 34.6% to 25.3%. This indicates that includ-
+                                                    longer paths. Most importantly, the ﬁdelity orienteding ﬁdelity measurements as reward signals im-
+                                                 agent signiﬁcantly outperforms the goal orientedprove the agent’s reliance on language instructions–
+                                                 agent for both CLS and navigation error, demon-thereby better keeping the L in VLN.
+                                                         strating the importance of both measuring path ﬁ-
+5.1  R2R Performance                               delity and using it to guide agent learning.
+                                      On the experiments, the goal oriented agent con-Table 3 summarizes the experiments on R2R.2
+                                                     tinues to exploit biases and the underlying struc-There are not major differences between goal ori-
+                                                      ture in the environment to reach the goal. Whenented and ﬁdelity oriented agents, highlighting the
+                                                      the instructions are removed during evaluation, theproblematic nature of R2R paths with respect to
+                                                     agent’s performance on the CLS metric barely de-instruction following: essentially, rewards that only
+                                                      grades, showing that the agent does not rely signif-take into account the goal implicitly signals path
+                                                       icantly on the instructions for its performance. Inconformity—by the construction of the dataset it-
+                                                          contrast, the ﬁdelity oriented agent learns to pursueself. As a result, an agent optimized to reach the
+                                                conformity to the reference path, which in turn re-
+    2Our goal oriented results match the RCM benchmark    quires attending more carefully to the instructions.
+on validation unseen but are lower on validation seen. We
+                                    When instructions are removed during evaluation,suspect this is due to differences in implementation details
+and hyper-parameter choices.                          performance of the ﬁdelity oriented agent degrades
+    3For the random evaluation, we ﬁrst sample the number    considerably on the CLS metric. In fact, the ﬁdelity
+of edges in the trajectory from the distribution of number of
+                                                     oriented agent performs better on CLS metric with-edges in the reference paths of the training dataset. Then, for
+each node, we uniformly sample between its neighbors and    out instructions as the goal oriented agent performs
+move the agent there. We report the average metrics for 1   with the full instructions.
+million random trajectories.
+                                                    Furthermore, we highlight that historically dom-    4As in Wang et al. (2019), we report the performance of
+Speaker-Follower model from Fried et al. (2018) that utilizes    inant metrics are ineffective – even misleading –
+panoramic action space and augmented data but no beam    for measuring agents’ performance: for instance,
+search (pragmatic inference) for a fair comparison.
+                                                     especially for reference paths that begin and end   5We report the performance of the RCM model without
+intrinsic reward as the benchmark.                            at close locations, SPL is a poor measure of suc-
+
+                                        1869
+=== PDF PAGE 9 ===
+                                               Validation Seen                Validation Unseen
+
+   # Model                    PL NE ↓SR ↑SPL ↑CLS ↑  PL NE ↓SR ↑SPL ↑CLS ↑
+   0 Random3                        10.4  9.82   5.0    3.7    29.4   9.32  9.32   5.2    4.0    29.0
+   1 Speaker-Follower  (Fried  et  al.,    -   3.36  66.4     -        -         -   6.62  35.5     -        -
+      2018)4
+   2 RCM (Wang et al., 2019)5        12.1  3.25  67.6     -        -     15.0  6.01  40.6     -        -
+   3 Speaker-Follower                15.5  4.98  50.1  40.1   54.8   15.2  6.36  35.3  28.1   42.9
+   4 RCM, goal oriented              13.7  4.48  55.3  47.9   61.1   14.8  6.00  41.1  32.7   47.4
+   5     last 5 tokens                   16.9  7.35  26.5  22.2   39.0   15.1  8.16  22.2  17.2   35.1
+   6   no instructions                21.1  7.78  22.3  11.6   27.5   17.7  8.69  13.0   9.4    26.1
+   7 RCM, ﬁdelity oriented            12.2  4.63  57.3  50.7   60.2   13.2  6.38  40.8  35.1   50.9
+   8     last 5 tokens                   13.4  8.08  27.8  23.5   42.4   14.4  8.29  23.2  17.7   35.5
+   9   no instructions                20.1  8.95  18.2   8.8    24.8   20.5  8.76  14.3   6.2    22.7
+
+Table 3: Results on R2R Validation Seen and Validation Unseen sets. Rows 0 and 3-9 shows numbers from our
+implementations. SR, SPL and CLS are reported as percentages and NE and PL in meters.
+
+
+                                               Validation Seen                Validation Unseen
+
+   # Model                    PL NE ↓SR ↑SPL ↑CLS ↑  PL NE ↓SR ↑SPL ↑CLS ↑
+   0 Random3                        21.8  11.4  13.1   2.0    23.1   23.6  10.4  13.8   2.2    22.3
+   1 Speaker-Follower                15.4  5.35  51.9  37.3   46.4   19.9  8.47  23.8  12.2   29.6
+   2 RCM, goal oriented              24.5  5.11  55.5  32.3   40.4   32.5  8.45  28.6  10.2   20.4
+   3     last 5 tokens                   29.5  8.73  26.4  12.4   35.1   29.5  9.04  23.4   4.5    20.4
+   4   no instructions                32.3  9.50  20.7   8.0    33.3   34.0  9.45  19.0   2.3    17.4
+   5 RCM, ﬁdelity oriented            18.8  5.37  52.6  30.6   55.3   28.5  8.08  26.1   7.7    34.6
+   6     last 5 tokens                   17.1  8.88  24.8  11.7   39.3   25.5  8.52  18.9   5.6    25.3
+   7   no instructions                12.7  10.5  12.1   5.4    37.2   22.8  9.41  15.5   4.9    23.0
+
+Table 4: Results on R4R Validation Seen and Validation Unseen sets (see Section 2). SR, SPL and CLS are reported
+as percentages and NE and PL in meters.
+
+
+cess since it assumes the optimal path length is the    agents will need to make effective use of language
+shortest distance between the starting and ending   and its connection to the environment to both drive
+positions (as illustrated in Figure 1, for example).  CLS up and bring NE down in R4R.
+This is particularly noticeable from the results: the    We expect path ﬁdelity to not only be interesting
+goal oriented agent gets better SPL scores than the   with respect to grounding language, but to be cru-
+ﬁdelity oriented agent, even when it has massively    cial for many VLN-based problems. For example,
+poorer performance on conformity (CLS).            future extensions of VLN will likely involve games
+                                                  (Baldridge et al., 2018) where the instructions be-
+6  Conclusion                                  ing given take the agent around a trap or help it
+                                                avoid opponents. Similar constraints could hold
+The CLS metric, R4R, and our experiments provide    in search-and-rescue human-robot teams (Kruijff
+a better toolkit for measuring the impact of better    et al., 2014; Kruijff-Korbayov et al., 2016), where
+language understanding in VLN. Furthermore, our    the direct path could take a rolling robot into an
+ﬁndings suggests ways that future datasets and met-   area with greater danger of collapse. In such sce-
+rics for judging agents should be constructed and    narios, going straight to the goal could be literally
+set up for evaluation. The R4R data itself clearly   deadly to the robot or agent.
+still has considerable headroom: our reimplemen-
+tation of the RCM model gets only 34.6 CLS on   Acknowledgments
+paths in R4R’s Validation Unseen houses. Keeping
+in mind that humans have an average navigation  We would like to thank our anonymous review-
+error of 1.61 in R2R (Anderson et al., 2018b), the    ers and the Google Research team, especially
+average navigation error of 8.08 meters for R4R by   Radu Soricut, for the insightful comments that con-
+our best agent leaves plenty of headroom. Future    tributed to this paper.
+
+                                        1870
+=== PDF PAGE 10 ===
+References                                      Abhishek Das, Satwik Kottur, Khushi Gupta, Avi
+                                                         Singh,  Deshraj Yadav,  Jos´e M.F. Moura, Devi
+Peter Anderson, Angel Chang, Devendra Singh Chap-                                                             Parikh, and Dhruv Batra. 2017. Visual Dialog.  In
+   lot, Alexey Dosovitskiy, Saurabh Gupta, Vladlen                                                       Proceedings of the IEEE Conference on Computer
+   Koltun, Jana Kosecka, Jitendra Malik, Roozbeh Mot-                                                            Vision and Pattern Recognition (CVPR).
+   taghi, Manolis Savva,  et  al. 2018a.  On evalua-
+   tion of embodied navigation agents. arXiv preprint   Harm de Vries, Kurt Shuster, Dhruv Batra, Devi Parikh,
+  arXiv:1807.06757 .                                   Jason Weston, and Douwe Kiela. 2018.  Talk the
+                                                        walk: Navigating new york city through grounded
+Peter Anderson, Qi Wu, Damien Teney, Jake Bruce,                                                            dialogue. CoRR abs/1807.03367.
+  Mark Johnson, Niko S¨underhauf, Ian Reid, Stephen
+  Gould, and Anton van den Hengel. 2018b. Vision-                                                   Edsger W Dijkstra. 1959. A note on two problems
+  and-language  navigation:   Interpreting  visually-                                                                in connexion with graphs. Numerische mathematik
+  grounded navigation instructions in real environ-                                                        1(1):269–271.
+  ments.  In Proceedings of the IEEE Conference on
+  Computer Vision and Pattern Recognition (CVPR).       J. Donahue, L. A. Hendricks, M. Rohrbach, S. Venu-
+                                                          gopalan, S. Guadarrama, K. Saenko, and T. Dar-
+S. Antol, A. Agrawal, J. Lu, M. Mitchell, D. Batra, C. L.                                                                              rell. 2017.  Long-term recurrent convolutional net-
+   Zitnick, and D. Parikh. 2015. VQA: Visual question                                                   works for visual recognition and description. IEEE
+   answering. In 2015 IEEE International Conference                                                         Transactions on Pattern Analysis and Machine Intel-
+  on Computer Vision (ICCV). pages 2425–2433.                                                            ligence 39(4):677–691.
+
+Michael Bain and Claude Sammut. 1999. A frame-
+                                                 H. Fang,  S. Gupta,  F. Iandola,  R. K.  Srivastava,
+  work for behavioural cloning.  In Machine Intelli-
+                                                         L. Deng, P. Dollr, J. Gao, X. He, M. Mitchell, J. C.
+  gence 15, Intelligent Agents [St. Catherine’s College,
+                                                                       Platt, C. L. Zitnick, and G. Zweig. 2015. From cap-
+  Oxford, July 1995]. Oxford University, Oxford, UK,
+                                                                tions to visual concepts and back.  In 2015 IEEE
+  UK, pages 103–129.                                                      Conference on Computer Vision and Pattern Recog-
+                                                                nition (CVPR). pages 1473–1482.Jason Baldridge, Tania Bedrax-Weiss, Daphne Luong,
+   Srini Narayanan, Bo Pang, Fernando Pereira, Radu
+                                                     Daniel  Fried, Ronghang Hu,  Volkan  Cirik, Anna
+   Soricut, Michael Tseng, and Yuan Zhang. 2018.
+                                                      Rohrbach, Jacob Andreas, Louis-Philippe Morency,
+   Points, paths, and playscapes:  Large-scale spatial
+                                                         Taylor Berg-Kirkpatrick, Kate Saenko, Dan Klein,
+  language understanding tasks set in the real world.
+                                                   and Trevor Darrell. 2018. Speaker-Follower models   In Proceedings of the First International Workshop
+                                                                for Vision-and-Language Navigation. In Neural In-  on Spatial Language Understanding. Association
+                                                        formation Processing Systems (NeurIPS).
+   for Computational Linguistics, New Orleans, pages
+  46–52.                                               Sepp Hochreiter and J¨urgen Schmidhuber. 1997. Long
+                                                           short-term memory.   Neural Comput. 9(8):1735–Yonatan Bisk, Kevin Shih, Yejin Choi, and Daniel
+                                                       1780.  Marcu. 2018. Learning interpretable spatial opera-
+   tions in a rich 3d blocks world. In Proceedings of the
+                                               Haoshuo Huang, Vihan  Jain, Harsh Mehta,  Jason
+  Thirty-Second Conference on Artiﬁcial Intelligence
+                                                           Baldridge, and Eugene  Ie. 2019.   Multi-modal
+  (AAAI-18). New Orleans, USA.
+                                                             discriminative model for vision-and-language nav-
+                                                                 igation.   In Proceedings of the Combined Work-Valts Blukis, Dipendra Misra, Ross A. Knepper, and
+                                                    shop on  Spatial Language  Understanding and  Yoav Artzi. 2018. Mapping navigation instructions
+                                                 Grounded  Communication  for  Robotics  (SpLU-   to continuous control actions with position visita-
+                                                  RoboNLP-2019).  Association  for  Computational   tion prediction.  In Proceedings of the Conference
+                                                               Linguistics, Minneapolis.  on Robot Learning.
+
+Howard Chen, Alane Suhr, Dipendra Misra, and Yoav    G.J.M. Kruijff, Ivana Kruijff-Korbayova, Shanker Ke-
+   Artzi. 2019. Touchdown: Natural language naviga-      shavdas, Benoit Larochelle, Miroslav Janicek, Fran-
+   tion and spatial reasoning in visual street environ-       cis Colas, Ming Liu, Franois Pomerleau, Roland
+  ments. In Conference on Computer Vision and Pat-      Siegwart, Mark Neerincx, Rosemarijn Looije, Nanja
+   tern Recognition.                                     Smets, Tina Mioch, Jurriaan Diggelen, Fiora Pirri,
+                                                   Mario Gianni, Federico Ferri, Matteo Menna, Rainer
+Volkan Cirik, Yuan Zhang, and Jason Baldridge. 2018.      Worst, and Vaclav Hlavac. 2014.  Designing, de-
+  Following formulaic map instructions in a street sim-      veloping, and deploying systems to support human-
+   ulation environment. NIPS Visually Grounded Inter-      robot teams in disaster response. Advanced Robotics
+   action and Language Workshop .                         28.
+
+Shreyansh Daftry,  J. Andrew Bagnell, and Martial      I. Kruijff-Korbayov, L. Freda, M. Gianni, V. Ntouskos,
+   Hebert. 2016.  Learning transferable policies for       V. Hlav, V. Kubelka, E. Zimmermann, H. Surmann,
+  monocular reactive MAV control.  In International      K. Dulic, W. Rottner, and E. Gissi. 2016.  De-
+  Symposium on Experimental  Robotics.  Springer,      ployment of ground and aerial robots in earthquake-
+  pages 3–11.                                              struck amatrice in italy (brief report). In 2016 IEEE
+
+                                        1871
+=== PDF PAGE 11 ===
+   International Symposium on Safety, Security, and      Computer Vision and Pattern Recognition (CVPR)
+  Rescue Robotics (SSRR). pages 278–279.                pages 3156–3164.
+
+Chih-Yao Ma, Jiasen Lu, Zuxuan Wu, Ghassan Alregib,   Xin Wang, Wenhu Chen, Jiawei Wu, Yuan-Fang Wang,
+   Zsolt Kira, Richard Socher, and Caiming Xiong.     and William Yang Wang. 2018.   Video caption-
+  2019.  Self-monitoring navigation agent via auxil-      ing via hierarchical reinforcement learning.  2018
+   iary progress estimation. In Proceedings of the Inter-     IEEE/CVF Conference on Computer Vision and Pat-
+   national Conference on Learning Representations       tern Recognition pages 4213–4222.
+  (ICLR).
+                                               Xin Wang, Qiuyuan Huang, Asli C¸elikyilmaz, Jian-
+Matt Macmahon, Brian Stankiewicz, and Benjamin      feng  Gao,  Dinghan  Shen,  Yuan-Fang  Wang,
+   Kuipers. 2006. Walk the talk: Connecting language,      William Yang Wang, and Lei Zhang. 2019.  Re-
+  knowledge, action in route instructions. In Proceed-      inforced cross-modal matching and self-supervised
+   ings of the National Conference on Artiﬁcial Intelli-       imitation learning for vision-language navigation.
+  gence (AAAI). pages 1475–1482.                         In Proceedings of the IEEE Conference on Com-
+                                                           puter Vision and Pattern Recognition (CVPR).
+Dipendra Misra, Andrew Bennett, Valts Blukis, Eyvind
+   Niklasson, Max Shatkhin, and Yoav Artzi. 2018.   Edward C. Williams, Nakul Gopalan, Mina Rhee, and
+  Mapping instructions to actions in 3D environments       Stefanie Tellex. 2018. Learning to parse natural lan-
+  with visual goal prediction.  In Proceedings of the      guage to grounded reward functions with weak su-
+  2018 Conference on Empirical Methods in Natu-       pervision.  In 2018 IEEE International Conference
+   ral Language Processing. Association for Computa-     on Robotics and Automation, ICRA 2018, Brisbane,
+   tional Linguistics, Brussels, Belgium, pages 2667–       Australia, May 21-25, 2018. pages 1–7.
+  2678.
+                                                 Ronald J. Williams. 1992. Simple statistical gradient-
+Jeffrey Pennington, Richard Socher, and Christopher      following algorithms  for connectionist  reinforce-
+  Manning. 2014. Glove: Global vectors for word rep-     ment learning. Machine Learning 8(3):229–256.
+   resentation. In Proceedings of the 2014 Conference
+  on Empirical Methods in Natural Language Process-   Claudia Yan, Dipendra Misra, Andrew Bennett, Aaron
+   ing (EMNLP). Association for Computational Lin-     Walsman, Yonatan Bisk, and Yoav  Artzi. 2018.
+   guistics, pages 1532–1543.                     CHALET: Cornell House Agent Learning Environ-
+                                                       ment. CoRR abs/1801.07357.
+M.  Schuster and K.K.  Paliwal.  1997.    Bidirec-
+   tional recurrent neural networks.  Trans. Sig. Proc.   Zichao Yang, Xiaodong He, Jianfeng Gao, Li Deng,
+  45(11):2673–2681.                                 and Alexander J. Smola. 2016.  Stacked attention
+                                                      networks for image question answering. 2016 IEEE
+Pararth Shah, Marek Fiser, Aleksandra Faust, Chase      Conference on Computer Vision and Pattern Recog-
+  Kew, and Dilek Hakkani-Tur. 2018.   FollowNet:       nition (CVPR) pages 21–29.
+  Robot navigation by following natural language di-
+   rections with deep reinforcement learning. In Third   Haonan Yu, Jiang Wang, Zhiheng Huang, Yi Yang, and
+  Machine Learning in Planning and Control of Robot     Wei Xu. 2016. Video paragraph captioning using hi-
+  Motion Workshop at ICRA.                                erarchical recurrent neural networks. In 2016 IEEE
+                                                      Conference on Computer Vision and Pattern Recog-
+D. Skoˇcaj, A. Vreˇcko, M. Mahniˇc, M. Jan´ıˇcek, G.-       nition, CVPR 2016, Las Vegas, NV, USA, June 27-30,
+   J. M. Kruijff, M. Hanheide, N. Hawes, J. L. Wy-      2016. pages 4584–4593.
+    att, T. Keller, K. Zhou, M. Zillich, and M. Kristan.
+  2016. An integrated system for interactive contin-
+  uous learning of categorical knowledge.  Journal
+   of Experimental & Theoretical Artiﬁcial Intelligence
+  28:823–848.
+
+Jesse Thomason, Daniel Gordon, and Yonatan Bisk.
+  2019. Shifting the baseline: Single modality perfor-
+  mance on visual navigation & QA. In Conference of
+   the North American Chapter of the Association for
+  Computational Linguistics (NAACL).
+
+Jesse Thomason, Jivko Sinapov, Raymond Mooney,
+  and Peter Stone. 2018. Guiding exploratory behav-
+   iors for multi-modal grounding of linguistic descrip-
+   tions.  In Proceedings of the Thirty-Second AAAI
+  Conference on Artiﬁcial Intelligence (AAAI-18).
+
+Oriol Vinyals, Alexander Toshev, Samy Bengio, and
+  Dumitru Erhan. 2015. Show and tell: A neural im-
+  age caption generator.  2015 IEEE Conference on
+
+                                        1872

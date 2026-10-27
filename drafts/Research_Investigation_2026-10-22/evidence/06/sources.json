@@ -1,0 +1,595 @@
+[
+  {
+    "source_id": "FU06-ua_nwm",
+    "paper_id": "ua_nwm",
+    "title": "Uncertainty-Aware World Model for Aerial Image-Goal Navigation",
+    "authors": [
+      "Deyi Zhu",
+      "Haoyu Fan",
+      "Yinan Zhu",
+      "Weichen Zhang",
+      "Shilin Ma",
+      "Xinlei Chen",
+      "Yansong Tang"
+    ],
+    "year": 2026,
+    "venue_or_status": "arXiv preprint",
+    "primary_url": "https://arxiv.org/abs/2608.05597v1",
+    "version": "v1, 6 August 2026",
+    "cutoff": "2026-10-22",
+    "retrieved": "2026-10-22",
+    "local_pdf": "followups\\sources\\ua_nwm.pdf",
+    "sha256": "8d3c06d2b3b86e1ed9b79d560ee1c2b3ff3bb03bd4fef8595ed8635ce7821aa5",
+    "full_text_reviewed": true,
+    "reviewed_pdf_pages": "1-8,13-25",
+    "review_scope": "Methods, experiments and stated limitations on listed pages; figure-only pages are not counted as visually inspected unless separately recorded.",
+    "precise_locators": "§3 Eqs 8-15; Tables 1, 3; supplementary G-H",
+    "review": "AUTHOR METHOD: A frozen DINOv3 feature world model predicts action-conditioned futures. A separately trained Hierarchical Error Projection head explains residuals through multiscale low-rank subspaces; candidate goals are scored by unexplained residual energy. This is structured error scoring, not calibrated failure probability. PAPER EXPERIMENT: The matched deterministic backbone improves aerial planning; AirSim uses a 20 m goal tolerance and the physical pilot five tasks. Supplement G requires strong anisotropy to motivate ignoring parallel residuals; greedy projections are not a general exact global projection. INSPECTED CODE: normalized training averages patchwise ratios rather than the paper's ratio of summed energies. Optional parallel-residual weighting and same-goal wrong-action contrastive losses already exist, although disabled by default. DEDUCTION: a new decision-aligned objective must compare these controls. Construction M3 below demonstrates a possible lost task direction, not trained-model failure.",
+    "repo_url": "https://github.com/DurYi/UA-NWM",
+    "repo_commit": "399960ce5fea5a3aa98084beaf44d92c2def9774",
+    "code_files_inspected": [
+      "uanwm/models/hep.py:1-154",
+      "uanwm/eval/scoring.py",
+      "uanwm/train_hep.py:35-132",
+      "uanwm/losses/post_training_losses.py",
+      "configs/ua_nwm.yaml",
+      "README.md"
+    ],
+    "code_executed": false,
+    "limitations": [
+      "No benchmark run; deployment wrappers downloaded but not deeply inspected; scene-disjoint AirGoal split not established; final qualitative figures not visually audited."
+    ]
+  },
+  {
+    "source_id": "FU06-cpnav",
+    "paper_id": "cpnav",
+    "title": "CPNAV: Calibrated Vision-Language Navigation for Object-Goal Search in Unseen Environments",
+    "authors": [
+      "Qizhao Chen",
+      "Yuanhong Zeng",
+      "Shoh Nishino",
+      "Anushri Dixit"
+    ],
+    "year": 2026,
+    "venue_or_status": "Preprint on official author publications page",
+    "primary_url": "https://practice-lab-ucla.github.io/papers/cpnav/",
+    "version": "Author PDF retrieved 22 October 2026",
+    "cutoff": "2026-10-22",
+    "retrieved": "2026-10-22",
+    "local_pdf": "followups\\sources\\cpnav.pdf",
+    "sha256": "aa6e319759ee496c1e297aec1d885a8485a0589a1709c52bff9895eefedcda2d",
+    "full_text_reviewed": true,
+    "reviewed_pdf_pages": "1-8",
+    "review_scope": "Methods, experiments and stated limitations on listed pages; figure-only pages are not counted as visually inspected unless separately recorded.",
+    "precise_locators": "§III.E-F Eqs 11-15; Table I; Tables II-III",
+    "review": "AUTHOR METHOD: Offline oracle search optimizes the minimum semantic score along a successful path; an episode-score quantile retains admissible actions for depth-first backtracking. Its stated exchangeability condition concerns complete episodes. PAPER/REPORTING: The text also describes independent observation/action calibration scenarios; the calibration unit, threshold complements and sample counts need reconciliation. Eq 12 uses the .99 upper Beta quantile while claiming 99% confidence, then says confidence 1−δ. The visually checked formula does not support the claimed confidence interpretation (M1). Oracle-path retention alone also does not ensure budgeted success (M5). Target visibility judged manually differs from standard distance-based ObjectNav. The linked official repository was inaccessible. DEDUCTION: do not present its score threshold as a certified collision-risk controller.",
+    "repo_url": "https://github.com/practice-lab-ucla/CPnav",
+    "repo_commit": null,
+    "code_files_inspected": [],
+    "code_executed": false,
+    "limitations": [
+      "Repository not found at retrieval, not proof no code exists; no raw calibration scores; no benchmark executed."
+    ]
+  },
+  {
+    "source_id": "FU06-adaptive_rollout",
+    "paper_id": "adaptive_rollout",
+    "title": "Adaptive Rollout Truncation Based on Epistemic Uncertainty for Efficient Offline World Model Training",
+    "authors": [
+      "Nikodem Sebastian Zymla",
+      "Laurin Thiele",
+      "Johannes Pitz"
+    ],
+    "year": 2026,
+    "venue_or_status": "Accepted IROS 2026 workshop, author-reported; not main conference",
+    "primary_url": "https://arxiv.org/abs/2609.21482v1",
+    "version": "v1, 18 September 2026",
+    "cutoff": "2026-10-22",
+    "retrieved": "2026-10-22",
+    "local_pdf": "followups\\sources\\adaptive_rollout.pdf",
+    "sha256": "fab996ce9ffc981a68fae7212cd28cf203751c02b2664bd7aaef86be3f1d6193",
+    "full_text_reviewed": true,
+    "reviewed_pdf_pages": "1-8",
+    "review_scope": "Methods, experiments and stated limitations on listed pages; figure-only pages are not counted as visually inspected unless separately recorded.",
+    "precise_locators": "§III; Table II; Appendices C, F",
+    "review": "AUTHOR METHOD: A GRU world model with bootstrap heads or dropout truncates training rollouts when epistemic disagreement crosses a warm-up threshold, bounded between four and 32 steps. PAPER EXPERIMENT: ANYmal/Ant offline prediction and rollout-compute results support efficiency in that training setting. Appendix F explicitly finds that replaying the induced horizon schedule without uncertainty gating matches within seed noise; it disclaims coverage calibration. Appendix C reports no clear downstream MOPO-PPO advantage. DEDUCTION: adaptive horizon proposals require a matched schedule replay control, and prediction efficiency is insufficient evidence for better navigation decisions. No official implementation of this new truncation method was verified; the cited predecessor repository is not substituted for it.",
+    "repo_url": null,
+    "repo_commit": null,
+    "code_files_inspected": [],
+    "code_executed": false,
+    "limitations": [
+      "No new-method source inspection; no deployment experiment reproduced."
+    ]
+  },
+  {
+    "source_id": "FU06-pijepa",
+    "paper_id": "pijepa",
+    "title": "Policy-Guided World Model Planning for Language-Conditioned Visual Navigation",
+    "authors": [
+      "Amirhosein Chahe",
+      "Lifeng Zhou"
+    ],
+    "year": 2026,
+    "venue_or_status": "CVPR 2026 WDFM-EAI workshop, pages 834-841",
+    "primary_url": "https://openaccess.thecvf.com/content/CVPR2026W/WDFM-EAI/papers/Chahe_Policy-Guided_World_Model_Planning_for_Language-Conditioned_Visual_Navigation_CVPRW_2026_paper.pdf",
+    "version": "CVF workshop version",
+    "cutoff": "2026-10-22",
+    "retrieved": "2026-10-22",
+    "local_pdf": "followups\\sources\\pijepa.pdf",
+    "sha256": "5f086e2ccfa496381c0d4d5cd28f0acbeb023a337737ce42a9a7c0c3c9c26e6a",
+    "full_text_reviewed": true,
+    "reviewed_pdf_pages": "1-8",
+    "review_scope": "Methods, experiments and stated limitations on listed pages; figure-only pages are not counted as visually inspected unless separately recorded.",
+    "precise_locators": "§3; §4.2; Table 2; conclusion",
+    "review": "AUTHOR METHOD: Language-conditioned Octo proposals initialize MPPI; an action-conditioned JEPA scores terminal image-feature proximity. Training uses frozen image encoders and latent prediction. PAPER EXPERIMENT: CAST validation ATE/RPE are offline trajectory comparisons; proposal scoring nearly matches iterative optimization for several metrics. Closed-loop validation remains future work. INSPECTED CODE: eval_octo_mppi_cast.py:670-703 explicitly takes the recorded final frame as goal. Its defaults differ from the paper's candidate/elite/temperature settings; training defaults to one-step loss and optional rollout losses detach previous predictions. No live controller is evaluated by this script. DEDUCTION: report image-goal access and reranking compute separately when transferring this mechanism to instruction-only VLN.",
+    "repo_url": "https://github.com/AmirhoseinCh/PiJEPA",
+    "repo_commit": "f38a265cbce4fac5aa5fd9b9f7b18c723bccb645",
+    "code_files_inspected": [
+      "scripts/eval_octo_mppi_cast.py:298-404,586-780,872-888",
+      "scripts/train_cast_wm.py:323-446",
+      "scripts/configs/train_cast_wm_config.py",
+      "README.md"
+    ],
+    "code_executed": false,
+    "limitations": [
+      "No fetched code execution; full Octo training/data pipeline not audited; no checkpoint download."
+    ]
+  },
+  {
+    "source_id": "FU06-worldmap",
+    "paper_id": "worldmap",
+    "title": "WorldMAP: Bootstrapping Vision-Language Navigation Trajectory Prediction with Generative World Models",
+    "authors": [
+      "Hongjin Chen",
+      "Shangyun Jiang",
+      "Tonghua Su",
+      "Chen Gao",
+      "Xinlei Chen",
+      "Yong Li",
+      "Zhibo Chen"
+    ],
+    "year": 2026,
+    "venue_or_status": "arXiv preprint",
+    "primary_url": "https://arxiv.org/abs/2604.07957v1",
+    "version": "v1, 9 April 2026",
+    "cutoff": "2026-10-22",
+    "retrieved": "2026-10-22",
+    "local_pdf": "followups\\sources\\worldmap.pdf",
+    "sha256": "ca7b93ad25ae9a441f46b0f07d27966de83cb44b2298f7088d468a213c92dfba",
+    "full_text_reviewed": true,
+    "reviewed_pdf_pages": "1-9,11-12; p13 captions only",
+    "review_scope": "Methods, experiments and stated limitations on listed pages; figure-only pages are not counted as visually inspected unless separately recorded.",
+    "precise_locators": "§III; Table III; AppendixA-B",
+    "review": "AUTHOR METHOD: Generated future views, depth/pose reconstruction, language-guided segmentation and BEV/FMM planning produce teacher trajectories. A Qwen3-VL-based multihypothesis student distills these offline. PAPER EXPERIMENT: Target-Bench uses trajectories projected onto the initial image and pixel-space ADE/FDE/DTW. Pseudo-label-only ADE is 95.98 versus 78.34 for ground truth and 42.06 combined (Table III); gains therefore involve mixed supervision. Training-free direct VLM comparisons also change architecture and data. Appendix B's inference description invokes best-of-K without fully specifying confidence training/selection. DEDUCTION: projected path accuracy does not establish collision-free physical execution or online forecast reliability. No official code located in bounded title/author searches.",
+    "repo_url": null,
+    "repo_commit": null,
+    "code_files_inspected": [],
+    "code_executed": false,
+    "limitations": [
+      "No implementation inspection; no actual closed-loop execution evaluated in reviewed evidence; qualitative figures not visually interpreted."
+    ]
+  },
+  {
+    "source_id": "FU06-janusvln",
+    "paper_id": "janusvln",
+    "title": "JanusVLN: Decoupling Semantics and Spatiality with Dual Implicit Memory for Vision-Language Navigation",
+    "authors": [
+      "Shuang Zeng",
+      "Dekang Qi",
+      "Xinyuan Chang",
+      "Feng Xiong",
+      "Shichao Xie",
+      "Xiaolong Wu",
+      "Shiyi Liang",
+      "Mu Xu",
+      "Xing Wei",
+      "Ning Guo"
+    ],
+    "year": 2026,
+    "venue_or_status": "ICLR 2026",
+    "primary_url": "https://arxiv.org/abs/2509.22548v2",
+    "version": "v2, 25 February 2026",
+    "cutoff": "2026-10-22",
+    "retrieved": "2026-10-22",
+    "local_pdf": "followups\\sources\\janusvln.pdf",
+    "sha256": "ae30ac6c63418811cf4c3dcb118a8753d0a5f48e375810023bbf1505bb914236",
+    "full_text_reviewed": true,
+    "reviewed_pdf_pages": "1-9,17-21",
+    "review_scope": "Methods, experiments and stated limitations on listed pages; figure-only pages are not counted as visually inspected unless separately recorded.",
+    "precise_locators": "§3; Tables 3, 5; AppendixD",
+    "review": "AUTHOR METHOD: RGB-only Qwen2.5-VL combines semantic features with frozen VGGT geometry and bounded initial/recent memory. Training includes extra ScaleVLN and DAgger trajectories. PAPER EXPERIMENT: Geometry/cache ablations support the tested architecture; Appendix D acknowledges recovery and premature stopping failures. INSPECTED CODE: VGGT caches first 8/recent 48 frames. Released evaluation instead resamples up to eight historical RGB images over the whole episode and calls the language model afresh; persistent semantic/LLM caches claimed in the paper were not found on that path. DEDUCTION: old observations are neither universally retained nor universally absent after 48 frames. Memory comparisons must specify raw-frame storage, sampling and geometric cache separately.",
+    "repo_url": "https://github.com/MIV-XJTU/JanusVLN",
+    "repo_commit": "8cfe3129f7af4ca276bd5e38f1fae7e5367a09ec",
+    "code_files_inspected": [
+      "src/evaluation.py:130-235,250-383",
+      "src/qwen_vl/model/modeling_qwen2_5_vl.py:1607-1691,1985-2040,2130-2156",
+      "src/qwen_vl/model/vggt/models/aggregator.py:195-297",
+      "README.md"
+    ],
+    "code_executed": false,
+    "limitations": [
+      "No benchmark run; complete optimizer/preprocessing not audited; source path may differ from paper experiments."
+    ]
+  },
+  {
+    "source_id": "FU06-humanoidvln",
+    "paper_id": "humanoidvln",
+    "title": "HumanoidVLN: A Physics-Grounded Simulator and Benchmark for Vision-Language Navigation Across Diverse Humanoid Embodiments",
+    "authors": [
+      "Quan-Dung Pham",
+      "Anh Dao",
+      "The-Anh Nguyen",
+      "Minh Nguyen-Dinh",
+      "Phuong Nam Dang",
+      "Tri Pham",
+      "Hung Tran",
+      "Bach Dao",
+      "Tuyen P. Le",
+      "Truong Nguyen",
+      "Quan Nguyen"
+    ],
+    "year": 2026,
+    "venue_or_status": "arXiv preprint; project says Humanoids 2026 under review",
+    "primary_url": "https://arxiv.org/abs/2608.12860v1",
+    "version": "v1, 13 August 2026",
+    "cutoff": "2026-10-22",
+    "retrieved": "2026-10-22",
+    "local_pdf": "followups\\sources\\humanoidvln.pdf",
+    "sha256": "02c3ee78cc8715bdb03a4556e5039d7d6e8b4a16d2fb36f649f4988068b172f4",
+    "full_text_reviewed": true,
+    "reviewed_pdf_pages": "1-7",
+    "review_scope": "Methods, experiments and stated limitations on listed pages; figure-only pages are not counted as visually inspected unless separately recorded.",
+    "precise_locators": "§III-VI; Table III; §VI.D",
+    "review": "AUTHOR METHOD: Physics-based humanoid execution combines morphology-specific RL locomotion with PD/MPC tracking and curated large navigable scenes. All 933 episodes form one zero-shot evaluation set. PAPER EXPERIMENT: Fall rates vary substantially by robot/model; action interface, tracker and locomotion policy vary together. The 20-pair real/sim pilot uses one checkpoint and two scenes, explicitly not scene-level generalization. DEDUCTION: the suite makes physical failures measurable, but does not identify an architecture-only cause or solve them. Scene filtering excludes tight environments. Code/data are promised on acceptance, limiting immediate independent replication.",
+    "repo_url": "https://humanoid-vln.github.io/",
+    "repo_commit": null,
+    "code_files_inspected": [],
+    "code_executed": false,
+    "limitations": [
+      "No available code/dataset inspection; no robot execution."
+    ]
+  },
+  {
+    "source_id": "FU06-reinsvln",
+    "paper_id": "reinsvln",
+    "title": "ReInsVLN: Revisiting Historical Evidence for Training-Free Vision-and-Language Navigation",
+    "authors": [
+      "Siwei Cheng",
+      "Hao Wu",
+      "Zitong Qi",
+      "Xinming Zhang",
+      "Haoyu Xi",
+      "Peiran Yin",
+      "Haozhe Hu",
+      "Xudong Wang",
+      "Xiaoyu Shen",
+      "Wei Zhang"
+    ],
+    "year": 2026,
+    "venue_or_status": "arXiv preprint",
+    "primary_url": "https://arxiv.org/abs/2610.26545v1",
+    "version": "v1, 19 October 2026",
+    "cutoff": "2026-10-22",
+    "retrieved": "2026-10-22",
+    "local_pdf": "evidence\\06\\papers\\reinsvln.pdf",
+    "sha256": "fb7da5300c6032ef822c750e7f6818cdf21150cb92cea15d94776a3266f5a00f",
+    "full_text_reviewed": true,
+    "reviewed_pdf_pages": "1-8",
+    "review_scope": "Methods, experiments and stated limitations on listed pages; figure-only pages are not counted as visually inspected unless separately recorded.",
+    "precise_locators": "§III Tables I-II; §IV-V Table IV",
+    "review": "AUTHOR METHOD: ReInsBench freezes failed navigator checkpoints; deployment combines fixed-history revisits and instruction-aware visual-token compression. PAPER EXPERIMENT: R0 versus neutral reminders improves 19/812 branches, 2.34 pp, with trajectory-cluster 95% CI [-0.99, 5.68]. Diagnostic checkpoint/suffix construction uses reference actions; deployed fixed reminders at steps 2/13 use the original instruction. Seven of 11 pilot net gains already occur at initial registration. FHR also breaks 78/71 previously successful Stream/Intern episodes while recovering 173/126. DEDUCTION: the diagnostic does not isolate restoration of lost history from improved initial grounding; deployment efficacy and explanatory attribution are separate. Its small real-world ordinal comparison changes doorway conditions. Reuse of historical evidence alone is established prior art.",
+    "repo_url": null,
+    "repo_commit": null,
+    "code_files_inspected": [],
+    "code_executed": false,
+    "limitations": [
+      "Official implementation/supplement not found in bounded search; full eight-page paper reviewed; no experiments reproduced."
+    ]
+  },
+  {
+    "source_id": "FU06-dartvln",
+    "paper_id": "dartvln",
+    "title": "DART-VLN: Test-Time Memory Decay and Anti-Loop Regularization for Discrete Vision-Language Navigation",
+    "authors": [
+      "Shaoheng Zhang",
+      "Zhichen Li",
+      "Guangfu Ma",
+      "Jie Mei"
+    ],
+    "year": 2026,
+    "venue_or_status": "IEEE SMC 2026 accepted, author-reported",
+    "primary_url": "https://arxiv.org/abs/2607.01043v4",
+    "version": "v4, 13 September 2026",
+    "cutoff": "2026-10-22",
+    "retrieved": "2026-10-22",
+    "local_pdf": "evidence\\06\\papers\\dartvln.pdf",
+    "sha256": "fdeb51aaec107c65a6cb1bf4d8476645521308db83bde98610a66b7cc0b6d1bd",
+    "full_text_reviewed": true,
+    "reviewed_pdf_pages": "1-6",
+    "review_scope": "Methods, experiments and stated limitations on listed pages; figure-only pages are not counted as visually inspected unless separately recorded.",
+    "precise_locators": "Eqs 1-5; Tables I-III; §IV.A",
+    "review": "AUTHOR METHOD: Frozen GridMM receives read-side age/repetition/novelty weighting and finite next-hop reversal/revisit penalties. PAPER EXPERIMENT: Same-checkpoint R2R/REVERIE comparisons improve several metrics; endpoint error is not uniformly improved. INSPECTED CODE: weights enter as log-priors in per-cell softmax; anti-loop penalties subtract from probabilities, with STOP unchanged. No memory-slot pruning occurs in that aggregation path. DEDUCTION: equal floored priors cancel exactly (M4), so this does not erase all stale evidence. Runtime reduction is an empirical report, not a consequence proved by reweighting alone. Finite penalties preserve the possibility of necessary backtracking but can still discourage it.",
+    "repo_url": "https://github.com/Japluto/DART-VLN",
+    "repo_commit": "a8889cf27723f1ffaac96ee7a802657a0b8e371a",
+    "code_files_inspected": [
+      "map_nav_src/models/vilmodel.py:740-759,817-851",
+      "map_nav_src/r2r/agent.py:452-501",
+      "map_nav_src/r2r/parser.py",
+      "README.md"
+    ],
+    "code_executed": false,
+    "limitations": [
+      "No fetched code execution; full environment metadata update not audited."
+    ]
+  },
+  {
+    "source_id": "FU06-cmmrvln",
+    "paper_id": "cmmrvln",
+    "title": "CMMR-VLN: Vision-and-Language Navigation via Continual Multimodal Memory Retrieval",
+    "authors": [
+      "Haozhou Li",
+      "Xiangyu Dong",
+      "Huiyan Jiang",
+      "Yaoming Zhou",
+      "Xiaoguang Ma"
+    ],
+    "year": 2026,
+    "venue_or_status": "arXiv preprint",
+    "primary_url": "https://arxiv.org/abs/2603.07997v1",
+    "version": "v1, 9 March 2026",
+    "cutoff": "2026-10-22",
+    "retrieved": "2026-10-22",
+    "local_pdf": "evidence\\06\\papers\\cmmrvln.pdf",
+    "sha256": "74276d0b520892068ef69d6d0cfff232c4982f8df5b1a4428357c32cb829e409",
+    "full_text_reviewed": true,
+    "reviewed_pdf_pages": "1-6",
+    "review_scope": "Methods, experiments and stated limitations on listed pages; figure-only pages are not counted as visually inspected unless separately recorded.",
+    "precise_locators": "§III.A-C Eq 3; Tables I-III; §IV.C",
+    "review": "AUTHOR METHOD: Viewpoint-indexed image/landmark memory retrieves prior experience as high-priority navigation rules; successful routes and first erroneous failure steps update memory. PAPER EXPERIMENT: R2R and 20 physical instructions support gains under this experience-augmented protocol. However the source of first-error labels, initial memory access, episode ordering and learned attention matrix training are not sufficiently specified for a fully label-free interpretation. Ablations use a different subset from main results. DEDUCTION: outcome-aware retrieval is prior art, but changing memory/feedback contracts prevents attributing its gains purely to a retrieval mechanism. No official implementation verified in the bounded search.",
+    "repo_url": null,
+    "repo_commit": null,
+    "code_files_inspected": [],
+    "code_executed": false,
+    "limitations": [
+      "Feedback provenance and attention training unresolved; no source code inspected."
+    ]
+  },
+  {
+    "source_id": "FU06-imaginenavpp",
+    "paper_id": "imaginenavpp",
+    "title": "ImagineNav++: Prompting Vision-Language Models as Embodied Navigator through Scene Imagination",
+    "authors": [
+      "Teng Wang",
+      "Xinxin Zhao",
+      "Wenzhe Cai",
+      "Changyin Sun"
+    ],
+    "year": 2026,
+    "venue_or_status": "Journal-style arXiv preprint; venue acceptance not independently verified",
+    "primary_url": "https://arxiv.org/abs/2512.17435v3",
+    "version": "v3, 30 April 2026; first version 2025",
+    "cutoff": "2026-10-22",
+    "retrieved": "2026-10-22",
+    "local_pdf": "evidence\\06\\papers\\imaginenavpp.pdf",
+    "sha256": "fecc9c6479517bc3a71d7a3e517f31c861d47ac9c7ba82922bccf17daedfb070",
+    "full_text_reviewed": true,
+    "reviewed_pdf_pages": "1-15",
+    "review_scope": "Methods, experiments and stated limitations on listed pages; figure-only pages are not counted as visually inspected unless separately recorded.",
+    "precise_locators": "§III; Tables I, III, V; §IV.J",
+    "review": "AUTHOR METHOD: A trained Where2Imagine module predicts waypoints; novel-view synthesis supplies candidate images to a frozen VLM, followed by learned VER PointNav. DINOv2-based hierarchical keyframes retain denser recent history. PAPER EXPERIMENT: Table V's full-history control does not improve success; selected history improves efficiency/quality, with an incremental approximation tradeoff. Table I distinguishes generated-future HM3D 58.5/26.6 SR/SPL from oracle-real-future 62.5/32.8. Author failure analysis includes hallucinated objects and ambiguous stopping. DEDUCTION: frozen high-level reasoning is not a globally untrained pipeline. The official repository contains only a coming-soon README at the inspected commit.",
+    "repo_url": "https://github.com/200203Z/ImagineNav_plus",
+    "repo_commit": "3803a563af97a1a0a2a6a176573a4a25c60c62a2",
+    "code_files_inspected": [
+      "README.md (release status only)"
+    ],
+    "code_executed": false,
+    "limitations": [
+      "No executable implementation released at inspected snapshot; references16-17 not reviewed."
+    ]
+  },
+  {
+    "source_id": "FU06-schrodinger_nav",
+    "paper_id": "schrodinger_nav",
+    "title": "Schrodinger's Navigator: Imagining an Ensemble of Futures for Zero-Shot Object Navigation",
+    "authors": [
+      "Yu He",
+      "Da Huang",
+      "Zhenyang Liu",
+      "Zixiao Gu",
+      "Qiang Sun",
+      "Guangnan Ye",
+      "Yanwei Fu",
+      "Yu-Gang Jiang"
+    ],
+    "year": 2026,
+    "venue_or_status": "CoRL 2026, paper and author project",
+    "primary_url": "https://arxiv.org/abs/2512.21201v5",
+    "version": "v5, 16 October 2026",
+    "cutoff": "2026-10-22",
+    "retrieved": "2026-10-22",
+    "local_pdf": "evidence\\06\\papers\\schrodinger_nav.pdf",
+    "sha256": "a77e62a46d04e7031753db0cd874dd214b9c6d39f0aebcb988b8d380754e532e",
+    "full_text_reviewed": true,
+    "reviewed_pdf_pages": "1,3-9,14-20,22-23",
+    "review_scope": "Methods, experiments and stated limitations on listed pages; figure-only pages are not counted as visually inspected unless separately recorded.",
+    "precise_locators": "§3-6; Tables 1-3; AppendicesC-G",
+    "review": "AUTHOR METHOD: FlashWorld imagines left/right/overhead virtual views, aligns depth and combines source-tagged observed/imagined primitives into semantic/exploration/risk maps. These trajectories are complementary cameras, not independent posterior world samples. Imagined semantic cues receive a fixed discount; observations and futures remain separately stored. PAPER EXPERIMENT: Increasing imagination weight can hurt; author limitations deny formal safety guarantees. HM3D uses ShortestPathFollower. Table 1's ImagineNav++ comparator equals its oracle-real-view row; protocol/version clarification is needed. Physical evidence is 30 trials per condition in three rooms. DEDUCTION: source tagging, discounts and multiview imagination alone are not new; calibrated decision risk and actual low-level execution remain distinct questions.",
+    "repo_url": "https://heyu322.github.io/Schrodinger-Navigator.github.io/",
+    "repo_commit": null,
+    "code_files_inspected": [],
+    "code_executed": false,
+    "limitations": [
+      "No official executable code located; videos not reviewed; qualitative image-only pages not inspected."
+    ]
+  },
+  {
+    "source_id": "FU06-memoir",
+    "paper_id": "memoir",
+    "title": "Dream to Recall: Imagination-Guided Experience Retrieval for Memory-Persistent Vision-and-Language Navigation",
+    "authors": [
+      "Yunzhe Xu",
+      "Yiyuan Pan",
+      "Zhe Liu"
+    ],
+    "year": 2026,
+    "venue_or_status": "TPAMI accepted 15 March 2026 per official repository",
+    "primary_url": "https://arxiv.org/abs/2510.08553v2",
+    "version": "v2, 30 March 2026; first version 2025",
+    "cutoff": "2026-10-22",
+    "retrieved": "2026-10-22",
+    "local_pdf": "evidence\\06\\papers\\memoir.pdf",
+    "sha256": "d274dd328788280f19f4be658af2f1ab6a74cc5037f9876242fdea82c99dc94a",
+    "full_text_reviewed": true,
+    "reviewed_pdf_pages": "1,3-13,17-21",
+    "review_scope": "Methods, experiments and stated limitations on listed pages; figure-only pages are not counted as visually inspected unless separately recorded.",
+    "precise_locators": "Algorithms1-3; Tables II, V; §V.E; supplementIV.A",
+    "review": "AUTHOR METHOD: A language-conditioned world model queries separate observation/behavior memories; DUET gains a history encoder and three-way action fusion. Persistent graphs permit inter-episode retrieval. PAPER EXPERIMENT: Table V controls instruction/state/random/full retrieval; oracle retrieval remains much stronger. §V.E identifies similar-goal confusion, premature imagination and equal treatment of failed/successful history. Continuous transfer improves success but loses path fidelity versus episodic DUET. INSPECTED CODE: history matching ranks cumulative compatibility products rather than the described prefix-minimum criterion; inference termination threshold differs from the supplement. Teacher paths in the inspected retrieval helper only calculate diagnostics. DEDUCTION: generic future-guided retrieval is established, and confidence-aware retrieval is explicitly suggested future work; a new proposal needs a sharper mechanism/test.",
+    "repo_url": "https://github.com/xyz9911/Memoir",
+    "repo_commit": "ea7fb9066366eb2aff3eabbc87b227a567cc6b90",
+    "code_files_inspected": [
+      "utils/graph_utils.py:419-531",
+      "nav_src/iter_nav/agent_ir2r.py:998-1082",
+      "vlnbert/vilmodel.py:1171-1248",
+      "nav_src/iter_nav/parser.py",
+      "readme.md"
+    ],
+    "code_executed": false,
+    "limitations": [
+      "No code execution; full training/loss pipeline not audited; cited theorem derivations not independently certified."
+    ]
+  },
+  {
+    "source_id": "FU06-neubay",
+    "paper_id": "neubay",
+    "title": "Long-Horizon Model-Based Offline Reinforcement Learning Without Explicit Conservatism",
+    "authors": [
+      "Tianwei Ni",
+      "Esther Derman",
+      "Vineet Jain",
+      "Vincent Taboga",
+      "Siamak Ravanbakhsh",
+      "Pierre-Luc Bacon"
+    ],
+    "year": 2026,
+    "venue_or_status": "ICML 2026 PMLR306:92875-92924",
+    "primary_url": "https://proceedings.mlr.press/v306/ni26a.html",
+    "version": "Published proceedings",
+    "cutoff": "2026-10-22",
+    "retrieved": "2026-10-22",
+    "local_pdf": "evidence\\06\\papers\\neubay.pdf",
+    "sha256": "be89caaa16a314d77d0988e73b194ea4c992d1fbf942e71556e036bc11ce2adf",
+    "full_text_reviewed": true,
+    "reviewed_pdf_pages": "1-9 main paper only",
+    "review_scope": "Methods, experiments and stated limitations on listed pages; figure-only pages are not counted as visually inspected unless separately recorded.",
+    "precise_locators": "§4 Algorithms1-2; §5; Eq 4",
+    "review": "AUTHOR METHOD: A history-dependent Bayesian offline-RL policy learns across an ensemble of dynamics models; rollouts stop using in-dataset uncertainty quantiles. Long horizons reduce bootstrap reliance while layer normalization controls predicted increments. PAPER EXPERIMENT: D4RL/NeoRL studies support dataset-dependent benefits; parameters are tuned using true-environment performance and narrow-coverage tasks remain difficult. DEDUCTION: uncertainty-triggered rollout truncation and history-based adaptation are established beyond VLN. Eq 4 bounds prediction magnitudes, not closeness to the true trajectory by itself. No probability-calibration or instruction-following guarantee follows. This is a scoped main-paper comparison, not a review of its extensive supplementary proofs or implementation.",
+    "repo_url": "https://github.com/twni2016/neubay",
+    "repo_commit": null,
+    "code_files_inspected": [],
+    "code_executed": false,
+    "limitations": [
+      "Full supplement pp10-50 and implementation not reviewed; no reproduction."
+    ]
+  },
+  {
+    "source_id": "FU06-vla_calibration",
+    "paper_id": "vla_calibration",
+    "title": "Confidence Calibration in Vision-Language-Action Models",
+    "authors": [
+      "Thomas P. Zollo",
+      "Richard Zemel"
+    ],
+    "year": 2026,
+    "venue_or_status": "TMLR, October 2026, as stated in final manuscript",
+    "primary_url": "https://arxiv.org/abs/2507.17383v3",
+    "version": "v3, 16 October 2026",
+    "cutoff": "2026-10-22",
+    "retrieved": "2026-10-22",
+    "local_pdf": "evidence\\06\\papers\\vla_calibration.pdf",
+    "sha256": "1ad1a10c57b379d9d506a07ce39b920ff0a9632066962711c453931a0c2b2077",
+    "full_text_reviewed": true,
+    "reviewed_pdf_pages": "1-14,18-21",
+    "review_scope": "Only the explicitly listed text sections and source files were reviewed; no benchmark execution.",
+    "precise_locators": "§§3.3-3.6; §4.2 pp.8-11; §4.4; §§6-7; Appendix B-C.1",
+    "review": "AUTHOR METHOD: Mean selected-token probabilities estimate eventual episode success; instruction-paraphrase ensembles and action-wise Platt scaling recalibrate the score. PAPER EXPERIMENT: Fine-tuned token-based VLAs in LIBERO support calibration improvements, not physical safety. Temporal alignment uses realized episode length retrospectively; the proposed progress-aware intervention is qualitative and requires an online progress estimator. Rephrased actions are discarded: original instructions control execution. INSPECTED CODE: each dimension is fitted separately against the same terminal label; the experiment explicitly averages outputs despite a product constructor default. DEDUCTION: neither paraphrase-based confidence nor generic progress-conditioned monitoring is new. Separate risk discrimination, calibration and intervention utility under policy/scene shift.",
+    "repo_url": "https://github.com/thomaspzollo/vla_calibration",
+    "repo_commit": "ee1ad08266c803b90bd601cfa6618bdb87a2af79",
+    "code_files_inspected": [
+      "vla_calibration/calibration.py:1-265",
+      "notebooks/recalibration.ipynb:cell 2",
+      "README.md"
+    ],
+    "code_executed": false,
+    "limitations": [
+      "Supplement pp.22-34 not reviewed; no notebook execution or raw rollout inspection; OpenReview verification page inaccessible."
+    ]
+  },
+  {
+    "source_id": "FU06-reliablenav",
+    "paper_id": "reliablenav",
+    "title": "ReliableNav: Uncertainty-Aware Zero-Shot Vision-Language Navigation in Continuous Environments",
+    "authors": [
+      "Zhanbo Shi",
+      "Lin Zhang",
+      "Shengjie Zhao",
+      "Yicong Zhou"
+    ],
+    "year": 2026,
+    "venue_or_status": "IEEE TMM Early Access, 21 August 2026",
+    "primary_url": "https://doi.org/10.1109/TMM.2026.3726310",
+    "version": "Retrieved 22 October 2026",
+    "cutoff": "2026-10-22",
+    "retrieved": "2026-10-22",
+    "local_pdf": null,
+    "sha256": null,
+    "full_text_reviewed": false,
+    "reviewed_pdf_pages": "Full paper inaccessible; publisher abstract and targeted official code only",
+    "review_scope": "Only the explicitly listed text sections and source files were reviewed; no benchmark execution.",
+    "precise_locators": "Publisher abstract; official README Usage; released map_handler.py and reliable_agent.py locators",
+    "review": "AUTHOR ABSTRACT: Atomic action reasoning and a reliability-check map address semantic and sampling uncertainty. INSPECTED CODE: clustered same-class landmark instances receive numbered image masks and trigger another subgoal query; geometry rejects nonnavigable choices. This is explicit disambiguation/replanning, not a verified probability-calibration mechanism. The released configuration defaults to replayed action/LLM logs for 100 R2R-CE episodes. DEDUCTION: generic uncertainty-triggered re-prompting is established prior art. Quantitative paper claims were not independently audited because full text was inaccessible.",
+    "repo_url": "https://github.com/ZhanboShiAI/ReliableNav",
+    "repo_commit": "5234e9f96292b319463df5ab2d10ab6340cced1e",
+    "code_files_inspected": [
+      "src/reliable_agent.py:90-203",
+      "src/mapping/map_handler.py:243-291,547-683",
+      "src/config/r2r_baselines/test.yaml:1-41",
+      "readme.md"
+    ],
+    "code_executed": false,
+    "limitations": [
+      "Publisher full text blocked; project paper button says coming soon; full planner and LLM parser not audited; no API or benchmark calls."
+    ]
+  },
+  {
+    "source_id": "FU06-safety_gating",
+    "paper_id": "safety_gating",
+    "title": "Uncertainty-Calibrated Safety Gating for Vision-Language-Action Manipulation Under Domain Shift: Reliability Gains and Intervention-Efficiency Trade-Offs",
+    "authors": [
+      "Atef M. Ghaleb",
+      "Ali S. Allahloh",
+      "Sobhi Mejjaouli",
+      "Mohammed A. H. Ali",
+      "Adel Al-Shayea"
+    ],
+    "year": 2026,
+    "venue_or_status": "Sensors 26(10), 3140; 15 May 2026",
+    "primary_url": "https://doi.org/10.3390/s26103140",
+    "version": "Retrieved 22 October 2026",
+    "cutoff": "2026-10-22",
+    "retrieved": "2026-10-22",
+    "local_pdf": null,
+    "sha256": null,
+    "full_text_reviewed": false,
+    "reviewed_pdf_pages": "HTML sections 3.2,4.1-4.3,5.3,6.1-6.4,9 and Tables2-7; partial text review",
+    "review_scope": "Only the explicitly listed text sections and source files were reviewed; no benchmark execution.",
+    "precise_locators": "§§4.1-4.3, 5.3, 6.1-6.4; Tables 2-7",
+    "review": "AUTHOR METHOD: A calibrated failure-risk score selects normal control, pause/reobserve or a MoveIt fallback. PAPER EXPERIMENT: Two simulated manipulation tasks under structured visual shifts show an intervention-efficiency tradeoff; the more aggressive uncalibrated baseline has stronger raw success/collision results. Threshold sweeps are retrospective, not rerun policies; most interventions use fallback, and residual contacts occur during pause/fallback. The authors explicitly deny a formal safety guarantee. DEDUCTION: a calibrated three-way gate alone is not a new mechanism; equal intervention budgets and closed-loop testing are essential. No released executable implementation or underlying logs were inspected.",
+    "repo_url": null,
+    "repo_commit": null,
+    "code_files_inspected": [],
+    "code_executed": false,
+    "limitations": [
+      "Partial HTML review; access intermittent; data offered on request; no code or raw-data audit."
+    ]
+  }
+]

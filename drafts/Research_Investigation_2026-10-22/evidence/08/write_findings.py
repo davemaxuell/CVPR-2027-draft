@@ -1,0 +1,122 @@
+"""Build the structured, human-authored independent review record."""
+from pathlib import Path
+import hashlib
+import json
+
+ROOT=Path(__file__).resolve().parents[2]
+proposals=[
+ {'id':'P1','decision':'revise','logical_status':'Conditionally sound teacher formulation; completion/action/state contracts need revision',
+  'severity':'major','supported_core':'Different histories at the same physical pose can have different efficient satisfying continuations.',
+  'required_changes':[
+   'Separate efficient action set Y from semantic feasibility. Audit complete teacher continuations including STOP; a recoverable first detour is not itself a semantic violation.',
+   'For any finite-budget semantic claim, declare remaining budget B and evaluate feasibility c+V*<=B separately from optimality.',
+   'Use a fixed common primitive-neighbor-plus-STOP pilot, or augment the teacher state with changing observed map/menu information for native macro actions.',
+   'Align endpoint-forced termination, cached STOP return, budget exhaustion and all intermediate macro-route events with the completion contract in every comparison.',
+   'Define ambiguous action labels separately from masked state labels; do not silently union incompatible state-specific action sets.',
+   'Specify transferable state/automaton encoding and which event evidence is actually observed by the deployed policy.'
+  ],
+  'proof_status':'Bellman descent and set-loss gradient derived under finite deterministic positive-cost graph assumptions; no learned-policy guarantee.',
+  'executed_checks':['P1_product_graph','P1_set_loss'],
+  'underlying_evidence':['CorrectNav PDF pp.3-4','DUET commit 93e8b233164bc079a6db48b8a0a78d123ec8de41, map_nav_src/r2r/agent.py:239-285,404-478'],
+  'untested_assumptions':['Natural rate of semantically invalid teacher continuations','Reliable procedural annotations','Observable and generalizable instruction state','Downstream navigation benefit'],
+  'next_decisive_test':'Blinded full-continuation teacher audit with separate semantic, efficiency and unresolved labels.',
+  'recommendation':'Proceed to revised diagnostic audit, not model training yet.'},
+ {'id':'P2','decision':'revise','logical_status':'Constrained selection is well defined; witness and label-population semantics need revision',
+  'severity':'major','supported_core':'Instruction-route validity is not logically equivalent to a named navigator successfully executing it.',
+  'required_changes':[
+   'Use complete alternative witness bundles or separately supervised required evidence groups; union-attention loss does not enforce conjunction.',
+   'Treat unresolved as annotation/evidence status and report selective label availability. Masked losses need an explicit population/support assumption or randomized audit.',
+   'Declare whether hard quotas may select low-validity examples or may abstain/be infeasible under a quality floor.',
+   'Keep generator/navigator/scorer separation procedural; do not claim probabilistic independence.',
+   'Match human evidence-label effort and downstream token/update budgets in addition to accepted pair count.'
+  ],
+  'proof_status':'Top-B_k selection per disjoint stratum follows by exchange argument; no learning-performance guarantee.',
+  'executed_checks':['P2_quota_witness_missing_labels'],
+  'underlying_evidence':['RSI-Nav Appendix H p.19','RSI-Nav commit 5e8fa2c74cf8e7dc305b33088a963b200e20805d, evo/evo_rollout.py:1509-1540,1578-1598'],
+  'untested_assumptions':['Auditable validity for difficult examples','Witness supervision improves validity beyond simple scorer','Fixed-budget selection improves navigation'],
+  'next_decisive_test':'Independently sampled validity-by-difficulty audit with resolved/unresolved coverage and complete witness definitions.',
+  'recommendation':'Proceed to revised diagnostic audit; no demonstrated method benefit.'},
+ {'id':'P3','decision':'revise','logical_status':'Strong symbolic aliasing result survives; real target impact and learnability remain speculative',
+  'severity':'major','supported_core':'Timewise event marginals and ever-event probabilities can both match while ordered co-occurrence differs.',
+  'required_changes':[
+   'Replace AA/BB versus AB/BA as evidence beyond p-only with uniform {AB0,B0A,0AB} versus {A0B,0BA,BA0}.',
+   'Describe NavQ as expected discounted sum of caption features under its shortest-continuation construction, not normalized average.',
+   'Preserve the continuation policy/horizon and same-continuation pair labels; do not interpret J as optimal reachability or risk guarantee.',
+   'Necessary pairwise bounds do not guarantee coherent trajectory probabilities. State single-occurrence/repetition assumptions before additional constraints.',
+   'Require natural target/readout headroom and observable predictive signal before training a new head; retain matched future-QA, sequence, capacity, task-input and supervision controls.'
+  ],
+  'proof_status':'Analytic equality of additive targets follows from identical timewise marginals for any fixed event feature map and discount; does not establish collision for actual NavQ caption features.',
+  'executed_checks':['P3_joint_events'],
+  'underlying_evidence':['NavQ PDF pp.4-5, Eqs.6-8','NavQ commit 9465fe43c9c1583bd7ba390b6be30996ea4f5a5c, code/Q_pretrain/dataset.py:189-222 and GPT_VL.py:236-239'],
+  'untested_assumptions':['Relevant target-level ambiguity exists in natural data','History contains identifying predictive signal','Compact joint head beats ordinary sequence/future-QA controls','Policy shift can be controlled'],
+  'next_decisive_test':'Oracle representation comparison on matched-marginal branches and natural cases, followed by an observability/learnability test.',
+  'recommendation':'Retain only as speculative; drop the method claim if direct controls match.'},
+ {'id':'P4','decision':'revise','logical_status':'Outcome-only failure attribution is not identifiable; a conditional evidence-based classifier is plausible but unvalidated',
+  'severity':'major','supported_core':'A failed arrival can coexist with a correct identity detection; terminal failure is not sufficient evidence of wrong category.',
+  'required_changes':[
+   'Measure write prevalence and causal downstream suppression before attributing practical harm; preserve collection-enabled and simulator-feedback conditions.',
+   'Define deployable identifying evidence; same-observation hidden causes cannot be separated merely by extra heads.',
+   'Address selectively observable attribution labels and distinguish balanced interventions from natural failure prevalence.',
+   'Restrict identity-invariance pairs to verified identity/evidence-preserving interventions.',
+   'Evaluate precision and coverage of the joint qD/witness gate. Global qD calibration alone does not survive arbitrary correlated witness conditioning.',
+   'Keep static memory, no-write, quarantine and witness-only controls; paper Table4 already reports small static-versus-dynamic increments.'
+  ],
+  'proof_status':'Restricted success truth table proves non-identifiability from outcome alone; no general identification or deployment-risk theorem.',
+  'executed_checks':['P4_attribution','P2_quota_witness_missing_labels'],
+  'underlying_evidence':['PSG-Nav PDF p.6, section3.4; p.9, Table4','PSG-Nav commit 181d878ff207845a31e542a19a6592925c1e9bab, PSG_Nav.py:1483-1555'],
+  'untested_assumptions':['Harmful writes are frequent enough','Their downstream effect survives quarantine baseline','Cause evidence is deployable','Intervention labels transfer to natural episodes'],
+  'next_decisive_test':'Shadow-write and retrieval replay with independent identity/control labels and natural-prevalence sampling.',
+  'recommendation':'Proceed only to the revised write audit; do not claim a new memory benefit yet.'}
+]
+additional=[
+ {'id':'08-UAGM','type':'DEDUCTION WITH EXECUTED NUMERICAL BOUNDS','status':'Reporting inconsistency under stated five-run interpretation',
+  'finding':'All six Table11 p-values lie below even one-sided lower bounds compatible with displayed five-run means/SDs, allowing rounding.',
+  'locator':'Supplied UAGM PDF p.19, Table11; visually checked; SHA256 a4a90b10da489a4fd6b88eedcc73ceeae413732ce55d511b5e25494de73dff3c',
+  'assumptions':['Same five paired run-level values for mean, SD and test','Ordinary t test df4','Nearest-.01 reporting'],
+  'required_resolution':'Request raw per-run measurements, pairing, statistical unit and test code. A different unit may explain values but needs disclosure.',
+  'nonclaims':['No inference of misconduct','No conclusion that mean gains are absent','Raw data normality/dependence and actual implementation not verified'],
+  'executed_check':'UAGM_statistics'},
+ {'id':'08-FeedTTA','type':'ALGEBRAIC DEDUCTION WITH EXECUTED CHECKS','status':'Original correction independently confirmed',
+  'finding':'Literal Eq5 and AppendixB1 normalize different branches; appendix is mean-preserving, literal formula generally is not. Both negative-alpha variants increase expected absolute coordinate multiplier for positive denominator.',
+  'locator':'FeedTTA pp.4-5, Eqs5,8-9; pp.13-14, AppendixB1',
+  'nonclaims':['No empirical forgetting/plasticity conclusion','Actual released implementation unavailable in reviewed record'],
+  'executed_check':'FeedTTA_scaling'},
+ {'id':'08-ATENA','type':'DERIVATION WITH EXECUTED FINITE DIFFERENCES','status':'Original correction independently confirmed',
+  'finding':'For q=lambda*onehot(selected)+(1-lambda)*pi, larger log gaps do not imply universally stronger gradients; the chain-rule factor matters.',
+  'locator':'ATENA main Eqs1-4; supplement A7 Eqs13-16; commit f6903760c2dccdc9fb3524aa3b83f62ee9331e35 agent_obj_atena.py:480-490',
+  'nonclaims':['No refutation of empirical adaptation results','Binary finite checks are not measurements of full-network gradient norms'],
+  'executed_check':'ATENA_gradient'},
+ {'id':'08-CPNAV','type':'ORDER-STATISTIC DEDUCTION WITH EXECUTED NUMERICAL COUNTEREXAMPLE','status':'Printed confidence criterion insufficient; success guarantee needs additional assumptions',
+  'finding':'The .99 upper Beta quantile exceeding target does not imply 99% probability that coverage exceeds target. Oracle-path retention is also distinct from finite-budget execution success.',
+  'locator':'CPNAV PDF pp.4-5, Eqs12-15; Eq12 visually checked',
+  'nonclaims':['No assertion about unavailable implementation threshold','No general rejection of conformal prediction','Exchangeability and calibration unit not established'],
+  'executed_check':'CPNAV_beta_and_budget'}
+]
+record={'assignment':'08','review_type':'independent_logic_and_mathematics','cutoff':'2026-10-22','completion_status':'Complete',
+        'proposal_ids_reviewed':['P1','P2','P3','P4'],'proposals':proposals,'additional_findings':additional,
+        'detailed_report':'evaluations/08_logic.md','executed_test_results':'experiments/08/logic_results.json',
+        'source_read_manifest':'evidence/08/source_reads.jsonl','project_code_executed':False,'navigation_benchmarks_executed':False,
+        'empirical_status':'All proposal benefits untested; nine isolated numerical/finite groups executed.',
+        'novelty_status':'Not certified by assignment08; independent assignment09 required.'}
+(ROOT/'evaluations/08_findings.json').write_text(json.dumps(record,ensure_ascii=False,indent=2),encoding='utf8')
+(ROOT/'evidence/08/search_log.json').write_text(json.dumps([
+ {'query':'site.itl.nist.gov paired t test differences standard deviation n-1','date':'2026-10-22',
+  'selected_primary_source':'https://www.itl.nist.gov/div898/handbook/prc/section3/prc311.htm',
+  'purpose':'Verify ordinary paired test definition; covariance bound is independently derived.'},
+ {'query':'site.statproofbook.github.io proof order statistics uniform beta distribution','date':'2026-10-22',
+  'purpose':'Background discovery only; no third-party summary used to establish CPNAV result. Standard iid order-statistic formula and numerical distribution check stated with assumptions.'}
+],ensure_ascii=False,indent=2),encoding='utf8')
+summary='''# Assignment 08 complete
+
+Independently reviewed all four proposal mechanisms, relevant primary passages and five pinned codebases. All four require the corrections documented in [the logic report](../evaluations/08_logic.md); P1, P2 and P4 can proceed to diagnostic audits, while P3 remains speculative. This is not novelty certification or benchmark validation.
+
+Nine original isolated check groups pass. Outputs and environment/script hashes are in [logic_results.json](../experiments/08/logic_results.json); no downloaded project modules or navigation models were executed.
+
+The main revisions are: assess P1 complete teacher continuations and separate semantic feasibility from efficient actions; use a shared realizable action/termination contract; define P2 complete witness bundles and unresolved-label populations; repair P3 with a counterexample matching timewise and ever-event marginals; and treat P4 cause identification, selective labels and joint gate precision explicitly.
+
+The additional evidence audit independently confirms FeedTTA's scaling inconsistency, ATENA's non-universal gradient-strengthening argument, and CPNAV's insufficient printed Beta criterion. UAGM Table11's six extreme p-values cannot coexist with its displayed means/SDs under the stated ordinary five-run paired-test interpretation, even allowing rounding. This is a bounded reporting inconsistency; no misconduct or absence of mean gains is inferred.
+
+Machine-readable decisions: [08_findings.json](../evaluations/08_findings.json). Exact source scopes and hashes: [source_reads.jsonl](../evidence/08/source_reads.jsonl). The root coordinator must reconcile revisions with novelty and feasibility reviews before recommending model development.
+'''
+(ROOT/'assignments/08_summary.md').write_text(summary,encoding='utf8')
+print(json.dumps({'proposals':len(proposals),'additional_audits':len(additional),'complete':True}))

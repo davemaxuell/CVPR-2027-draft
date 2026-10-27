@@ -1,0 +1,438 @@
+=== PDF PAGE 1 ===
+    Adaptive Rollout Truncation Based on Epistemic
+     Uncertainty for Efficient Offline World Model
+                        Training
+
+
+           Nikodem Sebastian Zymla               Laurin Thiele                    Johannes Pitz
+            TUM School of CIT           TUM School of CIT                  AIDX Lab
+             Technical University of Munich       Technical University of Munich       Technical University of Munich
+              nikodem.zymla@tum.de                 laurin.thiele@tum.de                 johannes.pitz@tum.de
+
+
+
+
+        Abstract—Accurate neural world models are central to model-   step transitions [1]. However, autoregressive prediction also in-2026 based robotics, where they enable robots to predict future states   troduces a major challenge: prediction errors accumulate over
+     from previously observed trajectories. Multi-step autoregressive                                                                 time and propagate through later rollout steps. During the early
+      training improves  long-horizon  prediction, but  fixed  rollout
+                                                                       stages of training, when the model is  still inaccurate, these      horizons also increase computational cost and can amplify earlySep      training errors when the model  is  still  inaccurate. Existing   accumulated errors can deteriorate the training signal. Long
+18 trainingoptimization,schemesindependenttypically useofthethesamemodel’srolloutcurrentlength throughoutpredictive   rolloutalso requiringhorizonsmorecan computation.thus be inefficientMostearlyexistingin trainingworld modelwhile
+        reliability.                                                                          training procedures use a fixed rollout horizon throughout
+      We propose an epistemic uncertainty-driven adaptive rollout
+                                                                       the complete training process. Although long rollouts become      strategy for  offline world model training following an auto-
+      curriculum training scheme. Instead of always unrolling to a   useful once the model has learned meaningful dynamics,
+       fixed horizon, the model terminates autoregressive rollouts once   applying the same horizon from the beginning exposes the
+      epistemic uncertainty exceeds a threshold calibrated from a   optimizer to unreliable long-term predictions. We argue that[cs.RO] warm-up phase. We study two uncertainty estimators: a five-head   rollout length should instead depend on model confidence.
+      ensemble with a shared recurrent backbone and Monte Carlo
+                                                          To  address  this  problem, we  propose  an  epistemic      Dropout. A two-stage warm-up procedure stabilizes uncertainty
+      estimates before we enable adaptive truncation.                   uncertainty-driven adaptive rollout strategy for offline world
+        Experiments on ANYmal-D and ANT show that ensemble-  model  training.  Instead  of  fixing  the  rollout horizon be-
+      based adaptive truncation matches or improves the prediction   forehand, the model estimates epistemic uncertainty during
+      accuracy of fixed-horizon training and the RWM-U baseline while   autoregressive prediction. Whenever the uncertainty estimate
+      requiring substantially fewer cumulative rollout steps. Training
+                                                                exceeds a predefined  threshold,  the model terminates  the
+      a world model on ANYmal-D following the presented approach
+      reaches comparable final performance with the baselines with   current rollout, and only the reliable predictions generated up
+      roughly 72% less rollout computation. These results indicate that   to that point contribute to the loss. As training progresses and
+      epistemic uncertainty is useful not only for downstream policy   the model becomes more confident, rollouts naturally become
+       regularization, but also for making world model training itself   longer without requiring a manually scheduled horizon.
+     more compute-efficient.                                              We compare two epistemic uncertainty estimators within the
+                                                        same adaptive rollout framework: a five-head ensemble [2] and
+                                   I. INTRODUCTION
+                                                       Monte Carlo Dropout [3].
+       World models have become an increasingly important com-   We summarize the main  contributions of  this work asarXiv:2609.21482v1     ponent in modern robotics. By learning the underlying system   follows:
+     dynamics from collected trajectories, they enable robots to     • We propose an epistemic uncertainty-driven adaptive roll-
+      predict future  states without  interacting with the physical        out termination strategy for efficient offline training of
+      environment. Such predictive models can improve planning,        recurrent robotic world models.
+      reduce the need for expensive real-world interactions, and     • We compare the proposed strategy against RWM-U [2]
+      provide a foundation for sample-efficient model-based learning       and fixed-horizon rollout baselines [1] under matched
+     methods.                                                  compute budgets.
+     A common training strategy, as presented by Li et al. [1],     • We analyze ensemble-based and Monte Carlo Dropout-
+      for recurrent world models is autoregressive multi-step pre-       based uncertainty estimates within the same adaptive
+       diction. During training, the model recursively feeds its own        rollout framework.
+      predictions back as input to generate trajectories over multiple     • We show that adaptive rollout termination reduces roll-
+      future time steps. This approach encourages the network to        out computation while maintaining or improving long-
+      learn long-term temporal dependencies rather than only one-       horizon prediction performance.
+
+=== PDF PAGE 2 ===
+                        II. RELATED WORK                               Dataset       Estimator          Configuration       Threshold T
+  Learning predictive world models has become an important     ANYmal-D   Ensemble        anchor@2          0.0808
+                                                           ANYmal-D   Ensemble        anchor@4          0.1062
+research direction for improving data efficiency in robotics.     ANYmal-D   Ensemble        anchor@6          0.1216
+Li et al. [1] introduced a recurrent world model that captures     ANYmal-D   Ensemble        anchor@8          0.1331
+robot dynamics from trajectory data through autoregressive    ANT        Ensemble        anchor@2          0.1332
+                                                           ANYmal-D  MC Dropout   anchor@2, p = 0.1      0.0828
+multi-step prediction.                                        ANYmal-D  MC Dropout   anchor@2, p = 0.4      0.1790
+  Building upon this work, Li et al. [2] incorporated uncer-     ANYmal-D  MC Dropout   anchor@2, p = 0.8      0.3847
+tainty estimation into the world model to improve robustness
+                                          TABLE  I: Frozen uncertainty thresholds used for adaptiveduring  offline model-based  learning. Estimating  epistemic
+                                                                     rollout truncation.uncertainty allows unreliable model predictions to be identified
+and treated differently during downstream policy training.
+  As an alternative to ensembles, Gal and Ghahramani [3] pro-
+                                                     The ensemble estimates epistemic uncertainty as the vari-
+posed Monte Carlo Dropout as an approximation to Bayesian
+                                                          ance across the means µ of five prediction heads. Large dis-
+inference using a single network rather than multiple indepen-
+                                                         agreement between the individual predictions indicates regions
+dently trained models.
+                                                      where the model is less confident. Monte Carlo Dropout es-  Curricula over the autoregressive horizon are not themselves
+                                                                timates uncertainty by executing 10 stochastic forward passesnew. Scheduled sampling [4] increases the degree of self-
+                                                           with dropout enabled. The variance across the resulting stateconditioning during training according to a hand-designed
+                                                                 predictions serves as the uncertainty estimate.schedule. MBPO [5] grows its model rollout length on a fixed
+linear schedule on several tasks, though this controls the length                                                          C. Adaptive Rollout Truncation
+of model-generated data for policy optimization rather than
+                                                     Our method dynamically determines the effective rolloutthe autoregressive horizon used to  fit the dynamics model
+                                                                   length. For every batch, the model generates autoregressiveitself. The previous work from Li et al. [2] exploits uncertainty
+                                                                 predictions until either it reaches the maximum rollout lengthestimates during policy training, without adapting the world
+                                                               or  the estimated epistemic uncertainty exceeds a  dataset-model training process itself. Our work addresses both gaps
+                                                                     specific threshold. Once the uncertainty exceeds the threshold,at once: we incorporate epistemic uncertainty directly into
+                                                                 the model generates no further prediction steps for that rollout.autoregressive rollout generation, using it to truncate rollouts
+                                                       Only the successfully generated prediction steps contributeduring training rather than only as an evaluation metric or a
+                                                                    to  the  objective.  Thus,  high-uncertainty  batches  producedownstream regularizer. This makes a hand-designed schedule
+                                                                   shorter rollouts, while confident batches continue until theobsolete. The horizon  is  set  online by  the model’s own
+                                              maximum horizon.predictive reliability rather than by iteration count. This also
+                                          We denote different adaptive configurations by the anchorreduces computation and limits the influence of unreliable
+                                                               parameter, anchor2, anchor4, anchor6, and anchor8.long-term predictions during world model training.
+                                                            Here, the parameter anchor@k is not itself a rollout length or
+                            III. METHOD                              interval. It defines an absolute epistemic-uncertainty threshold
+A. World Model Architecture                                     calibrated to the uncertainty observed at the forecast horizon k
+                                                                         at the end of warm-up. During the last 10 warm-up iterations,  Our approach is based on the recurrent neural world model
+                                                                 the model records the epistemic uncertainty at horizon k. Theproposed by Li et al. [2]. The architecture consists of a shared
+                                                                    resulting threshold T  is the median over these 10 iterations,Gated Recurrent Unit (GRU) backbone followed by multilayer
+                                                           averaged over at least 3 independent training runs. Duringperceptrons (MLP). Following the work by Li et al. [1] and its
+                                                                       training, the model truncates the rollout at the first step i forimplementation, the model performs autoregressive multi-step
+                                                      which i ≥hmin and the mean epistemic uncertainty at step ipredictions.
+                                                                               is at least T. We use hmin = 4 for all adaptive runs, which  For the ensemble, five independent MLP prediction heads
+                                                              guarantees that gradients always flow through at least fourproduce separate next-state predictions with the mean µ and
+                                                                   forecast steps. Larger anchor indices produce larger thresholdsvariance σ. We train each head on its own bootstrap sample
+                                                       and therefore later truncation, making the behavior closer toof the offline dataset during the warm-up, encouraging diverse
+                                                           a fixed-horizon rollout.predictions that capture epistemic uncertainty. For the Monte
+                                                            For reproducibility across seeds, the reported runs use theCarlo Dropout variant, the architecture remains unchanged
+                                                              frozen uncertainty thresholds listed in Table I, rather than re-except that dropout layers remain active during inference, and
+                                                               estimating the threshold separately for every run. We calibratedwe increase the size of the MLP to match the capacity of the
+                                                                 the ensemble and MC Dropout thresholds after 50 warm-upensemble heads.
+                                                                         iterations.
+B. Epistemic Uncertainty Estimation
+                                                      D. Warm-Up Strategy  As the world model becomes more accurate throughout
+training, we expect epistemic uncertainty to decrease, allowing     Uncertainty estimates are difficult to interpret at the be-
+longer and more reliable prediction horizons.                  ginning of training because the model has not yet learned
+
+=== PDF PAGE 3 ===
+meaningful short-term dynamics. We therefore disable adap-   baseline RWM-U from Li et al. [2]. The second is our fixed-
+tive rollout truncation during the initial phase.               32 reimplementation, which includes the warm-up phase and
+  The default configuration first performs 50 bootstrap single-   performs autoregressive prediction with a constant horizon of
+step warm-up iterations and then 10 full-horizon warm-up  32 steps. The third is a fixed-8 baseline, which uses a shorter
+iterations (see Appendix A for an ablation of this choice).   constant training horizon of 8 steps instead after iteration 60.
+Restricting the rollout length to one allows the model to learn   Apart from the adaptive rollout mechanism and the fixed-
+accurate local system dynamics before we introduce recursive   horizon, we keep the model architecture, optimizer settings,
+prediction. The second warm-up phase exposes the model to  and data identical whenever possible.
+long autoregressive sequences and improves prediction per-    The fixed-32 experiment  isolates the  effect of adaptive
+formance before adaptive rollout termination becomes active.   truncation compared  to the standard long-horizon  training
+Once both warm-up stages have completed, the model applies   setup. The fixed-8 experiment verifies whether using a cheaper
+adaptive rollout termination for the remaining training process.   short horizon is sufficient.
+
+                                                          C. Training Configuration                IV. EXPERIMENTAL SETUP
+                                          We visualize results over different seeds with a ±1σ bandA. Dataset
+                                                                    in the plots. For MC Dropout we test dropout rates p = 0.1,
+  We evaluate our method on the ANYmal-D and ANT   0.4, and 0.8.
+trajectory datasets. Both datasets contain trajectories collected
+during PPO policy training, so the observations cover tran-  D. Evaluation Metrics
+sitions from random behavior toward stronger policies. We      First, we measure  prediction accuracy using  validation
+use the data exclusively for offline world model training. We  RMSE over the rollout horizon. Second, we evaluate per-step
+reimplemented the repository of Li et al. [2], since the original   validation RMSE as a function of the forecast step to ana-
+repository contains only the code for online world model   lyze error accumulation. Third, we approximate computational
+training. The authors do not provide a dataset to reproduce   effort by the cumulative number of executed rollout steps,
+their findings.                                          which measures specifically our target of adaptive truncation.
+  The ANYmal-D dataset was collected using Isaac Lab and   Because every rollout step requires an additional recurrent
+contains 31,250 segments with maximum length 200 and mean   forward pass, this provides a hardware-independent compute
+length 192, corresponding to approximately 6.0 million valid   proxy. We also report measured FLOPs. The two compute
+transitions. Its observation and action dimensions are 45 and   metrics  differ slightly because each  iteration pays a fixed
+12, respectively. It additionally provides auxiliary targets con-   history-encoding cost independent of the forecast horizon.
+sisting of an 8-dimensional contact signal, a termination signal,
+                                                                                 V. RESULTSand  stability information. The ANT dataset was recorded
+with MuJoCo and contains 6,000 trajectories of length 1,000,   A. Prediction Performance
+corresponding to approximately 6.0 million transitions, with                                                                     Fig. 1 compares adaptive ensemble anchor@2 with 50
+observation dimension 105 and action dimension  8. Both                                                   warm-up iterations, which the anchor sweep in Appendix A
+datasets therefore cover a comparable number of transitions,                                                                        identifies as the best-performing configuration, against the
+consistent with the setup in [2].                                                                fixed-32  baseline. Compared  to  the  fixed-32 and RWM-
+  We split at the segment level, so complete trajectories go  U baseline adaptive truncation reaches the same validation
+either to training or validation. We use a validation fraction  RMSE with fewer cumulative rollout steps. At equal compute,
+of 0.1 with a fixed  split seed. For ANYmal-D this yields    it also achieves lower 32-step prediction error. The rollout
+28,125 training segments and 3,125 validation segments, or ap-   statistics show the intended behavior: epistemic uncertainty
+proximately 162,000 training windows and 18,000 validation   decreases during training, while the number of executed rollout
+windows. Following Li et al. [2], we extract training windows   steps increases.
+with 32 history steps and 32 forecast steps, for a total length      Fig. 1 also compares adaptive truncation with a fixed-8
+of 64, using stride 32 without crossing segment boundaries.   baseline. The fixed-8 model performs well on early prediction
+We discard segments shorter than 64 steps.                      steps and reaches a better accuracy at convergence. But its
+  We normalize states and actions by per-dimension z-scoring,   error grows more strongly beyond its training horizon due to
+computing the statistics from the training segments only and    its fixed training scheme. In contrast, adaptive truncation first
+applying them to both training and validation data. Unless   focuses on both reliable short rollouts and later shifts toward
+stated otherwise, we compute validation RMSE in the quan-   accurate long-horizon predictions. Appendix B illustrates how
+titative figures on normalized states inside the autoregressive   the compounding error develops during extended rollouts.
+rollout.                                                        Table II summarizes the final prediction accuracy and the
+                                                            cumulative rollout steps at convergence for all methods. It also
+B. Baseline                                                               includes a final evaluation over long forecasts. Consistent with
+  We compare adaptive rollout training against three fixed-   the reduction in rollout steps, adaptive truncation also directly
+horizon baselines. The  first  is our reimplementation of the   reduces FLOPs, see Appendix E.
+
+=== PDF PAGE 4 ===
+                                                                   Fig. 3: Adaptive truncation trained on the ANT dataset.
+
+
+                                                                                     Method                 32-step RMSE    160-step RMSE   Cum. rollout steps   ∆compute
+                                                                                                          fixed-32              0.314 ± 0.001    0.429 ± 0.021          3,250      —
+                                                                                                              fixed-8               0.274 ± 0.002    0.458 ± 0.006          1,090       −66%
+                                                               RWM-U [2]           0.321 ± 0.001    0.419 ± 0.007          4,800       +48%
+                                                                                                 Adaptive anchor@2   0.288 ± 0.002   0.389 ± 0.007         924       −72%
+
+                                          TABLE II: ANYmal-D prediction accuracy and compute using
+                                                        an ensemble estimator (three-seed mean ± std). Compute is
+                                                                       relative to fixed-32 accuracy (32 steps) and the RWM-U results
+Fig. 1: Adaptive anchor@2 compared to the fixed-32 base-   are reported at convergence.
+line, RWM-U baseline and fixed-8 baseline. Adaptive trunca-
+tion and fixed-8 reach a given validation RMSE at substantially
+lower compute than fixed-32 and RWM-U (a), and adaptive                                                                robust to reasonable threshold variations, overly conservative
+truncation attains lower per-step error than both fixed-32 and                                                               or aggressive thresholds may lead to suboptimal trade-offs
+RWM-U at equal compute (b).                                                       between compute efficiency and long-horizon learning.
+                                                                     Further, Li et al. [2] report that an offline-trained policy
+                                                         can outperform the data-collecting policy on real robots. Their
+                                                                released code provides only online world-model and policy
+                                                                    training rather than an offline pipeline, and their pretrained
+                                                     model does not match our accuracy on our data (Appendix D).
+                                                               In contrast, our contribution is compute-efficient offline world-
+                                                     model training via adaptive truncation. We validate its down-
+                                                           stream use by showing, in simulation, that an epistemic penalty
+                                                                 closes the world-model-exploitation gap (imagined-to-sim) as
+                                                           a function of λ. We deploy the trained anchor@2 model
+                                                                    in an uncertainty-penalized MOPO-PPO setup, reported in
+                                                      Appendix C.
+
+      Fig. 2: Adaptive truncation using MC Dropout.
+
+                                                                              VII. CONCLUSION
+
+   Fig. 2 shows the Monte Carlo Dropout experiments. Adap-
+                                                                  In this work, we presented an uncertainty-driven adaptive
+tive truncation only becomes clearly active for p = 0.8, where
+                                                                     rollout truncation strategy for  offline training of recurrent
+the number of rollout steps taken increases. For the other
+                                                               neural world models, which  adjusts  the  effective  rollout
+configurations the minimal number of rollout steps hmin = 4                                                               length based on epistemic uncertainty from either ensembles
+is dominant. MC Dropout adds a dependency on the dropout
+                                                               or Monte Carlo Dropout under an auto-curriculum training
+rate p, thus the ensemble is preferred.
+                                                         scheme. We showed that this simple mechanism leads to a
+  Further ablations regarding the prediction performance are
+                                                                    substantial reduction in computational cost while maintaining
+described in Appendix B.
+                                                                 prediction accuracy comparable to fixed-length rollouts. When
+B. ANT environment                                              transitioning from short to long rollouts during training, the
+                                                     compounding error over long forecasts is smaller compared to  We verify the method by transferring the ensemble approach
+                                                                  short fixed-length training.to the ANT environment. We relaunch the fixed baseline runs
+to measure the anchor@2 value. Fig. 3 shows that adaptive     These results suggest that uncertainty-aware control of the
+truncation again converges faster during training, with better   training process itself is a promising direction for improving
+accuracy at equal compute over the 32-step prediction.         the efficiency of model-based reinforcement learning systems.
+                                                             Future work may explore alternative uncertainty measures,
+                   VI. DISCUSSION                                                            automatic threshold selection, and evaluation on additional
+  Our method introduces a dependency on the uncertainty   robotic benchmarks such as different locomotion tasks and
+threshold. While we observe that the approach is relatively   environments.
+
+=== PDF PAGE 5 ===
+                 REFERENCES
+
+[1] C. Li, A. Krause, and M. Hutter, “Robotic World Model: A
+    Neural Network Simulator for Robust Policy Optimization
+    in Robotics,” arXiv preprint arXiv:2501.10100, 2025.
+[2] ——, “Uncertainty-Aware Robotic World Model Makes
+    Offline Model-Based Reinforcement Learning Work on
+    Real Robots,” arXiv preprint arXiv:2504.16680, 2025.
+[3] Y. Gal and Z. Ghahramani, “Dropout  as a Bayesian
+    approximation: Representing model uncertainty in deep
+    learning,” in Proceedings of the 33rd International Con-
+    ference on Machine Learning, ser. Proceedings of Machine
+    Learning Research, vol. 48. PMLR, 2016, pp. 1050–1059.
+[4] S. Bengio, O. Vinyals, N. Jaitly, and N. Shazeer, “Sched-
+    uled sampling  for sequence  prediction with  recurrent
+    neural networks,”  in Advances  in Neural Information
+    Processing Systems, vol. 28, 2015.
+[5] M.  Janner,  J. Fu, M. Zhang, and  S. Levine, “When
+    to trust your model: Model-based policy optimization,”
+    in Advances in Neural Information Processing Systems,
+    vol. 32, 2019.
+
+=== PDF PAGE 6 ===
+                  APPENDIX A
+       ANCHOR AND WARM-UP ABLATIONS
+
+   Fig. 4 compares the anchor thresholds evaluated for the
+ensemble listed in Table  I. Anchor@2 applies the strictest
+truncation and therefore uses the fewest rollout steps, while
+also reaching the lowest 32-step validation error. Larger anchor
+indices allow longer rollouts earlier in training, but do not
+improve prediction accuracy. We therefore use anchor@2 for
+all main experiments.
+   Fig. 5 studies the number of bootstrap warm-up iterations.
+The warm-up length has only a small effect on final accuracy,
+so adaptive truncation for the ensemble is robust to this choice.
+We nevertheless keep 50 warm-up iterations as the default   Fig. 6: Long-horizon prediction error of fixed-8 and adaptive
+to ensure that the ensemble heads are sufficiently developed  anchor@2, evaluated on 3,000 held-out rollouts. The fixed-
+before we enable adaptive truncation.                      8 model focused on shorter rollouts during training, its error
+                                                                 increases dramatically on long forecasts. Our proposed auto-
+                                                            curriculum uncertainty scheme transitions from short to long
+                                                                     rollouts and shows a gentle increase in the RMSE error.
+
+
+
+
+                                                                 the uncertainty estimator. Fig. 7 shows the validation error
+                                                               across the 32-step prediction horizon for different dropout
+                                                                          rates. Compared with the corresponding fixed-32 baseline MC
+                                                       Dropout achieves only a marginal improvement. Further, com-
+Fig. 4: Adaptive truncation for different epistemic thresh-   pared with the adaptive anchor@2 ensemble, MC Dropout
+olds measured  at different anchors. Comparison of model   achieves  less competitive prediction performance  at equal
+configurations under matched compute budgets (left) and at   compute. Fig. 8 visualizes the training progress for the MC
+convergence (right).                                      Dropout estimator and the final accuracy at convergence for
+                                                    p = 0.8. These results provide further motivation for using
+                                                        an ensemble as the uncertainty estimator for adaptive rollout
+                                                                   truncation.
+
+
+
+
+
+Fig. 5: Adaptive truncation for different warm-up lengths.
+A warm-up phase of 50 iterations matches the results of no
+bootstrap warm-up at all. Training with a warm-up window of
+25 steps yields the weakest results.
+
+
+                  APPENDIX B
+            PERFORMANCE ABLATION
+
+  As reported in Table II, the prediction error of the fixed-8
+baseline increases more rapidly over long forecast horizons.                                                                   Fig.  7: Validation  error  across  the  32-step  prediction
+Fig. 6 compares the two training schemes and illustrates how                                                        horizon for different MC Dropout rates. For p = 0.1 and
+compounding error develops during extended rollouts. This                                                    p = 0.4, adaptive truncation does not engage. Thus, the model
+setting  is  particularly  relevant because downstream policy                                                                       trains only with the minimal rollout length, and its forecast
+training  relies on long model-generated  trajectories. Since                                                                    error increases dramatically. The model with p = 0.8 is trained
+our adaptive method trains on rollouts of varying lengths, it                                                     on both short and long rollouts, but its accuracy over the 32
+remains more stable over long forecast horizons.                                                                   forecast steps  is higher than that of  its fixed and adaptive
+  For MC Dropout, adaptive truncation is activated only at                                                        ensemble counterparts.
+the high dropout  rate p =  0.8. The dropout  probability
+therefore introduces an additional sensitive hyperparameter for
+
+=== PDF PAGE 7 ===
+                                                                   Fig. 9: Qualitative open-loop rollout as robot pose. The
+                                             ANYmal-D rendered  at the world model’s predicted  joint
+                                                              angles  at  forecast horizons h ∈{0, 8, 32, 96, 160}. Both
+                                                       models track the truth up to the 32-step training horizon. The
+                                                                  fixed-8 baseline then collapses, whereas the adaptive model
+                                                          remains coherent through 160 steps. The value under eachFig. 8: Adaptive truncation training for the MC Dropout
+                                                         frame is the per-frame RMSE over the 12 joint angles. Posesestimator. The models with p =  0.4 and p =  0.8 train
+                                                                 are anchored at a common base position, so deviation reflectsonly with the minimal rollout length. Thus, they show faster
+                                                                            joint,  tilt, and velocity error. Rendered in PyBullet from theconvergence and a lower RMSE error compared to the adaptive
+                                                               public ANYmal-D description.model with p = 0.8, which is trained on the transition from
+short to long rollouts.
+
+                                                           Without an epistemic penalty, the policy reaches a higher
+                                                         imagined model reward but visits more uncertain states. AA. Qualitative Rollouts
+                                                                stronger penalty reduces epistemic uncertainty but also low-
+  To make the open-loop error concrete, Fig. 9 renders the   ers the imagined task reward. The gap between imagined
+predicted robot state as a physical pose. Starting from a 32-step  and simulated return therefore shrinks as λ increases, which
+history, each world model is rolled out autoregressively for up   matches the findings of Li et al. [2]. We do not observe a
+to 160 steps (the MOPO imagination depth) on a held-out   clear difference in downstream policy training between the
+validation segment. We pose the ANYmal-D at the predicted   adaptive-truncation and the fixed-horizon world model. This
+joint angles q (state dimensions 9–20) and recover the base roll    is consistent with the scope of this work, which targets world
+and pitch from the predicted projected-gravity vector. Yaw is  model training rather than policy optimization.
+not identifiable from projected gravity (a rotation about the
+gravity axis leaves the vector unchanged) and is absent from
+the observation, so it is fixed to zero. The ground-truth pose is
+overlaid as a translucent ghost, and because the absolute base
+position is likewise unobservable, both poses are anchored at
+a common origin. All visible deviation reflects joint-,  tilt-,
+and velocity-prediction error rather than global translation or
+heading. Arrows denote the base linear velocity, in the same
+colour as each robot (grey: ground truth, blue/red: prediction).
+Up to the 32-step training horizon both models track the   Fig. 10: Deploying the trained anchor@2 world model into
+ground truth closely (per-joint RMSE ≤0.03 rad). Beyond it,  MOPO-PPO training presented in [2]. The imagined-to-sim
+the fixed-8 baseline diverges catastrophically: its pose detaches   gap  is reduced by a higher value of λ for both the fixed
+from the ground truth and collapses by h = 96, while the   ensemble (a) and adaptive model (b).
+adaptive model stays pose-coherent through the full 160-step
+rollout (≈0.08 rad). This is the qualitative counterpart of the
+                                                                 APPENDIX D
+long-horizon error reported in Fig. 6 and Table II.
+                                                           PRETRAINED WORLD MODEL
+
+                  APPENDIX C                       The  repository  by  Li   et   al.   [2]   is  available   at
+         MOPO-PPO REPRODUCTION             leggedrobotics/robotic_world_model_lite.1  It
+                                                              provides a pretrained world model checkpoint. We validated
+  We reproduce the uncertainty-penalized MOPO-PPO setup   the RMSE of this model with our results achieved on our
+that Li et al. [2] use for downstream evaluation, and deploy   dataset. However the provided model underperforms compared
+our trained anchor@2 ensemble world model in it. Fig. 10   to our results, as shown in Fig. 11. The RMSE over the forecast
+reports the tracking reward over MOPO-PPO iterations for   horizon increases, matching the behavior of our results. As a
+the imagined rollouts and for the corresponding evaluation on
+simulated dynamics, for several uncertainty penalties λ.             1https://github.com/leggedrobotics/robotic world model  lite
+
+=== PDF PAGE 8 ===
+sanity floor we plot the error of a constant predictor that always   shape the training curriculum (which rollout depths receive
+outputs the dataset mean. In our z-scored units this trivially   gradient), not to certify deployment-time rollouts. Reliability
+attains an RMSE of one standard deviation (≈1.0), so it marks    is assessed empirically via long-horizon  rollout  error and
+the boundary between predictive and non-predictive behavior.   policy sim-transfer. A coverage guarantee could be obtained
+The externally pretrained RWM-U [2] tracks this line across  by replacing the anchor with a conformal quantile calibrated
+the horizon, confirming that its forecasts transfer no usable  on  held-out  rollouts. We  leave  this  as an  extension.  Its
+dynamics to our ANYmal-D distribution, while our models   lack of a formal guarantee  is not a practical  liability: an
+remain lower.                                                    ablation replaying the induced horizon schedule without any
+                                                                 uncertainty gating reproduces the adaptive model’s accuracy
+                                                                    to within seed noise across all horizons (Fig. 12), showing
+                                                                 the method’s benefit comes from the reproducible curriculum
+                                                                                               it induces. This does not diminish the role of uncertainty.
+                                                   The manually replayed schedule  is an oracle derived from
+                                                        an adaptive run (anchor@2), whereas the baseline schedules
+                                                            without  it (fixed-8, fixed-32, RWM-U) are strictly worse at
+                                                                  short or long horizons (Fig. 1). Uncertainty is the mechanism
+                                                                      that produces the effective schedule without tuning.
+Fig. 11: Deploying the pretrained world model by Li et al.
+[2] on our dataset. We verified that the observed error is
+not an interface artifact. Under these conditions, the released
+checkpoint does not produce usable forecasts on our ANYmal-
+D distribution. Its error exceeds both of our models over the
+full 32-step rollout (a) and across every observation group at
+h = 7 (b), and tracks the predict-the-mean floor throughout
+the horizon.
+
+                                                                   Fig.  12:  Compute-matched  non-uncertainty  ablation.
+                                                               Uncertainty-driven adaptive (anchor@2) vs. a scripted cur-
+                  APPENDIX E
+                                                           riculum that replays each seed’s recorded per-iteration rollout-
+              COMPUTE SAVINGS
+                                                               length schedule with no uncertainty gating, matched in com-
+  Table  III shows the compute measure in FLOPs for the                                                             pute and identical in every other respect. (a) validation RMSE
+different training schemes. Both the fixed-8 and the adap-                                                            over training, (b) end-of-training per-step error over the 32-
+tive ensemble reduce the compute as already measured in                                                                  step horizon, (c) 160-step open-loop rollout. The two agree to
+cumulative rollout steps. But here, the adaptive method  is                                                              within seed noise at every horizon: the accuracy gain comes
+the most efficient alternative. The reason fixed-8 has more                                                      from the induced curriculum, which epistemic uncertainty
+FLOPs is that  it still has to process the 32-history steps in                                                               discovers automatically per run, with no manual schedule or
+each iteration. Since it needs more training iterations to reach                                                                     oracle.
+the same amount of cumulative rollout steps, fixed-8 always
+operates in the inefficient short-horizon regime. It repeatedly
+pays the full history cost for only eight forecast steps.
+
+        Method             FLOPs [PFLOP]  ∆FLOPs
+           fixed-32                      60.2      —
+           fixed-8                       21.4       −65%
+      RWM-U [2]                  90.6       +51%
+          Adaptive anchor@2         18.0      −70%
+
+TABLE III: Training compute on ANYmal-D. Fixed-32 and
+RWM-U report FLOPs at their own convergence, fixed-8 and
+adaptive anchor@2 report the FLOPs to reach fixed-32’s
+accuracy. FLOPs are measured GRU-inclusive.
+
+
+                  APPENDIX F
+                 ROBUSTNESS
+
+  The threshold is a self-calibrating heuristic. The frozen an-
+chor is not a coverage-calibrated threshold. It is an empirically-
+selected stopping rule, a robust (median) estimate of ensemble
+disagreement at a shallow reference horizon. Its purpose is to

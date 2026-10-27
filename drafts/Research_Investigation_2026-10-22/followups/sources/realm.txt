@@ -1,0 +1,763 @@
+=== PDF PAGE 1 ===
+          From Region Arrival to Instance-Level Grounding in
+                     Vision-and-Language Navigation
+
+
+                        Xiangyu Shi1, Ruoxi Yang2, Wei Tao2, Jiwen Zhang3, Yanyuan Qiao†4, Qi Wu ‡1
+                                        1Australian Institute for Machine Learning, Adelaide University
+                                                       2Ruyi Dynamics
+                                                     3Fudan University
+                                       4Swiss Federal Institute of Technology Lausanne (EPFL)
+
+                                                           † Project Lead, ‡ Corresponding Author
+
+
+
+
+                              Abstract: Vision-and-Language Navigation (VLN) agents may satisfy conven-2026
+                                   tional success criteria while still failing to establish reliable object-level ground-
+                                   ing, because current evaluation protocols mainly reward stopping within a 3-Jul                             meter radius and largely ignore the agent’s final orientation and target visibility.
+4                We formalize this limitation as the Last-3-Meter Grounding Gap and introduce
+                                 three instance-centric metrics to quantify proximity precision, target visibility,
+                            and final-view grounding. To mitigate this gap, we propose REALM (Region-
+                                  to-Entity Alignment for Last-3-Meter Navigation), a plug-and-play, architecture-
+                                agnostic refinement module that decouples fine-grained target approaching from
+                               long-horizon navigation. REALM uses a visibility-aware stopping strategy to re-[cs.RO]                       duce premature termination and improve final viewpoint alignment. We further
+                                 construct REVERIE-AIM, which provides object-instance-level goals and 180K
+                                short-horizon training samples for final-stage target approaching. Extensive eval-
+                                uations across four diverse VLN backbones show that REALM consistently im-
+                              proves proximity precision and visual grounding success, demonstrating its broad
+                                    applicability.
+
+                          Keywords: Vision-and-Language Navigation, Object-Centric Navigation
+
+                1  Introduction
+
+                     For embodied agents to follow language instructions in physical environments, reaching the cor-
+                          rect room or region is often insufficient: the agent must also obtain a viewpoint from which the
+                         referred object can be reliably perceived and grounded. This capability bridges high-level language
+                      understanding with object-level visual grounding, and provides a necessary perceptual interface forarXiv:2607.03792v1                    downstream interaction tasks such as inspection or manipulation. The REVERIE task [1] was the
+                               first introduced to study this setting: given a natural language instruction containing a referring
+                        expression, the agent must navigate through an indoor environment, locate the specified object in-
+                         stance, and predict its bounding box. REVERIE-CE [2] further transfers this task from discrete
+                       navigation graphs to continuous environments, bringing it closer to realistic robotic deployment.
+
+                    However, current evaluation protocols for REVERIE and REVERIE-CE still largely inherit region-
+                          level navigation criteria from VLN-CE. In subsequent methods [3, 4], an agent is typically deemed
+                        successful if it stops within 3 meters of a pre-annotated endpoint. This endpoint represents a nav-
+                        igable location near the target object, rather than the object instance itself. Moreover, the agent’s
+                           final heading is not evaluated: it may stop within a 3m radius while facing a wall, a corridor, or the
+                       opposite direction from the target. As a result, a trajectory can be counted as successful even when
+                        the referred object is not visible from the final viewpoint. This critical flaw is illustrated in Fig-
+                       ure 1: while existing evaluation protocols reward the agent for merely stopping near a pre-annotated
+                          target region, true object grounding requires the agent to actively adjust its final viewpoint so that
+
+=== PDF PAGE 2 ===
+                    Instruction: Go to the bathroom and clean the toilet seat.
+
+                                                                   Viewpoint-based Evaluation
+                                               Agent Front View
+
+                                    ❌ Distant Target
+                                    ❌ Invisible Target
+                                                                                          Success   ❌ Wrong Heading
+
+
+                                                              Grounding-based Evalua;on (Ours)
+                                                                                  Check: Visibility; Distance to Object; Heading
+                                      Counted as success, but
+                                         the target object is neither                        dist       ,      > 0.5m
+                                                    visible nor operable.
+                                                         ≠     mismatch
+     Agent Start Pose      Agent Ending Pose       Navigation Path
+                                                                                                                     Failure
+       Ground Truth Pose        Target Object     Success Radius
+
+Figure 1: Existing evaluation rewards stopping near a target viewpoint, but object grounding requires
+a final viewpoint where the referred object is actually visible and localizable.
+
+the referred object is actually visible and localizable in its camera frame. For tasks that require
+object-level grounding, such as confirming the object’s presence, inspecting its state, or preparing
+for manipulation, such region-level arrival does not provide a functional endpoint.
+
+While related problems have been studied in other embodied navigation tasks, such as switching
+strategies near the target [5], optimizing viewpoints via point-cloud scoring [6], and recovering
+6-DoF pose from a reference image [7], these methods assume successful target localization or a
+known goal image, neither of which applies to the VLN setting where the agent must ground a free-
+form language instruction. We term this systematic gap the Last-3-Meter Grounding Gap: the
+disconnect between coarse-grained region arrival and fine-grained object grounding. Bridging this
+gap is essential for deploying language-conditioned navigation in any real robotic system where the
+agent must subsequently perceive, manipulate, or interact with the referred object.
+
+To quantify this gap, we propose three complementary object-instance-centric metrics: Object Nav-
+igation Success (ONS) for geodesic proximity to the target instance, Grounding Success (GS) for
+detection accuracy at the final viewpoint, and Oracle Grounding Success (OracleGS) for target visi-
+bility in the camera frame. Under these metrics, we find that even ETPNav-FT [8], fine-tuned on the
+REVERIE-CE dataset, achieves only 6.32% ONS@0.1m and 11.31% OracleGS, in sharp contrast
+to its 34.67% Success Rate under the conventional 3-meter criterion. This gap shows that strong
+performance under the conventional Success Rate does not necessarily carry over to instance-level
+positioning and grounding: methods that rank well on standard VLN metrics can still perform poorly
+once the target must actually be reached and faced.
+
+To bridge this gap, we then propose REALM (Region-to-Entity Alignment for Last-3-Meter Nav-
+igation), a plug-and-play refinement module decoupled from the upstream navigation policy. This
+decoupled design is motivated by two considerations.  Firstly, long-horizon navigation and short-
+horizon target approach are fundamentally different problems: the former demands path planning
+and scene-level reasoning over tens of meters, while the latter requires precise visual alignment
+and visibility-grounded stopping within a few meters. Coupling them into a single model forces
+them to share capacity, yielding suboptimal fine-grained behaviour which limits fine-grained per-
+formance even when the upstream policy is strong. Secondly, the VLN landscape is highly diverse
+and rapidly evolving, with methods spanning graph-based, video-based, zero-shot, and training-free
+paradigms. Tying fine-grained positioning to any specific architecture would require rebuilding the
+alignment module whenever the upstream model changes, which is neither generalizable nor sus-
+tainable. Once any VLN model issues a stop command, REALM takes over using only egocentric
+RGB and the original language instruction, with no depth sensors, maps, or architectural changes
+to the upstream model. We instantiate REALM by LoRA-finetuning UniNaVid [9] with a tailored
+
+
+                                       2
+
+=== PDF PAGE 3 ===
+visibility-aware stopping strategy, which successfully suppresses premature termination and triggers
+decisive stops based on explicit object perception. In addition, to support training and evaluation, we
+construct REVERIE-AIM, which replaces region-level endpoints with object-instance-level goals
+and provides 180K short-horizon samples for the final approach stage.
+
+Extensive evaluations across four diverse VLN backbones demonstrate that REALM consistently
+and significantly bridges the Last-3-Meter Grounding Gap. For instance, it elevates ETPNav-ZS’s
+ONS@0.1m from 7.07% to 14.66% (a 107% relative gain) and substantially boosts SmartWay’s
+OracleGS from 4.69% to 15.92%. Ablation results confirm that our complete loss function brings
+consistent improvements by successfully suppressing premature termination. Furthermore, physical
+deployment on a Hello Robot Stretch platform provides preliminary evidence of real-world applica-
+bility, escalating the real-world navigation Success Rate (ONS@0.5m) from 8.33% to 33.33%.
+
+To summarise, our contributions are: (1) we identify the Last-3-Meter Grounding Gap: the dis-
+connect between reaching the correct region and actually perceiving the target object; (2) we propose
+REALM, a plug-and-play decoupled refinement module with a visibility-aware stopping strategy;
+(3) we construct the REVERIE-AIM dataset and three evaluation metrics (ONS, GS, OracleGS);
+and (4) we validate REALM across four diverse VLN backbones, demonstrating consistent improve-
+ments in fine-grained grounding.
+
+
+2  Related Work
+
+Vision-and-Language Navigation (VLN) requires an autonomous agent to navigate by following
+natural language instructions [10, 11, 12, 13, 14]. Early benchmarks primarily operate on discrete
+environments, where the agent’s movement is restricted to predefined navigation graphs [1, 15, 16,
+17, 18]. To better align with real-world applications, Krantz et al. [19] lifted these constraints by
+extending VLN to continuous environments (VLN-CE), enabling agents to move freely without a
+predefined topological map.
+
+Beyond standard instruction-following VLN, REVERIE [1] introduces a more complex setting
+that requires agents to navigate via high-level instructions and localise a specific target object.
+REVERIE-CE [2] further transitions this task into VLN-CE, bringing low-level control and obstacle
+avoidance challenges into focus. To tackle this, specialised methods like Dynam3D [3] and D3D-
+VLP [4] leverage dynamic 3D representations on REVERIE-CE, empowering vision-language mod-
+els with spatial tokens or dynamic chain-of-thought pipelines. Alternatively, advanced paradigms
+from broader VLN-CE domains, such as graph-based models [8, 20], video-based models [9], or
+zero-shot navigation approaches [21, 22, 23], can also be adapted to this task. Concurrently, Ground-
+ingMate [24] identifies the gap between navigation success and object grounding success in discrete
+REVERIE, leveraging an MLLM to assist target selection when the agent is uncertain. While ef-
+fective, its object grounding remains a classification-based paradigm that selects from pre-annotated
+candidate bounding boxes rather than performing open-world detection, and it operates exclusively
+in discrete graph environments. However, we observe that both specialised and broader continuous
+methods inherit a legacy evaluation protocol: success depends solely on stopping within 3 meters of
+an endpoint, largely ignoring orientation accuracy or object grounding precision. Our work identifies
+and systematically addresses this critical evaluation gap.
+
+Beyond coarse trajectory following, several works have begun to address fine-grained target ap-
+proaching. SLING [5] switches navigation strategies upon nearing the target. MSGNav [6] op-
+timises the observation viewpoint via point-cloud visibility scoring after target localisation. Any-
+ImageNav [7] extends the InstanceImageNav success criterion from coarse distance thresholds to
+precise 6-DoF pose recovery by geometrically registering the goal-image camera orientation. More
+recently, APRR [25] decouples navigation into an exploration phase and a “last-mile” phase. The
+latter dynamically refines the robot’s pose via active perception to ensure an optimal viewpoint for
+manipulation. However, these methods either assume successful target localisation as a precondition
+or rely on a known reference image as the navigation goal, neither of which directly transfers to the
+VLN setting. More importantly, none of them considers the VLN evaluation framework itself: cur-
+
+
+                                       3
+
+=== PDF PAGE 4 ===
+rent benchmarks judge success solely by endpoint proximity while imposing no constraint on final
+orientation, leaving the Last-3-Meter Grounding Gap entirely unaddressed.
+
+3  The Last-3-Meter Grounding Problem
+
+3.1  Preliminaries
+
+For the REVERIE-CE [2] task, at each step t, the navigation policy πnav receives an observation Ot,
+which may consist of various sensory inputs depending on the system design, including egocentric or
+panoramic RGB-D views, RGB-only inputs, or other modality-specific features. The agent state at
+time t is defined as st = (pt, θt), where pt ∈R3 denotes the 3D position and θt denotes the heading
+direction. Given a high-level natural language instruction I, the agent is required to navigate in an
+unseen indoor environment E and reach the goal location. After πnav issues a stop command at
+step Tnav, the agent needs localise the referred target object o∗within its final observation OTnav by
+predicting a bounding box ˆb: ˆb = Det(OTnav, I)
+
+3.2  Problem Formulation: The Last-3-Meter Grounding Gap
+
+In standard VLN-CE  evaluation,  an episode  is deemed  successful  if  the  agent’s stopping
+position  pTnav  lies within 3 meters of a pre-annotated endpoint  pep:  Success Rate (SR) =
+[d(pTnav, pep) ≤3 m] .
+
+However, this paradigm fails in instance-level language instructions [1, 2] because pep is merely a
+neighbouring waypoint rather than the physical target. For practical embodied instruction following,
+the final state sTnav = (pTnav, θTnav) must satisfy two conditions: (i) Physical proximity to the actual
+target instance, and (ii) Visual groundability in the egocentric view with sufficient resolution.
+
+These two conditions are purely task-level requirements independent of any particular model design,
+and together define what we term the last-3-meter grounding gap: the discrepancy between reach-
+ing the general vicinity of the target (as measured by SR) and achieving a final state from which
+reliable instance-level grounding is possible.
+
+
+3.3  Evaluation Metrics
+
+Prior evaluation protocols typically assess navigation and grounding jointly. In contrast, we decouple
+them into three independent axes to enable fine-grained diagnosis.
+
+Object Navigation Success (ONS).  Following ObjectNav [26], we measure navigation precision
+via the minimum geodesic distance from the agent’s stop position to navigable points surrounding
+the target:
+
+                    ONS@τ =  min d(pTnav, q) ≤τ   ,
+                                                    q∈Sobj
+
+where Sobj is the set of navigable points sampled around the target instance and d(·, ·) is geodesic
+distance. Unlike ObjectNav, we require proximity to the specified instance rather than any cate-
+gory match. We report τ=0.1 m (standard ObjectNav) and τ=0.5 m (for downstream positioning
+tolerance). Note that VLN-CE’s SR measures alignment with the annotated endpoint, whereas ONS
+directly measures proximity to the target object.
+
+Grounding Success (GS).  Grounding success  is evaluated unconditionally, independent of
+whether navigation succeeded. Given the predicted bounding box ˆb produced by the detection mod-
+ule at the agent’s final viewpoint, and the ground-truth bounding box b∗, we define:
+
+                                    h               i                       GS =  IoU(ˆb, b∗) ≥0.5  .
+
+
+Oracle Grounding Success (OracleGS).  An episode achieves oracle grounding success if the
+ground-truth bounding box b∗of the target instance is visible in the agent’s current observation OT
+
+
+                                       4
+
+=== PDF PAGE 5 ===
+                1. Naviga)on (Upstream Policy 𝜋!"#)                      2. Refinement (Our Policy 𝜋$%&)                3. Grounding
+                               Long-horizon path planning                                     Short-horizon object finding                        Object detec7on
+                                                      Stop at 𝑠!!"#                                           Stop at 𝑠!$%&               from ﬁnal observa7on
+
+
+
+
+
+                                                                                         Visibility-aware
+                                                                              Stopping
+                                                                                                                                            Target object is
+                                                                                                                Hello-Robot    visible & operatable                                                                  Target object is nearby          Following 𝜋"#$:                                                                                                                   bounding box
+                                                   Hello-Robot
+                                                                                                                                                                                   𝑏# = Det(𝑂'!"#, 𝐼)
+
+                                 Refinement Policy 𝝅𝒓𝒆𝒇                                            Detection Module
+                        Architecture                                 Training Objec1ve                               1) Target Expression Extrac2on
+             Instruc6on 𝐼                                                              Visibility-Aware Stop Penalty (VSP) 𝓛𝒗𝒔𝒑                    Instruc6on 𝐼       BERT 🔥     “ﬂowersTarget Expressionon the table”𝑟̂                             LoRA🔥
+                                               Next                                                     Four                                                                                                                                    Grounding                                                                                            Target                                                                      NOT                                                                                                                       visible                                                                                                                                                   visible ✓          2) Visual                                              ❌                  Target                                               Ac6ons                             UniNaVid       Step
+                                                                  𝑎!,#,                                                                       𝑎!,$,                                                                                                                       Obs 𝑂!!"#                                                                                                                OWLV2❄     Bounding Box 𝑏$                                                                                             Penalize                                                                                 STOP                                                                                         ac8on                                                                                       No penalty                                                                  𝑎!,%,                                                                  𝑎!,&
+            Egocentric RGB                                                                                                                                                                                                                                                                         𝑟̂ = BERT'((𝑄, 𝐼)
+           sequence 𝑂"                                                                  Total Loss ℒ#$#%& = ℒ'%() + 𝜆*(+ℒ*(+                                                                     𝑏2 = OWL)$  𝑂*!"#, 𝑟̂
+
+Figure 2: An overview of the REALM framework. The pipeline comprises three decoupled stages:
+(i) Navigation: πnav follows instruction I (e.g., “Go to the living room and water the flowers on
+the table.”) and stops at sTnav; (ii) Refinement: πref repositions the agent to sTref where the target
+is proximate and visible; (iii) Grounding: a BERT-based extractor yields a target phrase ˆr, passed
+to OWLv2 for bounding box prediction. The refinement module is plug-and-play across arbitrary
+VLN backbones.
+
+and occupies at least 1% of the camera frame area:
+                                          Area(b∗)
+                          OracleGS =          ≥0.01  .
+                                    Area(OT )
+
+By comparing GS with OracleGS, we can distinguish visibility failures caused by suboptimal navi-
+gation from failures caused by the detection module.
+
+We evaluate four representative VLN backbones on our proposed REVERIE-AIM to validate this
+gap. As shown in Table 2, all methods exhibit a severe performance drop between SR and our
+metrics. Notably, ETPNav-FT scores 34.67% SR but only 6.32% ONS@0.1m, meaning over 80%
+of “successes” fail to actually ground the target.  This consistent discrepancy across backbones
+confirms the last-3-meter gap is a systematic issue of the current evaluation protocol.
+
+4  The REALM
+
+We propose REALM, a plug-and-play decoupled refinement module to solve the above last-3-
+meters grounding problem. The complete pipeline has three stages (Figure 2): (i) Navigation—πnav
+follows I and stops at sTnav; (ii) Refinement—πref repositions and reorients the agent to a refined
+state sTref where the target is both proximate and visible;  (iii) Grounding—a detection module
+predicts the bounding box over the final observation. To maximize efficiency and flexibility, πref
+operates fully independently of the upstream navigation policy πnav. This decoupled design avoids
+performance trade-offs between long-horizon path planning (tens of meters) and short-horizon pre-
+cision approaching, while ensuring seamless plug-and-play compatibility across diverse VLN back-
+bones (e.g., graph-based, video-based, or zero-shot paradigms).
+
+4.1  Refinement Policy
+
+We instantiate the refinement policy πref with UniNaVid [9], a video-based Vision-Language-Action
+(VLA) foundation model that maps egocentric video streams and language instructions to multi-
+step action sequences. We choose UniNaVid for two reasons:  its video-level temporal encoding
+naturally suits the sequential observations arising in short-horizon refinement, and its pre-trained
+visual-linguistic representations provide a strong initialisation that reduces the data requirement for
+downstream adaptation. At each decision step t, the model consumes the egocentric RGB sequence
+
+
+                                       5
+
+=== PDF PAGE 6 ===
+Ot together with the instruction I, and predicts the next four-step action sequence at,1, at,2, at,3, at,4
+over the low-level action space A = {forward, turn left, turn right, stop}.
+
+During training, non-action positions (e.g., instruction and visual tokens) are masked with the ignore
+index −100. Let M = {(b, n) : yb,n ̸= −100} denote the set of valid action token positions across a
+batch of size B with token sequence length N. The baseline imitation learning objective minimizing
+token-level cross-entropy is:
+
+                                 1
+                           Lbase =  X   ℓCE(ˆzb,n, yb,n) ,                            (1)
+                           |M|
+                                       (b,n)∈M
+
+where yb,n and ˆzb,n represent the target tokens and predicted logits at batch index b and token
+position n, respectively.
+
+We apply LoRA [27] to all linear layers of the LLM backbone while keeping the vision encoder
+frozen. However, directly optimizing Lbase suffers from severe trajectory biases, causing the agent
+to stop prematurely. We address these failure modes via a visibility-aware stopping strategy.
+
+Visibility-Aware Stop Penalty.  During navigation the agent may issue a stop action before the
+target is within view, ending the episode prematurely with no chance of recovery. We penalise this
+by measuring how strongly the model favours stop and applying a punishment only when the target
+is absent.
+Concretely, let ˆzb ∈R|V| be the logit vector at the first valid decision step (i.e., at,1 of the four-
+step sequence at,1, at,2, at,3, at,4 predicted at step t) for sample b, with V the action vocabulary,
+and let vb ∈{0, 1} indicate target visibility from simulator annotations. We define the stop
+margin to quantify how strongly the model favors stopping over all alternative low-level actions:
+mb =   ˆzb, stop −maxk̸=stop ˆzb, k , which is positive exactly when stop is the greedy action.
+To selectively punish incorrect termination without hindering correct stops, the penalty averages the
+positive part of this margin over all target-invisible samples:
+
+                             B
+                               1
+                       Lvsp =  X ReLU(mb)  · I[vb = 0] ,                         (2)
+                                Ninv
+                                      b=1
+
+where Ninv = max Pb I[vb=0], 1  , I[·] is the indicator function, and the denominator is clamped
+to at least 1 for numerical stability. This leaves the agent free to stop once the target is perceived,
+while suppressing premature termination during exploration.
+
+Total Training Objective.  The final loss combines imitation and the stop penalty:
+
+                                   Ltotal = Lbase + λvsp Lvsp,                                (3)
+
+where λvsp controls the penalty strength relative to the imitation signal.
+
+
+4.2  Target Expression Extraction and Visual Grounding
+
+After the refinement policy terminates at sTref, the agent must localise the target object in its final
+observation. However, REVERIE-AIM instructions often contain both navigation cues and object
+descriptions, e.g., “go to the bathroom and clean the toilet seat”. Directly using the full instruction
+as an open-vocabulary detector query may introduce irrelevant spatial or action-related words. We
+therefore first extract a target phrase from the instruction and then use it for visual grounding.
+
+For target expression extraction, we use GPT-4o-mini to automatically annotate target noun phrases,
+and fine-tune a BERT-Large [28] extractive QA model on 2,048 curated instruction–phrase pairs. At
+inference time, the BERT model extracts the target span ˆr from the instruction I, ˆr = BERTQA(I).
+For visual grounding, the extracted ˆr is passed to OWLv2 [29] as the text query to predict the final
+bounding box ˆb, ˆb = OWLV 2(OTref, ˆr), where OTref is the agent’s final egocentric observation. This
+design removes irrelevant navigation cues from the grounding query.
+
+
+                                       6
+
+=== PDF PAGE 7 ===
+Table 1: Comparison with existing embodied navigation datasets. Our dataset is the first to combine
+all four desirable properties.
+
+         Dataset              Continuous  Language   Instance-level  Object Proximity
+                               Space       Goal        Target         Endpoint
+
+         Vision-and-Language Navigation (Discrete)
+      R2R [10]          ×      ✓      ×        ×
+      RxR [15]          ×      ✓      ×        ×
+      REVERIE [1]        ×      ✓      ✓        ×
+
+         Vision-and-Language Navigation (Continuous)
+       R2R-CE [19]        ✓      ✓      ×        ×
+       RxR-CE [15, 19]       ✓      ✓      ×        ×
+       REVERIE-CE [2]      ✓      ✓      ✓        ×
+
+         Object Navigation
+      MP3D ObjNav [30]     ✓      ×      ×        ✓
+      HM3D ObjNav [31]     ✓      ×      ×        ✓
+      HM3D ImageNav [32]    ✓      ×      ✓        ✓
+       Ours            ✓      ✓      ✓        ✓
+
+
+5  The REVERIE-AIM Dataset
+
+
+To support the instance-level evaluation metrics introduced in the main content and provide suf-
+ficient supervision for both long-horizon navigation and fine-grained target approaching, we con-
+struct the REVERIE-AIM dataset by extending the original REVERIE [1] through three progressive
+stages. First, we remap the discrete navigation graph into the Habitat continuous simulator to obtain
+physically plausible trajectories (Section 5.1). Second, we replace the original region-level goal an-
+notations with instance-level object-centric endpoints aligned via ObjectNav sampling (Section 5.2).
+Third, we summarize the dataset statistics and compare against existing benchmarks (Section 5.3).
+We then extract a dedicated short-horizon training set from REVERIE-AIM to provide dense super-
+vision for the final-meters approaching phase (Section 5.4).
+
+
+5.1  Continuous Trajectory Reconstruction
+
+The original REVERIE dataset [1] is constructed upon a discrete navigation graph, where the agent’s
+movement is restricted to transitions between predefined nodes. Such a mechanism fundamentally
+fails to capture the dynamic complexity of continuous motion and the fine-grained requirements of
+obstacle avoidance. Inspired by the trajectory transfer strategies adopted in REVERIE-CE [2] and
+Dynam3D [3], we systematically remap the discrete node-based trajectories in REVERIE into the
+Habitat continuous simulation environment.
+
+Specifically, through trajectory mapping and interpolation, the agent’s action space is transformed
+from discrete node transitions into continuous linear movements and arbitrary-angle rotations. This
+process ensures that the generated trajectories exhibit both motion smoothness and physical plausi-
+bility within a continuous action space.
+
+
+5.2  Object-Centric Goal Alignment
+
+The REVERIE dataset defines targets as nearby navigable waypoints rather than the physical bound-
+aries of the instances themselves. Consequently, training on such loosely annotated goals limits
+agents to region-level arrival instead of precise instance-level localization.
+
+To address this limitation, we integrate the annotation protocol from the Habitat Object Goal Nav-
+igation (ObjectNav) task [33] and propose an object-instance-centric annotation fusion strategy.
+Capitalizing on the shared Matterport3D scene hierarchy between REVERIE and ObjectNav, we
+establish a deterministic mapping of instance identifiers across both benchmarks. As a result, the
+
+
+                                       7
+
+=== PDF PAGE 8 ===
+sampling locations generated by ObjectNav for target instances can be seamlessly transferred into
+our dataset framework without information loss.
+
+Specifically, we replace the original ambiguous nearby-goal annotations with precise sampling
+points located within the geometric boundary or visually observable region of the target object. This
+modification elevates the navigation objective from mere position reachability to instance-level
+precise alignment.
+
+After completing continuous trajectory reconstruction and object-centric goal alignment,  the
+REVERIE-AIM dataset possesses the fundamental structure required for long-horizon navigation
+training.
+
+
+
+5.3  Dataset Statistics
+
+
+The resulting REVERIE-AIM dataset contains 3,691 training trajectories spanning 53 scenes and
+covering 90 target object categories, as well as 1,344 validation trajectories (val-unseen) across 10
+unseen scenes with 48 object categories. To contextualize the scalability and structural superiority
+of REVERIE-AIM within the robot learning community, we present a feature-matrix comparison
+against existing embodied navigation benchmarks in Table 1.
+
+Our object-centric goal alignment directly bridges the region-to-object grounding gap. While stan-
+dard REVERIE-CE endpoints terminate at a loose, region-level distance, REVERIE-AIM reduces
+the valid average minimum geodesic distance to the target from 1.32 m to just 0.34 m. This finer-
+grained spatial resolution enables more precise evaluation of both navigation and instance-level
+grounding.
+
+
+
+5.4  Short-Horizon Training Data Generation
+
+
+We further construct a dedicated fine-grained navigation dataset based on REVERIE-AIM. The
+primary objective of this stage is to generate a large number of short-horizon video clips contain-
+ing instruction–visual observation–action sequence tuples, thereby enhancing the agent’s decision-
+making capability during the target interaction stage.
+
+
+Task-specific Initial Sampling  To simulate the visual state of an agent approaching the final stage
+of long-horizon navigation, we select the second-to-last node of the reference path as the anchor
+point for initialization. To further improve the model’s tolerance to localization errors and enhance
+generalization, we augment the initial states through the following strategies:
+
+Spatial Perturbation. We perturb the anchor position using a truncated Gaussian distribution (σ =
+1.5, truncated within [−5, 5] meter) to generate spatially diverse starting states around the target
+object.
+
+Viewpoint Augmentation. We randomly sample the initial heading angle within [−π, π] to simulate
+diverse target-approaching viewpoints.
+
+
+Clip and Action Sequence Extraction  For each valid sampled starting point, we compute the
+shortest path to the target object’s surrounding sampling location, determined by the object-centric
+endpoint described in Section 5.2. We then extract the corresponding visual observation sequences
+(video clips) together with their continuous action labels. The action labels are a set of low-level
+actions: {forward, turn left, turn right, stop}. In total, the resulting dataset contains
+approximately 180,000 fine-grained navigation samples from the training split. These samples pro-
+vide dense supervision for learning precise short-horizon navigation behaviors, particularly during
+the final target-approaching stage.
+
+
+                                       8
+
+=== PDF PAGE 9 ===
+6  Experiments
+
+6.1  Experimental Setup
+
+Upstream VLN Baselines  We evaluate our plug-and-play module across four diverse VLN-CE
+baselines to verify its universality: (1) ETPNav-ZS [8], a zero-shot topological planning policy,
+testing refinement under zero exposure to object-referring instructions; (2) ETPNav-FT [8], a fine-
+tuned variant of ETPNav, evaluating benefits when the upstream policy is already task-calibrated; (3)
+UniNaVid-ZS [9], a video-based VLA baseline that shares the same base architecture as our module,
+isolating the gains of our LoRA adaptation; and (4) Smartway [22], a training-free paradigm using
+large VLMs. These backbones comprehensively cover zero-shot/fine-tuned, graph/video-based, and
+training-free navigation paradigms.
+
+Downstream Variants  To verify the components and optimization of our refinement module, we
+compare six downstream variants: (1)w/o Refinement, which directly uses the upstream policy’s raw
+endpoints; (2) Random Walk, which performs random movements at the destination; (3) Heuristic
+CLIP-Search, which spins 360◦and moves toward the direction with the highest CLIP matching
+score; (4) Vanilla UniNaVid, the training-free base architecture executing raw upstream endpoints
+directly; (5) Ours w/o VSP, our model optimized on our data using standard cross-entropy loss; and
+(6) Ours (Full), our complete module optimized on our data by the full tailored loss function.
+
+
+Standard VLN-CE Metrics  We report standard VLN-CE metrics (TL, NE, OSR, SR, SPL) [34]
+for upstream reference. our instance-level metrics (ONS, GS, OracleGS) are the primary evaluation
+targets.
+
+
+
+Table 2:   Plug-in fine-grained navigation module performance on REVERIE-AIM (val-unseen).
+Standard VLN metrics are fixed per backbone and shown in parentheses beside each backbone
+name. Bold = best in group; underline = second best.
+  Backbone   Move Policy      ONS@0.1m↑   ONS@0.5m↑   GS↑    OracleGS↑
+  ETPNav-ZS TL = 11.85, NE↓= 7.26, OSR = 35.86, SPL = 23.39, SR = 28.94
+       — (no move)            7.07            11.98        3.05        6.99
+            Random                 5.21            10.42        1.93        4.61
+                 Heuristic                7.51            12.57        4.02       10.19
+                 Vanilla UniNavid        11.16           17.78        4.54       11.90         ETPNav-ZS           Ours w/o VSP          13.47           20.24        5.28       15.55
+             Ours (Full)            14.66           21.13        6.10       16.52
+  ETPNav-FT TL = 13.86, NE↓= 6.71, OSR = 40.63, SPL = 27.68, SR = 34.67
+       — (no move)            6.32            12.20        4.46       11.31
+            Random                 5.65            12.95        2.75        8.78
+                 Heuristic                6.77            13.24        5.88       12.05
+                 Vanilla UniNavid        13.39           19.12        4.91       12.57         ETPNav-FT           Ours w/o VSP          16.82           25.00        8.04       19.79
+             Ours (Full)            17.19           25.89        8.48       20.24
+  UniNavid-ZS TL = 16.07, NE↓= 8.69, OSR = 34.40, SPL = 17.40, SR = 25.10
+       — (no move)           13.61           18.08        5.65       12.20
+            Random                 9.75            16.89        2.83        8.78
+                 Heuristic               12.35           18.15        5.13       10.42
+                 Vanilla UniNavid        10.42           16.07        4.84       11.01
+              Ours w/o VSP          12.43           18.38        5.95       14.29           UniNavid-ZS             Ours (Full)            14.96           20.68        6.85       16.37
+  Smartway TL = 20.00, NE↓= 8.79, OSR = 25.37, SPL = 4.81, SR = 8.21
+       — (no move)            7.81            11.83        1.49        4.69
+            Random                 5.21            10.42        1.34        4.61
+                 Heuristic                7.22            11.98        2.90        8.04
+                 Vanilla UniNavid        9.30            14.81        3.50        9.45        Smartway              Ours w/o VSP          12.95           17.49        4.69       14.66
+             Ours (Full)            13.99           19.72        5.65       15.92
+  Human Eval                         50.40           74.71        38.24      80.38
+
+
+
+                                       9
+
+=== PDF PAGE 10 ===
+6.2  Results in Simulator
+
+As shown in Table 2, our full module (Ours (Full)) consistently and significantly outperforms
+all alternative move policies across all four backbones.  For instance, on ETPNav-FT, it boosts
+ONS@0.1m from 6.32% (no move) to 17.19% and GS from 4.46% to 8.48%, demonstrating its
+superior capability in fine-grained object localization. The ablation variant (Ours w/o VSP) incurs
+consistent performance drops across all settings (e.g., ONS@0.1m falls by 2.53% on UniNavid-ZS),
+validating the necessity of our proposed Visibility-Aware Stopping loss. Nevertheless, a substantial
+performance gap remains compared to Human Eval (e.g., 25.89% vs. 74.71% on ONS@0.5m),
+highlighting that this benchmark leaves massive room for future improvement.
+
+6.3  Results in Real-world Environments
+
+To verify REALM in real-world performance, we deploy both the vanilla UniNavid and our en-
+hanced pipeline on a Hello Robot Stretch platform equipped with an Intel RealSense D435if RGB-D
+camera. All real-world experiments are conducted on a workstation with the NVIDIA RTX 4090
+GPU. Since real-world environments lack predefined navigable viewpoints, we define ONS@0.5m
+as the Euclidean distance between the robot and the nearest navigable position to the instance. We
+collect 12 diverse episodes across multiple rooms, including a robot lab, the school’s lobby and
+foyer. Since UniNavid already performs well in simulation without our module, we compare the
+vanilla UniNavid against UniNavid as Upstream module augmented with our method.
+
+As shown in Table  3,  the  vanilla    Table 3: Comparison on Real-world robot evaluation.
+UniNavid policy struggles severely                              Method        ONS@0.5m↑  GS↑   OracleGS↑
+in the physical environment, yield-
+                                  UniNavid              8.33        8.33      16.67ing an 8.33% SR due to accumulated
+                                  UniNavid + Ours      33.33      25.00     25.00
+motor noise and its limited exposure
+to REVERIE-style instructions dur-
+ing training, alongside a low OracleGS of 16.67% and GS of 8.33%. In contrast, our plug-and-play
+refinement module (UniNavid + Ours) brings substantial improvements across all metrics, escalat-
+ing the SR to 33.33%. Crucially, it boosts both OracleGS and GS to 25.00%. This clear performance
+gain demonstrates that our visibility-aware strategy successfully corrects upstream drift and aligns
+the robot’s heading, effectively bridging the Last-3-Meter Grounding Gap to provide a reliable per-
+ception interface for physical interaction.
+
+7  Conclusion and Limitations
+
+We identify the Last-3-Meter Grounding Gap in continuous VLN and introduce REVERIE-AIM,
+three instance-centric metrics, and REALM to bridge region-level arrival and object-level grounding.
+Although REALM consistently improves diverse VLN backbones, its absolute performance remains
+far below the human upper bound. This suggests that final-stage object-centric navigation requires
+more than short-horizon motion refinement: agents must actively select informative viewpoints,
+reason about target visibility, and make reliable stopping decisions under partial observability. These
+challenges remain open for future work.
+
+References
+
+ [1] Y. Qi, Q. Wu, P. Anderson, X. Wang, W. Y. Wang, C. Shen, and A. v. d. Hengel.  Reverie:
+    Remote embodied visual referring expression in real indoor environments.  In CVPR, pages
+     9982–9991, 2020.
+
+ [2] X. Li, D. Guo, H. Liu, and F. Sun. Reve-ce: Remote embodied visual referring expression in
+     continuous environment. RAL, 7(2):1494–1501, 2022.
+
+ [3] Z. Wang, S. Lee, and G. H. Lee. Dynam3d: Dynamic layered 3d tokens empower vlm for
+     vision-and-language navigation. In NeurIPS, 2025.
+
+
+                                       10
+
+=== PDF PAGE 11 ===
+ [4] Z. Wang, S. Lee, G. Dai, and G. H. Lee.  D3d-vlp: Dynamic 3d vision-language-planning
+    model for embodied grounding and navigation. arXiv preprint arXiv:2512.12622, 2025.
+
+ [5]  J. Wasserman, K. Yadav, G. Chowdhary, A. Gupta, and U. Jain. Last-mile embodied visual
+     navigation. In CoRL, pages 666–678. PMLR, 2023.
+
+ [6] X. Huang, S. Zhao, Y. Wang, X. Lu, W. Zhang, R. Qu, W. Li, Y. Wang, and C. Wen. Msgnav:
+     Unleashing the power of multi-modal 3d scene graph for zero-shot embodied navigation. arXiv
+     preprint arXiv:2511.10376, 2025.
+
+ [7] Y. Deng, S. Yuan, and Y. Fang.  Anyimagenav: Any-view geometry for precise last-meter
+     image-goal navigation. arXiv preprint arXiv:2604.05351, 2026.
+
+ [8] D. An, H. Wang, W. Wang, Z. Wang, Y. Huang, K. He, and L. Wang. Etpnav: Evolving topo-
+      logical planning for vision-language navigation in continuous environments. TPAMI, 2024.
+
+ [9]  J. Zhang, K. Wang, S. Wang, M. Li, H. Liu, S. Wei, Z. Wang, Z. Zhang, and H. Wang. Uni-
+     navid: A video-based vision-language-action model for unifying embodied navigation tasks.
+     arXiv preprint arXiv:2412.06224, 2024.
+
+[10] P. Anderson, Q. Wu, D. Teney, J. Bruce, M. Johnson, N. S¨underhauf, I. Reid, S. Gould, and
+    A. Van Den Hengel. Vision-and-language navigation: Interpreting visually-grounded naviga-
+      tion instructions in real environments. In CVPR, pages 3674–3683, 2018.
+
+[11] Y. Zhang, Z. Ma, J. Li, Y. Qiao, Z. Wang, J. Chai, Q. Wu, M. Bansal, and P. Kordjamshidi.
+     Vision-and-language navigation today and tomorrow: A survey in the era of foundation mod-
+      els. arXiv preprint arXiv:2407.07035, 2024.
+
+[12] X. Su, R. Chen, B. Liu,  J. Ma, Z. Di, R. Krishna, and J. Froehlich.  Capnav:  Bench-
+     marking vision language models on capability-conditioned indoor navigation. arXiv preprint
+     arXiv:2602.18424, 2026.
+
+[13] S. Wang, Y. Wang, G. Lian, Y. Wang, M. Chen, K. Wang, B. Zhang, Z. Su, Y. Zhou, W. Li,
+      et al. Progress-think: Semantic progress reasoning for vision-language navigation. In CVPR,
+     2026.
+
+[14] Q. Jin, Y. Song, and Q. Wu. Does peer observation help?  vision-sharing collaboration for
+     vision-language navigation. arXiv preprint arXiv:2603.20804, 2026.
+
+[15] A. Ku, P. Anderson, R. Patel, E. Ie, and J. Baldridge. Room-across-room: Multilingual vision-
+     and-language navigation with dense spatiotemporal grounding. In EMNLP, pages 4392–4412,
+     2020.
+
+[16]  J. Thomason, M. Murray, M. Cakmak, and L. Zettlemoyer. Vision-and-dialog navigation. In
+    CoRL, pages 394–406, 2020.
+
+[17] Y. Qiao, Y. Qi, Y. Hong, Z. Yu, P. Wang, and Q. Wu. Hop: History-and-order aware pre-training
+      for vision-and-language navigation. In CVPR, pages 15418–15427, 2022.
+
+[18]  J. Zhang, J. Fan, J. Peng, et al.  Curriculum learning for vision-and-language navigation.
+     NeurIPS, 34:13328–13339, 2021.
+
+[19]  J. Krantz, E. Wijmans, A. Majumdar, D. Batra, and S. Lee. Beyond the nav-graph: Vision-and-
+     language navigation in continuous environments. In ECCV, pages 104–120. Springer, 2020.
+
+[20] S. Zhang, Y. Qiao, Q. Wang, Z. Yan, Q. Wu, Z. Wei, and J. Liu. Cosmo: Combination of
+      selective memorization for low-cost vision-and-language navigation. In ICCV, pages 5511–
+     5522, 2025.
+
+
+                                       11
+
+=== PDF PAGE 12 ===
+[21] Y. Long, W. Cai, H. Wang, G. Zhan, and H. Dong. Instructnav: Zero-shot system for generic
+      instruction navigation in unexplored environment. In CoRL, pages 2049–2060. PMLR, 2024.
+
+[22] X. Shi, Z. Li, W. Lyu, J. Xia, F. Dayoub, Y. Qiao, and Q. Wu. Smartway: Enhanced waypoint
+     prediction and backtracking for zero-shot vision-and-language navigation. In IROS, 2025.
+
+[23] K. Chen, D. An, Y. Huang, R. Xu, Y. Su, Y. Ling, I. Reid, and L. Wang. Constraint-aware
+     zero-shot vision-language navigation in continuous environments. TPAMI, 2025.
+
+[24] Q. Liu, S. Zhang, Y. Qiao, J. Zhu, X. Li, L. Guo, Q. Wang, X. He, Q. Wu, and J. Liu. Ground-
+     ingmate: Aiding object grounding for goal-oriented vision-and-language navigation. In WACV,
+     pages 1775–1784. IEEE, 2025.
+
+[25] L. Qin, M. Wang, P. Li, W. Zhou, and H. Li.  Active perception meets rule-guided rl: A
+     two-phase approach for precise object navigation in complex environments. In ICCV, pages
+     7603–7612, 2025.
+
+[26] M. Khanna, Y. Mao, H. Jiang, S. Haresh, B. Shacklett, D. Batra, A. Clegg, E. Undersander,
+    A. X. Chang, and M. Savva. Habitat synthetic scenes dataset (hssd-200): An analysis of 3d
+     scene scale and realism tradeoffs for objectgoal navigation.  In CVPR, pages 16384–16393,
+     2024.
+
+[27] E. J. Hu, Y. Shen, P. Wallis, Z. Allen-Zhu, Y. Li, S. Wang, L. Wang, and W. Chen.  Lora:
+    Low-rank adaptation of large language models. In ICLR. OpenReview.net, 2022.
+
+[28]  J. Devlin, M.-W. Chang, K. Lee, and K. Toutanova. Bert: Pre-training of deep bidirectional
+     transformers for language understanding. In Proceedings of the 2019 conference of the North
+    American chapter of the association for computational linguistics: human language technolo-
+      gies, volume 1 (long and short papers), pages 4171–4186, 2019.
+
+[29] M. Minderer, A. Gritsenko, and N. Houlsby.  Scaling open-vocabulary object detection.
+     NeurIPS, 36:72983–73007, 2023.
+
+[30] D. Batra, A. Gokaslan, A. Kembhavi, O. Maksymets, R. Mottaghi, M. Savva, A. Toshev, and
+     E. Wijmans.  Objectnav revisited: On evaluation of embodied agents navigating to objects.
+     arXiv preprint arXiv:2006.13171, 2020.
+
+[31] K. Yadav, S. K. Ramakrishnan, J. Turner, A. Gokaslan, O. Maksymets, R. Jain, R. Ramrakhya,
+    A. X. Chang, A. Clegg, M. Savva, E. Undersander, D. S. Chaplot, and D. Batra.  Habitat
+     challenge 2022. https://aihabitat.org/challenge/2022/, 2022.
+
+[32] K. Yadav, R. Ramrakhya, S. K. Ramakrishnan, T. Gervet, J. Turner, A. Gokaslan, N. Maestre,
+    A. X. Chang, D. Batra, M. Savva, et al.  Habitat-matterport 3d semantics dataset.  In Pro-
+     ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages
+     4927–4936, 2023.
+
+[33] S. Chen, T. Chabal, I. Laptev, and C. Schmid. Object goal navigation with recursive implicit
+     maps. In IROS, pages 7089–7096. IEEE, 2023.
+
+[34] Y. Hong, Z. Wang, Q. Wu, and S. Gould. Bridging the gap between learning in discrete and
+     continuous environments for vision-and-language navigation. In CVPR, pages 15439–15449,
+     2022.
+
+
+
+
+
+                                       12

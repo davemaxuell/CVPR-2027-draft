@@ -1,0 +1,22 @@
+# Experiment register
+
+Updated 2026-10-23. **No CE rollout, navigation training, model-weight download or complete GPU-pipeline evaluation has been executed in this review.** Arithmetic/tensor checks below cannot establish navigation usefulness or an 8 GB fit. Original files remain read-only.
+
+| ID | Status / owner | Artifacts | What the result establishes |
+|---|---|---|---|
+| X02 | Executed by A2 | [Source](../evidence/02_formal_checks.py), [results](../evidence/02_formal_checks.json) | Finite synthetic policy-improvement/margin checks and counterexamples; not CE evidence. |
+| X03 | Executed by A3 | [Source](../evidence/03_adversarial_checks.py), [results](../evidence/03_adversarial_checks.json), [A2 replay](../evidence/03_a2_replay/) | Independent stochastic-history/margin checks; utility-compatible sampling and noisy-oracle counterexamples; gradient contract; unchanged A2 output. |
+| X06a | Executed by A6 | [Copied scorer checks](06/scorer/check_results.json), [log](06/scorer_rerun.log) | All 13 original CPU tensor/interface groups passed on hash-matched copies. |
+| X06b | Executed by A6 | [Profile source](06/profile_scorer.py), [results](06/scorer_profile.json) | Synthetic CPU-only scorer: 2.44 s for one eight-root/32-observation optimizer step; 1.049 GiB process peak; 16.18 ms median four-candidate scoring. Not a full-pipeline latency/VRAM measurement. |
+| X06c | Inspected/probed by A6 | [Hardware](06/hardware.json), [Python](06/python313_probe.json), [PATH Python](06/path_python_probe.json), [assets](../evidence/06/asset_check.json) | Scoped host/environment/asset evidence. Target GPU reports 8,188 MiB; tested Torch is CPU-only; usable CE setup/weights are not demonstrated. |
+| X09 | Executed by A9 | [Source](../evidence/09_correctness_checks.py), [results](../evidence/09_correctness_checks.json) | Centered/pair identity, analytical/autograd agreement,6,561 greedy/margin cases and copied-scorer movement/STOP/frozen-weight gradient checks passed. No actual49-token adapter or WM/CE training. |
+| E0 | Proposed, blocked | [A7 §3](../assignments/07_experiments.md) | Simulator/action/cache/metric replay and deployed-input integrity. Requires CE assets, trained frozen actor and working environment. |
+| E1 | Proposed, blocked | [A7 §§3–4](../assignments/07_experiments.md) | 64-root/eight-episode **debug** collection, then separate candidate-opportunity evaluation. Stochastic selection and evaluation use disjoint seed panels. |
+| E2 | Proposed, conditional on E0/E1 | [A7 §3](../assignments/07_experiments.md) | Actual-next scorer versus matched full-history direct Q; data-size learning curve. No claim that specified tiers are sufficient training or powered evidence. |
+| E3 | Proposed, conditional on E2 | [A7 §§3–4](../assignments/07_experiments.md) | Predicted versus direct/copy/cheap prediction/distillation controls; fixed scorer for WM comparisons; independent imagined seeds. |
+| E4 | Proposed redesign, conditional on E3 | [A7 §3](../assignments/07_experiments.md) | v2 centered utility-residual objective with frozen qualified critic, versus native/per-action/feature-weighting rivals. Cheaper feature-contrast remains A7's explicit preferred rival. Strict geometric reversals, ties, STOP and independently annotated semantics are separate. No objective has been trained. |
+| E5 | Proposed, conditional on prior gates | [A7 §§3–5](../assignments/07_experiments.md) | Frozen held-out-scene closed-loop comparison, clustered uncertainty, actual complete-path memory/latency and matched-cost controls. |
+
+A7 performed source/log inspection and protocol design only; it added no redundant toy test. Its numerical gates and budgets are declared planning assumptions. Exact checkpoint interfaces, especially DINO's inspected 14×14 versus original scorer 16×16 grid, must be resolved and versioned before experiments. Every proposed stage admits positive, meaningful-effect-excluded, invalid and inconclusive outcomes; lack of significance is not evidence of equivalence.
+
+Final candidate: [v3](../proposal_v3.md). V2→v3 clarifies original-loss attribution and policy-relative semantics; centered objective and E0–E5 are unchanged. X09 was indexed after final reviews; execution belongs to A9. The coordinator's [package audit](../evidence/verify_package.py) and [result](../evidence/package_verification.json) check files/hashes/links/records, not research effectiveness.

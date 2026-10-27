@@ -1,0 +1,2725 @@
+[
+  {
+    "paper_id": "activevig",
+    "short_name": "Active Visual Exploration",
+    "full_title": "Active Visual Information Gathering for Vision-Language Navigation",
+    "authors": [
+      "Hanqing Wang",
+      "Wenguan Wang",
+      "Tianmin Shu",
+      "Wei Liang",
+      "Jianbing Shen"
+    ],
+    "year": 2020,
+    "venue_or_status": "ECCV 2020",
+    "bibliography_sources": [
+      {
+        "url": "https://www.ecva.net/papers/eccv_2020/papers_ECCV/papers/123670307.pdf",
+        "locator": "Supplied main paper"
+      },
+      {
+        "url": "https://github.com/HanqingWangAI/Active_VLN",
+        "locator": "Official implementation"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "1–16"
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/HanqingWangAI/Active_VLN",
+    "repo_commit": "d5dabd5fe6127bcfec023b90f14a4ba5ac671f9b",
+    "code_files_inspected": [
+      "active/agent.py:293–415,1724–1794,1893–1923"
+    ],
+    "code_executed": false,
+    "repository_status": "Official source inspected statically; no project execution or benchmark reproduction.",
+    "dossier_path": "dossiers/activevig.md",
+    "key_findings": [
+      {
+        "claim": "Physical exploration improves success with a substantial travel/SPL tradeoff and can corrupt initially correct actions.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "https://github.com/HanqingWangAI/Active_VLN",
+        "locator": "Tables 1 and 3; p. 14 action-change analysis"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "activevig-cost",
+        "description": "Exploration improves success while consuming motion and sometimes corrupting a correct choice.",
+        "conditions": "Ambiguous landmarks or long exploration branches, especially when the initial policy action was already correct.",
+        "cause": "Information value is learned through a downstream reward proxy, while new evidence can mislead the policy and incurs physical travel.",
+        "evidence": "PAPER EXPERIMENT: Table 3 and p. 14 action-change analysis.",
+        "kind": "methodological",
+        "followups": [
+          "ULN",
+          "Meta-Explore",
+          "Explore until Confident"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High within the specified evidence scope"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "Main methods/results and late-action source reviewed; official ECVA page and pinned tree expose no separate appendix. Exact physical trajectory accounting and the printed RL sign conventions were not independently reproduced. No benchmark executed."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "aiuta",
+    "short_name": "AIUTA",
+    "full_title": "Collaborative Instance Object Navigation: Leveraging Uncertainty-Awareness to Minimize Human-Agent Dialogues",
+    "authors": [
+      "Francesco Taioli",
+      "Edoardo Zorzi",
+      "Gianni Franchi",
+      "Alberto Castellini",
+      "Alessandro Farinelli",
+      "Marco Cristani",
+      "Yiming Wang"
+    ],
+    "year": 2025,
+    "venue_or_status": "ICCV 2025",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content/ICCV2025/html/Taioli_Collaborative_Instance_Object_Navigation_Leveraging_Uncertainty-Awareness_to_Minimize_Human-Agent_Dialogues_ICCV_2025_paper.html",
+        "locator": "Supplied main paper"
+      },
+      {
+        "url": "https://intelligolabs.github.io/CoIN/",
+        "locator": "Official ICCV project"
+      },
+      {
+        "url": "https://github.com/intelligolabs/CoIN",
+        "locator": "Official repository"
+      },
+      {
+        "url": "https://openaccess.thecvf.com/content/ICCV2025/supplemental/Taioli_Collaborative_Instance_Object_ICCV_2025_supplemental.pdf",
+        "locator": "Official supplementary or complete author version; reviewed scope listed in associated material"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "3–8"
+    ],
+    "associated_files_reviewed": [
+      {
+        "file": "evidence/04/supplements/aiuta_supp.txt",
+        "pages_read": "1–10",
+        "scope": "Full-text supplementary methods, protocols and result discussion; qualitative figures reviewed through captions/text unless separately stated. No independent image relabeling or video review."
+      }
+    ],
+    "repo_url": "https://github.com/intelligolabs/CoIN",
+    "repo_commit": "b750a1a6cf6485e513aa4b24d6942fea56f50a51",
+    "code_files_inspected": [
+      "vlfm/brain/llm_brain_history.py:159–183,234–259",
+      "vlfm/policy/base_objectnav_policy.py:408–446"
+    ],
+    "code_executed": false,
+    "repository_status": "Official source inspected statically; no project execution or benchmark reproduction.",
+    "dossier_path": "dossiers/aiuta.md",
+    "key_findings": [
+      {
+        "claim": "Uncertainty-aware dialogue is evaluated with a small human study and tuned selective-answer thresholds, not calibrated task-success probabilities.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "https://intelligolabs.github.io/CoIN/",
+        "locator": "Supplement §§E,H, pp. 5–7; main uncertainty analysis"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "aiuta-verify",
+        "description": "Uncertainty-filtered dialogue does not ensure correct instance recognition or stop decisions.",
+        "conditions": "Unseen object categories, poor views, misleading visual captions, or a confident visual mistake.",
+        "cause": "Entropy measures the model score distribution and alignment is another model judgment; neither is a calibrated truth test.",
+        "evidence": "PAPER EXPERIMENT: Table 2 low absolute SR; METHOD: heuristic thresholds.",
+        "kind": "methodological",
+        "followups": [
+          "KnowNo",
+          "Explore until Confident"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High within the specified evidence scope"
+      },
+      {
+        "id": "aiuta-cost",
+        "description": "Reported question efficiency excludes failed episodes.",
+        "conditions": "Comparing user effort when methods have different success rates.",
+        "cause": "The NQ denominator includes only successful episodes.",
+        "evidence": "METRIC DEFINITION: experiments section.",
+        "kind": "insufficiently tested",
+        "followups": [
+          "KnowNo"
+        ],
+        "status": "Uncertain because evidence is insufficient",
+        "confidence": "High within the specified evidence scope"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "Supplement sections A–J and relevant source reviewed. Human truthfulness is assumed; small human comparison is not an equivalence guarantee. No benchmark executed."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "atena",
+    "short_name": "ATENA",
+    "full_title": "Active Test-time Vision-Language Navigation",
+    "authors": [
+      "Heeju Ko",
+      "Sung June Kim",
+      "Gyeongrok Oh",
+      "Jeongyoon Yoon",
+      "Honglak Lee",
+      "Sujin Jang",
+      "Seungryong Kim",
+      "Sangpil Kim"
+    ],
+    "year": 2025,
+    "venue_or_status": "NeurIPS 2025 (volume 38; author repository BibTeX uses 2026 publication year)",
+    "bibliography_sources": [
+      {
+        "url": "https://proceedings.nips.cc/paper_files/paper/2025/hash/3f510f82323c1293ae3e343893dd77b1-Abstract-Conference.html",
+        "locator": "Supplied main paper"
+      },
+      {
+        "url": "https://kuai-lab.github.io/neurips2025atena/",
+        "locator": "Official project and repository link"
+      },
+      {
+        "url": "https://proceedings.nips.cc/paper_files/paper/2025/file/3f510f82323c1293ae3e343893dd77b1-Supplemental-Conference.zip",
+        "locator": "Official supplementary appendix,7 PDF pages read"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20
+    ],
+    "associated_files_reviewed": [
+      "Official supplementary 5981_SUPPLE.pdf, all7 pages read; saved under evidence/04/supplements."
+    ],
+    "repo_url": "https://github.com/kuai-lab/NeurIPS25_att_vln",
+    "repo_commit": "f6903760c2dccdc9fb3524aa3b83f62ee9331e35",
+    "code_files_inspected": [
+      "ATENA_DUET/map_nav_src/reverie/agent_base_atena.py:105–190",
+      "ATENA_DUET/map_nav_src/reverie/agent_obj_atena.py:323–380,445–515",
+      "ATENA_DUET/map_nav_src/models/vilmodel.py:660–700",
+      "ATENA_DUET/map_nav_src/scripts/run_reverie_atena.sh"
+    ],
+    "code_executed": false,
+    "repository_status": "Official DUET adaptation source inspected; hidden-test oracle and all-backbone reproduction not fully established.",
+    "dossier_path": "dossiers/atena.md",
+    "key_findings": [
+      {
+        "claim": "Released REVERIE external feedback is computed from benchmark goal-viewpoint annotations.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/kuai-lab/NeurIPS25_att_vln/tree/f6903760c2dccdc9fb3524aa3b83f62ee9331e35",
+        "locator": "agent_base_atena.py159–165"
+      },
+      {
+        "claim": "The outcome head still has216 false positives among1124 predicted positives in the supplementary confusion matrix.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "ATENA supplement",
+        "locator": "AppendixA.4/Table7, supplementPDF p2"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "atena-B1",
+        "description": "Low-entropy failures may be reinforced by the self-labeling feedback loop.",
+        "conditions": "A confident but wrong policy episode is routed away from external feedback.",
+        "cause": "The outcome head is trained partly on its own hard prediction and receives only pooled state information.",
+        "evidence": "Eqs 5–8; source self-label branch; supplementary confusion matrix contains false positive outcomes.",
+        "kind": "methodological",
+        "followups": "Future work needs independently validated outcome evidence or selective calibration under policy drift; generic self-verification alone does not resolve this.",
+        "status": "Partially addressed",
+        "confidence": "High for mechanism and remaining errors; cascade frequency unmeasured."
+      },
+      {
+        "id": "atena-B2",
+        "description": "Episode-level outcome feedback cannot localize which action or instruction clause failed.",
+        "conditions": "Long routes with many correct actions and one decisive wrong action.",
+        "cause": "The same success sign weights entropy at every step, without step-level blame.",
+        "evidence": "Eq 3 and main limitations, PDF p9.",
+        "kind": "methodological",
+        "followups": "Step/segment feedback and retrospective correction are relevant; their feedback budgets and oracle access must be matched.",
+        "status": "Still unresolved in the reviewed literature",
+        "confidence": "High for credit-assignment ambiguity; bounded to this method."
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "No benchmark executed. The separate seven-page supplement was reviewed. Hidden-test oracle access and all-backbone equivalence are not established; reported table inconsistencies remain unresolved."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "babywalk",
+    "short_name": "BabyWalk",
+    "full_title": "BabyWalk: Going Farther in Vision-and-Language Navigation by Taking Baby Steps",
+    "authors": [
+      "Wang Zhu",
+      "Hexiang Hu",
+      "Jiacheng Chen",
+      "Zhiwei Deng",
+      "Vihan Jain",
+      "Eugene Ie",
+      "Fei Sha"
+    ],
+    "year": 2020,
+    "venue_or_status": "ACL 2020",
+    "bibliography_sources": [
+      {
+        "url": "https://aclanthology.org/2020.acl-main.229/",
+        "locator": "Official proceedings"
+      },
+      {
+        "url": "https://github.com/Sha-Lab/babywalk",
+        "locator": "Author implementation"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "3–9",
+      "12–18"
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/Sha-Lab/babywalk",
+    "repo_commit": "4265340d5e521b59030bc50ef71f01b0d3d3ba63",
+    "code_files_inspected": [
+      "src/follower.py:49–115,149–202,486–548",
+      "src/train_follower.py:50–82,156–194",
+      "src/process_data.py: make_data and curriculum split dispatch"
+    ],
+    "code_executed": false,
+    "repository_status": "Official source inspected statically; no project execution or benchmark reproduction.",
+    "dossier_path": "dossiers/babywalk.md",
+    "key_findings": [
+      {
+        "claim": "Baby-step imitation and curriculum train length transfer, but rely on subinstruction segmentation and learned segment stopping.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "https://aclanthology.org/2020.acl-main.229/",
+        "locator": "Main method §§3–4, results and appendix pp. 12–18"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "babywalk-composition",
+        "description": "Long-route gains rely on heuristic chunk boundaries and weak landmark alignment, with low final success on the longest routes.",
+        "conditions": "Repeated landmarks, object-poor clauses, incorrect chunk endpoints, or missions whose dependencies extend beyond recent chunks.",
+        "cause": "Monotonic dynamic programming and exponential forgetting encode a particular compositional prior; training uses artificial concatenations and expert-start curriculum.",
+        "evidence": "PAPER EXPERIMENT: R8R SR 26.3, Table 2; DEDUCTION from §§4.1–4.4 and Appendix A/B, not a measured repeated-landmark failure rate.",
+        "kind": "methodological",
+        "followups": [
+          "FGR2R",
+          "Landmark-RxR",
+          "HAMT",
+          "M-TRACK"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High for reported low success; medium for inferred failure conditions"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "Relevant appendix and core source reviewed; simulator assets and training/checkpoints were not executed. Model-specific memory/curriculum gains do not establish arbitrary-length generalization."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "continualvln",
+    "short_name": "Continual VLN",
+    "full_title": "Continual Vision-and-Language Navigation",
+    "authors": [
+      "Seong Jun Jeong",
+      "Gi-Cheon Kang",
+      "Seongho Choi",
+      "Joochan Kim",
+      "Byoung-Tak Zhang"
+    ],
+    "year": 2025,
+    "venue_or_status": "BMVC 2025",
+    "bibliography_sources": [
+      {
+        "url": "https://bmva-archive.org.uk/bmvc/2025/assets/papers/Paper_84/paper.pdf",
+        "locator": "Official BMVC paper"
+      },
+      {
+        "url": "https://bmvc2025.bmva.org/proceedings/84/",
+        "locator": "Official proceedings entry"
+      },
+      {
+        "url": "https://bmva-archive.org.uk/bmvc/2025/assets/papers/Paper_84/supplementary.zip",
+        "locator": "Official supplement: six-page PDF reviewed"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "3–9"
+    ],
+    "associated_files_reviewed": [
+      {
+        "file": "evidence/04/supplements/continualvln_0084_ sup.txt",
+        "pages_read": "1–6",
+        "scope": "Full-text supplementary methods, protocols and result discussion; qualitative figures reviewed through captions/text unless separately stated. No independent image relabeling or video review."
+      }
+    ],
+    "repo_url": null,
+    "repo_commit": null,
+    "code_files_inspected": [],
+    "code_executed": false,
+    "repository_status": "Official repository not located in bounded exact-title/author/proceedings search; official algorithm supplement reviewed.",
+    "dossier_path": "dossiers/continualvln.md",
+    "key_findings": [
+      {
+        "claim": "Replay and stored-logit distillation partly mitigate forgetting but remain below joint training and require prior episodes.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "https://bmva-archive.org.uk/bmvc/2025/assets/papers/Paper_84/paper.pdf",
+        "locator": "Tables 1–4; supplementary Algorithms 1–2"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "continual-replay",
+        "description": "Rehearsal improves retention but remains far below joint training and requires stored previous episodes.",
+        "conditions": "Many scene domains, constrained storage, or domains whose rare skills are absent from the buffer.",
+        "cause": "Finite buffer selection and sequential distillation preserve only stored behavior; confident errors may receive low perplexity and be underrepresented.",
+        "evidence": "PAPER EXPERIMENT: Tables 1–4; DEDUCTION for confident-error selection.",
+        "kind": "methodological",
+        "followups": [
+          "M3E"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High within the evaluated setting"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "Official model repository was not located through the paper, proceedings and bounded exact-title/author searches. Supplement pseudocode is not an inspected executable implementation. No benchmark executed."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "cot",
+    "short_name": "CoT Prompting",
+    "full_title": "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models",
+    "authors": [
+      "Jason Wei",
+      "Xuezhi Wang",
+      "Dale Schuurmans",
+      "Maarten Bosma",
+      "Brian Ichter",
+      "Fei Xia",
+      "Ed H. Chi",
+      "Quoc V. Le",
+      "Denny Zhou"
+    ],
+    "year": 2022,
+    "venue_or_status": "NeurIPS 2022",
+    "bibliography_sources": [
+      {
+        "url": "https://arxiv.org/abs/2201.11903",
+        "locator": "Author manuscript"
+      },
+      {
+        "url": "https://proceedings.nips.cc/paper_files/paper/2022/hash/9d5609613524ecf4f15af0f7b31abca4-Abstract-Conference.html",
+        "locator": "Official NeurIPS 2022 proceedings and supplementary link"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "2–9",
+      "15–22",
+      "25–43"
+    ],
+    "associated_files_reviewed": [
+      {
+        "file": "Supplied main PDF, embedded appendices A–H",
+        "pages_read": "15–22,25–43",
+        "scope": "Prompt variants, result tables, error examples, resource and reproducibility statements reviewed; bibliography-only appendix pages not required for mechanism claims."
+      }
+    ],
+    "repo_url": null,
+    "repo_commit": null,
+    "code_files_inspected": [],
+    "code_executed": false,
+    "repository_status": "Prompt/output appendix reviewed; no official historical inference code or stated output ZIP located through checked primary links; proprietary models not executed.",
+    "dossier_path": "dossiers/cot.md",
+    "key_findings": [
+      {
+        "claim": "Reasoning demonstrations help selected text tasks without task fine-tuning; correctness and grounded-navigation transfer are not guaranteed.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "https://arxiv.org/abs/2201.11903",
+        "locator": "Main Tables 1–3; Appendix Table 7 and error/prompt examples pp. 25–43"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "cot-faithfulness",
+        "description": "A correct final answer does not guarantee a correct or faithful intermediate rationale.",
+        "conditions": "Fluent semantic errors, lucky answers, or explanations that fail to reflect the causal computation.",
+        "cause": "Autoregressive text is not a verified derivation and no correctness constraint is imposed.",
+        "evidence": "AUTHOR ACKNOWLEDGEMENT: §6 and Appendix D.1; correct-answer cases with flawed rationales. Main and appendix counts differ, so no exact rate is adopted.",
+        "kind": "methodological",
+        "followups": [
+          "VSI-Bench",
+          "VLN-MME",
+          "OmniAgent"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High within the stated experimental scope"
+      },
+      {
+        "id": "cot-transfer",
+        "description": "Reasoning-prompt gains do not automatically transfer to grounded sequential navigation.",
+        "conditions": "An agent must collect observations, interpret geometry, and execute actions over time.",
+        "cause": "Original evidence is primarily text reasoning with fixed inputs.",
+        "evidence": "DEDUCTION from task scope.",
+        "kind": "methodological",
+        "followups": [
+          "VLN-MME",
+          "VSI-Bench",
+          "UoT"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High within the stated experimental scope"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "Historical APIs and proprietary pretrained weights prevent exact reproduction here. The reported output ZIP was not located through the checked official supplemental link; appendix prompts/examples were reviewed instead."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "embodiedqa",
+    "short_name": "EmbodiedQA",
+    "full_title": "Embodied Question Answering",
+    "authors": [
+      "Abhishek Das",
+      "Samyak Datta",
+      "Georgia Gkioxari",
+      "Stefan Lee",
+      "Devi Parikh",
+      "Dhruv Batra"
+    ],
+    "year": 2018,
+    "venue_or_status": "CVPR 2018",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content_cvpr_2018/html/Das_Embodied_Question_Answering_CVPR_2018_paper.html",
+        "locator": "Supplied main paper"
+      },
+      {
+        "url": "https://embodiedqa.org/",
+        "locator": "Official project"
+      },
+      {
+        "url": "https://openaccess.thecvf.com/content_cvpr_2018/Supplemental/0052-supp.pdf",
+        "locator": "Official supplementary or complete author version; reviewed scope listed in associated material"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "3–8"
+    ],
+    "associated_files_reviewed": [
+      {
+        "file": "evidence/04/supplements/embodiedqa_supp.txt",
+        "pages_read": "1–10",
+        "scope": "Full-text supplementary methods, protocols and result discussion; qualitative figures reviewed through captions/text unless separately stated. No independent image relabeling or video review."
+      }
+    ],
+    "repo_url": "https://github.com/facebookresearch/EmbodiedQA",
+    "repo_commit": "306fd6ef3064b5b9a3bd2d3f06ac96a09c481d9d",
+    "code_files_inspected": [
+      "README.md",
+      "training/models.py:1100–1173",
+      "training/train_eqa.py:683–725"
+    ],
+    "code_executed": false,
+    "repository_status": "Official source inspected statically; no project execution or benchmark reproduction.",
+    "dossier_path": "dossiers/embodiedqa.md",
+    "key_findings": [
+      {
+        "claim": "Navigation and answering are jointly evaluated, with answer quality sensitive to the final-view distribution and templated question construction.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "https://embodiedqa.org/",
+        "locator": "Main navigation/QA results; supplementary pp. 1–4"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "eqa-stop",
+        "description": "Answer-seeking reinforcement can improve visual evidence while overshooting the target and failing to stop.",
+        "conditions": "A useful object view is encountered before the final movement decision.",
+        "cause": "The navigator is rewarded for answer correctness and progress while the answerer can attend to recent frames; terminal location and evidence quality differ.",
+        "evidence": "AUTHOR ACKNOWLEDGEMENT and PAPER EXPERIMENT: Table 1 and §5.",
+        "kind": "methodological",
+        "followups": [
+          "Explore until Confident",
+          "IQA"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High within the stated experimental scope"
+      },
+      {
+        "id": "eqa-memory",
+        "description": "Five-frame answering context cannot preserve arbitrary evidence collected much earlier.",
+        "conditions": "Questions requiring distant-object comparison or long search.",
+        "cause": "The answerer discards all but the last five frames; evaluated v1 questions have one target.",
+        "evidence": "METHOD: §4; broader question types are proposed rather than evaluated.",
+        "kind": "methodological",
+        "followups": [
+          "IQA",
+          "VSI-Bench",
+          "OmniAgent"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High within the stated experimental scope"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "Official supplement and archived source reviewed. House3D/SUNCG assets and checkpoints were not downloaded or initialized; current asset access was not tested. No navigation or QA benchmark executed."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "environment_review",
+    "short_name": "Environment Review",
+    "full_title": "Environment understanding for VLMs and VLAs (2020–2025)",
+    "authors": [],
+    "year": null,
+    "venue_or_status": "Supplied internal research report; not a verified conference paper",
+    "bibliography_sources": [],
+    "main_pdf_pages_read": [
+      "1–13"
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": null,
+    "repo_commit": null,
+    "code_files_inspected": [],
+    "code_executed": false,
+    "repository_status": "Not applicable: secondary internal report",
+    "dossier_path": "dossiers/environment_review.md",
+    "key_findings": [
+      {
+        "claim": "The supplied environment review is a secondary internal report, not primary experimental evidence.",
+        "evidence_type": "DEDUCTION",
+        "source": "Supplied internal environment review; primary-source status not established",
+        "locator": "Supplied report pp. 1–13; no established authorship/provenance"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "report-evidence",
+        "description": "Broad landscape claims lack an auditable primary-source chain and matched experimental scope.",
+        "conditions": "Using the report to justify novelty, absence of prior work, or quantitative cross-paper rankings.",
+        "cause": "Headline summaries combine heterogeneous settings and sometimes stronger conclusions than the underlying methods support.",
+        "evidence": "INSPECTED REPORT: pp. 1, 6, 10–13; direct cross-check against VLN-PE and VSI-Bench dossiers.",
+        "kind": "insufficiently tested",
+        "followups": [
+          "Primary-paper dossiers and assignments 05–06"
+        ],
+        "status": "Uncertain because evidence is insufficient",
+        "confidence": "High within the stated experimental scope"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "Authorship, creation date, and source-link provenance are not established. No findings in this report are treated as original experimental evidence."
+    ],
+    "completion_status": "Complete as an internal-report audit; primary cited literature is handled separately"
+  },
+  {
+    "paper_id": "explore_confident",
+    "short_name": "Explore until Confident",
+    "full_title": "Explore until Confident: Efficient Exploration for Embodied Question Answering",
+    "authors": [
+      "Allen Z. Ren",
+      "Jaden Clark",
+      "Anushri Dixit",
+      "Masha Itkina",
+      "Anirudha Majumdar",
+      "Dorsa Sadigh"
+    ],
+    "year": 2024,
+    "venue_or_status": "RSS 2024",
+    "bibliography_sources": [
+      {
+        "url": "https://explore-eqa.github.io/",
+        "locator": "Official project"
+      },
+      {
+        "url": "https://arxiv.org/abs/2403.15941",
+        "locator": "Author manuscript"
+      },
+      {
+        "url": "https://github.com/Stanford-ILIAD/explore-eqa",
+        "locator": "Official code"
+      },
+      {
+        "url": "https://arxiv.org/pdf/2403.15941v2",
+        "locator": "Complete 17-page author version; appendices A–C pp. 15–17 reviewed"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "3–12"
+    ],
+    "associated_files_reviewed": [
+      {
+        "file": "evidence/04/supplements/explore_confident_full.txt",
+        "pages_read": "15–17",
+        "scope": "Full-text supplementary methods, protocols and result discussion; qualitative figures reviewed through captions/text unless separately stated. No independent image relabeling or video review."
+      }
+    ],
+    "repo_url": "https://github.com/Stanford-ILIAD/explore-eqa",
+    "repo_commit": "18381da3370c5f7729594f10ebc49b5644bbb88c",
+    "code_files_inspected": [
+      "README.md",
+      "run_vlm_exp.py:197–213,339–366",
+      "Pinned repository tree and source search for conformal/calibration/quantile"
+    ],
+    "code_executed": false,
+    "repository_status": "Exploration/answer source inspected; calibrated stopping implementation not found in the pinned official release.",
+    "dossier_path": "dossiers/explore_confident.md",
+    "key_findings": [
+      {
+        "claim": "The trajectory-min score yields simultaneous answer-set coverage under the stated calibration distribution, while finite termination and control reliability are separate.",
+        "evidence_type": "DEDUCTION",
+        "source": "https://explore-eqa.github.io/",
+        "locator": "Main Claim 1; arXiv v2 Appendix A, p. 15"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "explore-answer",
+        "description": "A useful view can still produce a confident incorrect answer, and forced fallback answers lack the conformal retention guarantee.",
+        "conditions": "VLM perception/spatial reasoning errors; timeout or empty-set fallback; distribution or exploration-policy change.",
+        "cause": "The decision mechanism calibrates scores but does not improve the underlying visual reasoning; fallback returns a point answer without retained-set coverage.",
+        "evidence": "PAPER EXPERIMENT: §VII-C/H and Figure 10; METHOD: §V-B.",
+        "kind": "methodological",
+        "followups": [
+          "AIUTA",
+          "VSI-Bench",
+          "OmniAgent"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High within the evaluated setting"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "Complete arXiv v2 appendix reviewed. CP calibration/intersection/stopping code was not located in the pinned repository; this limits code verification of the paper guarantee. No robot experiment executed."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "feedtta",
+    "short_name": "FeedTTA",
+    "full_title": "Test-Time Adaptation for Online Vision-Language Navigation with Feedback-based Reinforcement Learning",
+    "authors": [
+      "Sung June Kim",
+      "Gyeongrok Oh",
+      "Heeju Ko",
+      "Daehyun Ji",
+      "Dongwook Lee",
+      "Byung-Jun Lee",
+      "Sujin Jang",
+      "Sangpil Kim"
+    ],
+    "year": 2025,
+    "venue_or_status": "ICML 2025",
+    "bibliography_sources": [
+      {
+        "url": "https://raw.githubusercontent.com/mlresearch/v267/main/assets/kim25ad/kim25ad.pdf",
+        "locator": "Supplied main paper"
+      },
+      {
+        "url": "https://proceedings.mlr.press/v267/kim25ad.html",
+        "locator": "Official ICML proceedings and bibliography"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": null,
+    "repo_commit": null,
+    "code_files_inspected": [],
+    "code_executed": false,
+    "repository_status": "Official implementation not located in bounded primary-source search; no code inspection claimed.",
+    "dossier_path": "dossiers/feedtta.md",
+    "key_findings": [
+      {
+        "claim": "The hidden-goal test split uses an LLM oracle, while validation results with stronger outcome feedback are substantially larger.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "FeedTTA supplied PDF",
+        "locator": "§5.1/Table1 and §5.3/Table4, PDF pp6–8"
+      },
+      {
+        "claim": "Eq5 and AppendixB.1 specify different normalization of SGR; the absolute-gradient shrinkage argument fails under either negative-alpha version with positive denominator.",
+        "evidence_type": "DEDUCTION",
+        "source": "FeedTTA supplied PDF and isolated_check_results.json",
+        "locator": "Eq5/Eqs8–9, AppendixB.1, PDF pp4–5,13–14"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "feedtta-B1",
+        "description": "Lenient final-image feedback can reinforce a semantically wrong instance or position.",
+        "conditions": "Similar-category distractors, partial visibility, or instructions requiring an exact spatial relation or route.",
+        "cause": "Oracle prompt explicitly accepts broad category and partial alignment and ignores exact placement.",
+        "evidence": "AppendixA/PDF p13; GPT-4o precision .68 in Table 4.",
+        "kind": "methodological",
+        "followups": "ATENA reduces query frequency with a learned outcome head; Context-Nav/PolarMem add verification cues; none removes the need to validate oracle semantics in this protocol.",
+        "status": "Partially addressed",
+        "confidence": "High for prompt and measured precision; specific failure rates unmeasured."
+      },
+      {
+        "id": "feedtta-B2",
+        "description": "The stated SGR mean-preservation and shrinkage explanations do not jointly follow from the printed formulas.",
+        "conditions": "Negative α with positive normalization denominator, including reported REVERIE settings.",
+        "cause": "Main equation and appendix scale different branches; first-order approximation drops terms affecting the inequality.",
+        "evidence": "Eqs 5,8–9 and AppendixB.1; isolated scalar checks recorded separately.",
+        "kind": "methodological",
+        "followups": "No correction located in this bounded review; empirical utility could remain even with an incorrect theoretical explanation.",
+        "status": "Uncertain because evidence is insufficient",
+        "confidence": "High for algebraic inconsistency; actual implementation unknown."
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "Official code not located in the bounded search. No navigation benchmark executed. The statistical association between weight norm and plasticity is not a proof of forgetting prevention."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "fgr2r",
+    "short_name": "FGR2R",
+    "full_title": "Sub-Instruction Aware Vision-and-Language Navigation",
+    "authors": [
+      "Yicong Hong",
+      "Cristian Rodriguez-Opazo",
+      "Qi Wu",
+      "Stephen Gould"
+    ],
+    "year": 2020,
+    "venue_or_status": "EMNLP 2020",
+    "bibliography_sources": [
+      {
+        "url": "https://aclanthology.org/2020.emnlp-main.271/",
+        "locator": "Official proceedings metadata and paper"
+      },
+      {
+        "url": "https://github.com/YicongHong/Fine-Grained-R2R",
+        "locator": "Author-linked release"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "2–9",
+      "11–17"
+    ],
+    "associated_files_reviewed": [
+      "Appendix A and qualitative examples embedded in supplied PDF, pp. 11–17"
+    ],
+    "repo_url": "https://github.com/YicongHong/Fine-Grained-R2R",
+    "repo_commit": "305ed4cd219d79306bc38650899edc14cfdcfb69",
+    "code_files_inspected": [
+      "README.md",
+      "source/make_subinstr.py:1–41",
+      "source/chunking_function.py:1–89"
+    ],
+    "code_executed": false,
+    "repository_status": "Official dataset/chunking source inspected; navigator training and inference implementation not included in the pinned release.",
+    "dossier_path": "dossiers/fgr2r.md",
+    "key_findings": [
+      {
+        "claim": "Correct chunk shifting alone does not establish landmark grounding.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "Supplied PDF",
+        "locator": "Appendix Figure 10, PDF p. 17"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "fgr2r-transition",
+        "description": "Chunk completion has low recall and cannot reverse an erroneous advance.",
+        "conditions": "Agent deviates from its annotated subpath or must revisit an earlier instruction after backtracking.",
+        "cause": "Training supplies teacher chunk transitions, whereas inference predicts them; the state machine allows only one forward transition.",
+        "evidence": "PAPER EXPERIMENT: Table 2 best F1 0.331; AUTHOR ACKNOWLEDGEMENT: Appendix A.1 leaves backward/multi-step shifts to future work.",
+        "kind": "methodological",
+        "followups": [
+          "BabyWalk",
+          "Landmark-RxR",
+          "GELA",
+          "VLN-Trans",
+          "M-TRACK"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High within the reported discretized R2R protocol"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "The pinned official release contains dataset/chunking utilities but no paper-equivalent navigator source. No benchmark executed."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "fstta",
+    "short_name": "FSTTA",
+    "full_title": "Fast-Slow Test-Time Adaptation for Online Vision-and-Language Navigation",
+    "authors": [
+      "Junyu Gao",
+      "Xuan Yao",
+      "Changsheng Xu"
+    ],
+    "year": 2024,
+    "venue_or_status": "ICML 2024",
+    "bibliography_sources": [
+      {
+        "url": "https://raw.githubusercontent.com/mlresearch/v235/main/assets/gao24p/gao24p.pdf",
+        "locator": "Supplied main paper"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/Feliciaxyao/ICML2024-FSTTA",
+    "repo_commit": "3481c5457c00f2a12a09264111816e9cdf3a6bf7",
+    "code_files_inspected": [
+      "map_nav_src/models/FSTTA.py:25–169,254–346,461–735",
+      "map_nav_src/reverie/agent_obj.py:29–37,350–455,588–628",
+      "map_nav_src/reverie/agent_base.py:40–90",
+      "map_nav_src/run_reverie_tta.sh"
+    ],
+    "code_executed": false,
+    "repository_status": "Official code inspected; static release defects and paper/code differences limit direct reproducibility.",
+    "dossier_path": "dossiers/fstta.md",
+    "key_findings": [
+      {
+        "claim": "The literal inverse covariance formula is singular for the stated small gradient window, and released fast code floors eigenvalues.",
+        "evidence_type": "DEDUCTION",
+        "source": "FSTTA paper and official code",
+        "locator": "Eqs3–5; FSTTA.py25–69"
+      },
+      {
+        "claim": "Current agent imports a function absent from the inspected FSTTA module.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/Feliciaxyao/ICML2024-FSTTA/tree/3481c5457c00f2a12a09264111816e9cdf3a6bf7",
+        "locator": "agent_obj.py37; FSTTA.py function definitions"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "fstta-B1",
+        "description": "Unlabeled entropy adaptation has no semantic signal identifying confidently wrong decisions.",
+        "conditions": "Policy is confident on a wrong landmark or route in a shifted environment.",
+        "cause": "Entropy loss rewards sharper predictions independently of instruction completion.",
+        "evidence": "Eq 2; later FeedTTA/ATENA explicitly study outcome-conditioned alternatives.",
+        "kind": "methodological",
+        "followups": "FeedTTA and ATENA use binary external or self-predicted outcome labels, trading the unlabeled setting for feedback dependence.",
+        "status": "Shifted into another cost or limitation",
+        "confidence": "High for objective information content; failure frequency is setting dependent."
+      },
+      {
+        "id": "fstta-B2",
+        "description": "The inspected release does not directly instantiate a reproducible paper-equivalent update path.",
+        "conditions": "Running the provided REVERIE agent at the pinned commit.",
+        "cause": "Missing imported function and differences in normalization/numerical handling.",
+        "evidence": "agent_obj.py:37; FSTTA.py:138,344–346,602–609; later papers reference issue1.",
+        "kind": "implementation-specific",
+        "followups": "FeedTTA and ATENA state they reimplement FSTTA; their results must identify which implementation is compared.",
+        "status": "Uncertain because evidence is insufficient",
+        "confidence": "High for static code differences; no full execution attempted."
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "No simulator, benchmark or fetched project code executed. Repository snapshot findings do not establish which code produced the paper results."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "gela",
+    "short_name": "GELA",
+    "full_title": "Grounded Entity-Landmark Adaptive Pre-training for Vision-and-Language Navigation",
+    "authors": [
+      "Yibo Cui",
+      "Liang Xie",
+      "Yakun Zhang",
+      "Meishan Zhang",
+      "Ye Yan",
+      "Erwei Yin"
+    ],
+    "year": 2023,
+    "venue_or_status": "ICCV 2023",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content/ICCV2023/supplemental/Cui_Grounded_Entity-Landmark_Adaptive_ICCV_2023_supplemental.pdf",
+        "locator": "Official supplementary or complete author version; reviewed scope listed in associated material"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+    ],
+    "associated_files_reviewed": [
+      {
+        "file": "evidence/04/supplements/gela_gela.txt",
+        "pages_read": "1–5",
+        "scope": "Full-text supplementary methods, protocols and result discussion; qualitative figures reviewed through captions/text unless separately stated. No independent image relabeling or video review."
+      }
+    ],
+    "repo_url": "https://github.com/CSir1996/VLN-GELA",
+    "repo_commit": "6754fa859807d6504759130c573480e0df34ffc1",
+    "code_files_inspected": [
+      "ada_pretrain_src/model/pretrain_cmt.py:351–424",
+      "ada_pretrain_src/model/gelunits.py:6–74",
+      "ada_pretrain_src/data/r2r_tasks.py:600–650",
+      "ada_pretrain_src/main_r2r.py:240–293",
+      "finetune_src/r2r/agent_cmt.py:349–388,487–523",
+      "finetune_src/scripts/run_r2r.sh",
+      "README.md"
+    ],
+    "code_executed": false,
+    "repository_status": "Official source inspected statically at the pinned commit; no project code or benchmark executed.",
+    "dossier_path": "dossiers/gela.md",
+    "key_findings": [
+      {
+        "claim": "GELA is offline entity-grounding adaptive pretraining on HAMT, not online test-time adaptation.",
+        "evidence_type": "AUTHOR CLAIM",
+        "source": "GELA supplied PDF",
+        "locator": "§4, PDF pp4–6"
+      },
+      {
+        "claim": "EPP and LBP alone do not improve the R2R baseline in Table5, whereas their combination with ELSA does.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "GELA supplied PDF",
+        "locator": "Table5, PDF p8"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "gela-B1",
+        "description": "High-quality entity grounding requires costly human boxes and does not certify decision-level language use.",
+        "conditions": "New domains, unseen landmark types, or ambiguous repeated objects beyond the annotated R2R scenes.",
+        "cause": "Limited human labels and proxy losses align representations without directly testing counterfactual action dependence.",
+        "evidence": "§5.5 acknowledges limited annotation; Figure 3 measures attention rather than interventional behavior.",
+        "kind": "methodological",
+        "followups": "NavNuances tests atomic instruction interventions; synthetic-data methods reduce annotation cost but require correctness controls.",
+        "status": "Partially addressed",
+        "confidence": "High for annotation cost; medium for the untested decision-level limitation."
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "The official five-page supplement and objective code were reviewed. No pretrained assets or navigation benchmark were executed."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "gsavln",
+    "short_name": "GSA-VLN",
+    "full_title": "General Scene Adaptation for Vision-and-Language Navigation",
+    "authors": [
+      "Haodong Hong",
+      "Yanyuan Qiao",
+      "Sen Wang",
+      "Jiajun Liu",
+      "Qi Wu"
+    ],
+    "year": 2025,
+    "venue_or_status": "ICLR 2025",
+    "bibliography_sources": [
+      {
+        "url": "https://proceedings.iclr.cc/paper_files/paper/2025/file/aebf6284fe85a8f44b4785d41bc8249a-Paper-Conference.pdf",
+        "locator": "Supplied main paper"
+      },
+      {
+        "url": "https://arxiv.org/abs/2501.17403",
+        "locator": "Author manuscript"
+      },
+      {
+        "url": "https://github.com/honghd16/GSA-VLN",
+        "locator": "Official ICLR release"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "3–10",
+      "15–28"
+    ],
+    "associated_files_reviewed": [
+      "Embedded appendices A3–A11, including prompts and runtime tables"
+    ],
+    "repo_url": "https://github.com/honghd16/GSA-VLN",
+    "repo_commit": "d7310c8e792504fc347cf0747797a18d9c91723c",
+    "code_files_inspected": [
+      "GR-DUET/map_nav_src/r2r/agent.py:31–66,342–377,581–680",
+      "GR-DUET/map_nav_src/models/graph_utils.py:95–139",
+      "GR-DUET/map_nav_src/r2r/agent_base.py:44–70",
+      "GR-DUET/map_nav_src/r2r/main_nav.py:64–84,225–248"
+    ],
+    "code_executed": false,
+    "repository_status": "Official source inspected statically at the pinned commit; no project code or benchmark executed.",
+    "dossier_path": "dossiers/gsavln.md",
+    "key_findings": [
+      {
+        "claim": "Scene memory is reset per scene and reused across episodes; benchmark generation includes navigator-based selection and visual correction.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/honghd16/GSA-VLN/tree/d7310c8e792504fc347cf0747797a18d9c91723c",
+        "locator": "Map lifecycle paths listed in dossier; Appendix A.2 pp. 16–17"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "gsa-style",
+        "description": "Persistent visual graph reuse does not explicitly learn an individual’s instruction style.",
+        "conditions": "Repeated User-style paraphrases, unusual vocabulary, or instructions whose synthetic refinement changed route meaning.",
+        "cause": "Graph nodes store visual observations; there is no language-specific adaptation mechanism, and generated instructions retain errors.",
+        "evidence": "AUTHOR ACKNOWLEDGEMENT: Appendix A11; PAPER EXPERIMENT: Table 16 incomplete rewriting recovery and Table 2 human path matching.",
+        "kind": "methodological",
+        "followups": [
+          "slow4fast-VLN",
+          "VLN-Trans"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High within the evaluated setting"
+      },
+      {
+        "id": "gsa-map",
+        "description": "Map accumulation is less effective when prior observations come from structurally different floors.",
+        "conditions": "Large multi-floor scenes with heterogeneous layouts.",
+        "cause": "Stored visual/topological context may be irrelevant to the current route; graph coverage alone does not ensure useful retrieval.",
+        "evidence": "PAPER EXPERIMENT/author interpretation: Appendix A7, Tables 17–19.",
+        "kind": "methodological",
+        "followups": [
+          "M3E"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High within the evaluated setting"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "Benchmark construction appendix and core map-reset source reviewed. t-SNE is descriptive rather than proof of distribution independence. No benchmark or generation pipeline executed."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "ieve",
+    "short_name": "IEVE",
+    "full_title": "Instance-aware Exploration-Verification-Exploitation for Instance ImageGoal Navigation",
+    "authors": [
+      "Xiaohan Lei",
+      "Min Wang",
+      "Wengang Zhou",
+      "Li Li",
+      "Houqiang Li"
+    ],
+    "year": 2024,
+    "venue_or_status": "CVPR 2024",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content/CVPR2024/html/Lei_Instance-aware_Exploration-Verification-Exploitation_for_Instance_ImageGoal_Navigation_CVPR_2024_paper.html",
+        "locator": "Supplied main paper"
+      },
+      {
+        "url": "https://openaccess.thecvf.com/content/CVPR2024/supplemental/Lei_Instance-aware_Exploration-Verification-Exploitation_for_CVPR_2024_supplemental.zip",
+        "locator": "Official supplementary or complete author version; reviewed scope listed in associated material"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "3–8"
+    ],
+    "associated_files_reviewed": [
+      {
+        "file": "evidence/04/supplements/ieve_supp.txt",
+        "pages_read": "1–4",
+        "scope": "Full-text supplementary methods, protocols and result discussion; qualitative figures reviewed through captions/text unless separately stated. No independent image relabeling or video review."
+      }
+    ],
+    "repo_url": "https://github.com/XiaohanLei/IEVE",
+    "repo_commit": "398414ab78cda1b7a77a63f9cae0c30ddd1a82fa",
+    "code_files_inspected": [
+      "README.md",
+      "agents/instance_exp.py:73–74,426–486,592–661",
+      "main.py:246–278,396–402"
+    ],
+    "code_executed": false,
+    "repository_status": "Official source inspected statically; no project execution or benchmark reproduction.",
+    "dossier_path": "dossiers/ieve.md",
+    "key_findings": [
+      {
+        "claim": "Instance verification reduces false-positive commitment with hand-tuned distance/match switching; it is not a general confidence or safety guarantee.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "https://openaccess.thecvf.com/content/CVPR2024/html/Lei_Instance-aware_Exploration-Verification-Exploitation_for_Instance_ImageGoal_Navigation_CVPR_2024_paper.html",
+        "locator": "Main method and verification ablation; supplementary pp. 1–4"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "ieve-perception",
+        "description": "Distance-aware verification reduces rejection errors but remains dependent on viewpoint-sensitive instance features.",
+        "conditions": "Textureless objects, camera mismatch, occlusion, repeated similar instances, or inaccurate category segmentation.",
+        "cause": "Match counts are heuristic evidence and both the map and verification depend on visual perception.",
+        "evidence": "PAPER EXPERIMENT: Tables 1–2 oracle perception gap and re-identification distance analysis.",
+        "kind": "methodological",
+        "followups": [
+          "AIUTA"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High within the specified evidence scope"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "Four-page official supplement reviewed; accompanying video not reviewed. Piecewise released switching differs from the supplementary linear boundary; no measured impact or robot reproduction."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "iqa",
+    "short_name": "IQA",
+    "full_title": "IQA: Visual Question Answering in Interactive Environments",
+    "authors": [
+      "Daniel Gordon",
+      "Aniruddha Kembhavi",
+      "Mohammad Rastegari",
+      "Joseph Redmon",
+      "Dieter Fox",
+      "Ali Farhadi"
+    ],
+    "year": 2018,
+    "venue_or_status": "CVPR 2018",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content_cvpr_2018/html/Gordon_IQA_Visual_Question_CVPR_2018_paper.html",
+        "locator": "Supplied main paper"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "2–8"
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/danielgordon10/thor-iqa-cvpr-2018",
+    "repo_commit": "38358569422a93fa42a782f3022554672507a08a",
+    "code_files_inspected": [
+      "networks/qa_planner_network.py:50–79,114–189,220–253",
+      "Pinned tree: training/evaluation and question-generation entry points"
+    ],
+    "code_executed": false,
+    "repository_status": "Official source inspected statically; no project execution or benchmark reproduction.",
+    "dossier_path": "dossiers/iqa.md",
+    "key_findings": [
+      {
+        "claim": "Hierarchical manipulation/navigation/answering and semantic memory help interactive QA, while detector/control assumptions remain distinct from language reasoning.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "https://openaccess.thecvf.com/content_cvpr_2018/html/Gordon_IQA_Visual_Question_CVPR_2018_paper.html",
+        "locator": "Main §§4–5, especially §4.3 controller definitions and ablations"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "iqa-height",
+        "description": "A 2-D semantic map aliases vertical containment and support relations.",
+        "conditions": "Objects inside versus above the same container footprint.",
+        "cause": "Map projection removes height and explicit relations.",
+        "evidence": "AUTHOR ACKNOWLEDGEMENT: §5.5.",
+        "kind": "methodological",
+        "followups": [
+          "VSI-Bench",
+          "3-D map methods"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High within the stated experimental scope"
+      },
+      {
+        "id": "iqa-count",
+        "description": "Accurate global counting requires reliable persistent detections and efficient coverage.",
+        "conditions": "Long searches with repeated object observations and hidden containers.",
+        "cause": "Perception errors and inefficient exploration accumulate before answering.",
+        "evidence": "PAPER EXPERIMENT: Tables 2–3 counting and oracle gaps.",
+        "kind": "methodological",
+        "followups": [
+          "Explore until Confident"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High within the stated experimental scope"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "Official CVPR page and complete arXiv v3 expose no separate supplement; main §4 and source provide the implementation details. AI2-THOR assets were not initialized, and no physical robot evidence is supplied by these experiments."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "knowno",
+    "short_name": "KnowNo",
+    "full_title": "Robots That Ask For Help: Uncertainty Alignment for Large Language Model Planners",
+    "authors": [
+      "Allen Z. Ren",
+      "Anushri Dixit",
+      "Alexandra Bodrova",
+      "Sumeet Singh",
+      "Stephen Tu",
+      "Noah Brown",
+      "Peng Xu",
+      "Leila Takayama",
+      "Fei Xia",
+      "Jake Varley",
+      "Zhenjia Xu",
+      "Dorsa Sadigh",
+      "Andy Zeng",
+      "Anirudha Majumdar"
+    ],
+    "year": 2023,
+    "venue_or_status": "CoRL 2023; PMLR volume 229",
+    "bibliography_sources": [
+      {
+        "url": "https://proceedings.mlr.press/v229/ren23a.html",
+        "locator": "Official proceedings"
+      },
+      {
+        "url": "https://robot-help.github.io/",
+        "locator": "Official project and repository link"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "3–8",
+      "12–22"
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/google-research/google-research",
+    "repo_commit": "0d94f8c4d92678ce5f7a0eacae725f79174cfb03",
+    "code_files_inspected": [
+      "language_model_uncertainty/KnowNo_Demo.ipynb: prediction-set cells",
+      "language_model_uncertainty/KnowNo_MobileManipulation.ipynb: cells23–27 (extracted text373–481)",
+      "language_model_uncertainty/KnowNo_TabletopSim.ipynb: environment reset/motion and calibration references"
+    ],
+    "code_executed": false,
+    "repository_status": "Official source inspected statically; no project execution or benchmark reproduction.",
+    "dossier_path": "dossiers/knowno.md",
+    "key_findings": [
+      {
+        "claim": "Calibrated option sets cover acceptable high-level labels under scenario assumptions; reliable low-level execution and help are separate assumptions.",
+        "evidence_type": "DEDUCTION",
+        "source": "https://proceedings.mlr.press/v229/ren23a.html",
+        "locator": "Main conformal theorem; Appendix pp. 17–22; mobile notebook calibration"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "knowno-grounding",
+        "description": "Planning coverage does not cover perception errors, failed low-level control, or a changed scenario distribution.",
+        "conditions": "Ambiguous or incorrect textual grounding, physical execution failures, or deployment shifts.",
+        "cause": "Calibration is over grounded planning choices from an exchangeable scenario distribution; correct human help is assumed.",
+        "evidence": "AUTHOR ACKNOWLEDGEMENT: §6; PAPER EXPERIMENT: Table 2 plan 0.87 versus task 0.76.",
+        "kind": "insufficiently tested",
+        "followups": [
+          "Explore until Confident",
+          "AIUTA"
+        ],
+        "status": "Still unresolved in the reviewed literature",
+        "confidence": "High within the evaluated setting"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "Notebooks were read as text, not executed; external model APIs and robots were not run. Guarantee scope depends on scenario exchangeability, acceptable-label definitions and assumed execution/help reliability."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "landmark_rxr",
+    "short_name": "Landmark-RxR",
+    "full_title": "Landmark-RxR: Solving Vision-and-Language Navigation with Fine-Grained Alignment Supervision",
+    "authors": [
+      "Keji He",
+      "Yan Huang",
+      "Qi Wu",
+      "Jianhua Yang",
+      "Dong An",
+      "Shuanglin Sima",
+      "Liang Wang"
+    ],
+    "year": 2021,
+    "venue_or_status": "NeurIPS 2021",
+    "bibliography_sources": [
+      {
+        "url": "https://proceedings.neurips.cc/paper/2021/file/0602940f23884f782058efac46f64b0f-Paper.pdf",
+        "locator": "Official main paper"
+      },
+      {
+        "url": "https://github.com/hekj/Landmark-RxR",
+        "locator": "Official dataset release"
+      },
+      {
+        "url": "https://proceedings.neurips.cc/paper/2021/file/0602940f23884f782058efac46f64b0f-Supplemental.pdf",
+        "locator": "Official supplementary or complete author version; reviewed scope listed in associated material"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "1",
+      "3–9"
+    ],
+    "associated_files_reviewed": [
+      {
+        "file": "evidence/04/supplements/landmark_rxr_supp.txt",
+        "pages_read": "1–9",
+        "scope": "Full-text supplementary methods, protocols and result discussion; qualitative figures reviewed through captions/text unless separately stated. No independent image relabeling or video review."
+      }
+    ],
+    "repo_url": "https://github.com/hekj/Landmark-RxR",
+    "repo_commit": "6c9c6f5a0313f7c799c5a55538c9540829469031",
+    "code_files_inspected": [],
+    "code_executed": false,
+    "repository_status": "Official repository pinned; dataset/README release only at inspected tree",
+    "dossier_path": "dossiers/landmark_rxr.md",
+    "key_findings": [
+      {
+        "claim": "Human chunk alignment and landmark-weighted rewards differ from autonomous recovery; oracle resets provide privileged intervention.",
+        "evidence_type": "DEDUCTION",
+        "source": "https://proceedings.neurips.cc/paper/2021/file/0602940f23884f782058efac46f64b0f-Paper.pdf",
+        "locator": "Main reset protocol §4 and Table 4; supplementary annotation datasheet"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "landmark-order",
+        "description": "Landmark visitation alone does not enforce ordered or procedural instruction constraints.",
+        "conditions": "A path visits the right objects in the wrong order or repeats an action incorrectly.",
+        "cause": "Hard reward uses a minimum distance over all predicted points independently for each landmark.",
+        "evidence": "DEDUCTION from Eqs. 3–4.",
+        "kind": "methodological",
+        "followups": [
+          "M-Track",
+          "NavNuances"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High within the stated experimental scope"
+      },
+      {
+        "id": "landmark-reset",
+        "description": "Reset-based local success does not quantify an agent’s ability to recover by itself.",
+        "conditions": "A route fails before a later annotated segment.",
+        "cause": "Evaluation supplies the correct landmark location and remaining instruction after failure.",
+        "evidence": "METHOD: §4.",
+        "kind": "insufficiently tested",
+        "followups": [
+          "Meta-Explore",
+          "ULN"
+        ],
+        "status": "Uncertain because evidence is insufficient",
+        "confidence": "High within the stated experimental scope"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "Repository tree/README inspection is not model-code inspection; no released model source found at pinned commit."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "mtrack",
+    "short_name": "M-Track",
+    "full_title": "One Step at a Time: Long-Horizon Vision-and-Language Navigation with Milestones",
+    "authors": [
+      "Chan Hee Song",
+      "Jihyung Kil",
+      "Tai-Yu Pan",
+      "Brian M. Sadler",
+      "Wei-Lun Chao",
+      "Yu Su"
+    ],
+    "year": 2022,
+    "venue_or_status": "CVPR 2022",
+    "bibliography_sources": [
+      {
+        "url": "https://arxiv.org/abs/2202.07028",
+        "locator": "Author full version"
+      },
+      {
+        "url": "https://github.com/chanhee-luke/M-Track",
+        "locator": "Official implementation"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "3–8"
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/chanhee-luke/M-Track",
+    "repo_commit": "a7eaf93fc8631c9d1e7bbef437cc858b5b60f36a",
+    "code_files_inspected": [
+      "Assignment 05: mtrack_src/milestone_checker.py:1–30; agent.py:96–115,236–345; env.py:53,106–165; train.py:1–90,250–268; eval.py:17–89",
+      "Assignment 05: milestone.py:18–95; milestone/src/model/transformer_crf.py:14–43; vision/alfred_head.py:31–123; vnn.py:156–203; run launchers"
+    ],
+    "code_executed": false,
+    "repository_status": "Official release independently inspected by assignment 05; incomplete runtime and syntax/launcher defects.",
+    "dossier_path": "dossiers/mtrack.md",
+    "key_findings": [
+      {
+        "claim": "Milestone gates provide explicit intermediate constraints, but the released checker is incomplete relative to paper runtime claims.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/chanhee-luke/M-Track/tree/a7eaf93fc8631c9d1e7bbef437cc858b5b60f36a",
+        "locator": "evidence/05/code_audit.md; milestone_checker.py:1–30 and agent.py:96–115"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "mtrack-procedure",
+        "description": "Object reachability and interaction checks do not certify procedural action-history requirements.",
+        "conditions": "Turn twice, preserve order, or satisfy an implicit prerequisite that is not an object-state condition.",
+        "cause": "Current milestones are type/target tuples and the checker primarily observes current objects.",
+        "evidence": "AUTHOR ACKNOWLEDGEMENT: §6.",
+        "kind": "methodological",
+        "followups": [
+          "NavNuances",
+          "Landmark-RxR"
+        ],
+        "status": "Still unresolved in the reviewed literature",
+        "confidence": "High within the stated experimental scope"
+      },
+      {
+        "id": "mtrack-hard",
+        "description": "Hard sequential milestones can block valid alternative task orders or propagate a wrong target extraction.",
+        "conditions": "Multiple valid plans or implicit/ambiguous instructions.",
+        "cause": "Only the current sentence is exposed and all target checks must complete before advancing.",
+        "evidence": "AUTHOR ACKNOWLEDGEMENT: §6; PAPER EXPERIMENT: Table 4 GT gap.",
+        "kind": "methodological",
+        "followups": [
+          "FGR2R",
+          "BabyWalk"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High within the stated experimental scope"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "Official runtime is materially incomplete and has compile/launcher defects; the independently inspected files do not establish the paper-equivalent WordNet/IoU/top-five milestone checker. No project execution."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "m3e",
+    "short_name": "M3E",
+    "full_title": "M³E: Continual Vision-and-Language Navigation via Mixture of Macro and Micro Experts",
+    "authors": [
+      "Yongliang Jiang",
+      "Huaidong Zhang",
+      "Xuandi Luo",
+      "Shengfeng He"
+    ],
+    "year": 2026,
+    "venue_or_status": "ICLR 2026",
+    "bibliography_sources": [
+      {
+        "url": "https://yongliangjiang.top/data/m3e/M3E_ICLR2026.pdf",
+        "locator": "Author full paper"
+      },
+      {
+        "url": "https://github.com/YongliangJiang/M3E-Code",
+        "locator": "Official release"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "3–10",
+      "14–19"
+    ],
+    "associated_files_reviewed": [
+      {
+        "file": "evidence/05/m3e_original_audit.md",
+        "pages_read": "All",
+        "scope": "Independent original-source audit from assignment 05; inspected by assignment 04 for integration."
+      }
+    ],
+    "repo_url": "https://github.com/YongliangJiang/M3E-Code",
+    "repo_commit": "35595353e6838b474ea835b9670419fa56e8f615",
+    "code_files_inspected": [
+      "models/nav_model.py:1–135,142–305",
+      "models/moe_lora.py: complete",
+      "models/marco_router.py: complete",
+      "tools/momentum/experts_stats.py: complete",
+      "tools/momentum/momentum_update.py: complete",
+      "train.py:35–115,123–307",
+      "tasks/agents/mp3d_agent.py:500–530,675–778",
+      "tasks/datasets/r2r.py:1–141",
+      "tasks/datasets/mp3d_dataset.py:1–75",
+      "tasks/loaders.py:1–160",
+      "tools/optims.py: complete",
+      "All four scripts, both R2R YAML configurations and README; inspected by assignment 05"
+    ],
+    "code_executed": false,
+    "repository_status": "Official source independently inspected by assignment 05; release blockers and paper/code discrepancies documented, with compile-only own test.",
+    "dossier_path": "dossiers/m3e.md",
+    "key_findings": [
+      {
+        "claim": "Supervised scene-incremental training leaves negative REVERIE BWT, and the public release does not faithfully implement all stated routing/workload details.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/YongliangJiang/M3E-Code/tree/35595353e6838b474ea835b9670419fa56e8f615",
+        "locator": "Paper Table 2; evidence/05/m3e_original_audit.md and pinned files"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "m3e-retention",
+        "description": "Replay-free consolidation still forgets in object-grounded navigation and uses expert workload as a retention proxy.",
+        "conditions": "REVERIE domain changes or new tasks that reuse experts important for old tasks.",
+        "cause": "Frequent routing on current data does not reveal old-domain parameter importance; fixed expert capacity and interpolation do not guarantee isolation.",
+        "evidence": "PAPER EXPERIMENT: Table 2 BWT -5.91; DEDUCTION from Eqs. 9–13.",
+        "kind": "methodological",
+        "followups": [
+          "SAME",
+          "Continual VLN"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High within the evaluated setting"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "Unmodified pinned source has independently documented compile/wiring/shape blockers; no project import or execution. Exact data partitions and cross-stage BWT/FWT aggregation were not released in inspected paths; paper-result validity is not adjudicated."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "metaexplore",
+    "short_name": "Meta-Explore",
+    "full_title": "Meta-Explore: Exploratory Hierarchical Vision-and-Language Navigation Using Scene Object Spectrum Grounding",
+    "authors": [
+      "Minyoung Hwang",
+      "Jaeyeon Jeong",
+      "Minsoo Kim",
+      "Yoonseon Oh",
+      "Songhwai Oh"
+    ],
+    "year": 2023,
+    "venue_or_status": "CVPR 2023",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content/CVPR2023/html/Hwang_Meta-Explore_Exploratory_Hierarchical_Vision-and-Language_Navigation_Using_Scene_Object_Spectrum_Grounding_CVPR_2023_paper.html",
+        "locator": "Supplied main paper"
+      },
+      {
+        "url": "https://rllab-snu.github.io/projects/Meta-Explore/doc.html",
+        "locator": "Author project; paper and demonstration links checked for code"
+      },
+      {
+        "url": "https://openaccess.thecvf.com/content/CVPR2023/supplemental/Hwang_Meta-Explore_Exploratory_Hierarchical_CVPR_2023_supplemental.pdf",
+        "locator": "Official supplementary or complete author version; reviewed scope listed in associated material"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "3–8"
+    ],
+    "associated_files_reviewed": [
+      {
+        "file": "evidence/04/supplements/metaexplore_supp.txt",
+        "pages_read": "1–9",
+        "scope": "Full-text supplementary methods, protocols and result discussion; qualitative figures reviewed through captions/text unless separately stated. No independent image relabeling or video review."
+      }
+    ],
+    "repo_url": null,
+    "repo_commit": null,
+    "code_files_inspected": [],
+    "code_executed": false,
+    "repository_status": "Official model repository not located in bounded project/title/author search; main and relevant supplementary methods reviewed.",
+    "dossier_path": "dossiers/metaexplore.md",
+    "key_findings": [
+      {
+        "claim": "Recovery gains depend on grounding quality and can cost additional motion; physical image-goal demonstration does not establish physical VLN.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "https://rllab-snu.github.io/projects/Meta-Explore/doc.html",
+        "locator": "Supplement Table 2 pp. 4 and Tables 5–6 pp. 7–8"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "meta-spectrum",
+        "description": "Object-spectrum recovery cannot uniquely determine the intended route when relational information or category distinctiveness matters.",
+        "conditions": "Repeated objects, generic landmarks, direction-sensitive instructions, or false detections.",
+        "cause": "Object lists omit some language relations and Fourier magnitude removes translation phase; mode labels operationalize shortest-path detours rather than all instruction violations.",
+        "evidence": "AUTHOR ACKNOWLEDGEMENT: REVERIE discussion; DEDUCTION from spectral representation and labels.",
+        "kind": "methodological",
+        "followups": [
+          "NavNuances",
+          "M-Track",
+          "GELA"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High within the specified evidence scope"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "Official model repository not located in bounded title/author/project search; exact loss implementation remains unverifiable. Supplementary physical demo is image-goal navigation. No benchmark executed."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "mind_error",
+    "short_name": "Mind the Error",
+    "full_title": "Mind the Error! Detection and Localization of Instruction Errors in Vision-and-Language Navigation",
+    "authors": [
+      "Francesco Taioli",
+      "Stefano Rosa",
+      "Alberto Castellini",
+      "Lorenzo Natale",
+      "Alessio Del Bue",
+      "Alessandro Farinelli",
+      "Marco Cristani",
+      "Yiming Wang"
+    ],
+    "year": 2024,
+    "venue_or_status": "IROS 2024; official author repository identifies the accepted paper.",
+    "bibliography_sources": [
+      {
+        "url": "https://intelligolabs.github.io/R2RIE-CE/",
+        "locator": "Official project"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "2–7"
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/intelligolabs/R2RIE-CE",
+    "repo_commit": "d330a55a717f4415f34541f8d8514c71c0716804",
+    "code_files_inspected": [
+      "README.md",
+      "vlnce_baselines/models/bev/vilmodel_cmt.py:687–742",
+      "vlnce_baselines/ss_trainer_BEV.py:1755–1789; inspected optimizer/evaluation references at283–318,875–889,1067–1073,1631–1661"
+    ],
+    "code_executed": false,
+    "repository_status": "Official source inspected statically; no project execution or benchmark reproduction.",
+    "dossier_path": "dossiers/mind_error.md",
+    "key_findings": [
+      {
+        "claim": "Trajectory-conditioned instruction-error detection does not by itself identify whether mismatch came from language, perception or the executed path.",
+        "evidence_type": "DEDUCTION",
+        "source": "https://intelligolabs.github.io/R2RIE-CE/",
+        "locator": "Main task definition §III; benchmark §IV; detection/localization experiment"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "iedl-cause",
+        "description": "A trajectory-language mismatch does not identify which input or action is wrong.",
+        "conditions": "The navigator takes a wrong turn while the instruction is correct, or several substitutions leave the route semantically valid.",
+        "cause": "The detector conditions on one completed policy trajectory rather than an independent ground-truth environmental explanation.",
+        "evidence": "DEDUCTION from architecture; PAPER EXPERIMENT: weak directional AUC in Table II.",
+        "kind": "methodological",
+        "followups": [
+          "NavNuances",
+          "ULN"
+        ],
+        "status": "Still unresolved in the reviewed literature",
+        "confidence": "High within the specified evidence scope"
+      },
+      {
+        "id": "iedl-online",
+        "description": "Detection does not provide an online repair policy.",
+        "conditions": "A mistaken instruction must be diagnosed before a long failed rollout.",
+        "cause": "The model aggregates the completed trajectory and predicts labels, with no tested action-selection or instruction-editing loop.",
+        "evidence": "METHOD: architecture and evaluation protocol.",
+        "kind": "methodological",
+        "followups": [
+          "VLN-Trans"
+        ],
+        "status": "Uncertain because evidence is insufficient",
+        "confidence": "High within the specified evidence scope"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "No separate supplement was located through exact-title search and the pinned official tree; no PDF appendix was present there. Synthetic corruption is an operational label, not proof that every modified instruction is semantically false. No benchmark executed."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "walkreadless",
+    "short_name": "NAP",
+    "full_title": "Walk and Read Less: Improving the Efficiency of Vision-and-Language Navigation via Tuning-Free Multimodal Token Pruning",
+    "authors": [
+      "Wenda Qin",
+      "Andrea Burns",
+      "Bryan A. Plummer",
+      "Margrit Betke"
+    ],
+    "year": 2025,
+    "venue_or_status": "EMNLP 2025, pp. 23556–23570",
+    "bibliography_sources": [
+      {
+        "url": "https://aclanthology.org/2025.emnlp-main.1202.pdf",
+        "locator": "Supplied main paper"
+      },
+      {
+        "url": "https://github.com/wdqin/VLN-NAP",
+        "locator": "Official EMNLP implementation"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "1",
+      "3–9",
+      "13–15"
+    ],
+    "associated_files_reviewed": [
+      "Embedded appendices A–F, pp. 13–15"
+    ],
+    "repo_url": "https://github.com/wdqin/VLN-NAP",
+    "repo_commit": "e6eededcda9d4e1fb504da892176746af8c6ce89",
+    "code_files_inspected": [
+      "README.md",
+      "map_nav_src/r2r/agent.py:134–205,476–571",
+      "map_nav_src/models/pruning/vpp.py:1–99",
+      "map_nav_src/models/pruning/bgp.py:107–206",
+      "map_nav_src/r2r/main_nav.py:190–240"
+    ],
+    "code_executed": false,
+    "repository_status": "Official source inspected statically at the pinned commit; no project code or benchmark executed.",
+    "dossier_path": "dossiers/walkreadless.md",
+    "key_findings": [
+      {
+        "claim": "Training-free token pruning still depends on an already trained navigation policy and can remove context required later.",
+        "evidence_type": "DEDUCTION",
+        "source": "https://github.com/wdqin/VLN-NAP",
+        "locator": "Main pruning definitions; inspected BGP/BTP/VPP source and release README"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "nap-semantics",
+        "description": "Context-independent word pruning can remove quantities or relational words that distinguish routes.",
+        "conditions": "Ordinal, count, or context-sensitive instructions under tight token budgets.",
+        "cause": "A vocabulary-level relevance label ignores sentence composition; attention importance is not semantic necessity.",
+        "evidence": "AUTHOR EXAMPLE: Appendix F Table 13 labels one and flight irrelevant; DEDUCTION for route effects.",
+        "kind": "methodological",
+        "followups": [
+          "NavNuances",
+          "GELA"
+        ],
+        "status": "Uncertain because evidence is insufficient",
+        "confidence": "High within the stated experimental scope"
+      },
+      {
+        "id": "nap-recovery",
+        "description": "Deleting graph frontier options trades recovery access for compute and sometimes still increases motion.",
+        "conditions": "The needed corrective route is a low-attention frontier or pruned observations cause uncertainty.",
+        "cause": "BTP changes the action set, not only an internal representation.",
+        "evidence": "PAPER EXPERIMENT: Tables 3 and 7.",
+        "kind": "methodological",
+        "followups": [
+          "Meta-Explore",
+          "ULN"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High within the stated experimental scope"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "Pruning source reviewed, but the release itself labels hyperparameters/code as uncleaned and does not establish final paper configuration equivalence. No benchmark executed."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "navnuances",
+    "short_name": "NavNuances",
+    "full_title": "Navigating the Nuances: A Fine-grained Evaluation of Vision-Language Navigation",
+    "authors": [
+      "Zehao Wang",
+      "Minye Wu",
+      "Yixin Cao",
+      "Yubo Ma",
+      "Meiqi Chen",
+      "Tinne Tuytelaars"
+    ],
+    "year": 2024,
+    "venue_or_status": "Findings of EMNLP 2024",
+    "bibliography_sources": [
+      {
+        "url": "https://aclanthology.org/2024.findings-emnlp.269/",
+        "locator": "Supplied main paper"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/zehao-wang/navnuances",
+    "repo_commit": "57c0a58e89e198178a52f2bad067d8328c5aef9f",
+    "code_files_inspected": [
+      "Assignment 05: all six evaluators, eval.py and math_utils.py; see evidence/05/navnuances_code_audit.md"
+    ],
+    "code_executed": false,
+    "repository_status": "Official metric implementation independently inspected by assignment 05; no project execution.",
+    "dossier_path": "dossiers/navnuances.md",
+    "key_findings": [
+      {
+        "claim": "NavNuances already uses paired directional commands and Dual SR to diagnose selective bias.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "NavNuances supplied PDF",
+        "locator": "§4.4/Fig6, PDF pp8–9"
+      },
+      {
+        "claim": "Its numerical criterion compares the executed path against competing same-start ordinal routes using nDTW.",
+        "evidence_type": "AUTHOR CLAIM",
+        "source": "NavNuances supplied PDF",
+        "locator": "AppendixB.3, PDF p13"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "navnuances-B1",
+        "description": "Atomic diagnostics do not cover error recovery in long composed instructions.",
+        "conditions": "An agent deviates mid-route, revisits landmarks, or must revise instruction progress after a detour.",
+        "cause": "The benchmark intentionally isolates short atomic concepts in fixed scenes.",
+        "evidence": "Limitations, PDF p9; only78 ordinal examples in Table 1/AppendixD.",
+        "kind": "insufficiently tested",
+        "followups": "SkillNav explicitly trains skill specialists and evaluates this benchmark; VLN-MME probes broader reasoning, but neither automatically validates off-path composed semantics.",
+        "status": "Still unresolved in the reviewed literature",
+        "confidence": "High for benchmark scope; bounded to reviewed sources."
+      },
+      {
+        "id": "navnuances-B2",
+        "description": "Metric success can be weaker than full semantic task completion.",
+        "conditions": "Moving-towards and walking-past subsets evaluated from endpoint geometry.",
+        "cause": "Moving-towards needs only distance reduction; walking-past uses a start–end line rather than every segment of an arbitrary looping path.",
+        "evidence": "AppendixB.2, PDF pp12–13. This is a deduction from metric definitions, not an observed score inflation measurement.",
+        "kind": "methodological",
+        "followups": "Route-fidelity and predicate-state evaluation can complement these diagnostics; revised metrics need validation.",
+        "status": "Uncertain because evidence is insufficient",
+        "confidence": "High for metric definitions; unknown empirical effect."
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "No benchmark executed or source images independently relabeled. GPT-4 uses a smaller subset than many supervised methods; full-ID completeness should be controlled in new evaluations."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "omniagent",
+    "short_name": "OmniAgent",
+    "full_title": "Native Active Perception as Reasoning for Omni-Modal Understanding",
+    "authors": [
+      "Zhenghao Xing",
+      "Ruiyang Xu",
+      "Yuxuan Wang",
+      "Jinzheng He",
+      "Ziyang Ma",
+      "Qize Yang",
+      "Yunfei Chu",
+      "Jin Xu",
+      "Junyang Lin",
+      "Chi-Wing Fu",
+      "Pheng-Ann Heng"
+    ],
+    "year": 2026,
+    "venue_or_status": "ICML 2026; PMLR 306:140133–140152",
+    "bibliography_sources": [
+      {
+        "url": "https://arxiv.org/abs/2606.19341",
+        "locator": "Author manuscript v2, 17 July 2026"
+      },
+      {
+        "url": "https://github.com/harryhsing/OmniAgent",
+        "locator": "Official implementation"
+      },
+      {
+        "url": "https://proceedings.mlr.press/v306/xing26g.html",
+        "locator": "Official ICML proceedings; title, authors, year and pages verified"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "1",
+      "3–9",
+      "13–20"
+    ],
+    "associated_files_reviewed": [
+      "Embedded appendices A–D, pp. 13–20"
+    ],
+    "repo_url": "https://github.com/harryhsing/OmniAgent",
+    "repo_commit": "0ce93ec0b9f6de9cc22057327d90b0b33914849f",
+    "code_files_inspected": [
+      "verl/trainer/ppo/core_algos.py:950–989",
+      "verl/trainer/ppo/ray_trainer.py:1380–1418",
+      "agent_system/environments/env_package/video_env.py: inspected action/reward entry-point definitions"
+    ],
+    "code_executed": false,
+    "repository_status": "Official source inspected statically; no project execution or benchmark reproduction.",
+    "dossier_path": "dossiers/omniagent.md",
+    "key_findings": [
+      {
+        "claim": "Entropy-normalized advantages are implemented, but mean-one weights do not preserve the original gradient or establish causal credit assignment.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/harryhsing/OmniAgent/tree/0ce93ec0b9f6de9cc22057327d90b0b33914849f",
+        "locator": "verl/trainer/ppo/core_algos.py:950–989; ray_trainer.py:1392–1409"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "omni-memory",
+        "description": "Purging raw media makes later reasoning dependent on the faithfulness and completeness of textual observations.",
+        "conditions": "An important detail was omitted or misdescribed, or a later question changes which information matters.",
+        "cause": "Only selected textual summaries survive; recovering evidence requires another archive query.",
+        "evidence": "METHOD: Appendix B.4 and prompt warning; DEDUCTION for irrecoverable physical observations.",
+        "kind": "methodological",
+        "followups": [
+          "VSI-Bench",
+          "Explore until Confident"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High within the stated experimental scope"
+      },
+      {
+        "id": "omni-credit",
+        "description": "Entropy weighting is a useful heuristic but is not established causal credit assignment.",
+        "conditions": "High-entropy filler or confidently wrong pivotal decisions.",
+        "cause": "Outcome-level advantages are redistributed by entropy rather than an intervention on action value.",
+        "evidence": "PAPER EXPERIMENT: Table 4; limited correlation audit Appendix C.",
+        "kind": "methodological",
+        "followups": [
+          "UoT"
+        ],
+        "status": "Uncertain because evidence is insufficient",
+        "confidence": "High within the stated experimental scope"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "Official ICML publication verified; source inspection is restricted to documented paths. Historical model/configuration equivalence and causal benefit of entropy weighting remain untested. No model execution."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "same",
+    "short_name": "SAME",
+    "full_title": "SAME: Learning Generic Language-Guided Visual Navigation with State-Adaptive Mixture of Experts",
+    "authors": [
+      "Gengze Zhou",
+      "Yicong Hong",
+      "Zun Wang",
+      "Chongyang Zhao",
+      "Mohit Bansal",
+      "Qi Wu"
+    ],
+    "year": 2025,
+    "venue_or_status": "ICCV 2025",
+    "bibliography_sources": [
+      {
+        "url": "https://github.com/GengzeZhou/SAME",
+        "locator": "Official implementation and ICCV metadata"
+      },
+      {
+        "url": "https://openaccess.thecvf.com/content/ICCV2025/supplemental/Zhou_SAME_Learning_Generic_ICCV_2025_supplemental.pdf",
+        "locator": "Official supplementary or complete author version; reviewed scope listed in associated material"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "3–8"
+    ],
+    "associated_files_reviewed": [
+      {
+        "file": "evidence/04/supplements/same_supp.txt",
+        "pages_read": "1–3",
+        "scope": "Full-text supplementary methods, protocols and result discussion; qualitative figures reviewed through captions/text unless separately stated. No independent image relabeling or video review."
+      }
+    ],
+    "repo_url": "https://github.com/GengzeZhou/SAME",
+    "repo_commit": "b74c57bbb189a0ed8c908e90b53d02dfbe417528",
+    "code_files_inspected": [
+      "src/models/vilmodel.py:474–558,911–988",
+      "src/configs/default.yaml:1–140",
+      "src/configs/main_multi_q.yaml",
+      "src/trainers/base_trainer.py:208–280"
+    ],
+    "code_executed": false,
+    "repository_status": "Official source inspected statically at the pinned commit; no project code or benchmark executed.",
+    "dossier_path": "dossiers/same.md",
+    "key_findings": [
+      {
+        "claim": "Pinned task routing normalizes expert logits over the batch axis; at batch one this removes state-dependent routing preferences before top-k selection.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/GengzeZhou/SAME/tree/b74c57bbb189a0ed8c908e90b53d02dfbe417528",
+        "locator": "Pinned vilmodel.py TaskMoeRouting:954–988, especially line 982; full path in dossier"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "same-conflict",
+        "description": "Task mixing and expert routing still trade off path efficiency and continuous-environment transfer.",
+        "conditions": "Joint fine-grained and goal-only training, or graph-to-continuous transfer.",
+        "cause": "Different tasks reward distinct behavior; sparse routing does not remove waypoint/control discrepancies or all gradient conflict.",
+        "evidence": "PAPER EXPERIMENT: Tables 4, 5 and 7.",
+        "kind": "methodological",
+        "followups": [
+          "M3E",
+          "VLN-MME",
+          "Rethinking the Embodied Gap"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High within the evaluated setting"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "Source has a batch-axis softmax discrepancy. Its impact on published checkpoints/results was not measured. Reported checkpoint variation is not independent-seed uncertainty."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "slow4fast",
+    "short_name": "slow4fast-VLN",
+    "full_title": "Towards Open Environments and Instructions: General Vision-Language Navigation via Fast-Slow Interactive Reasoning",
+    "authors": [
+      "Yang Li",
+      "Aming Wu",
+      "Zihao Zhang",
+      "Yahong Han"
+    ],
+    "year": 2026,
+    "venue_or_status": "CVPR 2026",
+    "bibliography_sources": [
+      {
+        "url": "https://arxiv.org/abs/2601.09111",
+        "locator": "Author manuscript and title"
+      },
+      {
+        "url": "https://openaccess.thecvf.com/content/CVPR2026/html/Li_Towards_Open_Environments_and_Instructions_General_Vision-Language_Navigation_via_Fast-Slow_CVPR_2026_paper.html",
+        "locator": "Official CVPR 2026 page; main paper and arXiv links, no supplementary link listed at inspection"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "3–8"
+    ],
+    "associated_files_reviewed": [
+      {
+        "file": "evidence/04/slow4fast_page7.png",
+        "pages_read": "7",
+        "scope": "Rendered original page inspected: Table 5 really prints SPL 64.0 above SR 63.1 for residential K=200."
+      }
+    ],
+    "repo_url": "https://github.com/yl6017339/Slow4Fast-VLN",
+    "repo_commit": "75e73db12ff4d37013bb4769b0e081bfc9796bd4",
+    "code_files_inspected": [
+      "README.md",
+      "r2r/main_nav.py:1–50",
+      "r2r/agent.py:16–36",
+      "r2r/reflection_memory_bank.py:236–280,415–456",
+      "r2r/experience_enhanced_vlnbert.py:23–95,121–127"
+    ],
+    "code_executed": false,
+    "repository_status": "Official release inspected; central reflection and text-embedding paths contain explicit placeholders, and documented agent does not integrate them.",
+    "dossier_path": "dossiers/slow4fast.md",
+    "key_findings": [
+      {
+        "claim": "The documented runtime does not integrate the paper reflection path; separate modules contain mock LLM and placeholder embeddings.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/yl6017339/Slow4Fast-VLN/tree/75e73db12ff4d37013bb4769b0e081bfc9796bd4",
+        "locator": "r2r/agent.py:24–32; reflection_memory_bank.py:236–252,441–454; experience_enhanced_vlnbert.py:121–127"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "slow4fast-feedback",
+        "description": "Experience quality and evaluation feedback access are insufficiently specified for an autonomous generalization claim.",
+        "conditions": "Reflection on failed routes or noisy captions in unseen scenes, especially when success/nDTW are unavailable to a deployed agent.",
+        "cause": "LLM summaries may encode unsupported spatial rules; logged metric provenance and retrieval/confidence calibration need implementation verification.",
+        "evidence": "METHOD: Figure 2 and §§2.3–2.6; uncertainty is an audit limitation rather than proven leakage.",
+        "kind": "insufficiently tested",
+        "followups": [
+          "GSA-VLN",
+          "ATENA",
+          "FeedTTA"
+        ],
+        "status": "Uncertain because evidence is insufficient",
+        "confidence": "Medium"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "Official CVPR page and author arXiv links expose no separate supplement at inspection; the conventional supplemental PDF URL returns 404. Central released modules contain placeholders and are not integrated in the documented runtime, leaving feedback provenance and paper-equivalent configuration unverified."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "uln",
+    "short_name": "ULN",
+    "full_title": "ULN: Towards Underspecified Vision-and-Language Navigation",
+    "authors": [
+      "Weixi Feng",
+      "Tsu-Jui Fu",
+      "Yujie Lu",
+      "William Yang Wang"
+    ],
+    "year": 2022,
+    "venue_or_status": "EMNLP 2022",
+    "bibliography_sources": [
+      {
+        "url": "https://aclanthology.org/2022.emnlp-main.429/",
+        "locator": "Official proceedings"
+      },
+      {
+        "url": "https://github.com/weixi-feng/ULN",
+        "locator": "Author-linked implementation"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "3–9",
+      "13–19"
+    ],
+    "associated_files_reviewed": [
+      "Appendices A–B embedded in main PDF, pp. 13–19"
+    ],
+    "repo_url": "https://github.com/weixi-feng/ULN",
+    "repo_commit": "0f251df3ffc6dd9c538d075db8674e6ad54a596b",
+    "code_files_inspected": [
+      "Assignment 05: evidence/05/uln_code_audit.md; ULN-Rec-VLN-BERT model.py:865–882; agent.py:270–294,620–627,683,754–755,857–892,1065–1074; train.py:267–287; README and launcher"
+    ],
+    "code_executed": false,
+    "repository_status": "Official recurrent VLN-BERT source independently inspected by assignment 05; HAMT release incomplete.",
+    "dossier_path": "dossiers/uln.md",
+    "key_findings": [
+      {
+        "claim": "One-step lookahead is paid physical exploration, and improved SR does not imply improved SPL.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "Supplied PDF",
+        "locator": "Tables 4 and 7, pp. 7–8"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "uln-exploration-cost",
+        "description": "Uncertainty-triggered exploration increases success while sharply reducing path efficiency.",
+        "conditions": "Underspecified instructions, repeated uncertainty triggers, and physical lookahead/backtracking.",
+        "cause": "The trigger predicts disagreement with a teacher action rather than calibrated value of information; future-logit scores are heuristic and exploration is not free.",
+        "evidence": "PAPER EXPERIMENT: Tables 4 and 7, Appendix Table 13; AUTHOR ACKNOWLEDGEMENT: §5.2.3 uncertainty is least accurate near the early corrections where intervention matters.",
+        "kind": "methodological",
+        "followups": [
+          "Meta-Explore",
+          "Explore until Confident",
+          "KnowNo",
+          "AIUTA"
+        ],
+        "status": "Shifted into another cost or limitation",
+        "confidence": "High for the measured SR–SPL tradeoff; no universal impossibility claim"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "The recurrent model source was inspected independently by assignment 05; HAMT release remains incomplete. Parallel branch simulations and spliced reported paths require replay to establish comparable physical cost. No such replay executed."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "uot",
+    "short_name": "UoT",
+    "full_title": "Uncertainty of Thoughts: Uncertainty-Aware Planning Enhances Information Seeking in LLMs",
+    "authors": [
+      "Zhiyuan Hu",
+      "Chumin Liu",
+      "Xidong Feng",
+      "Yilun Zhao",
+      "See-Kiong Ng",
+      "Anh Tuan Luu",
+      "Junxian He",
+      "Pang Wei Koh",
+      "Bryan Hooi"
+    ],
+    "year": 2024,
+    "venue_or_status": "NeurIPS 2024",
+    "bibliography_sources": [
+      {
+        "url": "https://github.com/zhiyuanhubj/UoT",
+        "locator": "Official implementation"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "1",
+      "3–10",
+      "14–29"
+    ],
+    "associated_files_reviewed": [
+      "Embedded appendices A–I partly reviewed and selected prompts, precise pages listed above"
+    ],
+    "repo_url": "https://github.com/zhiyuanhubj/UoT",
+    "repo_commit": "e08f17ff4ceec0f734da66e04d7d35df04ae6460",
+    "code_files_inspected": [
+      "README.md",
+      "src/uot/uot.py:85–155"
+    ],
+    "code_executed": false,
+    "repository_status": "Official source inspected statically; no project execution or benchmark reproduction.",
+    "dossier_path": "dossiers/uot.md",
+    "key_findings": [
+      {
+        "claim": "Released expected reward applies branch probability in nested routines; it is not automatically the single-weight expectation written in the method.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/zhiyuanhubj/UoT/tree/e08f17ff4ceec0f734da66e04d7d35df04ae6460",
+        "locator": "src/uot/uot.py:115–147; paper reward equations"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "uot-elimination",
+        "description": "Hard hypothesis deletion is unreliable when answers are noisy, ambiguous, or compatible with several hypotheses.",
+        "conditions": "A symptom is absent despite a disease, or LLM simulated partitions are wrong.",
+        "cause": "Yes/no sets are assumed disjoint and exhaustive; uncertain likelihoods are replaced by elimination.",
+        "evidence": "AUTHOR ACKNOWLEDGEMENT: §5; PAPER EXPERIMENT: Appendix F imperfect feedback.",
+        "kind": "methodological",
+        "followups": [
+          "KnowNo",
+          "AIUTA"
+        ],
+        "status": "Still unresolved in the reviewed literature",
+        "confidence": "High within the stated experimental scope"
+      },
+      {
+        "id": "uot-search",
+        "description": "Tree lookahead spends many model calls and optimizes a heuristic average continuation.",
+        "conditions": "Larger candidate spaces, richer answer types, deeper planning.",
+        "cause": "Branching grows with questions and answers, and the backed-up reward averages future choices.",
+        "evidence": "METHOD: §2.5; PAPER EXPERIMENT: Table 2 and Appendix E.",
+        "kind": "methodological",
+        "followups": [
+          "OmniAgent"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High within the stated experimental scope"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "Task prompts and source reward logic reviewed. The simulator answerer knows the hidden target and is prompted to answer truthfully; no clinical validity or navigation performance is established. No project execution."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "vlnmme",
+    "short_name": "VLN-MME",
+    "full_title": "VLN-MME: Diagnosing MLLMs as Navigation Agents",
+    "authors": [
+      "Xunyi Zhao",
+      "Gengze Zhou",
+      "Qi Wu"
+    ],
+    "year": 2026,
+    "venue_or_status": "ACL 2026, pp. 28207–28231",
+    "bibliography_sources": [
+      {
+        "url": "https://aclanthology.org/2026.acl-long.1300.pdf",
+        "locator": "Supplied main paper"
+      },
+      {
+        "url": "https://aclanthology.org/2026.acl-long.1300/",
+        "locator": "Official proceedings"
+      },
+      {
+        "url": "https://github.com/billzhao1030/VLN-MME",
+        "locator": "Official implementation"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "3–9",
+      "12–25"
+    ],
+    "associated_files_reviewed": [
+      "Embedded appendices A–F, pp. 12–25"
+    ],
+    "repo_url": "https://github.com/billzhao1030/VLN-MME",
+    "repo_commit": "7d37bd6d1763c28a382201c1634cf93e7cff4a2b",
+    "code_files_inspected": [
+      "src/agents/baseline_agent.py:1–145",
+      "src/utils/eval.py:5–40",
+      "Pinned agent strategy tree"
+    ],
+    "code_executed": false,
+    "repository_status": "Official source inspected statically; no project execution or benchmark reproduction.",
+    "dossier_path": "dossiers/vlnmme.md",
+    "key_findings": [
+      {
+        "claim": "Snapshot-level action and perception diagnostics separate abilities but do not measure full closed-loop embodied success.",
+        "evidence_type": "DEDUCTION",
+        "source": "https://aclanthology.org/2026.acl-long.1300/",
+        "locator": "Main benchmark definition and embedded diagnostic appendix"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "vlnmme-history",
+        "description": "Provided textual history and topology do not reliably prevent repeated wrong actions.",
+        "conditions": "Qwen map-memory agents on the inspected 200-episode subset and tested zero-shot prompt designs.",
+        "cause": "Models may fail to use history, interpret regions/verticality, or map recognition to actions; the evidence does not isolate these causes.",
+        "evidence": "PAPER EXPERIMENT: Appendix E, Figures 13–14.",
+        "kind": "methodological",
+        "followups": [
+          "M-Track",
+          "Meta-Explore",
+          "NavNuances"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High within the stated experimental scope"
+      },
+      {
+        "id": "vlnmme-proxy",
+        "description": "A small benchmark subset is not uniformly a close numerical proxy for every policy.",
+        "conditions": "Comparing methods whose errors concentrate on selected scene/path categories.",
+        "cause": "Stratification on observed attributes does not control all policy-specific failure distributions.",
+        "evidence": "PAPER EXPERIMENT: Appendix Table 6 REVERIE NaviLLM difference.",
+        "kind": "insufficiently tested",
+        "followups": [
+          "NavNuances"
+        ],
+        "status": "Uncertain because evidence is insufficient",
+        "confidence": "High within the stated experimental scope"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "Embedded appendix and diagnostic source reviewed; Figures 15–19 assessed through captions, without independent trajectory relabeling. No benchmark executed."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "embodiedgap",
+    "short_name": "VLN-PE",
+    "full_title": "Rethinking the Embodied Gap in Vision-and-Language Navigation: A Holistic Study of Physical and Visual Disparities",
+    "authors": [
+      "Liuyi Wang",
+      "Xinyuan Xia",
+      "Hui Zhao",
+      "Hanqing Wang",
+      "Tai Wang",
+      "Yilun Chen",
+      "Chengju Liu",
+      "Qijun Chen",
+      "Jiangmiao Pang"
+    ],
+    "year": 2025,
+    "venue_or_status": "ICCV 2025",
+    "bibliography_sources": [
+      {
+        "url": "https://www.openaccess.thecvf.com/content/ICCV2025/papers/Wang_Rethinking_the_Embodied_Gap_in_Vision-and-Language_Navigation_A_Holistic_Study_ICCV_2025_paper.pdf",
+        "locator": "Supplied main paper"
+      },
+      {
+        "url": "https://crystalsixone.github.io/vln_pe.github.io/",
+        "locator": "Official project"
+      },
+      {
+        "url": "https://arxiv.org/abs/2507.13019",
+        "locator": "Author manuscript"
+      },
+      {
+        "url": "https://openaccess.thecvf.com/content/ICCV2025/supplemental/Wang_Rethinking_the_Embodied_ICCV_2025_supplemental.pdf",
+        "locator": "Official supplementary or complete author version; reviewed scope listed in associated material"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "3–8"
+    ],
+    "associated_files_reviewed": [
+      {
+        "file": "evidence/04/supplements/embodiedgap_supp.txt",
+        "pages_read": "1–7",
+        "scope": "Full-text supplementary methods, protocols and result discussion; qualitative figures reviewed through captions/text unless separately stated. No independent image relabeling or video review."
+      }
+    ],
+    "repo_url": "https://github.com/InternRobotics/InternNav",
+    "repo_commit": "7a5c62400ac45b313d9b709c740b64191556a242",
+    "code_files_inspected": [
+      "internnav/trainer/rdp_trainer.py:109–145",
+      "internnav/agent/rdp_agent.py:300–352",
+      "README.md and author project link"
+    ],
+    "code_executed": false,
+    "repository_status": "Official source inspected statically; no project execution or benchmark reproduction.",
+    "dossier_path": "dossiers/embodiedgap.md",
+    "key_findings": [
+      {
+        "claim": "Physical embodiment, controller and appearance choices materially affect transfer; the small real-robot CMA test is not an RDP robot evaluation.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "https://crystalsixone.github.io/vln_pe.github.io/",
+        "locator": "Main evaluation; supplementary A–D, especially p. 4"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "vlnpe-physical",
+        "description": "Navigation success does not transfer across controller and sensor conditions without substantial degradation.",
+        "conditions": "Legged locomotion, changed camera height, dim lighting, or Gaussian-splat rendering.",
+        "cause": "Training observations and action consequences differ; depth availability and control stability vary by baseline.",
+        "evidence": "PAPER EXPERIMENT: Tables 4–6.",
+        "kind": "methodological",
+        "followups": [
+          "NaVILA",
+          "HumanoidVLN"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High within the stated experimental scope"
+      },
+      {
+        "id": "vlnpe-stairs",
+        "description": "Stair traversal remains outside the evaluated platform split.",
+        "conditions": "Multi-floor routes requiring reliable legged stair control.",
+        "cause": "Controller failure led to filtering stair episodes.",
+        "evidence": "AUTHOR ACKNOWLEDGEMENT: §3 datasets.",
+        "kind": "implementation-specific",
+        "followups": [
+          "HumanoidVLN"
+        ],
+        "status": "Still unresolved in the reviewed literature",
+        "confidence": "High within the stated experimental scope"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "Supplement and current author-linked InternNav source reviewed; the maintained commit is not verified as the historical paper code. Simulator/controller installation and robot trials were not executed."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "vln_trans",
+    "short_name": "VLN-Trans",
+    "full_title": "VLN-Trans: Translator for the Vision and Language Navigation Agent",
+    "authors": [
+      "Yue Zhang",
+      "Parisa Kordjamshidi"
+    ],
+    "year": 2023,
+    "venue_or_status": "ACL 2023, main long papers",
+    "bibliography_sources": [
+      {
+        "url": "https://aclanthology.org/2023.acl-long.737/",
+        "locator": "Supplied main paper"
+      }
+    ],
+    "main_pdf_pages_read": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "associated_files_reviewed": [],
+    "repo_url": "https://github.com/HLR/VLN-trans",
+    "repo_commit": "78f512710ef67bf67cd31a46ef2862716fc51c09",
+    "code_files_inspected": [
+      "VLN-trans/r2r_src_navigator/agent.py:310–390,700–746",
+      "VLN-trans/r2r_src_navigator/model.py:207–310",
+      "VLN-trans/r2r_src_translator/speaker.py:240–315",
+      "VLN-trans/run_translator/train_nav.bash:1–23",
+      "VLN-trans/r2r_src_navigator/eval.py:97–114",
+      "README.md"
+    ],
+    "code_executed": false,
+    "repository_status": "Official source inspected statically at the pinned commit; no project code or benchmark executed.",
+    "dossier_path": "dossiers/vln_trans.md",
+    "key_findings": [
+      {
+        "claim": "The online translator contributes latent sub-instruction representations rather than an actual rewritten instruction.",
+        "evidence_type": "AUTHOR CLAIM",
+        "source": "VLN-Trans supplied PDF",
+        "locator": "§3.4 and §6, PDF pp6,9"
+      },
+      {
+        "claim": "Extra navigation pretraining data already improve the baseline, and Table4 provides a data-matched ++ control.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "VLN-Trans supplied PDF",
+        "locator": "Tables1 and4, PDF pp7–8"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "vln_trans-B1",
+        "description": "A recognizable substitute landmark can be the wrong referent.",
+        "conditions": "Several plausible objects share a semantic association with the named room or object.",
+        "cause": "Offline co-occurrence and detector-defined uniqueness replace verified instruction-to-instance equivalence.",
+        "evidence": "Author failure cases in Figures 4(c) and 7(d,e), PDF pp9,13; §6 latent interpretability limitation.",
+        "kind": "methodological",
+        "followups": "GELA adds explicit entity grounding; SkillNav uses textual rewrites for routing. Neither comparison here establishes faithful online referent substitution.",
+        "status": "Partially addressed",
+        "confidence": "High for the documented failure mechanism; prevalence not measured."
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "No benchmark executed. The inspected translator produces latent representations, not a literal textual paraphrase. Data and checkpoint retrieval were not tested."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  },
+  {
+    "paper_id": "vsi_bench",
+    "short_name": "VSI-Bench",
+    "full_title": "Thinking in Space: How Multimodal Large Language Models See, Remember, and Recall Spaces",
+    "authors": [
+      "Jihan Yang",
+      "Shusheng Yang",
+      "Anjali W. Gupta",
+      "Rilyn Han",
+      "Li Fei-Fei",
+      "Saining Xie"
+    ],
+    "year": 2025,
+    "venue_or_status": "CVPR 2025",
+    "bibliography_sources": [
+      {
+        "url": "https://openaccess.thecvf.com/content/CVPR2025/html/Yang_Thinking_in_Space_How_Multimodal_Large_Language_Models_See_Remember_CVPR_2025_paper.html",
+        "locator": "Supplied main paper"
+      },
+      {
+        "url": "https://openaccess.thecvf.com/content/CVPR2025/supplemental/Yang_Thinking_in_Space_CVPR_2025_supplemental.pdf",
+        "locator": "Official supplementary or complete author version; reviewed scope listed in associated material"
+      }
+    ],
+    "main_pdf_pages_read": [
+      "1–8"
+    ],
+    "associated_files_reviewed": [
+      {
+        "file": "evidence/04/supplements/vsi_supp.txt",
+        "pages_read": "1–16",
+        "scope": "Full-text supplementary methods, protocols and result discussion; qualitative figures reviewed through captions/text unless separately stated. No independent image relabeling or video review."
+      }
+    ],
+    "repo_url": "https://github.com/vision-x-nyu/thinking-in-space",
+    "repo_commit": "51e089c3ae69b9435e9489058610f5b3964c56a8",
+    "code_files_inspected": [
+      "README.md",
+      "lmms_eval/tasks/vsibench/utils.py:48–180"
+    ],
+    "code_executed": false,
+    "repository_status": "Official source inspected statically; no project execution or benchmark reproduction.",
+    "dossier_path": "dossiers/vsi_bench.md",
+    "key_findings": [
+      {
+        "claim": "Video QA exposes geometry and perspective errors, but post-answer explanations are diagnostic interpretations rather than causal accounts of computation.",
+        "evidence_type": "DEDUCTION",
+        "source": "https://openaccess.thecvf.com/content/CVPR2025/html/Yang_Thinking_in_Space_How_Multimodal_Large_Language_Models_See_Remember_CVPR_2025_paper.html",
+        "locator": "Supplement B.1–B.4 and C, pp. 1–5"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "id": "vsi-spatial",
+        "description": "Generated spatial representations are inaccurate enough to limit the benefit of explicit map reasoning.",
+        "conditions": "Distant object pairs, high-resolution maps, and geometric questions beyond local adjacency.",
+        "cause": "Perception, temporal memory, and spatial reconstruction errors enter the map before reasoning.",
+        "evidence": "PAPER EXPERIMENT: Table 3 and local-versus-distant map analysis.",
+        "kind": "methodological",
+        "followups": [
+          "OmniAgent"
+        ],
+        "status": "Partially addressed",
+        "confidence": "High within the specified evidence scope"
+      },
+      {
+        "id": "vsi-transfer",
+        "description": "Offline spatial QA accuracy does not establish closed-loop navigation reliability.",
+        "conditions": "A policy must select views, execute movements, and recover from observation or action errors.",
+        "cause": "The benchmark supplies a fixed video and evaluates an answer rather than interactive control.",
+        "evidence": "DEDUCTION from benchmark protocol.",
+        "kind": "insufficiently tested",
+        "followups": [
+          "EmbodiedQA",
+          "IQA",
+          "VLN-MME"
+        ],
+        "status": "Uncertain because evidence is insufficient",
+        "confidence": "High within the specified evidence scope"
+      }
+    ],
+    "followup_sources": [],
+    "access_limitations": [
+      "Official 16-page supplement and evaluator source reviewed; figures interpreted through captions/text, not independent visual relabeling. Subset selection, frame budgets and changing dataset version constrain comparisons. No navigation benchmark executed."
+    ],
+    "completion_status": "Complete within documented paper, supplement and implementation-access scope; no benchmark execution"
+  }
+]

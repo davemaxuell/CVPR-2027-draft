@@ -1,0 +1,53 @@
+=== PDF PAGE 1 ===
+RoomTour3D: Geometry-Aware Video-Instruction Tuning for Embodied Navigation Mingfei Han Mohamed Bin Zayed University of Artificial Intelligence
+
+=== PDF PAGE 2 ===
+Vision-and-Language Navigation • VLN tasks aim to enable an embodied agent to navigate through environments following natural language instructions VLN (CVPR’18) • Given an instruction, the agent navigates to a target location in novel environments (without pre-built maps). • VLN: The agent navigates on a graph, action space – selecting a node to teleport.
+
+=== PDF PAGE 3 ===
+Vision-and-Language Navigation • VLN tasks aim to enable an embodied agent to navigate through environments following natural language instructions VLN (CVPR’18) • VLN-CE: The agent navigates on a 3D mesh, action space – low-level control (Rotate, Forward 0.25m). VLN-CE (ECCV’20)
+
+=== PDF PAGE 4 ===
+Vision-and-Language Navigation • VLN tasks aim to enable an embodied agent to navigate through environments following natural language instructions Discrete panoramas (w.r.t. different orientations) Inputs: instructions, discrete panorama at each step, agent pose… Instruction Evaluation Metrics: • SR: success rate, stop position < 3m of the target location • SPL: SR penalized by path length
+
+=== PDF PAGE 5 ===
+Challenge Limited Diversity and Scale: • Most existing datasets (e.g., R2R, CVDN, REVERIE, SOON) rely heavily on manually curated data or limited-scope simulations. • These datasets lack variability in layouts, object variety, and realistic navigation complexity. Matterport3D consists of 90 fully annotated scenes.
+
+=== PDF PAGE 6 ===
+Why RoomTour3D? Real-World Videos? • Human behaviors – inherent decision-making and spatial understanding • Scalability and variety. … … Web videos 3D scenes with human walking trajectories
+
+=== PDF PAGE 7 ===
+Pipeline Overview Accepted to CVPR 2025 RoomTour3D – Our automatic annotation pipeline
+
+=== PDF PAGE 8 ===
+Data collection – YouTube Videos • Video Collection: Selecting high-quality, continuous real-world room tour videos. Length & Continuity: Videos longer than 3 minutes to ensure rich, detailed captures. Minimal Shot Transitions: Prioritize smooth, continuous videos without abrupt cuts or frequent transitions for better reconstruction. 1847 videos, totaling approximately 243 hours of diverse indoor footage.
+
+=== PDF PAGE 9 ===
+Description-Enriched Trajectories Depth Anything Grounding DINO + RAM picture frame, bed, lamp, basin, blanket, window… <0>: There is a bed, blanket, table to the right of the current spot in the near distance. There is a picture frame and curtain to the left of the current spot in closer distance. There is a chandelier and pillow in the middle in a closer distance. There is a window and lamp in the middle in a further distance. (a) Object variety and spatial awareness <0> Single frame spatial-aware description • We first get open-vocabulary object tags. • Then, objects are detected using Grounding-DINO and enhanced with spatial arrangement description. • Spatial context is enriched with depth estimations (Depth-Anything).
+
+=== PDF PAGE 10 ===
+Description-Enriched Trajectories Depth Anything Grounding DINO + RAM picture frame, bed, lamp, basin, blanket, window… <0>: There is a bed, blanket, table to the right of the current spot in the near distance. There is a picture frame and curtain to the left of the current spot in closer distance. There is a chandelier and pillow in the middle in a closer distance. There is a window and lamp in the middle in a further distance. (a) Object variety and spatial awareness Task Instruction: You will be given a set of continuous frames. The frames are captured during the camera movement. During movement, the objects in the frames change gradually, like objects passing by, objects moving towards somewhere. You should return a single and concrete sentence describing the camera moving trajectory by the object's progression in the frames. You don't need to mention all the objects. It is good to describe the moving trajectory without all of the objects. In-context Examples: Example 1: <0>: In the study. there is a plant…to the left of the current spot... <1>: In the study. there is a bookshelf to the left of the current spot… <2>: In the hallway. there is a door to the left of the current spot… Your moving trajectory description: Exit the study. Move from left to right, start near plant, laptop, and table, pass a bookshelf… Example 2: … Your turn: <0>: In the bedroom, there is a bed, blanket, table to the right of the current spot… … <5>: In the bedroom, here is a wall to the left of the current spot in near distance… Your moving trajectory description: (c) Controllable Instruction Generation <0> <5> <1> <4> <3> <2> BLIP-2 Bedroom, bedroom, bedroom, bathroom, bathroom, bedroom Q: Where am I? Options: bedroom, bathroom, foyer, hallway, … A: Bedroom. <0> Sequence: (b) Room locations
+
+=== PDF PAGE 11 ===
+D.E.T. Quality Validation • Instruction validity check Score ranks from 1 (totally irrelevant) to 4 (perfect match). The visual sequence of frames corresponds to the GPT-4 generated instruction, evaluated manually to ensure alignment, coherence, and correctness. Our annotation achieves an average relevance score of 3.08 out of 4.
+
+=== PDF PAGE 12 ===
+Action-Enriched Trajectories Cluster 1 Cluster 0 Cluster 2 2D projection of orientation vectors (significant view change points highlighted) <current> - <cand.0>: 36.6° <current> - <cand.1>: 149.8 ° Current view Candidate 1 Candidate 0 Track 0 Cluster 1 Track 0 <current> - <cand.0>: 15.23° <current> - <cand.1>: 53.62 ° Current view Candidate 0 Track 0 Track 0 Cluster 2 Candidate 1 Illustration of action-enriched trajectories generation in RoomTour3D. Significant viewpoint-change points are identified, clustered, and annotated with navigable candidate frames. Positive candidates, negative candidates.
+
+=== PDF PAGE 13 ===
+A.E.T. Quality Validation • Action reasonability check Action A Action B Action C We checked the spatial proximity and viewpoint diversity of 100 random selected action points – 87% satisfied our criteria
+
+=== PDF PAGE 14 ===
+Training Tasks Model training diagram with RoomTour3D. We design two tasks for our RoomTour3D to boost NaviLLM.
+
+=== PDF PAGE 15 ===
+Experiments
+
+=== PDF PAGE 16 ===
+Ablations Ablation study showing the impact of different input modalities (Object tags, Depth & Bounding Box, and Room type annotations) on navigation performance.
+
+=== PDF PAGE 17 ===
+Visualization
+
+=== PDF PAGE 18 ===
+Thank you Q & A https://roomtour3d.github.io/

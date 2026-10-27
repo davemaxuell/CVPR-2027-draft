@@ -1,0 +1,1273 @@
+=== PDF PAGE 1 ===
+            Schr¨odinger’s Navigator: Imagining an Ensemble of
+                Futures for Zero-Shot Object Navigation
+                      Yu He1,4,6, Da Huang2,4, Zhenyang Liu1,4,6, Zixiao Gu2,4,6, Qiang Sun3
+                              Guangnan Ye1,4,†, Yanwei Fu1,4,7,†,‡, Yu-Gang Jiang1
+
+                                    1Fudan University   2Shanghai Jiao Tong University
+                                  3Shanghai University of International Business and Economics
+                                          4Shanghai Innovation Institute   6ActiMind
+                                     7Shanghai Key Laboratory of Multimodal Embodied AI
+
+                                            †Corresponding authors   ‡Project leader
+
+                         Project Page: https://heyu322.github.io/Schrodinger-Navigator.github.io/
+2026
+Oct
+16
+[cs.RO]
+
+
+                   Figure 1: Real-world zero-shot object navigation often fails when the target (e.g., a cat) is hidden
+                   behind occlusions and surrounded by hazardous space. Conventional navigation systems perceive
+                   only the immediate occluder and are unable to infer what exists beyond it. Our Schr¨odinger’s Navi-
+                     gator addresses this challenge by modeling the unobserved regions as plausible futures.
+
+
+                           Abstract: Zero-shot object navigation (ZSON) requires robots to find target ob-
+                                 jects in unseen environments without task-specific fine-tuning or pre-built maps, a
+                         key capability for general-purpose service robots. Yet methods that perform well
+                               in simulation often degrade in cluttered real-world scenes with severe occlusion
+                         and latent hazards, where large unseen regions make single-scene inference brit-
+                                    tle and unsafe. We propose Schr¨odinger’s Navigator, a belief-aware framework
+                                that reasons at inference time over multiple trajectory-conditioned imagined 3DarXiv:2512.21201v5
+                                futures. Given candidate paths, a trajectory-conditioned 3D world model predicts
+                             hypothetical observations and maintains a superposition of plausible scene realiza-
+                               tions rather than committing to one map. An adaptive occluder-aware sampler di-
+                                rects imagination to uncertainty-critical regions, while a Future-Aware Value Map
+                      (FAVM) aggregates imagined futures for robust, proactive action selection. Ex-
+                           periments in simulation and on a physical Go2 quadruped show that Schr¨odinger’s
+                           Navigator outperforms strong ZSON baselines, improving hidden-target discov-
+                            ery and risk-aware waypoint selection in occlusion-heavy navigation scenarios.
+                         These results highlight imagined 3D futures as a promising foundation for a mod-
+                                  ular, scalable, and generalizable framework for zero-shot navigation in uncertain
+                             real-world environments.
+
+                       Keywords: Zero-Shot Object Navigation, Generative Scene Imagination
+
+
+                     10th Conference on Robot Learning (CoRL 2026), Austin TX, USA.
+=== PDF PAGE 2 ===
+1  Introduction
+
+
+Object navigation is a fundamental capability for mobile robots operating in human-centered envi-
+ronments [1, 2, 3]. Practical service robots must find requested objects in previously unseen scenes
+without pre-built maps [4, 5, 6] or costly scene-specific retraining [7, 8]. Zero-shot object navi-
+gation (ZSON) formalizes this setting by requiring a robot to locate a specified object in a novel
+environment without task-specific fine-tuning [9, 10].
+
+Despite strong results in simulation, current ZSON systems often degrade in cluttered real-world
+scenes with severe occlusions and latent hazards [11, 10, 12, 13]. We define a latent hazard as an
+initially unobserved, unannotated region that may cause collision, unsafe traversal, or task failure if
+traversed [14, 15, 16]. In these scenes, targets and risks may only become visible from revealing
+viewpoints, as illustrated by the occluded cat in Figure 1. Yet many existing methods act on a single
+inferred scene interpretation, making them prone to missing hidden targets or choosing unsafe paths
+through uncertain regions [17, 18].
+
+To address this limitation, we draw inspiration from Schr¨odinger’s thought experiment on uncer-
+tainty and propose Schr¨odinger’s Navigator, a principled navigation framework that treats unob-
+served space as a superposition of plausible future worlds and reasons over them before committing
+to an action, as illustrated in Figure 1. Rather than completing the scene once, the agent reasons at
+inference time over multiple trajectory-conditioned imagined 3D futures. This enables the robot to
+evaluate how the world may appear along different candidate paths and plan not only from what is
+observed, but also from what could be revealed behind occlusions.
+
+At the core of our framework is a trajectory-conditioned 3D world model [19], which differs from
+prior world-model navigation methods [20, 21, 22] in how imagined futures are generated and used.
+Given egocentric visual observations and sampled trajectories, the model predicts hypothetical 3D
+observations along each path, maintaining multiple plausible realizations of unobserved space. To
+make imagination efficient and decision-relevant, we introduce an adaptive, occluder-aware trajec-
+tory sampling strategy that uses local geometry and uncertainty to focus predictions on regions where
+occlusion is most likely to affect navigation, avoiding costly dense rollouts over the full scene. The
+imagined 3D predictions are spatially aligned and fused into a Future-Aware Value Map (FAVM).
+Unlike value maps built only from observed states or short-horizon predictions, FAVM aggregates
+evidence across candidate futures and assigns value to currently unobserved regions according to
+their expected utility. The policy can reduce uncertainty, expose likely target locations, and avoid
+hazardous regions without requiring dense global reconstruction or extra exploratory detours.
+
+We evaluate Schr¨odinger’s Navigator in Habitat and on a physical Go2 quadruped across ObjectNav
+and occlusion-heavy scenarios.  Results show that future-aware reasoning preserves competitive
+ObjectNav performance while improving behavior when targets or risks are initially hidden. By
+reasoning over imagined 3D futures at inference time, our method helps reveal hidden objects, avoid
+uncertain blind spots, and generalize to zero-shot navigation under real-world uncertainty.
+
+In summary, our contributions are as follows:
+
+        • We identify a fundamental limitation of existing zero-shot object navigation methods un-
+        der severe occlusion and latent hazards: their reliance on single-scene inference without
+          explicit reasoning over uncertainty in unobserved space.
+
+        • We propose Schr¨odinger’s Navigator, a belief-aware navigation framework that reasons
+        over multiple trajectory-conditioned imagined 3D futures. The framework combines a
+         trajectory-conditioned 3D world model, adaptive occluder-aware trajectory sampling, and
+        a Future-Aware Value Map (FAVM) for proactive uncertainty-aware planning.
+
+        • We demonstrate in both Habitat simulation and real-world Go2 deployment that explicit
+        reasoning over imagined 3D futures improves robustness in occlusion-heavy object search,
+          earlier hidden-target discovery, and risk-aware waypoint selection.
+
+
+
+                                       2
+=== PDF PAGE 3 ===
+                                                               Navigation-Decision System
+         Goal Instruction                 LLM: Action-Landmark                                                                  𝐴!, 𝐿!             Multi-Sourced          Future-Aware             Final-Decision
+                                                                          Value Maps            Value Map            Affordance Map
+                                                       Navigable Map
+           Find the <Sofa>.
+
+       RGB-D Observation                  Semantic Map
+
+
+
+
+
+                                                     Trajectory Sampler                  World Model
+
+           Robot Pose
+
+
+                                                                                                                   Next Waypoint
+
+                                           Trajectory-Conditioned 3D World Model                 Execution Unit
+
+Figure 2: Overview of the Schr¨odinger’s Navigator.  Given the navigation context, the system
+adaptively samples candidate trajectories around occluded and uncertain regions. A trajectory-
+conditioned 3D world model then imagines future 3DGS observations along each path to expose
+hidden structures, target cues, and risks. These imagined futures are fused with current observations
+to construct a Future-Aware Value Map, aggregating trajectory-level utility and risk for robust way-
+point selection. Finally, the selected navigation target is executed through the corresponding local
+controller.
+
+
+
+
+2  Related Work
+
+
+
+Object Navigation (ObjectNav) [23] studies embodied agents that locate target objects in unseen
+environments. Task-trained approaches based on reinforcement or imitation learning [8, 1, 24, 25]
+require large-scale training and often generalize poorly to cluttered real-world scenes, making sim-
+to-real deployment challenging. Zero-shot approaches instead leverage pretrained vision-language
+models [26, 9, 10] or large language models [27, 28, 29] for reasoning and planning without task-
+specific training [12, 10, 29, 30]. These methods improve semantics-driven exploration through mul-
+timodal target embeddings [9, 10], vision-language frontier maps [12], instruction-based prompting
+[31, 28], and adaptive fusion of semantic and geometric cues [32, 33, 34, 35, 36]. However, zero-
+shot ObjectNav remains brittle in realistic, occlusion-heavy environments and under unknown risks
+[10, 12], because value estimation is still dominated by visible frontiers and lacks explicit reasoning
+about hidden areas behind occluders, leading to myopic exploration.
+
+Imagination for Navigation leverages generation models to simulate future observations and sup-
+port planning [37, 20, 38, 21]. Related world-model methods learn predictive dynamics and roll
+out trajectories in latent space [39, 40]. Recent navigation world models further predict egocentric
+visual streams. NWM [20] predicts future trajectories and views for path ranking, while Navi-
+gateDiff [38] uses diffusion-based visual prediction as a zero-shot navigation assistant. Language-
+conditioned variants, such as VISTA and VISTAv2 [41, 42, 22], generate landmark images or
+instruction-conditioned future views and use their alignment to guide action selection. Other works
+imagine unseen scenes or predict occupancy maps to complete unobserved spaces for exploration
+[43, 44, 45, 46, 47]. These works are mainly studied under visual prediction, or vision-and-language
+navigation protocols. Unlike prior works, Schr¨odinger’s Navigator imagines future observations
+along multiple paths with a trajectory-conditioned 3D world model and constructs a FAVM, enabling
+explicit reasoning about occlusions, risks, and blind-spot targets for robust zero-shot navigation.
+
+
+                                       3
+=== PDF PAGE 4 ===
+3  Method
+
+We introduce Schr¨odinger’s Navigator, a zero-shot object navigation framework that reduces
+occlusion-induced uncertainty by reasoning over multiple trajectory-conditioned imagined 3D fu-
+tures. At each decision step, the robot receives the current navigation context, including the goal
+instruction, RGB-D observation, robot pose, and accumulated map.  Instead of committing to a
+single inferred scene, our method samples a compact set of occluder-aware candidate trajectories,
+imagines future 3D scenes along them, and aggregates the resulting cues into a future-aware affor-
+dance map for waypoint selection.
+
+
+3.1  Trajectory-Conditioned 3D Future Imagination
+
+Adaptive occluder-aware trajectory sampling. A single imagined
+path may miss targets or hazards hidden behind occlusions. To obtain
+complementary views with limited computation, we sample a small tra-
+jectory ensemble around the dominant occluder in the view. Specifically,
+we construct a local point cloud from the depth observation, remove               Up
+ground points, and select the primary forward occluder according to pro-            Left          Right
+jected occupancy, distance, and alignment with the robot’s heading. Its
+boundary provides a local geometric anchor for trajectory generation.
+                                                                     Figure  3:    Occluder-
+As shown in Figure 3, we instantiate three trajectory types V =  aware camera trajectory
+{L, R, U}, corresponding to left-bypass, right-bypass, and over-the-top  sampling.
+views. For each type v ∈V, the sampler generates a camera trajectory
+τ t(v) = Fsamp(v; Bt, qt, dc, Npose), where Bt is the estimated occluder
+boundary, qt is the current robot pose, dc is a nominal orbit-distance parameter, and Npose is the
+number of sampled camera poses. This compact trajectory set is designed to cover potentially visible
+regions on both sides of and above the occluder while avoiding dense sampling over the full action
+space. The three trajectories are generated from the same RGB-D observation to provide comple-
+mentary virtual camera viewpoints, rather than independent world-state samples or robot-executed
+paths. Details of occluder boundary extraction, occluder selection, and trajectory parameterization
+are provided in Appendix B.
+
+Trajectory-conditioned 3D world model.  As shown in Figure 4, given each sampled trajectory
+τ t(v) , we use a trajectory-conditioned 3D world model Φθ to generate a hypothetical future 3DGS:
+
+                                           ˆG(v)t = Φθ  It, qt, τt(v)   ,
+
+where It denotes the current RGB observation. We adopt FlashWorld [19] as the backend because
+it can generate 3D-consistent scenes efficiently. Each generated scene represents a plausible realiza-
+tion of the currently unobserved region conditioned on one candidate path.
+
+Since the generated 3DGS scene may not be metrically aligned with the robot’s environment, we
+use the observed depth Dt to perform metric scale alignment before fusion. We first render a depth
+map ˆD(v)t  from the generated scene at the current viewpoint and estimate a global scale factor using
+valid pixels:
+                                            Dt(p)
+                                       s(v)t = median             ,
+                                            p∈Ω(v)t   ˆD(v)t  (p)
+where Ω(v)t   is the set of pixels with valid observed and rendered depths. The generated scene is then
+scaled and transformed into the world frame as ˜G(v)t  = A(ˆG(v)t   , s(v)t   , qt), where A(·) denotes scale
+alignment and coordinate transformation. The aligned scenes are fused into a unified future scene
+Gimgt  = S v∈V ˜G(v)t   . We further transfer semantic labels from 2D segmentation to visible Gaussian
+primitives using depth-consistent projection and multi-view voting. Implementation details of 3DGS
+alignment, semantic label transfer, and scene fusion are provided in Appendix C.
+
+
+                                       4
+=== PDF PAGE 5 ===
+       Current Depth                           Render Depth × 3
+
+                            Depth Align
+                                                                                                                                               Scale                                                                      Merged 3DGS Scene
+
+                                                        Render                                                                                                                                                                            Factor        Current RGB
+                             S                                         3DGS Scene × 3
+
+                          3D World                               Scale Align
+                             Model                              Coordinate
+                                                                      Transformation
+
+                                                        Render
+        Initial Robot Pose                           Render Video × 3
+                               Trajectory Sampler
+                                 Trajectory List
+                                          {left, right, up}
+
+
+Figure 4: Overview of trajectory-conditioned 3D imagination: Given the current observation and
+robot pose, an occluder-aware sampler generates candidate trajectories that condition a 3D world
+model to predict future 3DGS scenes. These scenes are depth-aligned to recover a consistent scale,
+transformed into the world frame, and fused into a unified 3DGS scene for future-aware planning.
+
+
+3.2  Future-Aware Navigation Decision
+
+Future-Aware Value Map.  The imagined scene Gimgt   provides cues about free space, possible
+target locations, and risky regions beyond the current observation. We convert these cues into a
+Future-Aware Value Map (FAVM), denoted by mFAt   , over candidate navigation positions Pt =
+{µg | g ∈Gnav}, where µg is the center of a navigable Gaussian:
+          mFAt  (p) = N(αsemSt(p) + αexpEt(p) −αriskRt(p)) ,    p ∈Pt,
+
+where St(p) measures semantic relevance to the target, Et(p) estimates the local coverage of newly
+imagined free space, and Rt(p) penalizes candidate paths passing near geometrically supported
+occupied regions in the imagined scenes. The weights αsem, αexp, and αrisk balance target seeking,
+exploration, and safety.
+
+Specifically, St(p) uses exponentially decayed nearest distances to observed and imagined target-
+labeled Gaussians, where imagined target cues are discounted by a factor λimg < 1 to avoid over-
+trusting generated content. Et(p) estimates the amount of previously unobserved but likely navi-
+gable space that can be estimated around p, computed from imagined free-space primitives not yet
+covered by the observed map. Rt(p) is a soft geometric risk penalty computed from filtered and
+spatially deduplicated imagined occupied voxels according to their distances from the candidate
+path. All three component scores are normalized to [0, 1] before fusion, and the combined FAVM
+score is normalized once more. Implementation details, including kernel radius, semantic voting,
+and normalization, are provided in Appendix D.
+
+Fusion with observation-based cues. FAVM provides foresight, but navigation must remain
+grounded in current observations. We combine FAVM with an observation-based multi-sourced
+value map mt = mactt + msemt  + mtrajt  + mheut    , which aggregates action guidance, semantic land-
+mark cues, trajectory constraints, and heuristic navigation priors.
+
+The final affordance map is computed as
+
+                   mafft  (p) = β ¯mt(p) + (1 −β) mFAt  (p),    p ∈Pt,
+
+where ¯mt is the normalized observation-based value map and β ∈[0, 1] controls the balance
+between grounded evidence and imagined future guidance. The navigation target is selected as
+
+
+                                       5
+=== PDF PAGE 6 ===
+p⋆t = arg maxp∈Pt mafft  (p), with walkability constraints enforced during selection. Detailed defini-
+tions of FAVM scores and observation-based component maps are provided in Appendix D.
+
+
+Execution.  Following an instruction-driven hierarchical planner, the goal instruction is parsed into
+high-level action-landmark guidance, which contributes to the observation-based value map. The
+selected navigation target p⋆t is passed to the local planner to compute executable waypoints for robot
+control. To reduce latency, the world model is invoked periodically rather than at every navigation
+step.
+
+4  Experiments
+
+We evaluate Schr¨odinger’s Navigator in both simulation and real-world settings to assess its nav-
+igation performance, component effectiveness, and practical deployability. Our experiments first
+compare against strong ZSON baselines on HM3D, then ablate the key design choices behind future
+imagination and FAVM-based planning, and finally validate the system on a physical Go2 quadruped
+in indoor environments. More qualitative results and failure cases are shown in Appendix F.
+
+
+4.1  Experimental Setup
+
+Baselines and benchmark.  We compare our approach against a broad set of representative base-
+lines, including task-trained approaches (ZSON [9], PixNav [13], SPNet [48], SGM [35]), zero-shot
+semantic or map-based explorers (CoW [10], ESC [28], L3MVN [49], TriHelper [50], VoroNav [51],
+GAMap [33], BeliefMapNav [30]), imagination-based VLM navigators (ImagineNav [46], Imagi-
+neNav++ [47]), and LLM/VLM-based planners (VLFM [12], InstructNav [31]). We conduct large-
+scale simulation evaluation on HM3D [52] within Habitat [53]. Following prior work, we report
+Success Rate (SR), Success weighted by Path Length (SPL), and Distance to Goal (DTG). Detailed
+descriptions of baselines are provided in Appendix E.
+
+
+Implementation.  We use Qwen3.6-35B-A3B [54] for instruction parsing and navigation-direction
+judgment, FlashWorld [19] for trajectory-conditioned 3D imagination, and GLEE [55] for semantic
+segmentation. In HM3D simulation, FlashWorld is triggered every 50 observation updates, rather
+than at every step. Real-world tests use a Unitree Go2 with an RGB-D camera in Office, Classroom,
+and Common Room scenes, covering static-object search and occlusion-heavy unknown-risk cases.
+Hyperparameters, runtime, compute, and deployment details are provided in Appendices A and G.
+
+
+4.2  Simulation Results
+
+4.2.1  Quantitative Results
+
+Table 1 presents the quantitative results on HM3D. Our method achieves the highest SR of 0.682,
+outperforming the strongest baseline, ImagineNav++ (0.625), by 5.7 percentage points.  It also at-
+tains the lowest reported DTG of 1.84 m, compared with 2.89 m for InstructNav. Meanwhile, our
+method achieves the second-highest SPL of 0.311, remaining competitive in path efficiency. These
+results demonstrate the effectiveness of future-aware navigation in improving target discovery and
+goal proximity while maintaining competitive path efficiency. Further analysis across different oc-
+clusion severity levels is provided in Appendix E (Table 6).
+
+4.2.2  Ablation Analysis
+
+To assess the key design choices of Schr¨odinger’s Navigator, we ablate the trajectory ensemble size
+N, the fusion coefficient β, and the FAVM scoring components. All variants change one factor from
+the full model, except for the no-imagination baseline.
+
+The results in Table 2 show that future imagination is effective only when properly sampled and
+grounded. Our full model improves SR from 0.553 to 0.682 over the no-imagination baseline, a gain
+
+
+                                       6
+=== PDF PAGE 7 ===
+Table 1: Quantitative Comparison on Simulation Results. Cell background colors indicate the
+method is the best , second best , or third best on this metric.
+                                    HM3D
+            Method             Training Free
+                                         SR↑   SPL↑  DTG↓
+          ZSON [9]              ✗         0.255   0.126    –
+              PixNav [13]            ✗         0.379   0.205    –
+             SPNet [48]             ✗         0.312   0.101    –
+         SGM [35]              ✗         0.602   0.308    –
+           ESC [28]           ✓        0.392   0.223    –
+          VLFM [12]         ✓        0.525   0.304    –
+             VoroNav [51]        ✓        0.420   0.260    –
+          L3MVN [49]        ✓        0.504   0.231    4.43
+                TriHelper [50]        ✓        0.565   0.253    3.87
+          GAMap [33]         ✓        0.531   0.260    –
+                InstructNav [31]       ✓        0.510   0.187    2.89
+              ImagineNav [46]      ✓        0.530   0.238    –
+             ImagineNav++ [47]     ✓        0.625   0.328    –
+              BeliefMapNav [30]     ✓        0.614   0.306    –
+             Ours             ✓        0.682   0.311    1.84
+
+
+
+Table 2: Ablation and runtime analysis of Schr¨odinger’s Navigator on HM3D. We report success rate
+(SR), average number of imagination triggers per episode, per-trigger imagination latency, episode-
+level waiting ratio, and waypoint change rate.
+                                               Trig.        Lat.         Wait      Waypoint
+    Variant                 SR ↑                                                                 / Ep. ↓    / Trig. (s) ↓   Ratio (%) ↓  Change (%)
+
+  No Imagination               0.553    0.00       –            0.0          –
+
+   Single Traj. (N = 1)          0.594    4.31        3.0           7.2          28.4
+   Dense Sampling (N = 5)      0.622    4.18       15.0         30.8          51.6
+
+   Imagination-heavy (β = 0.2)   0.497    4.36        9.0          22.9          67.2
+   Observation-heavy (β = 0.8)   0.595    4.28        9.0          19.9          35.3
+
+  FAVM w/o Exploration E(p)   0.629    4.20        9.0          19.8          40.8
+  FAVM w/o Semantic S(p)     0.605    4.27        9.0          20.5          38.4
+  FAVM w/o Risk R(p)         0.634    4.19        9.0          19.3          42.1
+
+   Ours (N = 3, β = 0.6)        0.682    4.24        9.0          20.1          46.8
+
+
+
+
+of 12.9 percentage points. However, more trajectories do not necessarily yield better performance:
+N = 1 provides limited coverage, while N = 5 incurs higher latency and still underperforms our
+N = 3 design, demonstrating the coverage–cost advantage of tri-trajectory sampling.
+
+The fusion and component ablations further show that imagined guidance must be calibrated by
+real observations. The imagination-heavy setting (β = 0.2) achieves an SR of 0.497, while the
+observation-heavy setting (β = 0.8) reaches 0.595. Both underperform the balanced setting (β =
+0.6), highlighting the importance of balancing imagined future guidance with current observations.
+Removing any FAVM component reduces SR, with the largest drop caused by removing the semantic
+score S(p).
+
+The runtime results indicate that 3D future imagination introduces sparse rather than per-step over-
+head. Our full model triggers imagination 4.24 times per episode, with 9.0 seconds per trigger
+and a 20.1% waiting-time ratio. Dense sampling increases the waiting-time ratio to 30.8% with-
+out improving SR, showing that additional futures introduce extra cost without proportional benefit.
+
+
+                                       7
+=== PDF PAGE 8 ===
+Figure 5: Real-world object-navigation demonstrations of Schr¨odinger’s Navigator across three in-
+door scenarios:  Office-Chair, Classroom-Plant, and Common Room-Trash Can.  Each example
+shows the executed trajectory, egocentric observations with predicted target directions and target
+boxes, and world-model imagined views that reveal the target appearance.
+
+
+Table 3: Real-world quantitative comparison against the InstructNav baseline. We report success
+counts (Success / Total Trials) across three indoor environments.
+
+                    Scene      Office   Classroom  Common Room    All
+
+                                   Search for static objects
+
+                     InstructNav    7/10       7/10            8/10        22/30
+                     Ours       8/10       8/10            7/10        23/30
+
+                                  Scenarios with Unknown Risks
+
+                     InstructNav    4/10       3/10            4/10        11/30
+                     Ours       5/10       6/10            6/10        17/30
+
+
+
+The 46.8% waypoint change rate further indicates that imagined futures actively influence waypoint
+selection beyond the observation-only map.
+
+
+4.3  Real-World Deployment
+
+Our real-world experiments provide a controlled evaluation against an InstructNav-style baseline,
+complementing the broader comparisons with navigation methods conducted on HM3D.
+
+We evaluate adaptability under two task settings: (1) Static Object Search, where the agent explores
+standard scenes to locate objects; and (2) Unknown-Risk Scenarios, where severe static occlusions
+are not visible from afar, testing the agent’s ability to anticipate uncertainty and avoid blind spots.
+
+
+4.3.1  Performance Analysis
+
+As shown in Table 3, we report success counts over 30 trials per setting, with 10 trials in each of the
+three environments.
+
+In standard static object search, Schr¨odinger’s Navigator performs comparably to InstructNav,
+achieving a slightly higher success rate (23/30 vs.  22/30), indicating that future-aware reason-
+ing does not compromise regular object-search performance. In scenarios with unknown risks, our
+method shows a clearer advantage, succeeding in 17/30 trials compared with InstructNav’s 11/30.
+This suggests that imagined 3D futures help the robot better handle occlusions, ambiguous observa-
+tions, and potential blind spots.
+
+Overall, these real-world results show that our method maintains strong static-search performance
+while improving robustness in risk-aware navigation. Qualitative examples are provided in Figure 5.
+
+
+                                       8
+=== PDF PAGE 9 ===
+5  Conclusion
+
+Schr¨odinger’s Navigator addresses ZSON limitations in occluded environments by leveraging a 3D
+trajectory-conditioned world model to imagine and fuse plausible 3D futures into a unified scene.
+This training-free framework constructs a single affordance map encoding semantics, exploration,
+and risk. Real-world experiments on a Unitree Go2 demonstrate its robustness, achieving compara-
+ble performance in static tasks while outperforming the baseline in occlusion-heavy scenarios.
+
+6  Limitations
+
+Schr¨odinger’s Navigator uses imagined 3D futures as plausible hypotheses rather than exact re-
+constructions of hidden space. While FAVM discounts generated cues and grounds decisions in
+current observations, inaccurate generation, semantic transfer errors, or imperfect depth alignment
+may still bias waypoint selection when imagined evidence is over-weighted. Our method performs
+risk-aware waypoint selection but does not provide formal safety guarantees. Future work could im-
+prove reliability through uncertainty-calibrated imagination, stronger multi-view consistency, and
+active verification of uncertain regions. In addition, the current tri-trajectory sampler focuses on
+the dominant forward occluder for efficiency, but more complex layouts with multiple occluders or
+non-frontal blind spots may require adaptive trajectory budgeting. Broader evaluation across more
+diverse environments, dynamic obstacles, sensors, and robot platforms, as well as integration with
+certified local planners, would further strengthen real-world deployment.
+
+
+
+
+
+                                       9
+=== PDF PAGE 10 ===
+Acknowledgments
+
+This work was supported in part by the Science and Technology Commission of Shanghai Munici-
+pality (No. 24511103100) and the Xiaomi Young Scholar Program.
+
+References
+
+ [1] D. S. Chaplot, D. P. Gandhi, A. Gupta, and R. R. Salakhutdinov. Object goal navigation using
+     goal-oriented semantic exploration. Advances in Neural Information Processing Systems, 33:
+     4247–4258, 2020.
+
+ [2] P. Anderson, A. Chang, D. S. Chaplot, A. Dosovitskiy, S. Gupta, V. Koltun, J. Kosecka, J. Ma-
+       lik, R. Mottaghi, M. Savva, et al. On evaluation of embodied navigation agents. arXiv preprint
+     arXiv:1807.06757, 2018.
+
+ [3] Y. Cao, J. Zhang, Z. Yu, S. Liu, Z. Qin, Q. Zou, B. Du, and K. Xu. Cognav: Cognitive process
+     modeling for object goal navigation with llms. In Proceedings of the IEEE/CVF International
+     Conference on Computer Vision, pages 9550–9560, 2025.
+
+ [4] D. S. Chaplot, D. Gandhi, S. Gupta, A. Gupta, and R. Salakhutdinov.  Learning to explore
+     using active neural slam. arXiv preprint arXiv:2004.05155, 2020.
+
+ [5] K. Chen, J. P. De Vicente, G. Sepulveda, F. Xia, A. Soto, M. V´azquez, and S. Savarese. A
+     behavioral approach to visual navigation with graph localization networks.  arXiv preprint
+     arXiv:1903.00445, 2019.
+
+ [6] O. Kwon, J. Park, and S. Oh.  Renderable neural radiance map for visual navigation.  In
+     Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages
+     9099–9108, 2023.
+
+ [7] Y. Zhu, R. Mottaghi, E. Kolve, J. J. Lim, A. Gupta, L. Fei-Fei, and A. Farhadi. Target-driven
+     visual navigation in indoor scenes using deep reinforcement learning. In 2017 IEEE interna-
+      tional conference on robotics and automation (ICRA), pages 3357–3364. IEEE, 2017.
+
+ [8] R. Ramrakhya, D. Batra, E. Wijmans, and A. Das. Pirlnav: Pretraining with imitation and rl
+     finetuning for objectnav. In Proceedings of the IEEE/CVF Conference on Computer Vision and
+     Pattern Recognition, pages 17896–17906, 2023.
+
+ [9] A. Majumdar, G. Aggarwal, B. Devnani, J. Hoffman, and D. Batra. Zson: Zero-shot object-
+     goal navigation using multimodal goal embeddings. Advances in Neural Information Process-
+     ing Systems, 35:32340–32352, 2022.
+
+[10] S. Y. Gadre, M. Wortsman, G. Ilharco, L. Schmidt, and S. Song. Cows on pasture: Base-
+      lines and benchmarks for language-driven zero-shot object navigation.  In Proceedings of
+     the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages 23171–23181,
+     2023.
+
+[11] Q. Zhao, L. Zhang, B. He, H. Qiao, and Z. Liu. Zero-shot object goal visual navigation. arXiv
+     preprint arXiv:2206.07423, 2022.
+
+[12] N. Yokoyama, S. Ha, D. Batra, J. Wang, and B. Bucher. Vlfm: Vision-language frontier maps
+      for zero-shot semantic navigation. In 2024 IEEE International Conference on Robotics and
+     Automation (ICRA), pages 42–48. IEEE, 2024.
+
+[13] W. Cai, S. Huang, G. Cheng, Y. Long, P. Gao, C. Sun, and H. Dong.  Bridging zero-shot
+     object navigation and foundation models through pixel-guided navigation skill. In 2024 IEEE
+     International Conference on Robotics and Automation (ICRA), pages 5228–5234. IEEE, 2024.
+
+[14] Z. Zhang and J. F. Fisac. Safe occlusion-aware autonomous driving via game-theoretic active
+     perception. arXiv preprint arXiv:2105.08169, 2021.
+
+
+                                       10
+=== PDF PAGE 11 ===
+[15] R. Firoozi, A. Mir, G. S. Camps, and M. Schwager. Oa-mpc: Occlusion-aware mpc for guar-
+     anteed safe robot navigation with unseen dynamic obstacles. IEEE Transactions on Control
+     Systems Technology, 33(3):940–951, 2024.
+
+[16] B. Axelrod, L. P. Kaelbling, and T. Lozano-P´erez. Provably safe robot navigation with obstacle
+      uncertainty. The International Journal of Robotics Research, 37(13-14):1760–1774, 2018.
+
+[17] S. Racani`ere, T. Weber, D. Reichert, L. Buesing, A. Guez, D. Jimenez Rezende, A. Puig-
+     dom`enech Badia, O. Vinyals, N. Heess, Y. Li, et al. Imagination-augmented agents for deep
+     reinforcement learning. Advances in neural information processing systems, 30, 2017.
+
+[18] S. K. Ramakrishnan, Z. Al-Halah, and K. Grauman. Occupancy anticipation for efficient explo-
+      ration and navigation. In European conference on computer vision, pages 400–418. Springer,
+     2020.
+
+[19] X. Li, T. Wang, Z. Gu, S. Zhang, C. Guo, and L. Cao. Flashworld: High-quality 3d scene
+     generation within seconds. arXiv preprint arXiv:2510.13678, 2025.
+
+[20] A. Bar, G. Zhou, D. Tran, T. Darrell, and Y. LeCun. Navigation world models. In Proceedings
+      of the Computer Vision and Pattern Recognition Conference, pages 15791–15801, 2025.
+
+[21] Y. Wang, Y. Fang, T. Wang, Y. Feng, Y. Tan, S. Zhang, P. Liu, Y. Ji, and R. Xu. Dreamnav: A
+     trajectory-based imaginative framework for zero-shot vision-and-language navigation. arXiv
+     preprint arXiv:2509.11197, 2025.
+
+[22] Y. Huang, X. Jiang, X. Gao, M. Wu, and Z. Tu. Vistav2: World imagination for indoor vision-
+     and-language navigation. arXiv preprint arXiv:2512.00041, 2025.
+
+[23] S. Gupta, J. Davidson, S. Levine, R. Sukthankar, and J. Malik. Cognitive mapping and planning
+      for visual navigation. In Proceedings of the IEEE conference on computer vision and pattern
+     recognition, pages 2616–2625, 2017.
+
+[24] B. Mayo, T. Hazan, and A. Tal. Visual navigation with spatial attention. In Proceedings of the
+    IEEE/CVF conference on computer vision and pattern recognition, pages 16898–16907, 2021.
+
+[25] R. Ramrakhya, E. Undersander, D. Batra, and A. Das. Habitat-web: Learning embodied object-
+     search strategies from human demonstrations at scale. In Proceedings of the IEEE/CVF con-
+     ference on computer vision and pattern recognition, pages 5173–5183, 2022.
+
+[26]  J. Li, D. Li, S. Savarese, and S. Hoi. Blip-2: Bootstrapping language-image pre-training with
+     frozen image encoders and large language models.  In International conference on machine
+     learning, pages 19730–19742. PMLR, 2023.
+
+[27] Z. Yang, L. Li, K. Lin, J. Wang, C.-C. Lin, Z. Liu, and L. Wang. The dawn of lmms: Prelimi-
+     nary explorations with gpt-4v (ision). arXiv preprint arXiv:2309.17421, 2023.
+
+[28] K. Zhou, K. Zheng, C. Pryor, Y. Shen, H. Jin, L. Getoor, and X. E. Wang. Esc: Exploration with
+      soft commonsense constraints for zero-shot object navigation. In International Conference on
+    Machine Learning, pages 42829–42842. PMLR, 2023.
+
+[29] D. Shah, B. Osi´nski, S. Levine, et al.  Lm-nav: Robotic navigation with large pre-trained
+    models of language, vision, and action.  In Conference on robot learning, pages 492–504.
+    PMLR, 2023.
+
+[30] Z. Zhou, Y. Hu, L. Zhang, Z. Li, and S. Chen. Beliefmapnav: 3d voxel-based belief map for
+     zero-shot object navigation. Advances in Neural Information Processing Systems, 38:83008–
+     83036, 2026.
+
+[31] Y. Long, W. Cai, H. Wang, G. Zhan, and H. Dong. Instructnav: Zero-shot system for generic
+      instruction navigation in unexplored environment. arXiv preprint arXiv:2406.04882, 2024.
+
+
+                                       11
+=== PDF PAGE 12 ===
+[32] Y. Kuang, H. Lin, and M. Jiang. Openfmnav: Towards open-set zero-shot object navigation
+     via vision-language foundation models. arXiv preprint arXiv:2402.10670, 2024.
+
+[33] H. Huang, Y. Hao, C. Wen, A. Tzes, Y. Fang, et al. Gamap: Zero-shot object goal navigation
+     with multi-scale geometric-affordance guidance. Advances in Neural Information Processing
+     Systems, 37:39386–39408, 2024.
+
+[34]  J. Chen, G. Li, S. Kumar, B. Ghanem, and F. Yu. How to not train your dragon: Training-free
+    embodied object goal navigation with semantic frontiers. arXiv preprint arXiv:2305.16925,
+     2023.
+
+[35] S. Zhang, X. Yu, X. Song, X. Wang, and S. Jiang. Imagine before go: Self-supervised genera-
+      tive map for object goal navigation. In Proceedings of the IEEE/CVF Conference on Computer
+     Vision and Pattern Recognition, pages 16414–16425, 2024.
+
+[36] M. Zhang, Y. Du, C. Wu, J. Zhou, Z. Qi, J. Ma, and B. Zhou. Apexnav: An adaptive exploration
+     strategy for zero-shot object navigation with target-centric semantic fusion.  arXiv preprint
+     arXiv:2504.14478, 2025.
+
+[37]  J. Y. Koh, H. Lee, Y. Yang, J. Baldridge, and P. Anderson. Pathdreamer: A world model for
+     indoor navigation. In Proceedings of the IEEE/CVF International Conference on Computer
+      Vision, pages 14738–14748, 2021.
+
+[38] Y. Qin, A. Sun, Y. Hong, B. Wang, and R. Zhang. Navigatediff: Visual predictors are zero-shot
+     navigation assistants. arXiv preprint arXiv:2502.13894, 2025.
+
+[39] W. Liu, H. Zhao, C. Li, J. Biswas, B. Okal, P. Goyal, Y. Chang, and S. Pouya. X-mobility: End-
+     to-end generalizable navigation via world modeling. In 2025 IEEE International Conference
+    on Robotics and Automation (ICRA), pages 7569–7576. IEEE, 2025.
+
+[40] H. Wang, W. Liang, L. Van Gool, and W. Wang. Dreamwalker: Mental planning for continu-
+     ous vision-language navigation. In Proceedings of the IEEE/CVF international conference on
+     computer vision, pages 10873–10883, 2023.
+
+[41] A. Perincherry, J. Krantz, and S. Lee. Do visual imaginations improve vision-and-language
+     navigation agents?  In Proceedings of the Computer Vision and Pattern Recognition Confer-
+     ence, pages 3846–3855, 2025.
+
+[42] Y. Huang, M. Wu, R. Li, and Z. Tu.  Vista: Generative visual imagination for vision-and-
+     language navigation. arXiv preprint arXiv:2505.07868, 2025.
+
+[43] K. Katyal, K. Popek, C. Paxton, P. Burlina, and G. D. Hager. Uncertainty-aware occupancy
+    map prediction using generative networks for robot navigation. In 2019 International Confer-
+     ence on Robotics and Automation (ICRA), pages 5453–5459. IEEE, 2019.
+
+[44] V. D. Sharma, J. Chen, and P. Tokekar. Proxmap: Proximal occupancy map prediction for
+      efficient indoor robot navigation. In 2023 IEEE/RSJ International Conference on Intelligent
+     Robots and Systems (IROS), pages 7135–7140. IEEE, 2023.
+
+[45] H. Shah, J. Xing, N. Messikommer, B. Sun, M. Pollefeys, and D. Scaramuzza. Foresightnav:
+     Learning scene imagination for efficient exploration. In Proceedings of the Computer Vision
+    and Pattern Recognition Conference, pages 5236–5245, 2025.
+
+[46] X. Zhao, W. Cai, L. Tang, and T. Wang.  Imaginenav: Prompting vision-language models
+     as embodied navigator through scene imagination. In International Conference on Learning
+     Representations, volume 2025, pages 94387–94401, 2025.
+
+[47] T. Wang, X. Zhao, W. Cai, and C. Sun. Imaginenav++: Prompting vision-language models as
+    embodied navigator through scene imagination. IEEE Transactions on Pattern Analysis and
+    Machine Intelligence, 2026.
+
+
+                                       12
+=== PDF PAGE 13 ===
+[48] Q. Zhao, L. Zhang, B. He, and Z. Liu. Semantic policy network for zero-shot object goal visual
+     navigation. IEEE Robotics and Automation Letters, 8(11):7655–7662, 2023.
+
+[49] B. Yu, H. Kasaei, and M. Cao. L3mvn: Leveraging large language models for visual target
+     navigation.  In 2023 IEEE/RSJ International Conference on Intelligent Robots and Systems
+     (IROS), pages 3554–3560. IEEE, 2023.
+
+[50] L. Zhang, Q. Zhang, H. Wang, E. Xiao, Z. Jiang, H. Chen, and R. Xu. Trihelper: Zero-shot
+     object navigation with dynamic assistance.  In 2024 IEEE/RSJ International Conference on
+      Intelligent Robots and Systems (IROS), pages 10035–10042. IEEE, 2024.
+
+[51] P. Wu, Y. Mu, B. Wu, Y. Hou, J. Ma, S. Zhang, and C. Liu. Voronav: Voronoi-based zero-shot
+     object navigation with large language model. arXiv preprint arXiv:2401.02695, 2024.
+
+[52] S. K. Ramakrishnan, A. Gokaslan, E. Wijmans, O. Maksymets, A. Clegg, J. M. Turner, E. Un-
+     dersander, W. Galuba, A. Westbury, A. X. Chang, M. Savva, Y. Zhao, and D. Batra. Habitat-
+     matterport 3d dataset (HM3d): 1000 large-scale 3d environments for embodied AI. In Thirty-
+       fifth Conference on Neural Information Processing Systems Datasets and Benchmarks Track
+    (Round 2), 2021. URL https://openreview.net/forum?id=-v4OuqNs5P.
+
+[53] X. Puig, E. Undersander, A. Szot, M. D. Cote, R. Partsey, J. Yang, R. Desai, A. W. Clegg,
+    M. Hlavac, T. Min, T. Gervet, V. Vondruˇs, V.-P. Berges, J. Turner, O. Maksymets, Z. Kira,
+    M. Kalakrishnan, J. Malik, D. S. Chaplot, U. Jain, D. Batra, A. Rai, and R. Mottaghi. Habitat
+      3.0: A co-habitat for humans, avatars and robots, 2023.
+
+[54] Qwen Team. Qwen3.6-35B-A3B: Agentic coding power, now open to all, April 2026. URL
+    https://qwen.ai/blog?id=qwen3.6-35b-a3b.
+
+[55]  J. Wu, Y. Jiang, Q. Liu, Z. Yuan, X. Bai, and S. Bai. General object foundation model for
+     images and videos at scale. In Proceedings of the IEEE/CVF Conference on Computer Vision
+    and Pattern Recognition, pages 3783–3795, 2024.
+
+[56] C. B. Barber, D. P. Dobkin, and H. Huhdanpaa. The quickhull algorithm for convex hulls.
+   ACM Transactions on Mathematical Software (TOMS), 22(4):469–483, 1996.
+
+[57] H. Edelsbrunner, D. Kirkpatrick, and R. Seidel. On the shape of a set of points in the plane.
+    IEEE Transactions on information theory, 29(4):551–559, 2003.
+
+
+
+
+
+                                       13
+=== PDF PAGE 14 ===
+Contents
+
+
+Supplementary Video                                                           14
+
+
+A  Hyperparameters, Runtime, and System Configuration                            14
+
+
+B  Occluder-Aware Trajectory Sampling                                          15
+
+
+C 3DGS Alignment, Semantic Label Transfer, and Scene Fusion                      16
+
+
+D  Future-Aware Value Map and Observation-Based Component Maps                17
+
+
+E  Baselines, Evaluation Protocol, and Metrics                                     19
+
+
+F  Additional Qualitative Results and Failure Analysis                               20
+
+
+G Real-World Deployment Details                                               22
+
+
+Supplementary Video
+
+
+The supplementary video shows occlusion-heavy HM3D episodes and Go2 demonstrations in the
+Office, Classroom, and Common Room scenes, including executed trajectories, egocentric observa-
+tions, target predictions, and trajectory-conditioned imagined views.
+
+
+A  Hyperparameters, Runtime, and System Configuration
+
+
+Unless otherwise stated, the same parameters are used in HM3D simulation and real-world Go2
+deployment. All value maps are normalized to [0, 1], and distances are measured in meters.
+
+
+A.1  Trajectory-imagination hyperparameters
+
+The sampler uses three virtual camera trajectories, V = {L, R, U}, corresponding to left-bypass,
+right-bypass, and over-the-top futures. All three trajectories are used for future imagination rather
+than robot execution.
+
+
+  Table 4: Geometric parameters for adaptive occluder-aware virtual-camera trajectory sampling.
+
+  Parameter                  Symbol   Value    Description
+
+   Trajectory ensemble size     N     3         Left, right, and over-the-top futures.
+  Camera poses per trajectory     Npose   16         Initial camera poses before interpolation.
+  Nominal radial offset             δ      0.20 m   Offset used to define the nominal orbit radius.
+  Minimum orbit radius          dminc       1.0 m    Lower bound on the nominal orbit radius.
+  Nominal orbit radius             dc     –        dc = max(rt + rrobot + δ, dminc   ).
+  Angular expansion          ∆θ     20◦      Extends  lateral views beyond the observed oc-
+                                                       cluder boundary.
+  Nominal minimum arc extent    dminv       1.0 m    Lower setting for the nominal arc extent; realized
+                                                             trajectories may be shorter.
+  Maximum trajectory length     dmaxv       3.0 m    Upper bound on the sampled camera path length.
+   Lateral edge-gaze weight        γedge    0.35      Interpolates the lateral gaze target toward the cor-
+                                                   responding boundary side.
+
+
+
+                                       14
+=== PDF PAGE 15 ===
+                Table 5: Default coefficients for FAVM construction and fusion.
+
+ Parameter                     Symbol   Value      Description
+  Observation/future fusion balance    β      0.60       Balances ¯mt and mFAt   .
+ Semantic score weight             αsem     1.0        Weight for target relevance St(p).
+  Exploration score weight           αexp     1.0        Weight for expected reveal Et(p).
+ Risk score weight                     αrisk     1.0        Weight for traversal risk Rt(p).
+ Imagined semantic discount         λimg    0.50       Discount for imagined target cues.
+  Semantic-transfer depth tolerance    τ d,i(m)    Adaptive   Radius-  and  depth-dependent;   see  Ap-
+                                                       pendix C.
+
+
+A.2  FAVM, perception, and runtime settings
+
+We use Qwen3.6-35B-A3B [54] for instruction parsing and direction judgment, FlashWorld [19] for
+trajectory-conditioned 3D imagination, and GLEE [55] for open-vocabulary semantic segmentation.
+FlashWorld uses 480 × 704 input resolution, 24 conditioning camera poses interpolated from the 16
+initial poses, and sparse triggering. Semantic transfer uses three rendered views; optional videos are
+exported at 15 fps.
+
+A.3  Runtime characteristics
+
+Trig./Ep. denotes FlashWorld invocations per episode; Lat./Trig. denotes per-trigger world-model
+service time; Wait Ratio is the fraction of episode time waiting for fresh future evidence; and
+Waypoint Change measures the fraction of navigation decisions in which the selected waypoint
+differs from that selected using the observation-only map.  In HM3D simulation, FlashWorld is
+triggered at a fixed interval of 50 observation updates. In real-world execution it runs asynchronously
+while the local planner continues executing the current waypoint. In our experiments, N = 1/3/5
+futures take about 3.0/9.0/15.0s per trigger. The full model triggers 4.24 times per episode, with a
+20.1% waiting ratio and a 46.8% waypoint-change rate.
+
+B  Occluder-Aware Trajectory Sampling
+
+The sampler generates a compact set of virtual camera trajectories around the dominant forward
+occluder rather than densely enumerating actions. It is designed to cover complementary lateral and
+vertical reveal directions.
+
+B.1  Point cloud preprocessing and occluder selection
+
+Given RGB-D observation (It, Dt), intrinsics K, and pose qt, valid depth pixels are back-projected
+as
+                         x(p) = Dt(p)K−1¯p,       ¯p = [u, v, 1]⊤.                           (1)
+Ground points are removed, and the remaining non-ground points are clustered into Ct =
+{C1, . . . , CM}. A cluster is a forward candidate if
+                  Cj ∈Cfwdt  ⇐⇒|wrap (∠(¯xj −xt) −ψt)| ≤θfwd.                      (2)
+We rank each forward cluster by normalized projected area, inverse distance, and heading alignment:
+              ρj = Aj + (1 −dj) + hj,     hj = max{0, cos(∠(¯xj −xt) −ψt)},            (3)
+and select Ot = arg maxCj∈Cfwdt   ρj.
+
+B.2  Boundary, orbit center, and angular span
+
+The selected occluder Ot is projected onto the ground plane, and its boundary Bt is extracted using
+a convex hull [56] or an alpha-shape contour [57]. We define
+            1
+         ct =  X b,      rt = max ∥b −ct∥2,     dc = max(rt + rrobot + δ, dminc   ).      (4)
+             |Bt|                b∈Bt
+                 b∈Bt
+
+
+                                       15
+=== PDF PAGE 16 ===
+For each boundary point b, let θ(b) = atan2(by −ct,y, bx −ct,x). After unwrapping, the occluder
+span is [θmin, θmax]. Lateral target angles and arc lengths are
+
+   θL = θmax + ∆θ,  θR = θmin −∆θ,   d(v)v = clamp dc| wrap(θv −θ0)|, dminv    , dmaxv      ,   (5)
+
+where v ∈{L, R} and θ0 is the current camera azimuth around ct. The clamped length specifies a
+nominal arc extent; the realized start-anchored camera trajectory may be shorter than dminv    .
+
+B.3  Trajectory instantiation and filtering
+
+Based on the occluder geometry, the sampler generates continuous left, right, and overhead virtual
+camera trajectories from the current camera pose. Each trajectory is represented as
+
+                       τ t(v) = {(p(v)k  , R(v)k  )}Npose−1k=0      ,  v ∈{L, R, U}.                       (6)
+
+The lateral trajectories follow occluder-aware arcs with angular extents determined by the observed
+occluder boundary.
+
+For each lateral trajectory, the horizontal camera gaze target is defined as
+
+                       g(v)t,xy = (1 −γedge)ct,xy + γedgee(v)t,xy,  v ∈{L, R},                     (7)
+
+where e(v)t,xy denotes the corresponding observed boundary-side gaze target and γedge = 0.35. Cam-
+era orientations are smoothly interpolated toward the target viewing directions using spherical linear
+interpolation (SLERP).
+
+For the overhead trajectory, the camera faces the central direction of the observed occluder boundary,
+while its height varies smoothly as
+
+                                           πk
+                           z(U)k  = zcam + hmax sin                      .                           (8)                                                Npose −1
+
+The sampler validates the generated camera trajectories for pose validity, continuity, and compat-
+ibility with the world-model input.  If no reliable forward occluder is identified or the adaptive
+trajectories fail to meet the generation requirements, the sampler falls back to the predefined fixed
+left, right, and overhead virtual camera trajectories.
+
+C  3DGS Alignment, Semantic Label Transfer, and Scene Fusion
+
+This section summarizes how trajectory-conditioned 3DGS futures are converted into a planning
+representation.
+
+
+C.1  Representation and coordinate alignment
+
+Each Gaussian is stored compactly as
+                               gi = [xi, yi, zi, cri , cgi , cbi, radi, opai, ℓi],                           (9)
+where (xi, yi, zi) is the center, (cri , cgi , cbi) is color, radi and opai are simplified size and opacity, and
+ℓi is the semantic label. Before generation, the current pose and sampled trajectory are transformed
+into a local camera-centered frame ˆW:
+                     ˆqt = TWˆ ←W (qt),        ˆτt(v) = TWˆ ←W τ t(v) ,      ˆG(v)t = Φθ(It, ˆqt, ˆτt(v) ).         (10)
+
+After scale alignment, Gaussian centers are transformed back to the world frame:
+
+                                            ˜µ(v)i = Rt(s(v)t  ˆµ(v)i  ) + tt.                               (11)
+
+The compact imagined primitives use a fixed radius of 0.03 m and opacity of 1 after filtering.
+
+
+                                       16
+=== PDF PAGE 17 ===
+C.2  Depth scale alignment and semantic transfer
+
+For trajectory v, we render ˆD(v)t  from ˆG(v)t   at the current viewpoint and estimate scale by the median
+depth ratio:
+
+                                                                    Dt(p)
+                                                                                           (12)   Ω(v)t = {p | 0.1 < Dt(p) < 5.0, ˆD(v)t  (p) > 10−4},      s(v)t = medianp∈Ω(v)t                .                                                                                       ˆD(v)t  (p)
+
+The observed depth is center-cropped and resized using nearest-neighbor interpolation before align-
+ment. At least 100 valid pixels are required; otherwise, alignment raises an error. For semantic
+transfer, each available view m has a 2D semantic map Yt(m) (p). A projected primitive receives a
+valid vote only if it is inside the image and depth-consistent:
+                                  p(m)i  = π(KTCm←W µi),
+                   z(m)i  −D(m)rend(p(m)i   ) ≤τd,i(m) ,
+                                                                                           (13)
+
+                                    (m)                          (      D(m)rend(p(m)i   ) )
+                                   τ d,i = max  2 radi,      (m)          .
+                                                      fpix
+
+Here z(m)i    is the positive camera-frame depth of the Gaussian center, and f pix(m) is the smaller of the
+horizontal and vertical focal lengths in pixels. Only finite, positive rendered depths are used.  Its
+final label is obtained by majority voting over valid semantic labels:
+
+                                 ℓi = arg max X 1[Yt(m) (p(m)i   ) = c].                        (14)                                             c
+                            m∈Mi
+
+Segmentation confidence is thresholded at 0.3 before voting; primitives with no valid votes remain
+unlabeled.
+
+C.3  Scene fusion
+
+The aligned imagined primitives are first collected as
+
+                 Gimgt  = [ ˜G(v)t   ,     Gfuset  = Merge(Gobst  ∪Gimgt   ).                 (15)
+                         v∈V
+
+Here Merge denotes the joint use of separately stored observed and imagined representations, rather
+than confidence-weighted parameter averaging. The source indicator σg ∈{obs, img} is determined
+by buffer membership. Imagined trajectory outputs are concatenated after per-trajectory filtering and
+voxel downsampling, while the observed map is accumulated and downsampled separately. Voxel
+downsampling retains one representative primitive per occupied voxel.
+
+D  Future-Aware Value Map and Observation-Based Component Maps
+
+FAVM is evaluated on candidate waypoints using Gfuset    , while σg separates observed evidence from
+imagined hypotheses.
+
+D.1 FAVM components
+
+Let Pt = {µg | g ∈Gnav} denote candidate navigation positions given by the centers of navigable
+Gaussians. All scalar maps are normalized over Pt by
+
+                                       x(p) −minq∈Pt x(q)
+                    N(x)(p) =                                                        (16)                             maxq∈Pt x(q) −minq∈Pt x(q) + ϵ.
+For target category y⋆, observed and imagined target sets are
+   T treal = {g ∈Gfuset     | ℓg = y⋆, σg = obs},  T thyp = {g ∈Gfuset     | ℓg = y⋆, σg = img}.    (17)
+
+
+                                       17
+=== PDF PAGE 18 ===
+               Le#                             Right                      Up                       Merged
+
+
+
+
+
+Figure 6: Trajectory-conditioned 3DGS generation and fusion. Each row shows left-bypass, right-
+bypass, over-the-top, and merged futures.
+
+
+The semantic score discounts imagined target cues:
+
+
+                                                                            t                    ˜St(p) = e−dreal                                            t  (p)/τsem + λimge−dhyp                                                             (p)/τsem,   St = N(˜St).              (18)
+
+                        a ∥p −µg∥2 for a ∈{real, hyp}, τsem = 1.0 m, and λimg = 0.5. An emptyHere dat (p) = ming∈Tt
+target set contributes zero. At each imagination update, F tnew is constructed from imagined primi-
+tives lying less than 0.20 m from the estimated floor height and more than 0.15 m from the observed
+navigable map, followed by voxel downsampling. The expected reveal score is approximated by
+local coverage:
+                       ˜Et(p) = X  1[∥p −µg∥2 ≤rvis],  Et = N(˜Et).                  (19)
+                          g∈Ftnew
+Here rvis = 0.60 m. For risk estimation, we extract a set of imagined occupied voxels Himgt   through
+depth-consistency checks, geometric filtering, and spatial deduplication. Let dXY(h, p) denote the
+shortest ground-plane distance from voxel h to the line segment connecting the current camera
+position and candidate waypoint p. The geometric risk score is computed as
+                                                  p)2 !                    ˜Rt(p) = X  exp  −dXY(h,         ,    Rt = N(˜Rt).               (20)
+                                          2r2path
+                         h∈Himgt
+We set rpath = 0.35 m. When no valid risk evidence is available, Rt is set to zero. The Future-
+Aware Value Map is
+          mFAt  (p) = N (αsemSt(p) + αexpEt(p) −αriskRt(p)) ,    p ∈Pt.           (21)
+
+D.2  Observation-based map and navigation target
+
+The observation-based map is
+                   ¯mt(p) = N  mactt  (p) + msemt   (p) + mtrajt  (p) + mheut  (p)   .               (22)
+
+Here msemt    favors proximity to currently observed landmarks, mactt   encodes the next high-level
+action sector or frontier preference, mtrajt   discourages revisits using trajectory history, and mheut
+projects the multimodal planner’s predicted direction onto the map. The final affordance map and
+navigation target are
+             mafft  (p) = β ¯mt(p) + (1 −β)mFAt  (p),     p⋆t = arg max mafft  (p).           (23)
+                                                              p∈Pt
+
+
+                                       18
+=== PDF PAGE 19 ===
+               Current Observation                Imagined-Future-Aware Value Map (IFAVM) Components     Fused Affordance
+
+                                                                          Left Semantic S1(g)      Right Semantic S2(g)     Up Semantic S3(g)      Observation-Only Baseline
+
+
+
+
+
+                                                                         Left Exploration E1(g)    Right Exploration E2(g)    Up Exploration E3(g)
+
+              Imagined Trajectories                                                                                          Aggregated IFAVM
+
+                                   Left
+
+
+                                                                             Left Risk R1(g)           Right Risk R2(g)        Up Risk R3(g)
+
+
+
+                              Right
+
+                                                                                                                                                         Final Decision Map(Ours)
+
+
+                                                                         Left Contribution C1(g)   Right Contribution C2(g)   Up Contribution C3(g)
+
+                       Up
+
+
+
+
+Figure 7:  Future-Aware Value Map construction.  The figure shows the current observation,
+left/right/up imagined futures, per-trajectory semantic, exploration, risk, and contribution maps, and
+the final fused affordance map. Warm colors indicate higher utility, except in risk maps where they
+indicate higher penalty; the in-figure label IFAVM denotes the FAVM decomposition.
+
+
+The selected navigation target is used by the local planner to generate executable waypoints. Be-
+tween triggers, the robot uses the latest observation-based map and the most recent valid FAVM.
+
+For visualization, the per-trajectory contribution is
+
+                C(v)t  (p) = N  αsemS(v)t  (p) + αexpE(v)t  (p) −αriskR(v)t  (p)   .              (24)
+
+Figure 7 shows that FAVM shifts value from visible frontiers toward regions that balance target
+relevance, expected reveal, and traversal safety.
+
+
+E  Baselines, Evaluation Protocol, and Metrics
+
+E.1  Simulation benchmark and metrics
+
+We evaluate on HM3D within Habitat. Following the ObjectNav protocol, each episode is capped at
+a maximum of 500 steps and is considered successful if the agent stops within 1.0 m of an in-
+stance of the target category. We report Success Rate (SR), Success weighted by Path Length
+(SPL), and Distance to Goal (DTG). SR measures the fraction of successful episodes. SPL re-
+wards successful episodes with shorter paths. DTG measures the final geodesic distance from the
+agent to the target object. In HM3D simulation, the selected waypoints are executed using Habitat’s
+ShortestPathFollower with discrete navigation actions.
+
+We compare against four groups of baselines.
+
+
+Task-trained approaches.  ZSON [9], PixNav [13], SPNet [48], and SGM [35] rely on task-
+specific training or learned navigation policies. These methods can perform well in their training
+domains but are less aligned with the training-free zero-shot setting targeted by our method.
+
+
+Zero-shot geometric and semantic explorers.  ESC [28], L3MVN [49], TriHelper [50], VoroNav
+[51], GAMap [33], and BeliefMapNav [30] use geometric frontiers, semantic maps, language pri-
+ors, or belief maps to guide exploration without task-specific fine-tuning. They improve semantic
+
+
+                                       19
+=== PDF PAGE 20 ===
+Table 6: HM3D success rates stratified by occlusion severity. ∆SR denotes Ours minus Imagine-
+Nav++.
+                       Occlusion   ImagineNav++ SR ↑   Ours SR ↑  ∆SR ↑
+
+                 Low               0.682            0.720    +0.038
+                  Medium           0.629            0.674    +0.045
+                     High              0.564            0.652    +0.088
+
+
+
+
+exploration but typically estimate value from observed frontiers or a single belief state rather than
+from an ensemble of trajectory-conditioned future 3D scenes.
+
+
+
+LLM/VLM-based planners. VLFM [12] and InstructNav [31] use vision-language or language-
+model reasoning to construct navigation guidance. For real-world comparison, we use a Qwen3.6-
+35B-A3B-based implementation of InstructNav-style planning to align the high-level reasoning ca-
+pability with our system. This baseline uses the same RGB-D observations and local controller
+where applicable, but it does not use trajectory-conditioned 3D future imagination or FAVM.
+
+
+
+Imagination-based navigators.  ImagineNav [46] and ImagineNav++ [47] use scene imagination
+to assist embodied navigation.  Unlike these methods, Schr¨odinger’s Navigator imagines 3DGS
+futures conditioned on multiple candidate trajectories and fuses the resulting semantic, exploratory,
+and risk evidence into a spatial FAVM for zero-shot ObjectNav.
+
+As occlusion severity increases, both methods exhibit lower success rates, while the advantage of
+our method becomes more pronounced. Our method outperforms ImagineNav++ by 3.8, 4.5, and
+8.8 percentage points under low, medium, and high occlusion, respectively.
+
+
+
+E.2  Real-world protocol
+
+
+Real-world experiments are conducted on a Unitree Go2 quadruped equipped with an RGB-D cam-
+era in three indoor environments: Office, Classroom, and Common Room. We evaluate two settings.
+In Static Object Search, the target is a static object in a standard indoor scene. In Unknown-Risk
+Scenarios, the scene includes severe occlusion or blind spots that may hide targets or risky regions
+from the initial viewpoint. Each scene contains 10 trials per setting, and success is reported as
+Success / Total Trials.
+
+
+
+F  Additional Qualitative Results and Failure Analysis
+
+
+
+In qualitative overlays, Flag denotes the visual target-verification signal and DTS denotes the log-
+ger’s distance-to-success value; main quantitative results use DTG.
+
+
+
+Successful rollouts.  Figure 8 shows cases where imagined futures guide the agent toward view-
+points that reveal hidden targets across bed, potted plant, toilet, chair, sofa, and television set
+episodes.
+
+
+                                       20
+=== PDF PAGE 21 ===
+Figure 8: Successful occlusion-heavy simulation rollouts. Each row shows the current observation,
+imagined future views, top-down checkpoints, first-person rollout frames, and the final target reveal.
+
+
+
+
+End-to-end failures.  Figure 9 summarizes localization, detection, occlusion-handling, and termi-
+nation failures, which typically arise from compounding perception, mapping, planning, and stop-
+ping errors.
+
+
+
+
+
+Figure 9: End-to-end failure modes. Rows show localization, detection, occlusion-handling, and
+termination errors with imagined hypotheses, execution checkpoints, final evidence, and diagnostic
+cues.
+
+
+                                       21
+=== PDF PAGE 22 ===
+World-model failures.  Figure 10 isolates hallucinated target evidence, scale/depth drift, missed
+occluded evidence, and trigger gaps. These cases motivate discounting imagined semantics, penal-
+izing geometrically supported occupied regions along candidate paths, and fusing future evidence
+with observation-based maps.
+
+
+
+
+
+Figure 10: FlashWorld-related failure modes. Rows show hallucinated target evidence, scale/depth
+drift, missed occluded evidence, and trigger gaps.
+
+
+G  Real-World Deployment Details
+
+G.1  Hardware, services, and safety
+
+Real-world experiments use a Unitree Go2 quadruped with an Intel RealSense D435i RGB-D cam-
+era. The onboard Jetson Orin maintains robot-state feedback and velocity control, while RGB-D ob-
+servations are forwarded through FastAPI to a remote GPU server for perception, future imagination,
+and FAVM waypoint selection. The asynchronous split keeps high-frequency control independent
+of the slower world-model service.
+
+
+
+
+
+Figure 11: Real-world deployment architecture for Go2 sensing, FastAPI communication, remote
+GPU inference, and velocity-command execution.
+
+
+For HM3D simulation, four RTX 4090 GPUs support parallel episode evaluation and shared model
+inference, increasing evaluation throughput without changing the per-episode navigation protocol.
+
+Each control cycle updates the local point cloud and semantic/navigable maps, parses action-
+landmark guidance, triggers future imagination when needed, fuses observation-based maps with
+FAVM, and sends the selected waypoint to the local planner. In Static Object Search, targets are
+
+
+                                       22
+=== PDF PAGE 23 ===
+                         Table 7: Compute and service configuration.
+
+          Item                        Configuration
+
+         Robot platform              Unitree Go2 quadruped
+         Onboard computer        Go2 onboard Jetson Orin
+       RGB-D sensor                 Intel RealSense D435i
+          Simulation compute        Four NVIDIA RTX 4090 GPUs (parallel evaluation)
+          Real-world inference GPU  One NVIDIA H800 GPU on a remote server
+         World-model service        FlashWorld on the remote GPU server via FastAPI
+          High-level reasoning       Qwen3.6-35B-A3B for instruction and direction judgment
+          Control interface           FastAPI waypoint service with velocity-command output
+
+
+
+common indoor objects in plausible locations; in Unknown-Risk Scenarios, targets or risky regions
+are partially hidden by furniture, dividers, desks, or plants. The robot executes only locally collision-
+checked waypoints. Imagined futures modify affordance scores but never directly command motion,
+and all real-world trials use conservative speed limits with manual supervision.
+
+
+
+
+
+                                       23

@@ -1,0 +1,188 @@
+[
+  {
+    "id": "P1",
+    "name": "Recovery labels",
+    "cutoff": "2026-10-22",
+    "status": "Accepted as a conditional diagnostic study after independent review; originality and empirical benefit unestablished",
+    "method_novelty": "Low; broad mechanism established. No original-method certification.",
+    "study_originality_confidence": "Low to moderate, bounded by reviewed literature",
+    "logical_status": "Bounded acceptance in focused review 08; no material logical blocker under stated assumptions, no learned-policy or deployment guarantee",
+    "empirical_status": "No proposed-system training or navigation benchmark; natural prevalence and utility untested",
+    "implementation_feasibility": "Diagnostic conditional on missing assets/labels; model work gated by the diagnostic",
+    "scientific_value": "Potentially an independently validated protocol, audit or dataset plus a controlled intervention; conference-level method value not established",
+    "source_claim_ids": [
+      "correctnav-C01",
+      "fgr2r-C01",
+      "progressthink-C01",
+      "navnuances-C01",
+      "navnuances-C02",
+      "ROOT-C03"
+    ],
+    "source_bottleneck_ids": [
+      "03-correctnav-recovery",
+      "fgr2r-transition",
+      "mtrack-procedure",
+      "mtrack-hard"
+    ],
+    "source_matrix_ids": [
+      "05-R01",
+      "05-R03",
+      "05-R04",
+      "05-R06",
+      "05-R08",
+      "05-R10"
+    ],
+    "additional_source_ids": [
+      "07-ground_compose_reinforce"
+    ],
+    "novelty_source_ids": [
+      "S09-LAW",
+      "S09-NRM",
+      "S09-OCD",
+      "S09-GCR"
+    ],
+    "review_finding_ids": [
+      "09-P1-01",
+      "09-P1-02",
+      "09-P1-03",
+      "10-P1-01",
+      "10-P1-02",
+      "10-P1-03"
+    ],
+    "logic_review_record": "evaluations/08_findings.json:proposals[id=P1]",
+    "feasibility_review_record": "evaluations/10_findings.json:findings[proposal_id=P1]",
+    "novelty_review": "evaluations/09_novelty.md",
+    "detail_path": "proposals/final_proposals.md",
+    "original_review_target": "proposals/draft_proposals.md",
+    "research_hypothesis": "On a reliably annotated subset of route instructions, independently validated remaining obligations will expose semantically invalid **complete recovery continuations** that persist after a language-aligned waypoint teacher and a straightforward history/milestone baseline. Correcting those labels will improve held-out obligation completion in an otherwise matched training experiment. A cost-suboptimal first move alone is not a semantic error. Either stage can fail, in which case the method claim stops.",
+    "target_bottleneck": "CorrectNav's geometric suffix construction does not establish that earlier obligations are complete; DUET's inspected teacher returns STOP at the reference endpoint without checking a new obligation state. These are bounded mechanism observations, not measured natural semantic-error rates. See [CorrectNav](../dossiers/correctnav.md), claims `correctnav-C01`, and independent findings `10-P1-01`–`03` in [10's records](../evaluations/10_findings.json).\n\nThe elementary example is “visit A, then finish at G.” After arriving at a junction without visiting A, going to G can remain recoverable. **Going to G and stopping** fails. The independent check distinguishes this from efficiency and from a declared budget of 3 versus 5 movement units. [08 setup/results](../experiments/08/logic_results.json). Natural R2R instructions permit alternatives and explicit procedural cases may be rare; the pilot must report the excluded denominator.",
+    "proposed_mechanism": "Start with a **static, common graph-neighbor menu plus explicit STOP** for every teacher. This is a controlled label study, not native DUET reproduction. Use only a node-landmark visit grammar for which physical node, action and annotated event transitions are sufficient. Heading-sensitive turns, turn counts and other control-dependent clauses are excluded initially; a later extension needs heading/control state and separately validated event semantics.\n\nAnnotators inspect actual observed history and instruction, independently of teacher outputs, and adjudicate completed requirements, permitted alternatives and uncertainty. Full training-scene annotations may support the teacher oracle; the deployed student receives only its actual observation/action history. Missing or ambiguous action labels are masked, not replaced with the union of incompatible state-specific targets. Masking only the state loss while retaining an unjustified oracle action target is insufficient.\n\nThe sequence is: independently annotated history → common-menu teacher continuations → semantic/efficiency audit → label-only training if justified → optional state estimator only after separating label and architecture effects. No state module is required for the first diagnostic. If later needed, encode remaining clause descriptions and event relations with a shared compositional encoder or a restricted canonical schema. Arbitrary per-instruction state-number embeddings cannot support a claim about unseen instruction structures.",
+    "formal_formulation": "For the static pilot let `s=(v,q)`, with v the sufficient physical graph state and q the state of an adjudicated instruction automaton. Define an explicit acceptance predicate `C(v,q)`, including the required **current** terminal position and completed obligations. For “visit A, then finish at G,” `C(v,q) = (v=G) AND (A was previously visited)`, provided no rejecting condition occurred. A latched event state alone cannot license STOP after leaving G. Movement actions have positive costs and known transitions `T(s,a)`; STOP enters an absorbing success terminal only when C holds, otherwise an unsuccessful terminal. STOP is **not** a zero-cost self-loop. Use `c(STOP)=0`, `V*(success terminal)=0`, and `V*(failure terminal)=infinity`; these terminal states are absorbing and admit no further actions. An irreversible forbidden event enters a rejecting state. Let `V*(s)` be the minimum cost of an accepting completion over this exact common menu.\n\nFor finite `V*(s)`, use the zero-slack efficient set\n\n\\[\nY(s)=\\{a:c(s,a)+V^*(T(s,a))=V^*(s)\\}.\n\\]\n\nUnreachable or unresolved states receive no invented expert action. Report them separately as outcomes; do not remove them silently from the denominator. If a remaining budget B is part of the task, define the separate feasibility set\n\n\\[\nF_B(s)=\\{a:c(s,a)+V^*(T(s,a))\\le B\\}.\n\\]\n\nDeclare B before comparisons. A semantically viable but longer continuation is an efficiency difference; a continuation that stops without satisfying the instruction, an irreversible rejecting transition, or failure under a declared shared budget is a different outcome. For reversible eventual-visit tasks, most movements may remain viable, so the primary semantic audit evaluates the **whole teacher continuation including its terminal decision**. An action outside Y alone is never counted as semantic failure.\n\nAfter the audit, a nonempty fixed target set can train `L_action = -log(sum_{a in Y} pi_theta(a|h,I))`. This ordinary partial-label loss increases total mass on Y; it neither distributes mass among ties nor guarantees compliance. A later state model `b_phi(q|h,I)` can train with `L_state=-log b_phi(q_true|h,I)` on adjudicated labels and condition the policy through a shared semantic encoding `sum_q b_phi(q)e_I(q)`. Here e_I encodes the remaining clauses/state structure, not a lookup table of arbitrary training-instruction IDs. Combine losses with a development-selected weight and keep both action/state ambiguity masks explicit. No epsilon slack is used in the first study: slack can admit cycles. The finite positive-cost Bellman argument applies only to the specified oracle, not to a learned or partially observed policy.\n\nNative DUET integration is a separate stage. Its realized observed map, visited mask and macro menu depend on history; the oracle generally needs `s=(v,q,m)` with m describing that evolving interface, or a clearly frozen-menu subproblem. An unrestricted primitive shortest-path oracle cannot claim optimality for a different macro menu. Consume events only under the real observation contract: recording intermediate path nodes does not imply that the simulator delivered intermediate images.",
+    "novelty_argument": "[LAW](https://aclanthology.org/2021.emnlp-main.328/), §3, already changes off-path supervision from shortest-goal actions to language-aligned waypoints without changing the policy. Its inspected sensor is geometric; this does not make generic teacher correction new. [Reward Machines for Deep RL in Noisy and Uncertain Environments](https://proceedings.neurips.cc/paper_files/paper/2024/file/c71769e2715835d37c3e25cc1173bd62-Paper-Conference.pdf), §5.3, already predicts task-state distributions from full history. [Optimal Completion Distillation](https://arxiv.org/abs/1810.01398v2), §3, supplies optimal continuation sets with a uniform-tie target. Reward machines, FGR2R, M-TRACK, Landmark-RxR, HAMT's R2R-Back and [Ground-Compose-Reinforce](https://arxiv.org/abs/2507.10741v2) are additional controls.\n\nThe remaining possible contribution is **a trustworthy photorealistic recovery-label dataset/protocol and an incremental teacher result against these methods**, including valid alternatives, full-continuation semantics and independently observed evidence. A new state head, automaton or label-only intervention is not an originality claim. Novelty of this narrower empirical contribution remains unestablished. Review/source IDs: `09-P1-01/02/03`, `S09-LAW/NRM/OCD`. Inspected precedents include [LAW's pinned sensor](https://github.com/3dlg-hcvc/LAW-VLNCE/blob/020fa33a313beaf91f73add0cd62089fe768c8cf/habitat_extensions/sensors.py#L190) and [NRM's pinned state detector](https://github.com/andrewli77/reward-machines-noisy-environments/blob/af9883a1d382b8f2fe3a650faaa4fdda29d69ae1/src/detector_model.py#L8) and [state CE](https://github.com/andrewli77/reward-machines-noisy-environments/blob/af9883a1d382b8f2fe3a650faaa4fdda29d69ae1/src/algo_pretrain_detector.py#L46).",
+    "benefits_tradeoffs": "Possible benefits are clearer diagnosis and fewer incorrect labels on the measured slice. Costs include route/event annotation, excluded ambiguous cases, product-state computation and eventual state-estimation errors. A tiny natural slice may not justify a general navigation method. No performance improvement is predicted numerically.",
+    "minimal_implementation": "Use DUET commit `93e8b233164bc079a6db48b8a0a78d123ec8de41`. Implement the first oracle and annotation manifest outside the training stack. For later integration inspect `map_nav_src/r2r/agent.py:239–285,404–423` for targets, `110–123` and `models/vilmodel.py:786–813` for candidate masking, and `agent.py:287–303` for macro execution.\n\nChange endpoint-forced teacher/sample termination (`453–455`) identically across semantic-task arms; distinguish STOP from budget/no-frontier exhaustion (`459–466`). Disable cached return for **all** first semantic-task arms, or later use one shared declared return convention and recompute event completion and travel after it (`471–478`). Do not repair only the proposed arm. Native unchanged DUET remains a separate reference. At deployment, oracle event labels must not decide termination. FGR2R/M-TRACK reconstructions must be labelled and validated because the inspected releases are incomplete.",
+    "experimental_plan": "The [initial experiment plan](../experiments/Initial_Experiment_Plan.md) is a coordinator-maintained companion; this final proposal's distinctions take precedence over older wording. Establish visual assets, a checkpoint, encoded annotations and observation contracts first. Then probability-sample natural checkpoints from frozen-policy development rollouts independently of teacher disagreement. The suggested 200 natural checkpoints and 100 constructed pairs are pilot planning counts, not collected data or a power calculation. Controlled pairs never estimate natural prevalence.\n\nCompare geometric, goal-distance/nDTW, LAW, reversible-progress, milestone/reward-machine and validated product-state teachers over the same menu, events and checkpoints. Separate task-state input from target construction; compare one-label versus all-ties supervision and uniform-target CE/KL versus marginal-set loss at equal state/label access. Include full-continuation success, irreversible violation, budget feasibility, excess cost, ambiguity and annotation agreement. Use scene/episode clusters and retain sampling weights. Pre-training contract tests include unfinished obligations at the goal, a required visited destination, missing witness, rejecting event, budget exhaustion and return-path event changes.\n\nOnly after an informative diagnostic, train identical architectures on fixed rollout states with common initialization, data, labels, optimizer exposure and candidates. Compare labels-only before state estimation, then learned versus oracle state, history-only and current-view controls. Use R2R development data, interpretable RxR/R4R slices, R2R-Back with its existing stage-aware metrics, and validated NavNuances contrasts where their semantics fit. Preserve a new untouched final test; the existing local validation geometry has already been inspected. Report ordinary SR/SPL and route fidelity alongside independently adjudicated obligation completion and travel. Later recovery disturbances are common externally specified interventions, with natural self-induced errors reported separately.",
+    "falsification_criteria": "Reject or narrow if natural invalid continuations are negligible, labels are unreliable, legitimate alternatives explain the disagreement, LAW or a simple history/milestone teacher removes it, or equal-budget training shows no benefit. Reject the state-module claim if corrected labels alone suffice or only privileged state works. Do not reinterpret a purely efficient-route gain as semantic correctness.",
+    "risks_prerequisites": "Annotations/connectivity exist; usable visual features, licensed scenes, compatible checkpoint and simulator are not established locally. Raw R2R annotations lack the pinned loader's encoded instruction field. The laptop GPU exists but installed PyTorch is CPU-only. All natural prevalence, annotation reliability and downstream benefits remain untested. Logical status is conditional on the explicit graph/event/menu contract; scientific value is potentially an audit or dataset contribution. The next decisive experiment is the blinded **full-continuation** audit.",
+    "rank": 1
+  },
+  {
+    "id": "P2",
+    "name": "Route validity",
+    "cutoff": "2026-10-22",
+    "status": "Accepted as a conditional diagnostic study after independent review; originality and empirical benefit unestablished",
+    "method_novelty": "Low; broad mechanism established. No original-method certification.",
+    "study_originality_confidence": "Low to moderate, bounded by reviewed literature",
+    "logical_status": "Bounded acceptance in focused review 08; no material logical blocker under stated assumptions, no learned-policy or deployment guarantee",
+    "empirical_status": "No proposed-system training or navigation benchmark; natural prevalence and utility untested",
+    "implementation_feasibility": "Diagnostic conditional on missing assets/labels; model work gated by the diagnostic",
+    "scientific_value": "Potentially an independently validated protocol, audit or dataset plus a controlled intervention; conference-level method value not established",
+    "source_claim_ids": [
+      "rcm-C01",
+      "srdf-C01",
+      "ROOT-C03"
+    ],
+    "source_bottleneck_ids": [],
+    "source_matrix_ids": [
+      "05-D01",
+      "05-D02",
+      "05-D06",
+      "05-D07",
+      "05-D08"
+    ],
+    "additional_source_ids": [
+      "07-dataset_cartography",
+      "07-learning_to_reweight"
+    ],
+    "novelty_source_ids": [
+      "S09-CVS",
+      "S09-CART",
+      "S09-FCA"
+    ],
+    "review_finding_ids": [
+      "09-P2-01",
+      "09-P2-02",
+      "10-P2-01",
+      "10-P2-02"
+    ],
+    "logic_review_record": "evaluations/08_findings.json:proposals[id=P2]",
+    "feasibility_review_record": "evaluations/10_findings.json:findings[proposal_id=P2]",
+    "novelty_review": "evaluations/09_novelty.md",
+    "detail_path": "proposals/final_proposals.md",
+    "original_review_target": "proposals/draft_proposals.md",
+    "research_hypothesis": "Within one fixed generated instruction–route pool, complete independently adjudicated evidence bundles improve supported-validity assessment and useful selection beyond compatibility, success filtering and existing validity/hardness methods under matched annotation and training budgets. A positive validity audit without downstream improvement remains an empirical dataset result, not a better navigation method.",
+    "target_bottleneck": "RSI-Nav Appendix H acknowledges valid difficult pairs rejected by execution and semantically wrong pairs accepted by success. Its code subsequently trains source-route frames/actions rather than necessarily the verification rollout. RCM, APS, SRDF and GSA already provide matching, difficult-example selection, recursive filtering and visual correction. These support a precise audit question, not a known prevalence or evidence that scaling reduces language reliance. See claims `rcm-C01`, `srdf-C01`, matrix `05-D01/D02/D06/D07/D08`, and [10-P2 findings](../evaluations/10_findings.json).",
+    "proposed_mechanism": "Freeze route IDs, instructions, observed route evidence and generation version. For each pair record a frozen named navigator's difficulty separately from the annotators' **supported valid / contradicted / unresolved** status. Unresolved describes missing or ambiguous evidence; it is not a third physical truth value.\n\nA witness for a relational clause must contain everything needed to support it: for example, both referenced observations plus their ordered transition and identity association. Encode a complete bundle as one route-evidence unit. Multiple complete bundles can be alternatives; individual required pieces cannot be placed in a single OR-union and called a verified conjunction. A bundle encoder consumes all its elements with temporal/identity relations, followed by ordinary clause-status and pair-status heads. Test missing-element and order-swap counterexamples; attention or a saved explanation is not self-certifying evidence.",
+    "formal_formulation": "Let `B_c={b_c1,...,b_cM}` be candidate **complete** bundles for clause c, and `W_c` the annotated acceptable alternatives. A normalized bundle score alpha gives the auxiliary loss `-log(sum_{b in W_c} alpha_cb)`, only when W_c is known and nonempty. Its OR is over complete alternatives. A more granular implementation can use required groups with separate normalized distributions and a joint relation encoder; it is a separate variant, not the original single-row union loss. Pair/clausal annotation-status CE and bundle supervision are ordinary losses, not new principles.\n\nLet r_i be the scorer's supported-validity ranking score and d_i the frozen-policy difficulty. The fixed-count experiment chooses the highest-scoring `B_k` examples within each member of a **disjoint exhaustive partition** D_k, where `0<=B_k<=|D_k|` and `sum B_k=B`. Publish the difficulty/semantic partition and rare-cell merging rules. This is ordinary per-stratum ranking. Hard quotas can retain low-quality examples: the primary fixed-count study reports that cost. A separate quality-floor/abstention variant may select fewer examples or be infeasible; do not silently refill or claim an equal-count comparison for it.\n\nMasked binary labels identify `P(valid|evidence,label observed)` without additional missingness/support assumptions. Three-way status scores predict the annotation process, not automatically population truth. Use probability-sampled independent audits, record label availability by difficulty/type, and report resolved precision, unresolved coverage and downstream outcomes. Do not call r a calibrated truth probability. Blinding is procedural separation, not a claim of statistical independence between validity, observability and difficulty.",
+    "novelty_argument": "[CVS](https://arxiv.org/abs/2603.09715v2), §2.2, already filters semantic conflicts then prioritizes hard positives; its YES/NO token scores are not a normalized binary complement. GELA already supervises grounding, and [FCA-NIG](https://arxiv.org/abs/2506.08566), §§4.1–4.6, constructs sub-instruction/trajectory and entity/landmark alignments. Dataset Cartography, clean-validation reweighting and compatibility methods cover ordinary selection. GSA's Appendix A.2 uses navigator-based selection and visual corrections in benchmark construction. Consequently **validity plus difficulty or clause alignment is not a novel mechanism**.\n\nThe possible contribution is a route-specific evidence/annotation protocol and an incremental controlled selection result beyond those methods. Compare an adapted CVS scorer, a witness-free matched verifier, an ordinary alignment-supervised verifier, and correction-only controls. Meta-Explore supplementary §C.3/Table 2 shows category processing can change results, so keep that processing constant across selectors. Do not turn disclosed GSA benchmark construction into an automatic navigator-leakage allegation. Novelty of the narrow empirical study remains unestablished. Review/source IDs: `09-P2-01/02`, `S09-CVS/CART/FCA`; the review did not establish official CVS/FCA implementation availability, so adaptations must be described as such.",
+    "benefits_tradeoffs": "Potential benefits are identifying wrong accepted pairs and retaining valid difficult ones. Costs include finding complete witnesses, segmentation, adjudication, scorer computation and selection overfitting. Equal pair counts do not equal annotation effort. Constructing relational bundles can be expensive or impossible with incomplete observations; missing support must remain unresolved.",
+    "minimal_implementation": "Use DUET commit `93e8b233164bc079a6db48b8a0a78d123ec8de41`, `map_nav_src/r2r/data_utils.py:5–46` and `main_nav.py:24–82,143–155`. Introduce a versioned selected-pair manifest; preserve globally unique instruction IDs, route-family provenance and the ordinary/augmentation update schedule. Keep policy loss unchanged.\n\nUse RSI-Nav commit `5e8fa2c74cf8e7dc305b33088a963b200e20805d` only as a filter comparator initially: `evo_rollout.py:1517–1540,1578–1599` defines acceptance and source-path samples; `evo_utils.py:1035–1101` mixes additional QA queues. Freeze those streams. Recreating missing SRDF source is a labelled paper-derived baseline, not an official reproduction. Large RSI-Nav model training is unnecessary for the first audit.",
+    "experimental_plan": "First probability-sample the natural fixed pool within declared difficulty strata, then label validity; one cannot balance unknown validity before labelling. A later enriched case-control set is separate and retains inclusion probabilities. Split generated siblings/paraphrases with their route family and use scene-disjoint scorer development where the claim requires it. Final navigation evaluation uses independently authored instructions on an untouched split.\n\nAt equal acceptance rates compare random, success/SPL/nDTW, compatibility, CVS-style semantic-plus-hardness, training dynamics, clean-validation selection, validity-only, difficulty-only, witness-free and complete-bundle scorers. Match both human annotation time and label access where possible, reporting unavoidable differences. Measure false acceptance/rejection, complete-bundle correctness, unresolved coverage, valid-hard retention and annotation agreement. Missing-piece/order-swap tests check whether the evidence head uses all required elements.\n\nOnly if selection quality survives those controls, train equal-count subsets with fixed accepted unique-route count, token/update exposure, ordinary-data mixing, features, initialization and scene/path distribution; semantic-composition changes are a separate factor. Evaluate navigation success, path fidelity, correct responses to valid contrasts and paraphrase robustness, with scene/route-clustered uncertainty. Separate selection from instruction correction, which changes the pool.",
+    "falsification_criteria": "Stop the method claim if complete witnesses add no discrimination beyond an equal-cost ordinary verifier/CVS control, hard examples are mostly unresolved noise, annotation is unreliable, or downstream gains vanish when exposure and correction are matched. If only extra human labels explain the result, report that dependency. A better selector score alone does not establish useful navigation learning.",
+    "risks_prerequisites": "The immutable generated pool, route observations, difficulty logs/checkpoint and independent annotations are not established locally; geometry alone is insufficient. No selection audit or training has run. The quota optimization is elementary and correct under feasibility assumptions; the evidence encoder, population generalization and navigation benefits remain empirical hypotheses. The next decisive experiment is the blinded validity/witness audit with equal-rate existing selectors.",
+    "rank": 2
+  },
+  {
+    "id": "P4",
+    "name": "Negative memory",
+    "cutoff": "2026-10-22",
+    "status": "Accepted as a conditional diagnostic study after independent review; originality and empirical benefit unestablished",
+    "method_novelty": "Low; broad mechanism established. No original-method certification.",
+    "study_originality_confidence": "Lower confidence in residual empirical gap; conditional contamination study",
+    "logical_status": "Bounded acceptance in focused review 08; no material logical blocker under stated assumptions, no learned-policy or deployment guarantee",
+    "empirical_status": "No proposed-system training or navigation benchmark; natural prevalence and utility untested",
+    "implementation_feasibility": "Diagnostic conditional on missing assets/labels; model work gated by the diagnostic",
+    "scientific_value": "Potentially an independently validated protocol, audit or dataset plus a controlled intervention; conference-level method value not established",
+    "source_claim_ids": [
+      "psgnav-C02",
+      "polarmem-C01",
+      "polarmem-C02"
+    ],
+    "source_bottleneck_ids": [
+      "PSG-1",
+      "POLAR-1"
+    ],
+    "source_matrix_ids": [
+      "06-M03",
+      "06-A01",
+      "06-A02",
+      "05-S05",
+      "05-P03",
+      "05-R11"
+    ],
+    "additional_source_ids": [
+      "07-negative_information"
+    ],
+    "novelty_source_ids": [
+      "S09-HIMECO",
+      "S09-EMBODISKILL",
+      "S09-DOCTOR",
+      "S09-CANTEST",
+      "S09-PSG"
+    ],
+    "review_finding_ids": [
+      "09-P4-01",
+      "09-P4-02",
+      "09-P4-03",
+      "10-P4-01",
+      "10-P4-02",
+      "10-P4-03"
+    ],
+    "logic_review_record": "evaluations/08_findings.json:proposals[id=P4]",
+    "feasibility_review_record": "evaluations/10_findings.json:findings[proposal_id=P4]",
+    "novelty_review": "evaluations/09_novelty.md",
+    "detail_path": "proposals/final_proposals.md",
+    "original_review_target": "proposals/draft_proposals.md",
+    "research_hypothesis": "For a fixed navigation memory representation and feedback protocol, deployable evidence specific to the **semantic category claim** reduces harmful negative writes and later suppression beyond no-write, quarantine, simple controller-failure rules and diagnosis-based memory baselines. Improvement must survive fixed observations, retrieval, capacity and episode exposure. This is narrower than failure-aware memory in general.",
+    "target_bottleneck": "The inspected PSG-Nav release writes recent detections into a negative bank after terminal failure. Assignment 10's isolated actual-source/stub test then rejects a stipulated correct-category crop, even with a matching positive entry. That establishes a conditional write/read pathway, not natural poisoning frequency, real crop correctness or published performance. The paper's small reported dynamic-versus-static increments make frozen memory especially important. [08 logic](../evaluations/08_logic.md), [10 source findings](../evaluations/10_feasibility.md), `psgnav-C02`.\n\nThe release is not a faithful stand-in for paper EEC. It uses color-histogram crop features, an early negative veto at similarity 0.95, default negative capacity 20 and category banks loaded across scene folders. The paper uses visual/group/room context, an additive positive-minus-negative adjustment and capacity 10. Preserve a clearly named **release-level study**; a paper-faithful EEC reconstruction is a different, independently validated baseline. No claim about a paper-method failure follows from fixing release behavior.",
+    "proposed_mechanism": "Separate a category-recognition claim, an approach/control outcome and a completion check. Record actual crops, track/scene association, actions, available pose/control residuals and contradiction observations. The current bank lacks much of that record; collecting it is a prerequisite, not a free existing input. Native category ObjectNav accepts another instance of the requested category. Instance-specific navigation requires a separate task definition.\n\nA proposed gate permits a semantic negative only when a learned identity-error score is high **and** a linked observed contradiction supports that same category claim. No cause or no reliable witness means unresolved/quarantine. A predicted witness is fallible: verify association, visibility and label scope independently. Extra reasoning on the same crop does not create independent evidence; newly acquired views must be shared with controls or factored and charged separately.",
+    "formal_formulation": "Let E contain deployable evidence and c the scoped claim. Scores `q_D,q_R,q_C` represent recognition-error, approach-failure and completion-error predictions. With label indicators m_k, use `sum_k m_k BCE(q_k,y_k)`. Causes may co-occur; they are neither mutually exclusive nor assumed independent. Without an ignorable-label/support assumption this fits labelled subsets, not calibrated population probabilities. Use a separately probability-sampled audit; publish missingness and unresolved strata. If distinct causes are observationally indistinguishable, the learner cannot identify them by naming extra heads.\n\nFor verified controller-only paired interventions that preserve both identity evidence and label, an optional squared difference between q_D predictions encourages invariance. It is ordinary regularization, admits constant predictions and proves no causal identification. A changed view, occlusion or track invalidates that pair assumption.\n\nDefine `g(E,c)=1[q_D>=tau] * 1[W(E,c)=1]`, where W is the **predicted, linked contradiction witness**, not a ground-truth truth flag. Evaluate the entire correlated gate's precision, coverage and later memory effect. Marginal calibration of q_D can disappear after conditioning on W; do not multiply independent confidences or infer precision from a threshold alone. Oracle-witness, witness-presence-only and predicted-witness variants remain distinct. Threshold development is scene-disjoint and carries no guarantee under policy or environment shift.",
+    "novelty_argument": "[HiMeco](https://arxiv.org/abs/2610.20312v1), §§3.1–3.4, already diagnoses multiple failure types and gates persistent memory updates with evidence eligibility; its diagnosis uses privileged retrospective information. [EmbodiSkill](https://arxiv.org/abs/2605.10332v2), §3.2, already separates execution lapses from skill-content errors. [DoCtOR](https://arxiv.org/abs/2608.28264v1), §§3.1–3.3, addresses misattributed failure contaminating memories. PolarMem/Context-Nav/PSG-Nav, CLOSER, VLN-NF and old visibility-conditioned negative information add strong constraints.\n\n[CanTest](https://aclanthology.org/2026.findings-acl.1402/), §4.2 and Appendix A.4, provides a relevant counterfactual component-repair control in VLN; it does not establish this memory-writing rule. Any oracle repair belongs in diagnosis/upper-bound experiments and must not silently supply the deployable writer's input.\n\nNeither diagnosis-before-memory, typed memory, negative banks nor conservative gating is new. The possible contribution is a **measured incremental benefit for claim-specific negative semantic writes using evidence available at deployment**, against these principles and simple controls. A release fix or improved crop representation alone does not support this claim. Novelty and practical benefit remain uncertain. Review/source IDs: `09-P4-01/02/03`, `S09-HIMECO/EMBODISKILL/DOCTOR/CANTEST/PSG`; [EmbodiSkill's pinned routing](https://github.com/air-embodied-brain/EmbodiSkill/blob/760126030eab1d33ec6a6f30988f0f1fb58df3a7/agentkit/skill/embodiskill_skill/EmbodiSkill.py#L898) is an inspected mechanism precedent. The full CanTest oracle-repair implementation was not verified; the paper remains prior art.",
+    "benefits_tradeoffs": "Potential benefits are fewer wrong negatives and less later suppression. Costs include trace collection, track association, attribution labels/models and retained stale beliefs when writes are withheld. Improved feature representations can independently fix histogram collisions and must be isolated. A safer write policy may reduce useful negatives and harm overall performance; optimize repeated-task utility rather than false-write precision alone.",
+    "minimal_implementation": "Use PSG-Nav commit `181d878ff207845a31e542a19a6592925c1e9bab`: instrument `PSG_Nav.py:1483–1554`, detection windows in `utils/object_detection.py:289–324,543–564`, negative writes/retrieval in `utils/rag_manager.py:185–254,277–302`, feature extraction `354–392`, bank loading `739–809`, and the read-side exclusion in `object_detection.py:618–662`. Start with shadow logging; reset disk banks per replicate and preserve the upstream reference.\n\nFirst hold representation, detector outputs, retrieval/veto, capacity, scene scope, positive updates and feedback fixed while changing only negative-write policy. A second factorial study may improve representation for every arm. Paper-faithful EEC is separately reconstructed and labelled. The unmodified two-7B-model server is not a credible fit on the local 8 GB GPU; no throughput or memory benchmark has been measured. Offline trace replay avoids that stack only if appropriate traces have been collected elsewhere.",
+    "experimental_plan": "Probability-sample natural failures separately from balanced synthetic cases: correct category with failed approach, wrong category with adequate control, occlusion, track swap and moved objects. Independently adjudicate available evidence and unresolved causes. Replay identical observations/candidate sequences through outcome-only writing, no write, quarantine, simple controller-failure rule, witness-only, diagnosis-based and learned claim-specific gates. Hold bank resets, stored features, positive examples, capacity, eviction and feedback constant. Label a paper-derived HiMeco/EmbodiSkill adaptation rather than asserting it is an official navigation implementation.\n\nMeasure write precision/coverage, correct-category suppression, false acceptance, stale memory and track/witness reliability, jointly by scene and failure type. Offline decision changes are not navigation SR: alternate actions would produce different subsequent observations. Only after an informative replay result, run repeated navigation with randomized episode orders, scene-disjoint development/final splits, fixed reset/persistence rules and all-episode motion/sensing/model costs. Compare no external feedback, self-assessment and oracle terminal feedback as different protocols. Extra views and richer features are separate factors, not advantages reserved for the proposed gate.",
+    "falsification_criteria": "Reject if harmful writes are naturally rare, no-write/quarantine or a simple observable controller rule matches the learner, labels require unavailable privileged information, track/witness errors erase benefit, or withheld negatives leave stale beliefs that harm total utility. Reject a general paper-method claim if the gain occurs only in the mismatched release. A conditional source example does not justify predicting a large gain.",
+    "risks_prerequisites": "Real perception/control traces, reliable training labels, track identity and a compatible evaluation environment are missing. No natural write audit, attribution model or repeated-task benchmark ran. Independent tests establish only the specified conditional source pathway and logical non-identifiability examples. Scientific value is potentially a controlled negative-write study; the next decisive test is shadow logging plus fixed-representation replay against quarantine and simple rules.",
+    "rank": 3
+  }
+]

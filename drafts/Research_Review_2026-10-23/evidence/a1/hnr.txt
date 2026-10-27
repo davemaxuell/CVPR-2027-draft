@@ -1,0 +1,733 @@
+                        This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                                     Except for this watermark, it is identical to the accepted version;
+                               the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+           Lookahead Exploration with Neural Radiance Representation for
+                     Continuous Vision-Language Navigation
+
+ Zihan Wang1,2 , Xiangyang Li1,2 , Jiahao Yang1,2 , Yeqi Liu1,2 , Junjie Hu3,4 , Ming Jiang5 , Shuqiang Jiang1,2
+        1
+          Institute of Computing Technology, Chinese Academy of Sciences, Beijing, 100190, China
+                     2
+                       University of Chinese Academy of Sciences, Beijing, 100049, China
+               3
+                 Department of Computer Science, University of Wisconsin, Madison, WI, USA
+    4
+      Department of Biostatistics and Medical Informatics, University of Wisconsin, Madison, WI, USA
+           5
+             Department of Human-centered Computing, Indiana University, Indianapolis, IN, USA
+     zihan.wang@vipl.ict.ac.cn, lixiangyang@ict.ac.cn, {jiahao.yang, yeqi.liu}@vipl.ict.ac.cn,
+                              junjie.hu@wisc.edu, mj200@iu.edu, sqjiang@ict.ac.cn
+
+
+
+                                                                         Instruction: Walk past the bed and exit the bedroom through the door.
+                        Abstract                                                      Enter the toilet, and then stop before the window.
+
+
+    Vision-and-language navigation (VLN) enables the                                         2                                    2
+agent to navigate to a remote location following the natural                       1             3                     1              3
+language instruction in 3D environments. At each naviga-
+tion step, the agent selects from possible candidate loca-
+tions and then makes the move. For better navigation plan-                                                                                 1
+ning, the lookahead exploration strategy aims to effectively                                                                                   2
+evaluate the agent’s next action by accurately anticipating
+                                                                             1         2         3                                                 3
+the future environment of candidate locations. To this end,
+some existing works predict RGB images for future envi-                                (a)                                  (b)
+
+ronments, while this strategy suffers from image distortion       Figure 1. Illustration of different methods to represent the naviga-
+and high computational cost. To address these issues, we          ble candidate locations. (a) uses the single-view observation (yel-
+                                                                  low sector area). (b) uses the panorama of the candidate location
+propose the pre-trained hierarchical neural radiance rep-
+                                                                  (blue circular area) to anticipate the future environment.
+resentation model (HNR) to produce multi-level semantic
+features for future environments, which are more robust and       to entering the visual blind area compared to the discrete
+efficient than pixel-wise RGB reconstruction. Furthermore,        environment setting with perfectly predefined navigable lo-
+with the predicted future environmental representations, our      cations. This phenomenon raises a challenge to accurately
+lookahead VLN model is able to construct the navigable            represent future environments with visual occlusions, lead-
+future path tree and select the optimal path via efficient        ing to incorrect action decisions.
+parallel evaluation. Extensive experiments on the VLN-CE
+                                                                     As illustrated in Figure 1(a), previous approaches [8, 9,
+datasets confirm the effectiveness of our method. The code
+                                                                  25, 26] mainly rely on single-view visual observation of the
+is available at https://github.com/MrZihan/HNR-VLN
+                                                                  current location to perceive candidate locations, thus lead-
+                                                                  ing to a small restricted view (yellow sector area) due to
+1. Introduction                                                   the visual occlusions. In contrast, as shown in Figure 1(b),
+                                                                  a comprehensive panorama of the candidate location (blue
+Vision-and-language navigation (VLN) tasks [5, 22, 23, 31]        circular area) is much more helpful to the agent for under-
+require an agent to understand natural language instructions      standing the future environment and capturing critical vi-
+and move to the destination. In the continuous environ-           sual cues in action decisions. Lookahead exploration [1, 11]
+ment setting (VLN-CE) [22], the navigation agent is free          aims to enable an agent to explore steps forward before
+to traverse any unobstructed location with low-level actions      making a navigation decision. Unlike other lookahead ap-
+(i.e., turn left 15 degrees, turn right 15 degrees, or move       proaches, we adopt a strategy of exploring steps forward
+forward 0.25 meters), similar to some visual navigation           with environment anticipation, which helps current action
+tasks [41, 42, 45–47]. As a result, the agent is more prone       decisions by predicting the future outcome of actions.
+
+
+
+                                                               13753
+    As generating future environment representations ben-           predict more navigable locations (red nodes) in future en-
+efits much for action prediction, DREAMWALKER [39]                  vironments and integrate them into a future path tree. The
+proposes to imagine panoramic images of the navigable               cross-modal graph encoder parallelly evaluates the match-
+candidates. With simulated images through the visual gen-           ing score of different path branches in this path tree and se-
+eration model [20], it gains promising performance. How-            lects the optimal candidate locations (blue nodes) to move.
+ever, one major drawback of this method is the large distor-           In this work, our main contributions include:
+tions between the generated panoramic images and the ac-            • We propose a hierarchical neural radiance representation
+tual images, introducing noisy visual features to the agent.          model to produce multi-level semantic representations for
+Due to the pixel-wise training objective, image generation            future environments with better quality and efficiency.
+model [20] tends to fit the RGB values of local pixels, rather      • Utilizing predicted representations of future environ-
+than focusing on key environmental semantics. Indeed, for             ments, we propose a lookahead VLN model to parallelly
+unseen 3D environments, accurate RGB reconstruction is                evaluate possible future paths in the path tree, thus im-
+insurmountably difficult due to the high information re-              proving navigation planning.
+dundancy of RGB images. In addition, generating high-               • Extensive experiments demonstrate the effectiveness of
+resolution panoramic images is computing-intensive and                our methods over existing methods in continuous vision-
+time-consuming, increasing the delay of agent’s responses.            and-language navigation tasks.
+    To anticipate future environments with higher quality
+and faster speed, we propose a pre-trained Hierarchical             2. Related Work
+Neural Radiance (HNR) Representation Model that pro-                Vision-and-Language Navigation (VLN). VLN [5, 22,
+duces multi-level semantic representations of future can-           23, 31] has received significant attention in recent years.
+didate locations instead of generating panoramic images.            The VLN tasks include step-by-step instructions such as
+Our semantic representations are learned through a vision-          R2R [5] and RxR [23], navigation with dialogs such as
+language embedding model (i.e., CLIP [32]) that com-                CVDN [37], and navigation for remote object grounding
+presses the redundant information of RGB images and ex-             such as REVERIE [31] and SOON [48]. VLN-CE tasks
+tracts the critical visual semantics associated with the lan-       convert the topologically-defined VLN tasks into continu-
+guage. Specifically at each step of navigation, the fine-           ous environments, such as R2R-CE [22] and RxR-CE [23].
+grained grid features [44] extracted by the CLIP model are          Lots of previous methods focus on the representations of the
+saved into the feature cloud with 3D positions and orien-           visited environment during navigation. Among them, the
+tations. To predict the semantic features of future environ-        recurrent unit [5, 12, 15, 36, 40], explicitly encoded history
+ments, we sample points along camera rays, and aggregate            sequence [8, 29], topological map [4, 9], top-down semantic
+features around these points to produce latent feature vec-         map [7, 13, 18] and grid-based map [3, 27, 44] are usually
+tors and volume density, then use volume rendering tech-            adopted to represent the visited environment.
+niques to composite these values into small-scale region                Although the representation of the visited environment
+features. Furthermore, multi-level encoders are adopted to          in VLN has received continuous attention, future environ-
+produce multi-level semantic features for future environ-           mental representation and lookahead strategy have not been
+ments, supervised by CLIP embeddings.                               fully explored. VLN-SIG [25] generates the semantics of
+    The advantages of our method over previous methods              future navigation views using visual codebook [34] for bet-
+for future environment prediction are three-fold. First, our        ter decision-making. DREAMWALKER [39] utilizes an
+model directly predicts robust multi-level semantic features        image generation model [20] to generate panoramic images
+for future candidate locations, avoiding the difficulty of          of future environments and predict future actions. ULN [11]
+pixel-level image reconstruction in unseen environments             and Active Exploration [38] explore steps forward for ro-
+as used in existing methods like RNR-Map [24, 35] and               bust navigation decision-making, and Tactical Rewind [19]
+DREAMWALKER [39]. Second, as many empty regions                     performs tree search for planning. In contrast to them, we
+in the future views can be caused by visual occlusions, we          propose a hierarchical neural radiance representation model
+employ a hierarchical encoding method to predict features           to anticipate future environments and construct the naviga-
+of these empty regions by integrating surrounding contexts          ble future path tree for long-term planning.
+at both region and view levels. Lastly, our method using            Navigation with Neural Radiance Fields. The neural ra-
+volume rendering handles better spatial relationships in the        diance field (NeRF) [28] has gained significant popularity
+3D environment, which is challenging for 2D image gener-            in various AI tasks. NeRF predicts the RGB color and den-
+ation methods [25, 39] that lack depth perception.                  sity of a sampled point in a scene so that an image from
+    With the predicted high-quality future views of candi-          an arbitrary viewpoint can be rendered. However, the tradi-
+date locations, we propose a lookahead VLN model to eval-           tional NeRF methods with implicit MLP network can only
+uate the possible next actions. As shown in Figure 1(b), we         synthesize view images in seen scenes, which makes it dif-
+
+
+
+                                                                 13754
+                                          K-nearest            Volume Rendering
+                                       features search   𝐌𝐋𝐏
+                                                                                               ℒ
+                                                                          …                                  Actual future images
+
+                        Feature
+                         Cloud                                            …
+                            Candidate location           𝐌𝐋𝐏
+                                                                                                                                    Visited location
+                                                                  Region level                                                      Candidate location
+       CLIP Image                                                  Encoding         View            CLIP Image Encoder
+        Encoder                                                                    Encoder                                          Feature in the feature cloud
+                                                                                                                                    Color value
+                                                                   View level                                                       Latent vector
+                                                                   Encoding                   ℒ                                     Future view feature
+                                                                                               ℒ
+                                                                                                                                    Region features within a view
+                                                                  Panorama level
+                                                                     Encoding
+      RGB images    Depth images
+                                                                                        …      Panorama
+                                                                                                Encoder       Lookahead VLN Model
+
+Figure 2. The framework of the hierarchical neural radiance representation model (HNR). The HNR model encodes the observed environ-
+ments (yellow area) into the feature cloud. Through aggregating k-nearest features, the MLP network predicts the latent vector and volume
+density of sampled points along the rendered ray. A region-level representation is encoded by compositing these latent vectors via volume
+rendering, then a view encoder is used to encode all region-level representations within a future view (red area) and obtain an entire future
+view representation. All future views of the candidate location can be combined as a panorama (blue area) to support navigation.
+
+ficult to generalize to the unseen scenes and adapt to many                           view representation. These future representations of candi-
+embodied AI tasks. To address this issue, GSN [10] pro-                               dates help predict more and farther navigable locations (i.e.,
+poses locally conditioned radiance fields, which encode ob-                           lookahead nodes). By integrating lookahead node represen-
+served images into a latent grid map, supporting rendering                            tations into a future path tree, the lookahead VLN model
+images in unseen environments. Based on GSN [10], RNR-                                evaluates the match scores of different path branches and
+Map [24] designs a localization framework using renderable                            selects the optimal candidate location. Finally, a control
+neural radiance map for visual navigation, and Le-RNR-                                module [4] is used to produce low-level actions to reach the
+Map [35] embeds CLIP features into RNR-Map for query                                  selected candidate location.
+search with natural language. RNR-Map and Le-RNR-Map
+all encode features into a 2D latent grid map, which loses
+                                                                                      3.2. Hierarchical Neural Radiance Representation
+a lot of 3D geometric detail. The 3D feature cloud and hi-                            3.2.1   Feature Cloud Encoding
+erarchical encoding in HNR provide better capabilities of
+spatial representation and multi-level context integration.                           To encode the observed visual information, as shown in Fig-
+                                                                                      ure 2, our HNR model stores the fine-grained visual fea-
+                                                                                      tures and their corresponding spatial information into the
+3. Method                                                                             feature cloud M. Specifically, at each navigation step t,
+3.1. Navigation Setups                                                                for 12 observed RGB images Rt = {rt,i }12     i=1 , a pre-trained
+The HNR model focuses on the VLN-CE [22, 23] tasks,                                   CLIP-ViT-B/32 [32] model is used to extract grid features
+where the agent navigates with low-level actions. Initialized                         {gt,i ∈ RH×W ×D }12   i=1 . For convenience, all the subscripts
+at a starting location and given natural language instruc-                            (i, h, w) are denoted as j, where j ranges from 1 to J,
+tions W, the agent needs to explore the environment and                               and J = 12·H·W . Through the downsized depth images
+reach the target location. At time step t, the agent observes                         {dt,i ∈ RH×W }12                                    D
+                                                                                                        i=1 , each grid feature gt,j ∈ R is mapped
+panoramic RGB images Rt = {rt,i }12     i=1 and the depth im-
+                                                                                      to its 3D world position Pt,j = [px , py , pz ] using camera
+ages Dt = {dt,i }12i=1 surrounding  its  current location (i.e.,                      pose [R, T] and camera intrinsics K as follows:
+12 view images with 30 degrees separation).                                                                                         T
+                                                                                                                             h
+   During navigation, the agent’s visual observations are
+                                                                                                  Pt,j = dt,j R−1 K−1 w − T                      (1)
+encoded and stored into the feature cloud. Meanwhile, a
+                                                                                                                             1
+pre-trained waypoint predictor [16] is used to predict navi-                              To better represent the spatial information of features in
+gable candidates. For each navigable candidate, the HNR                               the feature cloud, we introduce the horizontal orientation
+model predicts 12 future view representations using hi-                               θt,j and the size st,j of each observed grid region:
+erarchical encoding method. Firstly, HNR uses the vol-
+ume rendering method to aggregate the features from the                                           st,j = 1/W · [tan(ΘHF OV /2) · dt,j ]          (2)
+feature cloud and produce region-level embeddings. Sec-                               where W is the width of the feature map extracted by the
+ondly, region-level embeddings within the same future view                            CLIP model for each view, ΘHF OV is the camera’s hori-
+are fed into the view encoder and obtain the entire future                            zontal field-of-view. All these grid features and their spatial
+
+
+
+                                                                                   13755
+                                              Panorama Encoder   Panorama level
+                                                                    Encoding
+                                                 …       …                                                 qk = LN(W1 [Pkrel , θkrel , sk ])          (6)
+          Candidate location
+          Feature in the feature cloud
+          Latent vector                                                                    where LN denotes layer normalization and W1 is learnable
+          Future view feature                                     View level
+                                                View Encoder
+                                                                   Encoding                parameters. With k-nearest features {gk }K  k=1 and positional
+                                                                                           embeddings {qk }K  k=1 , the MLP f eature   network aggregate
+               K-nearest      Latent vector
+            features search    Prediction                                                  all k-nearest features of sampled point Pn as follows:
+                                                                  Region level
+                                                                   Encoding
+                                                                                                     [rn , σn ] = MLPf eature ({gk ⊕ qk }Kk=1 )        (7)
+                              …
+
+
+
+
+                                𝐌𝐋𝐏
+                                                                                              The volume density σn [28] can be interpreted as the
+                                                                                           differential probability of a ray terminating at point Pn . As
+                                                                                           shown in Figure 3, the latent vector with a higher volume
+                                                                                           density has a higher contribution to the region feature. To
+                                                                                           reduce the computational cost, we adopt a sparse sampling
+Figure 3. Illustration of the volume rendering method and hierar-                          strategy. Specifically, if the sampled point Pn does not have
+chical encoding.                                                                           any neighboring features within the radius R̂, the latent vec-
+                                                                                           tor rn and volume density σn will be directly set as zero,
+information are stored into the feature cloud M:                                           without using MLPf eature .
+                                                                                              With all latent vectors {r}N  n=1 of N sampled points, we
+           Mt = Mt−1 ∪ {[gt,j , Pt,j , θt,j , st,j ]}Jj=1                         (3)
+                                                                                           use the volume rendering method [28] to produce a region
+                                                                                           feature Rh,w for future view as follows:
+3.2.2    Region Level Encoding via Volume Rendering                                                            N
+                                                                                                               X
+                                                                                                      Rh,w =         τn (1 − exp(−σn ∆n ))rn ,
+As shown in Figure 3, to produce a feature map R ∈
+                                                                                                               n=1
+RH×W ×D for each future view, given the encoded feature                                                                             n−1
+cloud M and the camera pose of the future view, the HNR
+                                                                                                                                    X
+                                                                                                               where τn = exp(−           σ i ∆i )    (8)
+model predicts each region feature Rh,w via volume ren-                                                                             i=1
+dering method [28]. Specifically, for each region-level rep-                               τn represents volume transmittance, and ∆n is the distance
+resentation, the HNR model uniformly samples N points                                      between adjacent sampled points. To enhance interaction
+{Pn |n = 1, ..., N } along the ray from the camera posi-                                   among different region features, we use both region-level
+tion P1 of the candidate location to the predicted region’s                                semantic alignment Lregion and view-level semantic align-
+center until 10 meters away. The KD-Tree algorithm [14]                                    ment Lview after view level encoding in Section 3.2.3.
+is used to search the k-nearest features {gk }K   k=1 in feature                              Although the goal of region-level encoding is to gener-
+cloud for each sampled point Pn = [Xn , Yn , Zn ]. Then                                    ate regional semantic features, for image reconstruction and
+a MLPf eature network is used to aggregate the k-nearest                                   depth estimation, we also trained an MLPrgbd network to
+features of Pn within radius R to produce a latent vector                                  predict the color value cn and volume density σ̂n , then ob-
+rn ∈ RD and the volume density σn ∈ R1 as Equation 7.                                      tain the volume transmittance τ̂ . As shown in Equation 9
+These latent vectors along the ray are composited into the                                 and 10, the RGB pixel Ch,w and depth value Dh,w can be
+region feature Rh,w via volume rendering as Equation 8.                                    predicted via volume rendering. The rendering loss Lrgbd is
+   To give the MLPf eature network translational invariance                                the squared error between rendered pixels and ground truth.
+for better generalization, the relative position Pkrel and rela-                                               N
+tive orientation θkrel of k-nearest feature gk to sampled point
+                                                                                                               X
+                                                                                                      Ch,w =         τ̂n (1 − exp(−σ̂n ∆n ))cn        (9)
+Pn is calculated as:                                                                                           n=1
+                                                                                                               XN
+        Pkrel = [xrel  rel  rel
+                  k , yk , zk ]                                                                       Dh,w =         τ̂n (1 − exp(−σ̂n ∆n ))dn       (10)
+                                                                                                               n=1
+        = [ (xk − Xn ) · cosΘn + (yk − Yn ) · sinΘn ,                                      where cn denotes color values, and dn denotes the distance
+              (yk − Yn ) · cosΘn − (xk − Xn ) · sinΘn ,                                    between the sampled point Pn and the camera position P1 .
+               zk − Zn ]                                                          (4)
+          θkrel = [ sin(θk − Θn ), cos(θk − Θn ) ]         (5)                             3.2.3   View Level Encoding
+where Pk = [xk , yk , zk ] is the world position of k-nearest                              The regional feature Rh,w obtained in Section 3.2.2 can
+feature gk , Θn denotes the horizontal orientation of the ren-                             only represent a small-scale region. To represent the en-
+dered ray. θk and sk are the orientation and region size of                                tire future view and predict features of empty regions by in-
+gk . The positional embedding is encoded as:                                               tegrating surrounding contexts, the regional feature map R
+
+
+
+                                                                                        13756
+together with a learnable view token V is inputted into the                                                 Next Goal:
+                                                                                                                2
+view encoder and output the encoded R̂ and V̂. The view                                   0.45 0.82
+                                                                                                                                   0.37              0.82             0.71    0.11 Soft target
+                                                                                                                                                                                   supervision
+
+                                                                                             2 0.64                        Max Pooling          Max Pooling     Max Pooling
+encoder consists of four-layer transformers.                              0.13
+                                                                                 0.37                                      0.37 0.17 0.13
+                                                                                                                                                                                   Hard target
+                                                                                                                                                0.64 0.82 0.45 0.71 0.39 0.41 0.11 supervision
+                                                                                                0.71 0.41
+   As shown in Figure 2, to supervise the encoded region                         1               3
+                                                                             0.17                                              1                 2                3
+features R̂, we align each region feature R̂h,w with the CLIP                                     0.39            Pair-wise
+                                                                                                               distance matrix            Goal Score Prediction
+embedding Rgt  h,w extracted from a small-scale cropped im-                                                                            Cross-Modal Graph Encoder
+age within the actual future view. Similarly, the view fea-
+                                                                         Feature        HNR
+ture V̂ is aligned with the CLIP embedding Vgt extracted                  Cloud         model
+                                                                                                                                   1        2               3
+
+
+
+
+                                                                                                         …
+                                                                                                                Mean Pooling
+from an entire future view. During training, we randomly
+                                                                         Instruction: Walk past the bed and exit the bedroom through                      Text
+sample some region features and then minimize the loss be-               the door. Enter the toilet, and then stop before the window.                   Encoder
+
+tween predicted features and actual CLIP embeddings, by
+                                                                    Figure 4. The framework of the lookahead VLN model. In addi-
+maximizing cosine similarity as follows:                            tion to the stop embedding (black), three types of nodes are used
+                                     R̂h,w · Rgt                    to structure the topological map: visited nodes (yellow), candidate
+                                              h,w
+                       X
+           Lregion =         (1 −                     )   (11)      nodes (blue) and lookahead nodes (red).
+                       h,w
+                                    ∥R̂h,w ∥∥Rgt
+                                              h,w ∥
+
+                               V̂ · Vgt                             tion. The panorama encoder consisting of a two-layer trans-
+             Lview = 1 −              gt
+                                                          (12)      former is used to encode V̂ with corresponding position em-
+                            ∥V̂∥∥V ∥                                                               e V candidate is represented
+                                                                    bedding and output features V.
+    For better generalization ability, the HNR model is pre-        as the candidate node embedding via average pooling of V.  e
+trained in large-scale HM3D [33] dataset with 800 training          The lookahead node embeddings are denoted as V lookahead ,
+scenes. Specifically, we randomly select a starting loca-           which are navigable parts of the future views Ve with corre-
+tion in the scene and randomly move to a navigable can-             sponding position embedding. The lookahead nodes con-
+didate location at each step. At each step, parts of the un-        nected to Vmcandidate                  lookahead
+                                                                                           are denoted as VN         . The ‘stop’
+                                                                                                             (m)
+visited candidate locations are randomly picked to predict                        stop
+                                                                    embedding V        is added to the graph to denote a stop ac-
+future views. The model is optimized with the training loss
+                                                                    tion and connect it with all other node embeddings.
+αLrgbd + βLregion + γLview , where α, β, γ are the factors
+of proportionality. The maximum number of action steps
+per episode is set to 15.
+                                                                    3.3.2            Cross-Modal Graph Encoding
+
+3.2.4   Panorama Level Encoding                                     To encode the environmental topological map and evaluate
+                                                                    future path branches in it, all node representations in Sec-
+The pre-trained HNR model in Section 3.2.3 can be used
+                                                                    tion 3.3.1 are fed into a 4-layer cross-modal transformer to
+to predict future view representations and combine them as
+                                                                    conduct interaction. Each transformer layer consists of a
+panoramic representations of candidate locations through
+                                                                    cross-attention layer and a graph-aware self-attention layer
+the panorama encoder, which is described in Figure 3.
+                                                                    (GASA). For cross-attention calculation, the encoded vis-
+Given a navigable candidate location, the HNR model pre-
+                                                                    ited nodes V visited , candidate nodes V candidate , lookahead
+dicts 12 single-view semantic features and depth maps at
+                                                                    nodes V lookahead and stop embedding V stop are used as
+30 degrees separation. Furthermore, the waypoint predictor
+                                                                    query tokens, the word embeddings W are used as key and
+model [16] is used to predict navigable locations around the
+                                                                    value tokens. The standard self-attention layer only con-
+candidate location via these depth maps. The predicted fu-
+                                                                    siders visual similarity among nodes, which may overlook
+ture view features and navigable locations are encoded by
+                                                                    nearby nodes that are more relevant than distant nodes. To
+the panorama encoder for lookahead exploration.
+                                                                    this end, following [4, 9], we adopt the GASA layer that fur-
+3.3. Architecture of the Lookahead VLN model                        ther takes into account the graph topology when computing
+                                                                    inter-node attention for node encoding:
+3.3.1   Node Embedding
+Three types of nodes are utilized to structure the topolog-                                                              VWq (VWk )T
+ical map, as shown in Figure 4. These nodes include vis-             GASA(V) = Softmax(                                      √       + EWe )VWv (13)
+                                                                                                                               d
+ited nodes (yellow), candidate nodes (blue), and lookahead
+nodes (red). Vtvisited is represented as the current node em-       where V denotes node representations, E is the pair-wise
+bedding via average pooling 12 observed view representa-            distance matrix obtained from the topological map, and
+tions. {Vivisited }ti=1 are all the visited node embeddings.        Wq , Wk , We , Wv are learnable parameters. After cross-
+   For each navigable candidate location, the HNR model             modal graph encoding, the encoded node representations
+predicts 12 future view features V̂ at 30 degrees separa-           are denoted as V̂ visited , V̂ candidate , V̂ lookahead , and V̂ stop .
+
+
+
+                                                                 13757
+3.3.3     Lookahead Exploration and Action Prediction                includes trajectories that are diverse in terms of length (av-
+                                                                     erage is 15 meters), which is more challenging in the con-
+The model predicts a navigation goal score for each node in
+                                                                     tinuous environments. The agent uses a 30◦ turning angle
+the topological map as follows:
+                                                                     and the horizontal field-of-view is 79◦ .
+                                                                        There are several standard metrics [5] in VLN for evalu-
+                         S = FFN(V̂)                      (14)       ating the agent’s performance, including Trajectory Length
+                                                                     (TL), Navigation Error (NE), Success Rate (SR), SR given
+where FFN denotes a feed-forward network. To avoid                   the Oracle stop policy (OSR), Normalized inverse of the
+unnecessary repeated visits to visited nodes, the scores             Path Length (SPL), Normalized Dynamic Time Warping
+for visited nodes are masked. With the candidate node                (nDTW), and Success weighted by normalized Dynamic
+  candidate                                lookahead
+V̂m           and those lookahead nodes V̂N  (m)      con-           Time Warping (SDTW).
+nected to it, the VLN model predicts their goal scores
+   candidate    lookahead
+[Sm          , SN (m)     ] and take the maximum value               4.2. Comparison to State-of-the-Art Methods
+among them as the goal score of the m-th path branch:
+                                                                     Table 1 and 2 represent the performance of our proposed
+        S path = {Max([Sm
+                        candidate    lookahead
+                                  , SN (m)     ])}M
+                                                  m       (15)       HNR model compared with existing VLN models on the
+   Finally, the agent selects a candidate node to move ac-           R2R-CE and RxR-CE datasets respectively. Overall, HNR
+cording to the predicted goal scores (i.e., select the path          achieves state-of-the-art results in the majority of metrics,
+branch with the maximum score). The agent performs the               demonstrating the effectiveness of the proposed approach
+stop action if the ‘stop’ score has the maximum value. If the        from diverse perspectives. As illustrated in Table 1, for the
+selected candidate node is not adjacent to the current node,         val unseen split of the R2R-CE dataset, our model outper-
+the agent computes the shortest path to the goal by perform-         forms our baseline method ETPNav [9] by 4% on SR and
+ing Dikjstra’s algorithm on the topological map. The con-            2% on SPL. For the test unseen split, the proposed method
+trol module [4] is responsible for converting the topological        outperforms ETPNav by 3% on SR and 2% on SPL. Mean-
+plan into a series of low-level actions that guide the agent to      while, as illustrated in Table 2, the proposed method also
+the selected candidate node.                                         achieves the improvement of 2% in the majority of metrics
+   As shown in Figure 4, there are two navigation supervi-           on the RxR-CE dataset.
+sion strategies. The first one is the Hard target supervision           Compared with DREAMWALKER [39] in Table 1,
+Ahard , which selects an unvisited node (candidate node or           which adopts a similar idea of lookahead exploration, our
+lookahead node) with the shortest distance to the destina-           HNR model achieves performance improvement of about
+tion. Then goal scores of all unvisited nodes are used to cal-       10% on SR for all splits. On the one hand, our HNR
+culate the cross-entropy loss. The other one is the Soft target      constructs a unified future path tree to represent the fu-
+supervision Asof t , which selects a candidate node with the         ture environment, which is better than the step-by-step path
+shortest distance to the destination. The goal scores S path         search strategy used in DREAMWALKER. The step-by-
+(in Equation 15) of candidate nodes are calculated by max            step search (i.e., only evaluate one path branch at a time)
+pooling all scores of the corresponding path branch shown            makes it difficult to compare different future paths. On the
+in Figure 4. Then goal scores after max pooling are used to          other hand, the future environmental representations pre-
+calculate the cross-entropy loss:                                    dicted by our HNR model are superior to those from the
+                                                                     image generation model adopted by DREAMWALKER.
+             Lnav = CrossEntropy(S path , Asof t )        (16)
+                                                                     4.3. Ablation Study
+4. Experiment
+                                                                     As described in Section 1, the representations of future en-
+4.1. Datasets and Evaluation Metrics
+                                                                     vironments play a crucial role in lookahead exploration.
+We evaluate our model on the R2R-CE [22] and RxR-                    In this section, we compare several popular representa-
+CE [23] datasets in continuous environments.                         tion strategies for future environments. (1) The most usual
+   R2R-CE [22] is collected based on the discrete Matter-            single-view representations [4], which rely on single-view
+port3D environments [6] with the Habitat simulator [33],             visual observation of the current location to perceive can-
+enabling the agent to navigate in the continuous environ-            didates. (2) NeRF-based rendering methods [24] that focus
+ments. It provides step-by-step instructions, and the aver-          on rendering RGB pixels for future view images and ex-
+age length is 32 words. The agent uses a 15◦ turning angle           tract features via the CLIP model. (3) Image Generation
+and the horizontal field-of-view is 90◦ .                            method [20, 39] that imagine the panoramic RGBD images
+   RxR-CE [23] is a larger multilingual VLN dataset con-             for candidate locations. (4) Our proposed hierarchical neu-
+taining 126K instructions in English, Hindi, and Telugu. It          ral radiance representation model (HNR).
+
+
+
+                                                                  13758
+                                 Val Seen                        Val Unseen                 Test Unseen
+            Methods
+                        TL↓ NE↓ OSR↑ SR↑ SPL↑ TL↓ NE↓ OSR↑ SR↑ SPL↑ TL↓ NE↓ OSR↑ SR↑ SPL↑
+          CM2 [13]     12.05 6.10 50.7 42.9 34.8 11.54 7.02 41.5 34.3 27.6 13.9 7.7              39    31 24
+       WS-MGMap [7]    10.12 5.65 51.7 46.9 43.4 10.00 6.28 47.6 38.9 34.3 12.30 7.11 45               35 28
+       Sim-2-Sim [21]  11.18 4.67 61       52    44 10.69 6.07 52           43  36 11.43 6.17 52       44 37
+      CWP-RecBERT [16] 12.50 5.02 59       50    44 12.23 5.74 53           44  39 13.31 5.89 51       42 36
+         GridMM [44]   12.69 4.21 69       59    51 13.36 5.11 61           49  41 13.31 5.64 56       46 39
+          Reborn [2]   10.29 4.34 67       59    56 10.06 5.40 57           50  46 11.47 5.55 57       49 45
+        Ego2 -Map [17]   -     -     -      -     -      -    4.94    -     52  46 13.05 5.54 56       47 41
+     DREAMWALKER [39] 11.6 4.09 66         59    48    11.3 5.53 59         49  44  11.8 5.48 57       49 44
+        ScaleVLN [43]    -     -     -      -     -      -    4.80    -     55  51   -   5.11     -    55 50
+         BEVBert [3]     -     -     -      -     -      -    4.57 67       59  50   -   4.70 67       59 50
+         ETPNav [4]    11.78 3.95 72       66    59 11.99 4.71 65           57  49 12.87 5.12 63       55 48
+         HNR (Ours)    11.79 3.67 76       69    61 12.64 4.42 67           61  51 13.03 4.81 67       58 50
+                                     Table 1. Evaluation on the R2R-CE dataset.
+
+                            Val Seen                    Val Unseen                    Test Unseen
+      Methods
+                NE↓ SR↑ SPL↑ NDTW↑ SDTW↑ NE↓ SR↑ SPL↑ NDTW↑ SDTW↑ NE↓ SR↑ SPL↑ NDTW↑ SDTW↑
+ CWP-CMA [16]     -    -     -       -   -   8.76 26.59 22.16 47.05   -   10.40 24.08 19.07 37.39 18.65
+CWP-RecBERT [16] -     -     -       -   -   8.98 27.08 22.65 46.71   -   10.40 24.85 19.61 37.30 19.05
+   Reborn [2]   5.69 52.43 45.46 66.27 44.47 5.98 48.60 42.05 63.35 41.82 7.10 45.82 38.82 55.43  38.42
+  ETPNav [4]    5.03 61.46 50.83 66.41 51.28 5.64 54.79 44.89 61.90 45.33 6.99 51.21 39.86 54.11  41.30
+  HNR (Ours)    4.85 63.72 53.17 68.81 52.78 5.51 56.39 46.73 63.56 47.24 6.81 53.22 41.14 55.61  42.89
+                                             Table 2. Evaluation on the RxR-CE dataset.
+
+  #     Representation Methods         NE↓ OSR↑ SR↑ SPL↑              multi-level semantics through hierarchical encoding.
+  1           Single View              4.71 64.71 57.21 49.15
+  2         NeRF Rendering             4.79 65.14 56.55 48.61         Upper bound of our lookahead exploration strategy.
+  3        Image Generation            4.68 66.01 58.35 50.96         The ground truth (GT) representations (row 5) are extracted
+  4              HNR                   4.42 67.48 60.74 51.27         from the actual future view images via the CLIP model. It
+  5          Ground truth              4.13 71.29 63.13 54.59         demonstrates the upper bound of our lookahead VLN model
+  6        HNR w/o Lregion             4.55 66.78 60.20 50.74         with GT future view prediction and also confirms the effec-
+  7 HNR w/o Positional embeddings 4.78 64.87 56.17 48.91              tiveness of the lookahead exploration strategy.
+Table 3. Comparison among different candidate location represen-
+tation methods on the val unseen split of the R2R-CE dataset.         Region level semantic alignment. As shown in Table 3,
+                                                                      without the training objective Lregion of region-level se-
+                                                                      mantic alignment (row 6) in Section 3.2.3, the performance
+Comparisons among different representation methods.                   of the HNR model has degraded. Hierarchical encoding
+For fair comparisons, rows 2-4 in Table 3 adopt the same              and multi-level semantic alignment help HNR integrate sur-
+lookahead VLN model shown in Section 3.3 for navigation               rounding contexts and predict features of empty regions
+planning but use different methods for future environments            caused by visual occlusions.
+prediction. Traditional single-view representation (row 1)
+                                                                      Quality analysis of future environment prediction. As
+is restricted to a limited observable view and is difficult
+                                                                      illustrated in Figure 5, we evaluate the quality of predicted
+to comprehensively represent future environments due to
+                                                                      representations by comparing the embeddings’ cosine sim-
+the visual occlusions. The lookahead exploration strategy
+                                                                      ilarity between the predicted future views and ground truth.
+(rows 2-4) helps evaluate the agent’s future paths by antic-
+                                                                      We observe a downward trend in cosine similarity as the
+ipating the future environment for better navigation plan-
+                                                                      distance between candidate location and agent increases.
+ning. NeRF-based RGB rendering method [24] has a low
+                                                                      Combining Table 3 and Figure 5, it’s obvious that the bet-
+image reconstruction accuracy in unseen environments due
+                                                                      ter quality of future environmental representations makes
+to the visual occlusions and high information redundancy
+                                                                      the higher navigation performance gains. Using region-
+of RGB images, resulting in undesirable performance gains.
+                                                                      level alignment, our HNR method has the best represen-
+The image generation method [39] has better performance
+                                                                      tation quality and its cosine similarity is above 0.8 overall,
+gains than NeRF Rendering in unseen environments but is
+                                                                      supporting the lookahead exploration well within 5 meters.
+still inferior to our HNR model. To avoid the difficulty of
+pixel-level prediction, the proposed HNR model takes the              Positional embeddings in region level encoding. The
+CLIP embeddings as the prediction objective and predicts              positional embeddings calculated by Equation 6 represent
+
+
+
+                                                                   13759
+the spatial relationships for region feature encoding. With-
+                                                                                                0.82                              Our HNR
+out the position and orientation of the k-nearest features rel-                                                                   Our HNR w/o region
+                                                                                                                                  Image Generation
+
+
+
+
+                                                                            Cosine similarity
+ative to the sampled point (row 7) in Table 3, MLPf eature                                      0.80                              NeRF Rendering
+network cannot accurately estimate the volume density and                                       0.78
+fails to perceive spatial relations in the 3D environment, re-
+sulting in a significant performance decrease.                                                  0.76
+
+                                                                                                0.74
+                                                                                                       0   1        2      3           4          5
+Number of k-nearest features. Table 4 shows the effect                                              Distance
+of the number of k-nearest features on performance. We               Figure 5. Average cosine similarity between predicted future
+observe an upward trend in performance as the number of              views and ground truth at different distances between candidate
+aggregated k-nearest features increases. Although the many           locations and agent, on the val unseen split of the R2R-CE dataset.
+more aggregated features make the region semantic predic-
+tion more accurate, the performance gains of the number                   Number of nearest features NE↓ OSR↑ SR↑ SPL↑
+                                                                                       1                4.68 65.63 57.86 49.21
+over 4 are marginal, so we finally take the K value as 4 for
+                                                                                       2                4.57 66.99 59.49 50.81
+lower computational cost.
+                                                                                       4                4.42 67.48 60.74 51.27
+                                                                                       6                4.37 67.70 60.58 51.30
+Sparse sampling and k-nearest features search. Ta-                   Table 4. The effect of different numbers of nearest features in the
+ble 5 illustrates two important strategies used in our HNR           HNR model on the val unseen split of the R2R-CE dataset.
+to improve computational efficiency. The first one is the
+sparse sampling strategy described in Section 3.2.2, the                                HNR                w/o Sparse sampling               w/o KD-Tree
+MLPf eature is not used to aggregate features in empty               87.3 Hz (11.5 ms)                         5.9 Hz (169.5ms)            23.1 Hz (42.3 ms)
+areas of the feature cloud. Due to the high proportion                    Table 5. Runtime analysis measured on one RTX 3090 GPU.
+of empty space in 3D indoor environments, this strategy
+can greatly reduce the redundant calculation. To paral-                   # S lookahead S candidate Soft Hard NE↓ OSR↑ SR↑ SPL↑
+lelly search the k-nearest features of all sampled points,                1                                   4.71 64.71 57.21 49.15
+the KD-Tree algorithm is adopted in HNR, as described                     2                  ✓       ✓        4.71 66.43 57.75 49.54
+in Section 3.2.2. Since the k-nearest features search has                 3      ✓           ✓            ✓ 4.81 65.85 56.72 48.41
+a heavy computational cost in our HNR model, we use the                   4      ✓           ✓       ✓ ✓ 4.62 67.92 59.87 50.03
+CUDA implementation of KD-Tree algorithm [14] to ac-                      5      ✓           ✓       ✓        4.42 67.48 60.74 51.27
+celerate it, much faster than other nearest neighbor search                      Table 6. Ablation study of the lookahead VLN model.
+methods [30] (i.e., w/o KD-Tree) in Table 5.
+                                                                     5. Conclusion
+Performance analysis of the lookahead exploration. In
+                                                                     In this paper, we propose a lookahead exploration method
+this part, we analyze different future path evaluation strate-
+                                                                     for continuous vision-language navigation. Our proposed
+gies and navigation supervision methods. As shown in Ta-
+                                                                     HNR model predicts multi-level future environmental rep-
+ble 6, S lookahead indicates that the VLN model uses the
+                                                                     resentations through volume rendering and hierarchical en-
+scores of the lookahead nodes to evaluate the future paths,
+                                                                     coding, supervised by CLIP embeddings. With predicted
+and S candidate indicates the usage of the candidate node
+                                                                     future representations, the lookahead VLN model con-
+scores, as shown in Equation 15. Soft target and Hard target
+                                                                     structs the navigable future path tree and selects the opti-
+are two different types of navigation supervision described
+                                                                     mal path branch via efficient parallel evaluation. Extensive
+in Section 3.3.3. In Table 6, row 1 has the lowest perfor-
+                                                                     experiments demonstrate the accuracy of the HNR model’s
+mance without the lookahead exploration strategy. Row 2
+                                                                     representations and the excellent performance of the looka-
+doesn’t use the lookahead node scores to evaluate the future
+                                                                     head VLN model. The lookahead exploration method helps
+paths and gain marginal performance improvement, con-
+                                                                     navigation planning by predicting the future outcome of ac-
+firming the necessity of the lookahead node representation.
+                                                                     tions, which has great research potential for VLN and Em-
+The performance of row 5 is superior to rows 3-4, show-
+                                                                     bodied AI tasks.
+ing the Soft target supervision is the better navigation su-
+pervision. The lookahead node closest to the destination             Acknowledgment. This work was supported in part by
+(i.e., Hard target) is not sure of the highest semantic match        the National Natural Science Foundation of China under
+score with the instruction due to visual occlusions and pre-         Grants 62125207, 62102400, 62272436, and U23B2012, in
+diction noise, compulsively overfitting the Hard target com-         part by the National Postdoctoral Program for Innovative
+promises the navigation performance.                                 Talents under Grant BX20200338.
+
+
+
+                                                                  13760
+References                                                               [14] Thomas Grandits, Alexander Effland, Thomas Pock, Rolf
+                                                                              Krause, Gernot Plank, and Simone Pezzuto. GEASI:
+ [1] Arpit Agarwal, Katharina Muelling, and Katerina Fragki-                  Geodesic-based earliest activation sites identification in car-
+     adaki. Model learning for look-ahead exploration in con-                 diac models. International Journal for Numerical Methods
+     tinuous control. In Proceedings of the AAAI Conference on                in Biomedical Engineering, 37(8):e3505, 2021. 4, 8
+     Artificial Intelligence, pages 3151–3158, 2019. 1                   [15] Yicong Hong, Qi Wu, Yuankai Qi, Cristian Rodriguez-
+ [2] Dong An, Zun Wang, Yangguang Li, Yi Wang, Yicong                         Opazo, and Stephen Gould. Vln bert: A recurrent vision-
+     Hong, Yan Huang, Liang Wang, and Jing Shao. 1st place so-                and-language bert for navigation. In CVPR, pages 1643–
+     lutions for rxr-habitat vision-and-language navigation com-              1653, 2021. 2
+     petition (cvpr 2022). arXiv preprint arXiv:2206.11610,              [16] Yicong Hong, Zun Wang, Qi Wu, and Stephen Gould. Bridg-
+     2022. 7                                                                  ing the gap between learning in discrete and continuous en-
+ [3] Dong An, Yuankai Qi, Yangguang Li, Yan Huang, Liang                      vironments for vision-and-language navigation. In CVPR,
+     Wang, Tieniu Tan, and Jing Shao. Bevbert: Multimodal map                 2022. 3, 5, 7
+     pre-training for language-guided navigation. In ICCV, pages         [17] Yicong Hong, Yang Zhou, Ruiyi Zhang, Franck Dernon-
+     2737–2748, 2023. 2, 7                                                    court, Trung Bui, Stephen Gould, and Hao Tan. Learning
+ [4] Dong An, Hanqing Wang, Wenguan Wang, Zun Wang, Yan                       navigational visual representations with semantic map super-
+     Huang, Keji He, and Liang Wang. Etpnav: Evolving topo-                   vision. In ICCV, pages 3055–3067, 2023. 7
+     logical planning for vision-language navigation in continu-         [18] Chenguang Huang, Oier Mees, Andy Zeng, and Wolfram
+     ous environments. arXiv preprint arXiv:2304.03047, 2023.                 Burgard. Visual language maps for robot navigation. In
+     2, 3, 5, 6, 7                                                            ICRA, London, UK, 2023. 2
+ [5] Peter Anderson, Qi Wu, Damien Teney, Jake Bruce, Mark               [19] Liyiming Ke, Xiujun Li, Yonatan Bisk, Ari Holtzman, Zhe
+     Johnson, Niko Sünderhauf, Ian Reid, Stephen Gould, and                  Gan, Jingjing Liu, Jianfeng Gao, Yejin Choi, and Siddhartha
+     Anton Van Den Hengel. Vision-and-language navigation:                    Srinivasa. Tactical rewind: Self-correction via backtrack-
+     Interpreting visually-grounded navigation instructions in real           ing in vision-and-language navigation. In Proceedings of
+     environments. In CVPR, pages 3674–3683, 2018. 1, 2, 6                    the IEEE/CVF conference on computer vision and pattern
+ [6] Angel Chang, Angela Dai, Thomas Funkhouser, Maciej Hal-                  recognition, pages 6741–6749, 2019. 2
+     ber, Matthias Niessner, Manolis Savva, Shuran Song, Andy            [20] Jing Yu Koh, Honglak Lee, Yinfei Yang, Jason Baldridge,
+     Zeng, and Yinda Zhang. Matterport3d: Learning from rgb-d                 and Peter Anderson. Pathdreamer: A world model for indoor
+     data in indoor environments. In 3DV, pages 667–676, 2017.                navigation. In ICCV, pages 14738–14748, 2021. 2, 6
+     6                                                                   [21] Jacob Krantz and Stefan Lee. Sim-2-sim transfer for vision-
+ [7] Peihao Chen, Dongyu Ji, Kunyang Lin, Runhao Zeng,                        and-language navigation in continuous environments. In
+     Thomas H Li, Mingkui Tan, and Chuang Gan. Weakly-                        ECCV, 2022. 7
+     supervised multi-granularity map learning for vision-and-           [22] Jacob Krantz, Erik Wijmans, Arjun Majumdar, Dhruv Batra,
+     language navigation. In NeurIPS, 2022. 2, 7                              and Stefan Lee. Beyond the nav-graph: Vision-and-language
+ [8] Shizhe Chen, Pierre-Louis Guhur, Cordelia Schmid, and                    navigation in continuous environments. In ECCV, 2020. 1,
+     Ivan Laptev. History aware multimodal transformer for                    2, 3, 6
+     vision-and-language navigation. In NeurIPS, pages 5834–             [23] Alexander Ku, Peter Anderson, Roma Patel, Eugene Ie, and
+     5847, 2021. 1, 2                                                         Jason Baldridge. Room-across-room: Multilingual vision-
+ [9] Shizhe Chen, Pierre-Louis Guhur, Makarand Tapaswi,                       and-language navigation with dense spatiotemporal ground-
+     Cordelia Schmid, and Ivan Laptev. Think global, act local:               ing. In EMNLP, pages 4392–4412, 2020. 1, 2, 3, 6
+     Dual-scale graph transformer for vision-and-language navi-          [24] Obin Kwon, Jeongho Park, and Songhwai Oh. Renderable
+     gation. In CVPR, pages 16537–16547, 2022. 1, 2, 5, 6                     neural radiance map for visual navigation. In CVPR, pages
+[10] Terrance DeVries, Miguel Angel Bautista, Nitish Srivastava,              9099–9108, 2023. 2, 3, 6, 7
+     Graham W Taylor, and Joshua M Susskind. Unconstrained               [25] Jialu Li and Mohit Bansal. Improving vision-and-language
+     scene generation with locally conditioned radiance fields. In            navigation by generating future-view image semantics. In
+     ICCV, pages 14304–14313, 2021. 3                                         CVPR, pages 10803–10812, 2023. 1, 2
+[11] Weixi Feng, Tsu-Jui Fu, Yujie Lu, and William Yang Wang.            [26] Xiangyang Li, Zihan Wang, Jiahao Yang, Yaowei Wang,
+     Uln: Towards underspecified vision-and-language naviga-                  and Shuqiang Jiang. Kerm: Knowledge enhanced reasoning
+     tion. arXiv preprint arXiv:2210.10020, 2022. 1, 2                        for vision-and-language navigation. In CVPR, pages 2583–
+[12] Daniel Fried, Ronghang Hu, Volkan Cirik, Anna Rohrbach,                  2592, 2023. 1
+     Jacob Andreas, Louis-Philippe Morency, Taylor Berg-                 [27] Rui Liu, Xiaohan Wang, Wenguan Wang, and Yi Yang.
+     Kirkpatrick, Kate Saenko, Dan Klein, and Trevor Darrell.                 Bird’s-eye-view scene graph for vision-language navigation.
+     Speaker-follower models for vision-and-language naviga-                  In ICCV, pages 10968–10980, 2023. 2
+     tion. In NeurIPS, 2018. 2                                           [28] Ben Mildenhall, Pratul P Srinivasan, Matthew Tancik,
+[13] Georgios Georgakis, Karl Schmeckpeper, Karan Wanchoo,                    Jonathan T Barron, Ravi Ramamoorthi, and Ren Ng. Nerf:
+     Soham Dan, Eleni Miltsakaki, Dan Roth, and Kostas Dani-                  Representing scenes as neural radiance fields for view syn-
+     ilidis. Cross-modal map learning for vision and language                 thesis. Communications of the ACM, 65(1):99–106, 2021. 2,
+     navigation. In CVPR, 2022. 2, 7                                          4
+
+
+
+
+                                                                      13761
+[29] Alexander Pashevich, Cordelia Schmid, and Chen Sun.                     31st ACM International Conference on Multimedia, pages
+     Episodic transformer for vision-and-language navigation. In             2838–2846, 2023. 1
+     ICCV, 2021. 2                                                      [42] Xiaohan Wang, Yuehu Liu, Xinhang Song, Beibei Wang, and
+[30] Fabian Pedregosa, Gaël Varoquaux, Alexandre Gramfort,                  Shuqiang Jiang. Camp: Causal multi-policy planning for in-
+     Vincent Michel, Bertrand Thirion, Olivier Grisel, Mathieu               teractive navigation in multi-room scenes. Advances in Neu-
+     Blondel, Peter Prettenhofer, Ron Weiss, Vincent Dubourg,                ral Information Processing Systems, 36, 2024. 1
+     et al. Scikit-learn: Machine learning in python. Journal of        [43] Zun Wang, Jialu Li, Yicong Hong, Yi Wang, Qi Wu, Mo-
+     machine Learning research, 12:2825–2830, 2011. 8                        hit Bansal, Stephen Gould, Hao Tan, and Yu Qiao. Scaling
+[31] Yuankai Qi, Qi Wu, Peter Anderson, Xin Wang,                            data generation in vision-and-language navigation. In ICCV,
+     William Yang Wang, Chunhua Shen, and Anton van den                      pages 12009–12020, 2023. 7
+     Hengel. Reverie: Remote embodied visual referring expres-          [44] Zihan Wang, Xiangyang Li, Jiahao Yang, Yeqi Liu, and
+     sion in real indoor environments. In CVPR, pages 9982–                  Shuqiang Jiang. Gridmm: Grid memory map for vision-and-
+     9991, 2020. 1, 2                                                        language navigation. In ICCV, pages 15625–15636, 2023. 2,
+[32] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya                      7
+     Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,              [45] Sixian Zhang, Xinhang Song, Yubing Bai, Weijie Li, Yakui
+     Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learn-                Chu, and Shuqiang Jiang. Hierarchical object-to-zone graph
+     ing transferable visual models from natural language super-             for object navigation. In 2021 IEEE/CVF International Con-
+     vision. In ICML, pages 8748–8763, 2021. 2, 3                            ference on Computer Vision, ICCV 2021, Montreal, QC,
+[33] Santhosh K Ramakrishnan, Aaron Gokaslan, Erik Wijmans,                  Canada, October 10-17, 2021, pages 15110–15120. IEEE,
+     Oleksandr Maksymets, Alex Clegg, John Turner, Eric Un-                  2021. 1
+     dersander, Wojciech Galuba, Andrew Westbury, Angel X               [46] Sixian Zhang, Weijie Li, Xinhang Song, Yubing Bai, and
+     Chang, et al. Habitat-matterport 3d dataset (hm3d): 1000                Shuqiang Jiang. Generative meta-adversarial network for un-
+     large-scale 3d environments for embodied ai. arXiv preprint             seen object navigation. In Computer Vision - ECCV 2022 -
+     arXiv:2109.08238, 2021. 5, 6                                            17th European Conference, Tel Aviv, Israel, October 23-27,
+[34] Aditya Ramesh, Mikhail Pavlov, Gabriel Goh, Scott Gray,                 2022, Proceedings, Part XXXIX, pages 301–320, 2022.
+     Chelsea Voss, Alec Radford, Mark Chen, and Ilya Sutskever.         [47] Sixian Zhang, Xinhang Song, Weijie Li, Yubing Bai, Xinyao
+     Zero-shot text-to-image generation. In ICML, pages 8821–                Yu, and Shuqiang Jiang. Layout-based causal inference for
+     8831. PMLR, 2021. 2                                                     object navigation. In Proceedings of the IEEE/CVF Confer-
+[35] Francesco Taioli, Federico Cunico, Federico Girella, Ric-               ence on Computer Vision and Pattern Recognition (CVPR),
+     cardo Bologna, Alessandro Farinelli, and Marco Cristani.                pages 10792–10802, 2023. 1
+     Language-enhanced rnr-map: Querying renderable neural              [48] Fengda Zhu, Xiwen Liang, Yi Zhu, Qizhi Yu, Xiaojun
+     radiance field maps with natural language. In ICCV, pages               Chang, and Xiaodan Liang. Soon: Scenario oriented object
+     4669–4674, 2023. 2, 3                                                   navigation with graph-based exploration. In CVPR, pages
+[36] Hao Tan, Licheng Yu, and Mohit Bansal. Learning to nav-                 12689–12699, 2021. 2
+     igate unseen environments: Back translation with environ-
+     mental dropout. In NAACL, pages 2610–2621, 2019. 2
+[37] Jesse Thomason, Michael Murray, Maya Cakmak, and Luke
+     Zettlemoyer. Vision-and-dialog navigation. In PMLR, 2020.
+     2
+[38] Hanqing Wang, Wenguan Wang, Tianmin Shu, Wei Liang,
+     and Jianbing Shen. Active visual information gathering
+     for vision-language navigation. In Computer Vision–ECCV
+     2020: 16th European Conference, Glasgow, UK, August
+     23–28, 2020, Proceedings, Part XXII 16, pages 307–322.
+     Springer, 2020. 2
+[39] Hanqing Wang, Wei Liang, Luc Van Gool, and Wenguan
+     Wang. Dreamwalker: Mental planning for continuous
+     vision-language navigation. In ICCV, pages 10873–10883,
+     2023. 2, 6, 7
+[40] Xin Wang, Qiuyuan Huang, Asli Celikyilmaz, Jianfeng Gao,
+     Dinghan Shen, Yuan-Fang Wang, William Yang Wang, and
+     Lei Zhang. Reinforced cross-modal matching and self-
+     supervised imitation learning for vision-language navigation.
+     In CVPR, pages 6629–6638, 2019. 2
+[41] Xiaohan Wang, Yuehu Liu, Xinhang Song, Beibei Wang, and
+     Shuqiang Jiang. Generating explanations for embodied ac-
+     tion decision from visual observation. In Proceedings of the
+
+
+
+
+                                                                     13762
+

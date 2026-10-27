@@ -1,0 +1,59 @@
+{
+  "locked_on": "2026-10-23",
+  "selection_status": "locked",
+  "execution_status": "not_started",
+  "purpose": "Compare three separate lightweight navigation policies trained with a StreamVLN-style recipe, then frozen for the separately specified world-model and scorer experiments.",
+  "checkpoint_revision_source": "Official Hugging Face model API metadata inspected on 2026-10-23.",
+  "trials": [
+    {
+      "id": "smolvlm2",
+      "name": "SmolVLM2-500M-Video-Instruct",
+      "model_id": "HuggingFaceTB/SmolVLM2-500M-Video-Instruct",
+      "revision": "7b375e1b73b11138ff12fe22c8f2822d8fe03467"
+    },
+    {
+      "id": "onevision",
+      "name": "LLaVA-OneVision-Qwen2-0.5B-OV",
+      "model_id": "lmms-lab/llava-onevision-qwen2-0.5b-ov",
+      "revision": "381d9947148efb1e58a577f451c05705ceec666e"
+    },
+    {
+      "id": "qwen3vl",
+      "name": "Qwen3-VL-2B-Instruct",
+      "model_id": "Qwen/Qwen3-VL-2B-Instruct",
+      "revision": "89644892e4d85e24eaac8bacfd4f463576704203"
+    }
+  ],
+  "shared_plan": {
+    "added_training_and_evaluation_datasets": ["R2R-CE", "RxR-CE"],
+    "training_scenes_only_for_data_collection": true,
+    "initialization": "Use each model's pretrained VLM weights; do not load the original StreamVLN navigation weights into a different backbone.",
+    "navigation_training": ["Expert trajectory supervised fine-tuning", "DAgger using each trial policy and simulator expert labels"],
+    "streaming_integration": "Adapt observation/action formatting, bounded dialogue context, visual history, and inference cache handling for each backbone.",
+    "initial_efficiency_strategy": "LoRA with a frozen policy visual encoder; exact adapter/projector settings, precision, and window budgets remain open pending profiling.",
+    "freeze_navigation_policy_before_world_model_experiments": true,
+    "world_model": "Four separate world-model trial families are specified in World_Model_Trials.json; this file locks navigation backbones only.",
+    "scorer": "Instruction/context features from the frozen trained policy, eight real-history memory slots, candidate action, and predicted next DINO patches; two attention blocks and utility/success/collision heads. See Scorer_Design.md and Scorer/config.json.",
+    "scorer_design": "../docs/Scorer_Design.md",
+    "scorer_reference_status": "Scorer and interface CPU checks implemented; saved native model metadata widths checked at 960/896/2048. Prefill hook primitive and runtime lifecycle implemented; actual trained policy wiring, CE runs and GPU profiling pending. See Architecture_Compatibility.md.",
+    "policy_adapter_contract": "Use each native model family/processor. Capture final decoder norm during exactly one real-history prefill; use expanded attention masks and last valid token. Initially rebuild bounded real-history prompts after each actual action; cache reuse requires agreement with replay. The selected OneVision checkpoint is native LLaVA, not an automatically interchangeable HF class.",
+    "explicit_instruction_splitting": false,
+    "inference": "Evaluate FORWARD, LEFT, RIGHT, and STOP with one-action predictions. STOP uses the current view. Override the base action only under a development-validated margin; execute once, observe reality, and update actual history.",
+    "comparison_controls": [
+      "Same expert dataset and scene splits",
+      "Matched DAgger rollout and expert-query budgets; record policy-dependent visit distributions",
+      "Matched sensing, evaluation episodes, and candidate budgets",
+      "Fixed policy checkpoint within each with/without-world-model comparison",
+      "Hold world-model variant and scorer protocol fixed when comparing navigation backbones; compare world-model variants separately with a fixed policy and shared branch data",
+      "Record precision, history/token budgets, full pipeline latency, and peak memory"
+    ]
+  },
+  "open_decisions": [
+    "Training and inference memory profiles on the 8 GB target",
+    "Backbone-specific streaming adapters",
+    "Exact optimizer, LoRA targets/rank, projector training, precision, and history budgets",
+    "Backbone-specific real-context feature extraction, action-ID mapping, and cache updates",
+    "CE validation of scorer utility weights, memory capacity, and override margin",
+    "Final deployment backbone after comparison"
+  ]
+}

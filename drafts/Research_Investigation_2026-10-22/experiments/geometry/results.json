@@ -1,0 +1,54 @@
+{
+  "executed_utc": "2026-10-22T07:46:37.264759+00:00",
+  "evidence_type": "EXECUTED STATIC DATASET GEOMETRY AND METRIC CHECK",
+  "navigation_benchmark_executed": false,
+  "connectivity_repo": "https://github.com/peteanderson80/Matterport3DSimulator",
+  "connectivity_commit": "589d091b111333f9e9f9d6cfd021b2eb68435925",
+  "connectivity_scenes": 72,
+  "reference_metric_source": "https://github.com/cshizhe/VLN-DUET/blob/93e8b233164bc079a6db48b8a0a78d123ec8de41/map_nav_src/r2r/env.py#L314",
+  "graph_source": "https://github.com/cshizhe/VLN-DUET/blob/93e8b233164bc079a6db48b8a0a78d123ec8de41/map_nav_src/utils/data.py#L25",
+  "success_condition": "Graph shortest-path endpoint distance strictly below 3 metres",
+  "spl_formula": "success * reference_length / max(executed_length, reference_length, 0.01)",
+  "unit": "One reference path; multiple natural-language instructions per path are not counted as independent geometries",
+  "annotation_sources": [
+    {
+      "split": "train",
+      "path": "G:\\내 드라이브\\CVPR\\261020\\Presentation\\_source_Benchmarks_Baseline\\cvpr_review_response_2026-10-21\\R2R_train.json",
+      "sha256": "30af70d96ea217778ba0d1b3085a774a13f36266fef39a13dbe8b03516fbf988",
+      "paths": 4675
+    },
+    {
+      "split": "val_unseen",
+      "path": "G:\\내 드라이브\\CVPR\\261020\\Presentation\\_source_Benchmarks_Baseline\\cvpr_review_response_2026-10-21\\R2R_val_unseen.json",
+      "sha256": "1cc730adc1c098998ac9191462849fc725e0c5336984a35bfbac7d5f044e682c",
+      "paths": 783
+    }
+  ],
+  "summary": {
+    "train": {
+      "valid_reference_paths": 4675,
+      "proper_successful_prefix_paths": 4051,
+      "fraction_of_reference_paths": 0.866524064171123,
+      "all_passing_prefixes_have_spl_one": true,
+      "median_omitted_reference_length_m_among_passing": 2.127591471056178,
+      "max_omitted_reference_edges": 4
+    },
+    "val_unseen": {
+      "valid_reference_paths": 783,
+      "proper_successful_prefix_paths": 712,
+      "fraction_of_reference_paths": 0.909323116219668,
+      "all_passing_prefixes_have_spl_one": true,
+      "median_omitted_reference_length_m_among_passing": 2.072439452302649,
+      "max_omitted_reference_edges": 3
+    }
+  },
+  "invalid_paths": [],
+  "interpretation": "The reviewed success/SPL criterion permits some proper reference prefixes to receive full credit. It therefore cannot logically certify visiting every reference waypoint.",
+  "limitations": [
+    "This is expected tolerance behavior, not an evaluator bug.",
+    "No model selected these prefixes; no navigator, simulator, checkpoint, image encoder or original project script was run.",
+    "Language entailment was not annotated. Omitting a waypoint is not automatically an instruction violation.",
+    "These are supplied local R2R reference annotations, not SRDF-generated data; no empirical SRDF failure rate follows.",
+    "Local annotations were not verified byte-identical to an upstream annotation version."
+  ]
+}

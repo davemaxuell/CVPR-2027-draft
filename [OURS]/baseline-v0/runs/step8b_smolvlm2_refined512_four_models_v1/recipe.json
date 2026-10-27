@@ -1,0 +1,55 @@
+{
+  "declared_utc": "2026-10-26T22:40:48.081951+00:00",
+  "declaration_phase": "Initial DINO C calibration still running; its E evaluation has not started",
+  "policy_identity_sha256": "729480bf5c8402b07cad653a7ef0f7124be212d50255077290316ba686777ca7",
+  "STOP_bias": -0.25,
+  "trials": [
+    "dinowm_transfer",
+    "dinov2_fresh_dynamics",
+    "nwm_transfer",
+    "cdit_fresh_dynamics"
+  ],
+  "seed": 8,
+  "epochs": 16,
+  "total_updates": 2048,
+  "roots_per_epoch": 1024,
+  "roots_per_batch": 8,
+  "stages": [
+    {
+      "name": "actual",
+      "start_epoch": 0,
+      "end_epoch": 4,
+      "updates": 512
+    },
+    {
+      "name": "mixed",
+      "start_epoch": 4,
+      "end_epoch": 8,
+      "updates": 512
+    },
+    {
+      "name": "predicted",
+      "start_epoch": 8,
+      "end_epoch": 16,
+      "updates": 1024
+    }
+  ],
+  "model_sampling": "Mixed:512 actual+128 per model per epoch. Predicted:256 per model per epoch. No model ID supplied to scorer.",
+  "optimizer": {
+    "name": "AdamW",
+    "learning_rate": 0.0001,
+    "weight_decay": 0.01,
+    "gradient_clip_norm": 1.0,
+    "schedule": "constant"
+  },
+  "BPTT": 32,
+  "variants": [
+    "pooled",
+    "null"
+  ],
+  "parameters_per_variant": 2890115,
+  "DINO_training_run": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/step8_smolvlm2_refined512_dino_pair_v1",
+  "inheritance_check": "All null checkpoints and the first four actual-only pooled epochs must match the original DINO fit bit for bit",
+  "selection": "Top two predicted-stage checkpoints by mean C measured-branch regret across all four models; C closed-loop selection and fixed margin required before evaluation",
+  "no_E_metrics_used_for_recipe": true
+}

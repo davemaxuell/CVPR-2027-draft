@@ -1,0 +1,41 @@
+BASE_TASK_CONFIG_PATH: src/config/vlnce/vlnce_task.yaml
+SIMULATOR_GPU_IDS: [0]
+TORCH_GPU_ID: 0
+NUM_ENVIRONMENTS: 1
+
+EVAL:
+    SPLIT: val_unseen
+    EPISODE_COUNT: 100
+    EVAL_NONLEARNING: True
+    USE_CKPT_CONFIG: False
+    PREDICTIONS_FILE: predictions.json
+    FORMAT: r2r
+
+COMMON:
+    VOXEL_SIZE: 0.1
+    SEARCH_DISTANCE: 5.0
+    SUCCESS_DISTANCE: 0.5
+    DISTANCE_THRESHOLD: 1.5
+
+MODEL:
+    GLEE_CONFIG_PATH: "src/thirdparty/GLEE/configs/SwinL.yaml"
+    GLEE_MODEL_PATH: "src/thirdparty/GLEE/GLEE_SwinL_Scaleup10m.pth"
+
+LLM:
+    IMG_PATH: data/image
+    GPT_MODEL: gpt-4o
+    MAX_SINGLE_CALL: 10
+    MAX_SUBGOAL_CALL: 10
+    OPENAI_API_KEY: ""
+
+MAPPING:
+    OBJ_THRESHOLD: 30
+    MOVE_DISTANCE: 2.0
+
+LOG:
+    LOG_DIR: data/logs
+    CLEAN: False
+    WRITE_LOG: True
+    USE_LOG_ACTION: True
+    SAVE_VIDEO: False
+    USE_LLM_LOG: True

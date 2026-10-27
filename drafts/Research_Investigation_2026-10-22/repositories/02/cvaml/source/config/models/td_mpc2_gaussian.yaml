@@ -1,0 +1,16 @@
+defaults:
+  - td_mpc2
+
+encoder:
+  _target_: mad_td.nn.model.TDMPC2GaussianEncoder
+
+  hidden_dim: [512]
+  feature_dim: 512
+
+latent_model:
+  _target_: mad_td.nn.model.TDMPC2GaussianLatentModel
+
+  feature_dim: [512, 512]
+  output_dim: ${models.encoder.feature_dim}
+  normalize_output: False
+  

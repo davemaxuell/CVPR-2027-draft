@@ -1,0 +1,3566 @@
+=== PDF PAGE 1 ===
+1
+Dream to Recall: Imagination-Guided Experience
+Retrieval for Memory-Persistent
+Vision-and-Language Navigation
+Yunzhe Xu, Yiyuan Pan, Zhe Liu
+Abstract—Vision-and-Language Navigation (VLN) requires
+agents to follow natural language instructions through envi-
+ronments, with memory-persistent variants demanding progres-
+sive improvement through accumulated experience. Existing
+approaches for memory-persistent VLN face critical limitations:
+they lack effective memory access mechanisms, instead rely-
+ing on entire memory incorporation or fixed-horizon lookup,
+and predominantly store only environmental observations while
+neglecting navigation behavioral patterns that encode valuable
+decision-making strategies. We present Memoir, which employs
+imagination as a retrieval mechanism grounded by explicit
+memory: a world model imagines future navigation states as
+queries to selectively retrieve relevant environmental observa-
+tions and behavioral histories. The approach comprises: 1) a
+language-conditioned world model that imagines future states
+serving dual purposes: encoding experiences for storage and
+generating retrieval queries; 2) Hybrid Viewpoint-Level Mem-
+ory that anchors both observations and behavioral patterns to
+viewpoints, enabling hybrid retrieval; and 3) an experience-
+augmented navigation model that integrates retrieved knowl-
+edge through specialized encoders. Extensive evaluation across
+diverse memory-persistent VLN benchmarks with 10 distinct
+testing scenarios demonstrates Memoir’s effectiveness: significant
+improvements across all scenarios, with 5.4% SPL gains on IR2R
+over the best memory-persistent baseline, accompanied by 8.3×
+training speedup and 74% inference memory reduction. The
+results validate that predictive retrieval of both environmental
+and behavioral memories enables more effective navigation, with
+analysis indicating substantial headroom (73.3% vs 93.4% upper
+bound) for this imagination-guided paradigm.
+Index Terms—Vision-and-language navigation, embodied intel-
+ligence, memory mechanisms, world models.
+I. INTRODUCTION
+V
+ISION-and-Language Navigation (VLN) [1] represents
+a cornerstone challenge in embodied AI, requiring
+agents to interpret natural language instructions and navigate
+through environments to reach specified goals. The fundamen-
+tal episodic nature of traditional VLN tasks [1]–[3], where
+agents operate independently across episodes without retaining
+experiential knowledge, limits their capacity for progressive
+improvement and environmental adaptation, constraining real-
+world applicability where sustained operation is essential.
+This paper was supported by the National Natural Science Foundation of
+China under Grant 62303307, and in part by the National Key Laboratory of
+Human Machine Hybrid Augmented Intelligence, Xi’an Jiaotong University
+(No. HMHAI-202408). (Corresponding author: Zhe Liu.)
+The authors are with the School of Automation and Intelligent Sens-
+ing, Shanghai Jiao Tong University, Shanghai 200240, China (e-mail:
+xyz9911@sjtu.edu.cn; pyy030406@sjtu.edu.cn; liuzhesjtu@sjtu.edu.cn).
+Code is available at https://github.com/xyz9911/Memoir.
+This limitation has motivated the development of memory-
+persistent navigation tasks [4]–[6] that evaluate agents’ ability
+to accumulate and leverage experience across multiple navi-
+gation episodes. These tasks more accurately reflect practical
+application scenarios where robotic agents must continuously
+improve their navigation capabilities through environmental
+familiarity and learned behavioral patterns.
+Recent advances in memory-persistent VLN have primarily
+focused on long-term memory mechanisms for progressive
+scene knowledge accumulation. Early approaches employed
+strategies such as episodic history stacking [5], but simply ex-
+tending history suffers from redundancy-induced performance
+degradation. Subsequent work [8] addressed this by augment-
+ing visual representations with broader spatial horizons rather
+than incorporating navigation histories, while OVER-NAV [7]
+leverages open-vocabulary detection to construct multimodal
+topological graphs that strengthen keyword-observation corre-
+spondence. Most recently, GR-DUET [6] enhanced the DUET
+architecture [9] with retained topological observation memory,
+achieving strong performance in VLN scene adaptation.
+Despite these advances, existing approaches exhibit two crit-
+ical limitations. First, current approaches lack effective mem-
+ory access mechanisms, instead relying on either complete
+memory incorporation (leading to irrelevant information inte-
+gration and computational overhead) or fixed-horizon spatial
+lookup (risking valuable experience loss). Second, navigation
+behavioral histories contain valuable decision-making patterns
+regarding how agents interpreted instructions and selected
+actions across different scenarios. However, existing memory-
+persistent VLN methods either ignore them entirely or, when
+attempted [5], fail to effectively leverage this information.
+How can agents effectively determine which memories to
+access in order to leverage navigation experiences? Human
+navigators naturally engage in mental imagination of navi-
+gation routes [10] and future travel events [11], consulting
+experiences to finalize decisions based on mental simulations
+[12], highlighting that imagination serves as a query mech-
+anism—agents can predict where they might navigate and
+retrieve relevant past experiences matching those predicted
+states. This paradigm differs from traditional imagine-planning
+approaches [13] that generate trajectories in isolation; instead,
+imagination is grounded by querying explicit long-term mem-
+ory, ensuring retrieved experiences directly inform decision-
+making while avoiding hallucination. To this end, we propose
+Model-based Hybrid Viewpoint-Level Memory for Experience
+Retrieval (Memoir), an agent that employs predictive world
+arXiv:2510.08553v2  [cs.CV]  30 Mar 2026
+
+=== PDF PAGE 2 ===
+2
+Episode 2 (Completed):
+Walk to the curved 
+staircase. Turn into the 
+hallway, pass the 
+laundry on your left, and 
+stop at the bathroom.
+Episode 3 (Present):
+Leave the family room, 
+walk past the dining table, 
+then continue walking 
+forward. Stop at the porch 
+area near the sofa.
+Episode 3 Path
+(Oracle)
+Episode 2 Path
+Episode 1 Path
+Episode 3 Path
+Episode 1 (Completed):
+Walk through the dining 
+room until you see a 
+cowhide sofa in the center 
+of the living room, then 
+proceed to the television.
+World Model
+History Bank
+Store
+Observation
+Store
+Latent States
+Observation Bank
+Based on the task, I 
+should find a dining table 
+first, then a sofa. 
+Navigation Planning
+Full Observation 
+Memory Incorporation
+(e.g. GR-DUET)
+Fixed-Horizon 
+Lookup
+(e.g. OVER-NAV)
+w/o Navigation History
+Limited Horizon
+Computationally Efficient
+Poor Robustness
+w/o Navigation History
+Distant Horizon
+Computationally Intensive
+Medium Robustness
+Navigation History 
+Adaptive Horizon
+Computationally Efficient
+Strong Robustness
+Adaptive Retrieval 
+with Hybrid 
+Memory (OURS)
+Current Node
+Visited Node
+History Memory
+Observation Memory
+Navigation Success
+Retrieved Node
+Retrieve
+Infer
+Imagine
+(b)
+(a)
+(a)
+(b)
+(b)
+Retrieve
+Fig. 1. Overview of Memoir’s workflow for experience retrieval via imagination. (a) In previous episodes (1 and 2), the agent populates the history bank
+with latent states encoded by the world model, and fills the observation bank with observations. (b) In the current episode (3), the agent utilizes world model
+imagination to generate retrieval queries and retrieves memory from both memory banks at each viewpoint for navigation planning. Compared with GR-DUET
+[6] that incorporates all retained observation memory and OVER-NAV [7] that only applies fixed-horizon lookup, our approach adaptively retrieves both
+observation and histories for navigation planning through imagination.
+modeling for memory retrieval at viewpoint granularity. Our
+approach addresses the aforementioned limitations through
+a unified framework. First, adaptive retrieval is grounded
+by using imagined future states as queries to selectively
+access verified experiences, avoiding both complete memory
+incorporation and fixed-horizon lookup. Second, behavioral
+pattern preservation is enabled by encoding navigation his-
+tories into latent states that capture decision-making strategies
+with viewpoint-level anchoring. Figure 1 illustrates Memoir’s
+workflow from memory storage to retrieval.
+Realizing this imagination-guided paradigm requires ad-
+dressing three challenges: how to generate predictive queries,
+what to store and retrieve, and how to integrate retrieved
+knowledge for navigation. Memoir tackles these through a uni-
+fied framework. 1) A language-conditioned world model learns
+to imagine future navigation states conditioned on instructions.
+These imagined states serve dual purposes: encoding current
+experience into latent representations for storage, and gener-
+ating queries to retrieve similar past experiences. 2) Hybrid
+Viewpoint-Level Memory (HVM) maintains this accumulated
+knowledge by anchoring both environmental observations and
+behavioral patterns to viewpoints, enabling retrieval of not just
+what agents saw, but how they navigated. 3) The navigation
+model then processes current observations alongside retrieved
+experiences through specialized encoders to make informed
+decisions. This enables adaptive memory access that preserves
+strategic knowledge across episodes.
+We implement Memoir on various VLN methods, validating
+its effectiveness across memory-persistent benchmarks with
+10 distinctive testing scenarios. Memoir demonstrates con-
+sistent improvements, achieving 5.4% improvement in SPL
+on IR2R [5], accompanied by 8.3× training speedup and
+74% inference memory reduction. We also reveal substantial
+headroom (73.3% vs 93.4% upper bound) for this paradigm
+and illuminate future directions. Our key contributions include:
+• A Novel Paradigm of Imagination-Guided Retrieval:
+We propose a paradigm shift from passive memory accu-
+mulation to active, predictive retrieval. Unlike traditional
+methods that rely on full incorporation or fixed-horizon
+lookup, we utilize a language-conditioned world model to
+imagine future states as dynamic queries. This approach
+grounds imagination in verified experience, enabling the
+adaptive filtering of both environmental observations and
+behavioral histories based on navigation intent.
+• Hybrid Viewpoint-Level Memory Architecture: We
+introduce a unified memory architecture that anchors both
+environmental observations and behavioral decision pat-
+terns encoded by the world model to specific viewpoints.
+This allows the agent to leverage historical navigation
+strategies alongside visual context, a dimension largely
+neglected in prior DUET-style architectures.
+• Efficient and Robust Navigation System: We develop
+Memoir, which integrates specific VLN architectural in-
+novations including a Navigation-History Encoder. Ex-
+tensive evaluations demonstrate consistent improvements
+with significant efficiency benefits, while oracle analy-
+sis reveals substantial headroom, illuminating promising
+directions for advancing this paradigm.
+II. RELATED WORK
+A. Vision-and-Language Navigation
+Vision-and-Language Navigation (VLN) [1]–[3] requires
+agents to follow natural language instructions while navigating
+toward target destinations. Single-episode VLN research has
+evolved through data augmentation approaches from speaker
+models [14]–[16] to synthetic data [17], [18] using Large Lan-
+guage Models (LLMs), and memory architectures progressing
+from historical representations [19], [20] to structured spatial
+systems, particularly topological observation memory [9], [21]
+which has been widely adopted. However, these single-episode
+approaches cannot accumulate knowledge across episodes.
+
+=== PDF PAGE 3 ===
+3
+Memory-persistent VLN benchmarks [5], [6] address real-
+world requirements where agents should operate continuously
+and improve through accumulated experience. TourHAMT
+[5] extends historical memory by stacking complete navi-
+gation sequences, but suffers performance degradation from
+excessive redundancy. ESceme [8] enhances environmental
+observations with broader spatial contexts, while OVER-
+NAV [7] constructs omni-graphs with fixed-distance retrieval.
+MAP-CMA [5] builds global semantic maps augmented with
+fixed-horizon egocentric perception. GR-DUET [6] retains
+complete topological memory, achieving performance gains
+at computational cost. These approaches share fundamental
+limitations: reliance on complete memory incorporation or
+fixed-horizon lookup, and exclusive focus on environmental
+observations while neglecting navigation behavioral patterns
+that encode decision-making strategies across contexts. Our
+work addresses these limitations through imagination-guided
+memory retrieval that selectively accesses both environmental
+and behavioral histories.
+B. Memory Mechanism
+Memory mechanisms in navigation systems encompass
+two primary types that serve complementary roles in spa-
+tial reasoning. Navigation history memory captures tempo-
+ral decision-making patterns and behavioral context through
+sequence representations [19], [22] or natural language ex-
+pression [23], [24], preserving how agents make decisions
+across different scenarios. Environmental observation memory
+preserves spatial information through structured representa-
+tions such as occupancy maps [25], [26], semantic maps
+[27], [28], bird’s-eye view representations [29], [30], and
+topological memory [31]–[33], maintaining spatial layouts and
+visual features for scene understanding. In memory-persistent
+scenarios where agents must accumulate knowledge across
+diverse experiences, current approaches [5], [6] treat these
+information sources separately. Environmental observations
+alone cannot encode the behavioral reasoning underlying nav-
+igation decisions, while navigation histories without spatial
+anchoring cannot disambiguate similar patterns across differ-
+ent environments. This separation limits knowledge transfer
+across navigation scenarios, motivating our unified memory
+that leverages both spatial and temporal historical information.
+C. World Model
+Predictive world models have demonstrated significant im-
+pact in reinforcement learning through POMDP solutions via
+latent dynamics modeling [34], [35]. The Recurrent State-
+Space Model (RSSM) [34] represents the dominant architec-
+ture, with extensions to language conditioning [36] and large-
+scale pretraining [37]. Contrastive world models [38], [39]
+offer computational efficiency without observation reconstruc-
+tion. In navigation domains, world models [40] serve diverse
+purposes: future observation synthesis for data augmentation
+[41], [42], trajectory planning through imagination [13], [43]–
+[45], and auxiliary task formulation [46], [47]. While effective,
+using world models as surrogate environments often suffer
+from compounding hallucination errors in complex tasks. A
+nascent alternative is using world models for memory access.
+MBEC [48] pioneered this direction in episodic control, but
+is limited to querying episodic buffers for policy optimization
+during training. Our approach advances this to a “Dream to Re-
+call” paradigm by unifying world modeling with retrieval for
+navigation reasoning. This repurposes the world model from
+a simulator to a neural search engine, anchoring imagination
+to grounded, long-term navigation experience.
+III. PRELIMINARIES
+A. VLN Formulation
+Vision-and-Language Navigation (VLN) requires an agent
+to follow instructions and navigate towards a target. The
+environment is represented as a connectivity graph G
+=
+(V, E), where V denotes navigable viewpoints and E represents
+traversable edges connecting adjacent viewpoints.
+Single-Episode VLN Formulation. In the traditional episodic
+setting, an agent receives a natural language instruction ℓand
+is initialized at a starting viewpoint v1 ∈V. At each timestep
+t, the agent observes a panoramic observation ot = {o(i)
+t }36
+i=1
+comprising 36 directional views: 12 horizontal viewing angles,
+each captured at three elevation levels (upward, horizontal,
+downward). The agent’s action space at viewpoint vt includes
+navigation to any neighboring viewpoint vj ∈N(vt) and a
+terminal stop action, where N(vt) = {vj ∈V : (vt, vj) ∈E}
+denotes the set of adjacent viewpoints. The episode terminates
+when the agent executes a stop action or reaches a maximum
+step limit Tmax.
+Memory-Persistent VLN Formulation. While traditional
+VLN effectively evaluates basic instruction-following capabili-
+ties, it fails to capture the requirements of progressive improve-
+ment during persistent operation. Memory-persistent VLN
+addresses this limitation by introducing a persistent memory
+bank M = {(ℓ(k), G(k), O(k), A(k))}N
+k=1 that accumulates
+experiential knowledge across multiple episodes, where for
+k-th episode, ℓ(k) is the instruction, G(k) = (V(k), E(k)) is the
+observed subgraph after k episodes, O(k) = {o(k)
+t
+}T (k)
+t=1 and
+A(k) = {a(k)
+t
+}T (k)
+t=1 records observations and actions respec-
+tively. The bank M is incrementally updated in each episode
+and serves as a persistent repository for decisions, enabling
+progressive performance improvement through accumulated
+environmental familiarity and learned behavioral patterns.
+B. Dual-Scale Graph Transformer (DUET)
+DUET [9] enables topological navigation through topolog-
+ical mapping and global action planning.
+Topological Mapping. The agent maintains an incremen-
+tally constructed topological representation Gt = (Vt, Et)
+of the explored environment, where Gt ⊆G represents the
+observed subset after t navigation steps. The viewpoint set
+Vt is partitioned into three categories: visited viewpoints,
+frontier viewpoints (observable but unvisited neighbors), and
+the current viewpoint. At each timestep t, the topological graph
+is updated by incorporating the current viewpoint vt and its
+navigable neighbors N(vt) into Vt−1, with corresponding edge
+updates to Et−1. Visual representations rt = {r(i)
+t }36
+i=1 are
+
+=== PDF PAGE 4 ===
+4
+…
+Viewpoint Feature
+x
+…
+xd
+xa xb
+xa xb
+…
+’
+x
+Walk past the kitchen … 
+z#
+Navigation History Encoder
+History Bank
+Coarse-Scale Encoder
+(a) World Model
+…
+…
+…
+…
+…
+Fine-Scale Encoder
+…
+Walk past the kitchen … 
+Walk past the kitchen … 
+Unfold
+(b) Hybrid Viewpoint-Level Memory
+(c) Navigation Model
+ot
+ot-1
+ot+d
+sim(𝜓! z'"#$ , 𝜓!(z'$))
+sim(𝜓! z'"#$ , 𝜓%(𝑟$))
+Observation Bank
+Observation
+Retrieval
+…
+Walk past the kitchen, 
+through it, into the next 
+room, and turn left at the 
+dining room table.
+Instruction:
+History
+Retrieval
+z$
+History Memory
+Current Viewpoint
+Observation Memory
+Inferred State
+Imagined State
+Visited Viewpoint
+z
+Contrastive Loss
+Previous 
+Episode
+Topology at Step t:
+Current 
+Episode
+Navigable
+(to Node j)
+Navigable
+(to Node d)
+…
+xg
+ot
+Observation:
+Images
+Panorama
+Navigation
+Planning
+Termination
+a
+b
+c
+d
+e
+j
+f
+g
+b
+c
+d
+j
+a
+b
+c
+d
+e
+g
+d
+e
+f
+g
+a
+b
+c
+d
+j
+e
+a
+b
+c
+d
+z#t+1
+z#t+2
+z#t+3
+z#t+d
+xt
+z#t+d
+zt-1
+xt+d
+xt-1
+zt
+ud
+d
+e
+g
+c
+d
+c
+c
+Fused Inferred State
+ug
+u
+xt
+xt-1
+…
+Global Action
+Text Embed
+Stop Embed
+Fig. 2.
+Details of imagination-guided experience retrieval. (a) The world model learns state-observation compatibility through contrastive training (top).
+During navigation, it infers the current state from observations and instruction, then recursively imagines future states (bottom). (b) Imagined trajectories
+enable dual retrieval: histories via state sequence similarity matching, and observations via topological searching based on state-observation compatibility. (c)
+Three specialized encoders process retrieved navigation histories, local observations, and retrieved observations respectively to determine the final action.
+computed through an observation encoder applied to ot. The
+visual representation of the current viewpoint xt is obtained
+via average pooling of rt, while each unvisited neighboring
+viewpoint vj ∈N(vt) is represented by its corresponding
+directional embedding r(ij)
+t
+where ij denotes the view index
+oriented toward vj. For viewpoints observed from multiple
+locations, embeddings are averaged to maintain consistency.
+Global Action Planning. DUET combines coarse-scale plan-
+ning over the topological graph with fine-scale planning over
+immediate neighbors. The instruction ℓis processed through
+a transformer to obtain textual representations ˆℓ. For coarse-
+scale planning, node representations xj for viewpoints vj ∈Vt
+are augmented with a special stop token x0. The coarse-scale
+encoder processes the instruction embedding ˆℓand viewpoint
+representations X = [x0, x1, . . . , x|Vt|] through cross-modal
+attention and Graph-Aware Self-Attention (GASA):
+GASA(X) = Softmax
+XWq(XWk)T
+√
+d
++ M
+
+XWv,
+(1)
+where the distance encoding matrix M = EWe + be in-
+corporates the pairwise distance matrix E. For fine-scale
+planning, the fine-scale encoder processes the instruction ˆℓand
+panoramic features rt to generate action scores for immediate
+neighbors N(vt). The final navigation decision combines both
+scales through learned dynamic weighting, producing action
+scores for each candidate viewpoint.
+C. Contrastive Variational World Model
+World models provide latent representations of environment
+dynamics, enabling efficient inference about future states.
+Given an observation sequence (o1, o2, . . . , oT ), the world
+model operates on latent states zt that capture environmental
+dynamics. The joint distribution factorizes as:
+p(o, z) =
+T
+Y
+t=1
+p(zt | zt−1)p(ot | zt).
+(2)
+To maximize the observation likelihood p(o1:T ), the model
+introduces a variational posterior q(z1:T |o1:T ) and derive the
+evidence lower bound (ELBO) [49]:
+ln p(o) ≥
+T
+X
+t=1
+
+Eq(zt|o≤t)[ln p(ot | zt)
+|
+{z
+}
+JRECOVER
+]
+−Eq(zt−1|o≤t)[KL[q(zt | o≤t) ∥p(zt | zt−1)]
+|
+{z
+}
+JKL
+]
+
+.
+(3)
+To empower the model with discriminative power while
+avoiding pixel-level reconstruction, the term JRECOVER is
+replaced with a contrastive objective [35], [39]. Follow-
+ing the information-theoretic derivation, we can lower-bound
+JRECOVER using noise-contrastive estimation (NCE) [50]:
+JRECOVER ≥Eq(zt|·)
+
+ln p(zt | ot) −ln
+X
+o′∈D
+p(zt | o′)
+
+= JNCE,
+(4)
+where D represents a mini-batch of negative samples. This
+contrastive objective trains the model to distinguish between
+correct state-observation pairs (zt, ot) and incorrect pairs
+(zt, o′), effectively learning representations that capture en-
+vironmental detail without explicit reconstruction.
+IV. MEMOIR
+This section presents Memoir, a memory-persistent VLN
+agent that employs world model imagination for adaptive
+experience retrieval. As illustrated in Figure 2, our approach
+
+=== PDF PAGE 5 ===
+5
+TABLE I
+KEY NOTATION SUMMARY.
+Notation
+Description
+Gt = (Vt, Et)
+Episodic graph at step t (viewpoints, edges)
+G(k) = (V(k), E(k))
+Persistent graph accumulated over k episodes
+ℓ, ˆℓ
+Natural language instruction & embedding
+ot = {o(i)
+t }36
+i=1, rt = {r(i)
+t }36
+i=1
+Panoramic observation & features (36 views)
+xt = AvgPool(rt)
+Viewpoint feature via average pooling
+γt, ϵ
+Reward signal (distance to goal), stop threshold
+zt, ˆzt
+Inferred state & imagined state
+ψs, ψo
+State & observation embedding functions
+τt = {ˆzt+i}Ht
+i=1
+Imagined trajectory with horizon Ht
+D
+Overshooting dist. and max imagination horizon
+Mo = (Vo, Xo)
+Observation bank (viewpoints, features)
+Mh = (Vh, Zh, Th)
+History bank (viewpoints, states, trajectories)
+ci,j, ci
+Compatibility scores for retrieval
+W, P
+Max width for obs. & max patterns for history
+ρo, γo
+Filter rate & decay factor for obs. retrieval
+θh, γh
+Base threshold & decay factor for history retrieval
+σc, σf, σh
+Fusion weights for navigation model encoders
+s(c)
+j
+, s(f)
+j
+, s(h)
+j
+Action scores (coarse, fine, history)
+comprises three components: a language-conditioned con-
+trastive world model that encodes histories and imagines
+future states as retrieval queries, a Hybrid Viewpoint-Level
+Memory (HVM) that stores both environmental observations
+and navigation histories for retrieval, and an experience-
+augmented navigation model integrating retrieved knowledge
+for navigation planning. To facilitate reading, we list the
+crucial notations in Memoir in Table I.
+A. Language-Conditioned World Model
+To adapt the basic contrastive world model that focuses
+solely on environmental dynamics [35] for VLN task, our
+approach explicitly incorporates instruction conditioning to
+leverage the strong prior knowledge inherent in VLN tasks.
+We extend the standard ELBO formulation by incorporating
+instruction ℓand reward signal γt (indicating distance to goal):
+ln p(o, γ | ℓ) ≥
+T
+X
+t=1
+
+Eq(zt|o≤t,ℓ)[ln p(γt | zt)
+|
+{z
+}
+JREWARD
+]
++Eq(zt|o≤t,ℓ)[ln p(zt | ot) −ln
+X
+o′∈D
+p(zt | o′)
+|
+{z
+}
+JNCE
+]
+−Eq(zt−1|o≤t,ℓ)[KL[q(zt | o≤t, ℓ) ∥p(zt | zt−1)]
+|
+{z
+}
+JKL
+]
+
+,
+(5)
+where JREWARD encourages accurate goal proximity predic-
+tion for imagination termination. The negative sample set D
+comprises observations from different timesteps and episodes
+within each training batch. The contrastive term JNCE is
+implemented through a learnable function that measures com-
+patibility between latent states and visual observations:
+f(zt, ot) = 1
+ζ sim(ψs(zt), ψo(xt))
+p(zt | ot) ∝exp(f(zt, ot)),
+(6)
+where xt represents the visual feature extracted through
+DUET’s observation encoder via averge pooling, ψs and ψo are
+learned embedding functions that map states and observations
+Algorithm 1: Environmental Observation Retrieval
+Input:
+W
+Max Width
+ρo
+Filter Rate
+γo
+Decay Factor
+G(k) Persistent Graph
+vt
+Current Viewpoint
+τt
+Imagined States
+MoObservation Bank
+Gt
+Episodic Graph
+1 Initialize retrieval set R ←∅
+2 for i ←1 to |τt| do
+3
+Initialize Rtmp ←∅
+4
+Get i-th order neighbors Ni(vt) from G(k)
+5
+for each viewpoint vn ∈Ni(vt) do
+6
+Extract imagined state ˆzt+i from τt
+7
+Compute compatibility ci,n via Equation (10)
+8
+Add (vn, ci,n) to Rtmp
+9
+Sort Rtmp by score ci,n in descending order
+10
+Retain top (1 −ρo · γi−1
+o
+) fraction of Rtmp
+11
+Keep top W nodes in Rtmp
+12
+for each (vn, ci,n) ∈Rtmp do
+13
+Find shortest path Pt,n from vt to vn in G(k)
+14
+Add path viewpoints: R ←R ∪Pt,n
+15 for each viewpoint vn ∈R do
+16
+Retrieve feature xn from Mo for viewpoint vn
+17
+Retrieve edges En from G(k) for vn
+18
+Update episodic graph: Gt.update(vn, En)
+19
+Store feature xn for viewpoint vn
+20 return updated episodic graph Gt
+to a shared embedding space, sim(a, b) =
+a⊤b
+∥a∥∥b∥denotes
+cosine similarity, and ζ denotes temperature parameter. This
+formulation enables principled assessment of compatibility
+between imagined states and observations stored in long-term
+memory, providing a foundation for similarity-based memory
+retrieval.
+To improve the model’s long-horizon predictive capabil-
+ity and enhance memory retrieval quality, we extend the
+ELBO formulation with multi-step overshooting. The d-step
+overshooting objective encourages accurate prediction over
+extended horizons:
+J (d) =
+T
+X
+t=1
+
+Ep(zt|zt−d+1)q(zt−d+1|·)[ln p(γt | zt)
+|
+{z
+}
+JREWARD
+]+
+Ep(zt|zt−d+1)q(zt−d+1|·)[ln p(zt | ot) −ln
+X
+o′
+p(zt | o′)
+|
+{z
+}
+JNCE
+]−
+Ep(zt−1|zt−d)q(zt−d|·)[KL[q(zt | o≤t, ℓ) ∥p(zt | zt−1)]
+|
+{z
+}
+JKL
+]
+
+.
+(7)
+With maximum overshooting distance D, the final optimiza-
+tion objective becomes:
+J = J (1) +
+1
+D −1
+D
+X
+d=2
+J (d).
+(8)
+To efficiently optimize the objective in Equation (8), we
+adopt the Recurrent State-Space Model (RSSM) architecture
+[34], comprising four components:
+
+=== PDF PAGE 6 ===
+6
+Inference Model:
+zt ∼q(zt | zt−1, ot, ℓ)
+Transition Model:
+ˆzt ∼p(zt | zt−1)
+Compatibility Model:
+p(zt | ot) ∝exp(f(zt, ot))
+Reward Model:
+ˆγt ∼p(γt | zt),
+(9)
+where in practice the inference model takes xt as input for
+observation, and ˆℓas input for instruction. The inference model
+encodes navigation histories into representations for storage,
+and the transition model generates imagined future states that
+facilitate similarity-based memory retrieval.
+B. Hybrid Viewpoint-Level Memory (HVM)
+Having established how our world model imagines and
+infers states, we now describe how the imagined states
+query long-term memory. We introduce a dual-bank memory
+architecture that maintains both environmental observations
+and navigation behavioral histories at viewpoint granularity.
+HVM comprises two complementary banks organized around
+a persistent graph G(k) = (V(k), E(k)) accumulated over k
+episodes:
+• Observation Bank: Mo = (Vo, Xo), where Vo = {vj}
+represents the set of recorded viewpoints and Xo =
+{xj}|Vo|
+j=1 contains corresponding viewpoint features ex-
+tracted by DUET’s observation encoder.
+• History Bank: Mh = (Vh, Zh, Th), where Vh = {vj}
+denotes viewpoints with recorded navigation histories,
+Zh = {{z(k)
+j
+}Nj
+k=1}|Vh|
+j=1 stores inferred agent states from
+past episodes, and Th = {{τ (k)
+j
+}Nj
+k=1}|Vh|
+j=1 contains cor-
+responding imagined trajectory sequences, where Nj de-
+notes the number of historical visits to viewpoint vj.
+At each timestep t, both memory banks are updated based
+on vt: Mo receives the viewpoint feature xt extracted from
+observation ot, while Mh stores the inferred state zt from the
+inference model and the imagined trajectory τt = {ˆzt+i}Ht
+i=1
+generated by the transition model in Equation (9). Ht repre-
+sents the imagination horizon, terminating when the predicted
+distance ˆγt+i falls below threshold ϵ or reaches maximum
+horizon D.
+Environmental Observation Retrieval. Given an imagined
+trajectory τt = {ˆzt+i}Ht
+i=1 at viewpoint vt, we retrieve observa-
+tions through topology-guided searching via state-observation
+compatibility. For imagined state ˆzt+i and stored feature xj at
+viewpoint vj from Mo, we compute a compatibility score:
+ci,j = 1
+2(sim(ψs(ˆzt+i), ψo(xj)) + 1).
+(10)
+This scoring mechanism directly leverages the contrastive
+objective from Equation (6), ensuring consistency between
+training and retrieval. For each imagination step i and cor-
+responding neighborhood order, the algorithm identifies all
+viewpoints in the i-th order neighborhood Ni(vt) = {v ∈
+V(k) : d(vt, v) = i} and computes compatibility scores
+using Equation (10). Percentile-based filtering retains the top
+(1−ρo·γi−1
+o
+) fraction of viewpoints ranked by score, followed
+by selecting the top-W viewpoints from the retained set.
+Algorithm 2: Navigation History Retrieval
+Input:
+P
+Max Patterns
+θh
+Threshold
+γh
+Decay Factor
+G(k) Persistent Graph
+vt
+Current Viewpoint
+τt
+Imagined States
+MhHistory Bank
+Gt
+Episodic Graph
+1 Retrieve all patterns Q from Mh for viewpoint vt
+2 for each (z′, τ ′) ∈Q do
+3
+Initialize L ←min(|τt|, |τ ′|), scores C ←∅
+4
+for i ←1 to L do
+5
+Get imagined state ˆzt+i, ˆz′
+i from τt, τ ′
+6
+Compute compatibility ci via Equation (11)
+7
+if ci < θh · γi−1
+h
+then
+8
+break
+9
+Append score: C ←C ∪{ci}
+10
+Store pattern with score: (z′, τ ′, C) ∈Q
+11 Sort Q in descending order (by length and score)
+12 Retain top P patterns as Q
+13 for each (z′, τ ′, C) ∈Q do
+14
+Trace subsequent trajectory from Mh: {z′
+i, vi}|C|
+i=1
+15
+for i ←1 to |C| do
+16
+Retrieve feature xi from Mo for viewpoint vi
+17
+Retrieve edges Ei from G(k) for vi
+18
+Update episodic graph: Gt.update(vi, Ei)
+19
+Store state z′
+i, score ci and xi for viewpoint vi
+20 return updated episode graph Gt
+Finally, shortest paths from vt to all selected viewpoints are
+added to the episodic graph Gt. The complete procedure is
+detailed in Algorithm 1.
+Navigation History Retrieval. History retrieval identifies
+stored historical navigation patterns that exhibit similar imag-
+ined trajectories to the current agent’s imagination. This
+process leverages the insight that agents with similar future
+expectations likely share comparable strategies and should
+benefit from each other’s experiences. For a stored trajectory
+τ ′ = {ˆz′
+i}H′
+i=1 at viewpoint vt from the history bank Mh, we
+perform sequential similarity matching based on imagined tra-
+jectory τt = {ˆzt+i}Ht
+i=1. The compatibility between imagined
+states at step i is computed as:
+ci = 1
+2(sim(ψs(ˆzt+i), ψs(ˆz′
+i)) + 1).
+(11)
+For each imagination step i in trajectory, we continue match-
+ing until either reaching the minimum of the two trajectory
+lengths, or encountering a compatibility score below the step-
+dependent threshold θh · γi−1
+h
+. The compatibility scores up to
+the matching termination are stored as C.
+We rank stored trajectories using a two-stage criterion:
+matching length (longer matches preferred), and the minimum
+compatibility score among matched steps. The top-P trajectory
+patterns are selected. For each selected pattern, we retrieve the
+subsequent |C| viewpoints and their associated inferred states
+{z′
+i, vi}|C|
+i=1, incorporating the corresponding subgraph struc-
+
+=== PDF PAGE 7 ===
+7
+ture into Gt along with state representations and compatibility
+scores. The complete procedure is outlined in Algorithm 2.
+C. Navigation Model
+At each timestep t, the agent imagines future states τt and
+retrieve environmental observation and navigation history ac-
+cording to vt. The retrieved information is then integrated into
+the episodic topological graph Gt maintained by topological
+mapping. Now, we extend DUET [9] with specialized process-
+ing encoders that integrate retrieved experiential knowledge
+into navigation decisions. Our model processes these retrieved
+information through dedicated encoders: global observations,
+local observations and navigation behavioral patterns. The
+navigation model comprises three branches:
+Coarse-Scale Encoder. The coarse-scale encoder incorporates
+retrieved observations by expanding viewpoint representations
+X with an additional type—retrieved viewpoints. The full
+viewpoint representations X = [x0, x1, . . . , x|Vt|] containing
+retrieved observations are processed through the coarse-scale
+encoder for ˆX. Global action scores are computed as s(c)
+j
+=
+FFN(ˆxj) for viewpoint vj, providing high-level navigation
+preferences.
+Fine-Scale Encoder. The fine-scale encoder processes im-
+mediate panoramic feature rt for ˆrt. Local action scores
+s(f)
+j
+= FFN(ˆr(ij)
+t
+) are computed for each neighbor vj ∈N(vt)
+and converted to the global action space:
+s(f ′)
+j
+=
+(
+sback,
+if vj ∈Vt \ N(vt)
+s(f)
+j
+,
+otherwise,
+(12)
+where ij denotes the view index oriented toward vj and sback
+aggregates scores for all visited neighbors of viewpoint vt to
+encourage backtracking when necessary.
+Navigation-History Encoder. The navigation-history encoder
+processes retrieved behavioral patterns by fusing historical
+states with current viewpoint representations. The node set Vh
+includes all viewpoints processed by this branch, comprising
+both currently visited locations and nodes retrieved from the
+history bank. For each viewpoint vj ∈Vh with retrieved
+states Zj = [z′(1)
+j
+, z′(2)
+j
+, . . . , z′(Nj)
+j
+] and compatibility scores
+Cj = [c(1)
+j , c(2)
+j , . . . , c(Nj)
+j
+], where Nj denotes the number of
+retrieved states at vj, we compute:
+uj =
+
+softmax
+Cj
+ζ
+⊤
+Zj + xj.
+(13)
+For visited nodes without retrieved historical states, we
+simply use the observation uj = xj. The fused state repre-
+sentations U = [u1, u2, . . . , u|Vh|] are processed through a
+transformer to produce history-informed action scores s(h)
+i
+,
+which are then mapped to the global action space:
+s(h′)
+i
+=
+(
+s0,
+if vi ∈Vt \ Vh
+s(h)
+i
+,
+otherwise.
+(14)
+Dynamic Fusion. We implement a learned dynamic fusion
+mechanism that automatically balances contributions from the
+three branches based on current situational factors. The fusion
+weights are computed through:
+Algorithm 3: Memoir Navigation Loop
+Input:
+Tmax Max Step limit
+D
+Imagination Horizon
+ϵ
+Stop threshold
+Mo Observation Bank
+Mh History Bank
+G(k) Persistent Graph
+1 Initialize episodic graph G0 ←∅
+2 Receive initial observation o1, viewpoint v1
+3 for step t = 1 to Tmax do
+4
+Update topological graphs Gt and G(k)
+5
+Infer current state zt ∼q(zt | zt−1, ot, ℓ)
+6
+Initialize imagined trajectory τt ←∅
+7
+for i = 1 to D do
+8
+Imagine next state ˆzt+i ∼p(zt+i | zt+i−1)
+9
+Predict reward ˆγt+i ∼p(γt+i | zt+i)
+10
+Update trajectory τt ←τt ∪{ˆzt+i}
+11
+if ˆγt+i < ϵ then
+12
+break
+13
+Gt ←ObsRetrieval(Mo, vt, τt, Gt, G(k))
+// Algorithm 1
+14
+Gt ←HistoryRetrieval(Mh, vt, τt, Gt, G(k))
+// Algorithm 2
+15
+Extract viewpoint feature xt from ot
+16
+Mo.add(vt, xt)
+17
+Mh.add(vt, zt, τt)
+18
+Compute score sj for each candidate node vj
+19
+Select action at ←argmaxj sj
+20
+if at = stop then
+21
+break
+22
+Receive ot+1, vt+1 ←env.step(at)
+[σf, σc, σh] = Softmax(FFN([ˆr0; ˆx0; ˆu0])),
+(15)
+where ˆr0, ˆx0, and ˆu0 represent the encoded stop token repre-
+sentations from fine-scale, coarse-scale, and navigation-history
+encoders respectively, and [; ] denotes concatenation. The final
+navigation scores integrate all three branches:
+sj = σfs(f ′)
+j
++ σcs(c)
+j
++ σhs(h′)
+j
+.
+(16)
+As presented in Algorithm 3, Memoir realizes imagination-
+guided memory retrieval by generating imagined trajectories as
+queries to adaptively access relevant observations and behav-
+ioral histories from persistent memory. The navigation model
+integrates retrieved experiences, enabling informed decisions
+grounded by historical evidence while continuously updating
+memory banks for progressive improvement across episodes.
+V. EXPERIMENTS
+A. Experimental Setup
+Datasets. We evaluate Memoir on two established memory-
+persistent VLN benchmarks that provide complementary eval-
+uation perspectives. Iterative Room-to-Room (IR2R) [5] ex-
+tends the foundational Room-to-Room (R2R) dataset [1] to
+multi-episode scenarios through structured tours, containing
+
+=== PDF PAGE 8 ===
+8
+183 training tours with an average length of 76.6 episodes.
+The validation splits comprise seen environments (159 tours,
+average 6.4 episodes) and unseen environments (33 tours,
+average 71.2 episodes). General Scene Adaptation (GSA-R2R)
+[6] incorporates 150 Habitat-Matterport3D (HM3D) scenes
+[51] with 600 paths per scene, providing 90,000 total episodes
+across 10 evaluation scenarios covering residential and non-
+residential environments with various instruction types includ-
+ing basic navigational instructions, scene-specific instructions,
+and user-personalized instructions.
+Implementation Details. We implement Memoir on three
+foundational models: DUET [9] and ScaleVLN [16] repre-
+senting traditional VLN models, and GR-DUET [6] repre-
+senting the memory-persistent approaches. All models utilize
+pretrained weights from their respective pretraining phases
+without task-specific fine-tuning. For rigorous comparison,
+we retrain all baseline models with identical hyperparameters
+and experimental conditions, including synchronized episode
+ordering in GSA-R2R. Our world model implementation em-
+ploys two architectural variants: GRU and Transformer. Both
+variants utilize textual embeddings and share the observation
+encoder with the navigation model. Joint pretraining of the
+world model and navigation model is conducted on R2R and
+augmented trajectories [15] for 5,000 iterations with batch size
+32 and learning rate 5e-5, followed by imitation learning at
+learning rate 1e-5. All results are reported over 3 separate runs.
+Evaluation Metrics. We employ standard VLN metrics [52]
+for navigation performance evaluation. To quantify the ef-
+fectiveness of long-term memory retrieval, we introduce four
+complementary metrics that evaluate both observation retrieval
+and history retrieval quality. The metrics include:
+Trajectory Length (TL): predicted path length in meters.
+Navigation Error (NE): distance between agent’s final po-
+sition to target in meters.
+Success Rate (SR): the percentage of final positions less than
+3 meters away from the target location.
+Success Rate penalized by Path Length (SPL): SR normal-
+ized by the ratio between the length of the shortest path and
+the predicted path.
+Normalized Dynamic Time Warping (nDTW): dynamic time
+warping normalized between predicted and expert paths.
+Tour-normalized Dynamic Time Warping (T-nDTW): the
+overall navigation consistency across complete tours.
+Observation Accuracy (OA): the precision of retrieved ob-
+servations from the observation bank Mo across the episode:
+OA = | ST
+t=1(Rt ∩Vo
+gt,t)|
+| ST
+t=1 Rt|
+,
+(17)
+where Rt denotes viewpoints retrieved from Mo at timestep
+t (as detailed in Algorithm 1), and Vo
+gt,t represents the ground
+truth viewpoints on the teacher trajectory within D steps that
+exist in the observation bank, where Vo denotes all viewpoints
+stored in Mo and T is episode length.
+Observation Recall (OR): the coverage of relevant environ-
+mental observations across the episode:
+OR = | ST
+t=1(Rt ∩Vo
+gt,t)|
+| ST
+t=1 Vo
+gt,t|
+.
+(18)
+History Accuracy (HA): the precision of retrieved navigation
+patterns from the history bank Mh across the episode:
+HA =
+PT
+t=1
+P|Qt|
+j=1 |Vh
+traj,t,j ∩Vh
+gt,t,j|
+PT
+t=1
+P|Qt|
+j=1 |Vh
+traj,t,j|
+,
+(19)
+where |Qt| denotes the number of retrieved navigation history
+patterns at timestep t (as detailed in Algorithm 2), and
+Vh
+traj,t,j = {v(j)
+1 , v(j)
+2 , . . . , v(j)
+|Cj|} represents the sequence of
+viewpoints in the j-th retrieved navigation history trajectory,
+and Vh
+gt,t,j represents the viewpoints on the teacher trajectory
+that exist in the original history trajectory.
+History Recall (HR): the coverage of relevant navigation
+patterns across the episode:
+HR =
+PT
+t=1
+P|Qt|
+j=1 |Vh
+traj,t,j ∩Vh
+gt,t,j|
+PT
+t=1
+P|Qt|
+j=1 |Vh
+gt,t,j|
+.
+(20)
+B. Quantitative Analysis
+1) Iterative Room-to-Room (IR2R): Table II presents a
+comparison of Memoir against both traditional and memory-
+persistent methods on the IR2R benchmark. When applied to
+traditional VLN models, Memoir demonstrates substantial per-
+formance improvements: 11.1% SPL enhancement for DUET-
+based implementations and 5.6% for ScaleVLN-based imple-
+mentations on unseen scenarios. These results prove that incor-
+porating retrieved information from long-term memory serves
+as an effective prior for robust navigation decisions, even for
+models not originally designed for memory persistence. To
+disentangle the sources of improvement, we also explicitly
+analyze a w/o Retrieval variant that benefits from training
+techniques like joint world model pretraining but lacks the
+active retrieval loop. Though this architectural baseline yields
+improvements on unseen environments, the complete Memoir
+framework further elevates performance, quantifying the sub-
+stantial gain from the imagination-guided retrieval mechanism.
+When compared against memory-persistent approaches, Mem-
+oir significantly outperforms GR-DUET, achieving 5.4% im-
+provement in SPL on unseen scenarios (73.3% versus 67.9%)
+and 11.6% improvement on seen scenarios. This superior per-
+formance validates our hypothesis that incorporating complete
+memory information introduces excessive noise that degrades
+navigation decisions and reduces flexibility in scenarios with
+limited experience availability. Our adaptive retrieval approach
+effectively addresses these limitations.
+Discussion. While achieving exceptional performance on un-
+seen scenarios, memory-persistent variants often exhibit re-
+duced performance on seen scenarios compared to their tra-
+ditional counterparts. For instance, DUET achieves 74.5%
+SPL compared to GR-DUET’s 55.1% on seen environments,
+with our method experiencing approximately 3% SPL degra-
+dation. This phenomenon stems from: (1) difference in tour
+lengths between validation splits, seen tours average only 6.4
+episodes compared to 71.2 episodes in unseen tours, limiting
+accumulated experience; (2) regularization effects where long-
+term memory integration prevents overfitting to training envi-
+ronments by encouraging broader contextual reasoning rather
+
+=== PDF PAGE 9 ===
+9
+TABLE II
+COMPARISON OF NAVIGATION PERFORMANCE BETWEEN MEMOIR AND VARIOUS VLN METHODS ON THE IR2R BENCHMARK.
+Val Seen
+Val Unseen
+Methods
+PH TH PHI IW
+TL ↓
+NE ↓
+nDTW ↑
+SR ↑
+SPL ↑
+t-nDTW ↑
+TL ↓
+NE ↓
+nDTW ↑
+SR ↑
+SPL ↑
+t-nDTW ↑
+HAMT [20]
+10.1 ±0.1 4.2 ±0.1
+71 ±1
+63 ±1
+61 ±1
+58 ±1
+9.4 ±0.1 4.7 ±0.0
+66 ±0
+56 ±0
+54 ±0
+50 ±0
+TourHAMT [5]
+✓✓
+✓
+✓
+9.4 ±0.4 5.8 ±0.1
+59 ±0
+45 ±1
+43 ±1
+45 ±0
+10.0 ±0.2 6.2 ±0.1
+52 ±0
+39 ±1
+36 ±0
+32 ±1
+✓✓
+✓
+10.5 ±0.3 6.0 ±0.2
+58 ±1
+45 ±2
+43 ±2
+42 ±1
+10.9 ±0.2 6.8 ±0.2
+51 ±1
+38 ±1
+34 ±1
+31 ±1
+✓✓
+10.6 ±0.3 6.0 ±0.1
+58 ±1
+45 ±1
+42 ±1
+42 ±1
+10.3 ±0.3 6.7 ±0.2
+50 ±1
+38 ±1
+34 ±1
+29 ±1
+✓
+10.9 ±0.3 6.1 ±0.1
+58 ±1
+45 ±1
+42 ±1
+41 ±0
+11.0 ±0.6 6.7 ±0.1
+51 ±0
+38 ±0
+34 ±0
+28 ±1
+OVER-NAV [7]
+9.9 ±0.1 3.7 ±0.1
+73 ±1
+65 ±1
+63 ±1
+62 ±0
+9.4 ±0.1 4.1 ±0.1
+69 ±0
+60 ±1
+57 ±0
+55 ±1
+Comparison with Traditional VLN Models:
+VLN models pretrained with default protocol:
+DUET [9]
+12.5 ±0.4 2.2 ±0.1 79.8 ±1.1 79.8 ±0.7 74.5 ±0.9 69.1 ±1.7
+14.4 ±0.1 3.5 ±0.0 65.0 ±0.1 69.2 ±0.3 58.0 ±0.1 47.0 ±0.8
++Memoir (w/o retrieval)
+11.2 ±0.0 2.3 ±0.0 81.2 ±0.0 79.4 ±0.4 75.8 ±0.8 72.3 ±0.3
+12.1 ±0.2 3.4 ±0.0 69.3 ±0.8 70.8 ±0.5 62.2 ±0.9 52.1 ±1.2
++Memoir (Ours)
+11.5 ±0.1 2.6 ±0.2 78.9 ±0.9 77.1 ±0.5 72.8 ±0.5 68.0 ±0.8
+11.0 ±0.0 2.8 ±0.1 75.2 ±0.0 75.4 ±0.2 69.1 ±0.3 58.8 ±0.4
+VLN models pretrained with environmental augmentation:
+ScaleVLN [16]
+12.8 ±0.0 2.2 ±0.0 79.6 ±0.4 79.5 ±0.5 74.1 ±0.6 67.0 ±0.2
+13.5 ±0.0 2.7 ±0.0 71.6 ±0.1 76.2 ±0.1 66.5 ±0.2 53.4 ±0.2
++Memoir (w/o retrieval)
+12.4 ±0.1 2.4 ±0.1 79.2 ±0.4 79.1 ±0.5 74.1 ±0.2 67.4 ±1.8
+12.6 ±0.2 2.6 ±0.1 74.5 ±0.7 76.8 ±0.3 69.1 ±0.3 56.3 ±2.7
++Memoir (Ours)
+11.6 ±0.2 2.5 ±0.1 78.7 ±0.1 76.1 ±0.5 72.3 ±0.1 67.1 ±0.0
+10.9 ±0.2 2.6 ±0.0 77.2 ±0.6 77.4 ±0.2 72.1 ±0.4 62.2 ±0.6
+Comparison with Memory-Persistent VLN Models:
+VLN models pretrained with full navigation graph:
+GR-DUET [6]
+12.5 ±0.7 4.3 ±0.2 65.2 ±0.7 61.1 ±1.4 55.1 ±0.1 49.0 ±0.5
+11.0 ±0.2 3.1 ±0.0 74.5 ±0.5 72.7 ±0.5 67.9 ±0.1 54.8 ±0.1
++Memoir (w/o retrieval)
+12.9 ±0.1 2.8 ±0.1 75.6 ±0.0 76.7 ±0.8 70.1 ±0.3 63.9 ±0.7
+12.5 ±0.3 3.2±0.1 70.3 ±0.1 72.7 ±0.5 64.0 ±0.0 52.0 ±0.5
++Memoir (Ours)
+11.8 ±0.4 3.0 ±0.0 74.1 ±0.3 72.2 ±0.2 66.7 ±0.5 61.9 ±0.3
+10.2 ±0.2 2.5 ±0.0 79.2 ±0.2 77.6 ±0.5 73.3 ±0.1 66.9 ±0.7
+(w/o Retrieval): Variant pretrained and finetuned under identical conditions to Memoir, excluding only the explicit memory retrieval mechanism.
+PH: previous history integration; TH: trainable history encoder; PHI: previous history identifier; IW: inflection weighting.
+TABLE III
+COMPREHENSIVE COMPARISON OF NAVIGATION PERFORMANCE ON THE GSA-R2R BENCHMARK.
+User Instructions
+Scene Instructions
+Basic Instructions
+Residential
+Non-Residential
+Residential
+Non-Residential
+Methods
+SR ↑
+SPL ↑
+SR ↑
+SPL ↑
+nDTW ↑
+SR ↑
+SPL ↑
+nDTW ↑
+SR ↑
+SPL ↑
+nDTW ↑
+TourHAMT [5]
+14.7
+12.0
+9.7 ±0.1
+8.0 ±0.1
+32.3 ±0.1
+14.9 ±0.1
+12.2 ±0.1
+34.7 ±0.1
+11.0 ±0.2
+8.6 ±0.2
+32.2 ±0.1
+OVER-NAV [7]
+20.4
+16.1
+16.7 ±0.4
+12.6 ±0.2
+34.6 ±0.3
+22.3 ±0.3
+16.8 ±0.2
+37.1 ±0.1
+16.6 ±0.2
+13.0 ±0.1
+35.0 ±0.2
+DUET [9]
+54.6
+44.9
+39.6
+30.1
+40.9
+57.7
+47.0
+55.6
+48.1
+37.3
+45.9
++MLM [15]
+55.2
+45.2
+39.8 ±0.1
+30.5 ±0.1
+41.1 ±0.1
+57.9 ±0.2
+47.3 ±0.1
+55.9 ±0.2
+48.3 ±0.5
+38.8 ±0.5
+48.4 ±0.3
++MRC [15]
+54.5
+44.8
+39.7 ±0.1
+30.2 ±0.1
+40.9 ±0.1
+57.7 ±0.1
+47.0 ±0.1
+55.6 ±0.1
+48.1 ±0.1
+37.3 ±0.1
+45.9 ±0.1
++BT [53]
+59.0
+55.7
+41.2 ±1.5
+38.2 ±1.2
+51.3 ±1.2
+61.3 ±0.6
+57.7 ±0.3
+70.1 ±0.5
+49.5 ±0.8
+46.0 ±0.8
+59.4 ±0.9
++TENT [54]
+53.8
+42.3
+40.6 ±0.2
+28.9 ±0.2
+38.9 ±0.2
+57.2 ±0.4
+44.2 ±0.4
+52.9 ±0.1
+46.5 ±0.4
+33.7 ±0.2
+42.6 ±0.3
++SAR [55]
+53.7
+41.9
+41.4 ±0.6
+29.1 ±0.3
+39.0 ±0.3
+57.6 ±0.2
+44.6 ±0.2
+53.0 ±0.2
+44.6 ±1.5
+31.5 ±1.6
+40.6 ±1.3
+VLN models pretrained with full navigation graph:
+GR-DUET [6]
+64.8
+59.6
+48.1 ±0.1
+42.8 ±0.1
+53.7 ±0.1
+69.3 ±0.2
+64.3 ±0.1
+71.4 ±0.1
+56.6 ±0.1
+51.5 ±0.1
+61.0 ±0.1
+GR-DUET* [6]
+63.8
+59.8
+47.1 ±0.5
+42.2 ±0.8
+54.1 ±0.6
+67.6 ±0.5
+63.6 ±0.6
+71.9 ±0.5
+55.3 ±0.2
+50.4 ±0.3
+60.8 ±0.4
++Memoir (w/o retrieval)
+59.6
+50.1
+43.3 ±0.2
+34.1 ±1.7
+44.2 ±3.1
+63.0 ±0.3
+52.9 ±0.3
+61.0 ±0.5
+51.6 ±0.8
+40.8 ±0.1
+49.6 ±0.0
++Memoir (Ours)
+66.1
+61.3
+50.2 ±0.3
+44.8 ±0.4
+56.2 ±0.6
+69.8 ±0.2
+64.9 ±0.4
+73.3 ±0.2
+57.7 ±0.1
+52.0 ±0.1
+61.9 ±0.4
+(w/o Retrieval): Variant pretrained and finetuned under identical conditions to Memoir, excluding only the explicit memory retrieval mechanism.
+* Results reproduced under aligned experimental conditions (episode ordering, training iterations, batch size, learning rate and dropout rate).
+44.1
+46.3
+43.3
+46.4
+44.4
+60.5
+61.4
+56.6
+61.7
+59.0
+61.3
+63.6
+57.5
+63.6
+60.4
+Fig. 3.
+Comparison of navigation performance (SPL) on various user
+instruction tasks from the GSA-R2R benchmark.
+than environmental detail memorization. Memoir substantially
+reduces this performance gap compared to GR-DUET, demon-
+strating more balanced memory utilization.
+2) General Scene Adaptation (GSA-R2R): Tables III sum-
+marize Memoir’s performance across diverse scene adaptation
+scenarios. The user instructions taxonomy encompasses five
+tasks featuring distinct instruction styles. The performance
+comparison, presented in Table III and Figure 3, demonstrates
+that our method consistently outperforms the GR-DUET base-
+line by 2.3% in SR and 2.5% in SPL on average. The scene
+instructions taxonomy and basic instructions taxonomy evalu-
+ate performance across different environmental characteristics
+and instruction expressions. Memoir consistently outperforms
+both adaptation-based and memory-based methods, achieving
+an average 2.4% SR increase and 1.6% SPL improvement
+compared to GR-DUET across eight distinct testing scenarios
+with aligned experimental configurations. The improvements
+
+=== PDF PAGE 10 ===
+10
+Instruction: Exit the room into the hallway. Go into the room on the left and wait next to the massage table.
+Retrieved Episode: … 
+Continue straight and walk up 
+the next set of stairs. Turn into 
+the first room on the right and 
+wait near the massage table.
+Previous 
+Episodes
+Environmental Observation
+GR-DUET
+Retrieved
+Filtered
+Filtered
+Navigation History
+DUET
+Memoir (Ours)
+STOP
+Visited
+Node
+Retrieved
+Node
+Environmental
+Observation
+Navigation
+History
+Fig. 4. Visualization of Memoir’s memory retrieval from environmental observation bank and navigation history bank as well as the panoramic trajectory
+visualization. We compare the navigation result between DUET, GR-DUET and ours. The goal location is indicated by checkered flag.
+TABLE IV
+COMPUTATIONAL EFFICIENCY COMPARISON (BATCH SIZE = 4).
+Training
+Inference
+Methods
+Memory ↓
+Latency ↓
+Memory ↓
+Latency ↓
+DUET [9]
+7.2 GB
+0.15s
+2.2 GB
+0.13s
+GR-DUET [6]
+29.4 GB
+4.39s
+9.9 GB
+0.25s
+Memoir (Ours)
+13.1 GB (-55%) 0.53s (-88%)
+2.6 GB (-74%) 0.31s (+28%)
+1
+2
+3
+4
+5
+Horizon
+0.00
+0.02
+0.04
+0.06
+0.08
+0.10
+0.12
+0.14
+0.16
+Latency (s)
+23.6%
+28.6%
+32.4%
+35.3%
+37.3%
+4.7%
+5.4%
+6.1%
+7.0%
+9.7%
+105ms
+119ms
+133ms
+147ms
+164ms
+Imagination
+Retrieval
+Other Overhead
+Fig. 5. Averaged inference latency breakdown in navigation as the imagination
+horizon (D) increases. (batch size=1)
+demonstrate that hybrid memory provides critical context
+absent in traditional approaches: by accessing past episodes
+where agents successfully processed similar expressions and
+executed corresponding actions, Memoir learns from historical
+patterns that GR-DUET’s observation memory cannot capture.
+Discussion. Memoir consistently outperforms GR-DUET,
+though with smaller margins than on IR2R. This reduced
+improvement stems from memory density differences, with
+GSA-R2R accumulating 600 episodes on average, increasing
+the topological completeness for GR-DUET.
+C. Qualitative Analysis
+Figure 4 demonstrates memory retrieval effectiveness in
+challenging scenarios where DUET and GR-DUET fail. Given
+the task of locating a “massage table” with two potential
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+Episode Count
+45
+50
+55
+60
+65
+70
+75
+80
+Cumulative SR (%)
+MEMOIR
+random
+non-retrieval
+(a) Cum. SR v.s. Episode Count.
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+Episode Count
+45
+50
+55
+60
+65
+70
+75
+80
+Cumulative SPL (%)
+MEMOIR
+random
+non-retrieval
+(b) Cum. SPL v.s. Episode Count.
+10
+20
+30
+40
+50
+60
+70
+80
+90
+100
+Tour Progress (%)
+60
+65
+70
+75
+80
+85
+Cumulative SR (%)
+MEMOIR
+GR-DUET
+DUET
+(c) Cum. SR v.s. Tour Progress.
+10
+20
+30
+40
+50
+60
+70
+80
+90
+100
+Tour Progress (%)
+50
+55
+60
+65
+70
+75
+80
+85
+Cumulative SPL (%)
+MEMOIR
+GR-DUET
+DUET
+(d) Cum. SPL v.s. Tour Progress.
+Fig. 6. Cumulative performance scaling across tour progression on IR2R.
+candidates barely visible from the hallway, the DUET agent
+incorrectly approaches the wrong target without observing the
+actual target, while the GR-DUET agent becomes confused
+among numerous candidate locations and produces incorrect
+decisions. Our model succeeds through the combination of
+observation retrieval, which identifies promising paths toward
+relevant locations while controlling redundancy, and history
+retrieval, which matches similar past episodes targeting “mas-
+sage room” objectives, prompting the agent to the destination.
+D. Ablation Studies & Analyses
+Computational Efficiency. Table IV demonstrates Memoir’s
+computational advantages over the memory-persistent base-
+line. While DUET operates with minimal memory overhead,
+GR-DUET’s complete memory retention strategy dramati-
+cally increases resource requirements (29.4GB training, 9.9GB
+inference) due to processing all accumulated observations
+simultaneously. Our retrieval mechanism achieves substantial
+
+=== PDF PAGE 11 ===
+11
+TABLE V
+ABLATION OF COMPONENTS FOR MEMORY RETRIEVAL.
+Observation
+History
+IR2R Val Unseen
+Strategy (Mo)
+Strategy (Mh)
+TL ↓
+NE ↓
+SR ↑
+SPL ↑
+nDTW ↑
+OR ↑
+OA ↑
+HR ↑
+HA ↑
+The upper-bound of long-term memory retrieval
+ORACLE
+ORACLE
+9.77
+0.51
+95.44
+93.40
+93.68
+100
+100
+100
+100
+NONE
+NONE
+12.24
+2.81
+72.33
+63.97
+70.35
+0.0
+0.0
+0.0
+0.0
+FULL
+FULL
+10.44
+2.86
+74.67
+69.98
+76.29
+100
+9.81
+100
+19.33
+RANDOM
+RANDOM
+10.97
+2.76
+75.82
+70.34
+76.03
+59.05
+21.31
+36.65
+22.11
+RANDOM
+IMAGINATION
+10.80
+2.61
+76.63
+71.03
+76.98
+58.83
+21.72
+98.36
+22.40
+IMAGINATION
+RANDOM
+10.77
+2.58
+76.63
+71.70
+78.08
+97.05
+23.33
+36.24
+21.94
+IMAGINATION
+INSTRUCTION
+10.28
+2.59
+77.01
+72.82
+79.43
+97.77
+22.04
+97.92
+21.82
+IMAGINATION
+STATE
+10.11
+2.67
+76.54
+72.85
+79.16
+97.13
+23.19
+81.86
+23.49
+IMAGINATION
+IMAGINATION
+10.32
+2.53
+78.03
+73.46
+79.46
+96.49
+24.58
+96.52
+24.21
+IMAGINATION: retrieve via imagination; RANDOM: random sampling; FULL: full incorporation; ORACLE: optimal retrieval;
+INSTRUCTION: retrieve via instruction-similarity; STATE: retrieve via state-similarity.
+TABLE VI
+ABLATION OF WORLD MODEL VARIANTS.
+(a) Impact of Backbone Architecture (Fixed D = 5)
+Backbone
+Overshoot SR ↑SPL ↑OR ↑OA ↑HR ↑HA ↑
+GRU
+76.12
+71.48
+97.54
+16.90
+30.21
+30.78
+GRU
+✓
+76.71
+72.30
+96.21
+18.60
+98.24
+21.65
+Transformer
+77.14
+72.11
+96.44
+17.86
+28.58
+32.32
+Transformer
+✓
+78.03
+73.46
+96.49
+24.58
+96.52
+24.21
+(b) Impact of Imagination Horizon (Transformer-based)
+Overshoot Horizon (D) SR ↑SPL ↑OR ↑OA ↑HR ↑HA ↑
+1
+73.44
+67.24
+31.25
+40.33
+26.26
+30.74
+3
+75.18
+70.21
+76.71
+26.05
+29.11
+32.29
+5
+77.14
+72.11
+96.44
+17.86
+28.58
+32.32
+✓
+1
+73.09
+67.26
+31.15
+43.22
+59.43
+29.24
+✓
+3
+76.63
+71.99
+77.04
+28.48
+93.40
+25.06
+✓
+5
+78.03
+73.46
+96.49
+24.58
+96.52
+24.21
+efficiency gains: 55% reduction in training memory and 88%
+reduction in training latency, representing an 8.3× speedup.
+During inference, memory usage decreases by 74%, approach-
+ing DUET’s efficiency while maintaining memory-persistent
+capabilities. To further investigate the inference overhead, we
+analyze the latency scalability in Figure 5. The slight increase
+in total inference latency (0.31s vs 0.25s) is primarily driven
+by the imagination process, which scales linearly with the
+lookahead horizon (D). Crucially, the retrieval latency remains
+remarkably low (approximately 16ms even at D = 5) and
+exhibits sub-linear growth relative to the total time. With
+a total latency consistently under 170ms per step across
+horizons, Memoir establishes itself as an approach to achieve
+both SOTA performance and practical real-time feasibility for
+resource-constrained deployment.
+Performance
+Scaling. We analyze performance scaling
+through both micro-level accumulation (Figure 6a and Fig-
+ure 6b) and macro-level tour progression (Figure 6c and
+Figure 6d) . At the micro-level, all variants exhibit identical
+initial performance, confirming architectural parity; however,
+Memoir immediately diverges with a steep upward trajectory
+above other variants. Crucially, although random retrieval ap-
+proximates our SR through stochastic coverage, both random
+TABLE VII
+ABLATION OF NAVIGATION HISTORY INTEGRATION.
+IR2R Val Unseen
+HIST ENCODER EMBED TYPE
+SR ↑
+SPL ↑nDTW ↑t-nDTW ↑
+VP + State
+76.59
+72.35
+78.60
+65.57
+✓
+VP
+76.54
+71.48
+78.24
+65.66
+✓
+State
+77.35
+72.83
+78.70
+66.37
+✓
+VP + State
+78.03
+73.46
+79.46
+66.44
+TABLE VIII
+ABLATION OF EXPERT POLICIES.
+IR2R Val Unseen
+GSA Test-R-Basic
+EXPERT POLICY
+SR ↑
+SPL ↑nDTW ↑
+SR ↑
+SPL ↑nDTW ↑
+SPL
+76.20
+71.71
+78.03
+67.34
+62.22
+71.30
++random sample
+78.03
+73.46
+79.46
+69.64
+64.91
+73.29
+and non-retrieval variants consistently underperform in SPL
+with a widening gap. This confirms that our imagination-
+guided mechanism optimizes navigation efficiency, rather than
+merely benefiting goal discovery. On the macro-level, Memoir
+maintains a robust and constant lead over GR-DUET through-
+out the tour, demonstrating consistent long-term adaptability
+compared to the baseline’s suboptimal performance.
+Memory Retrieval. Table V presents results validating the
+effectiveness of memory components. The “oracle” variant
+directly incorporates memories leading to target locations,
+simulating ideal world model behavior with perfect retrieval
+capabilities, achieving 93.40% SPL on unseen environments.
+This highlights the necessity of retrieval and serves as a perfor-
+mance upper bound. The variant with both observation and his-
+tory components disabled yields the lowest performance, fol-
+lowed by complete long-term memory incorporation. Random
+memory selection enhances navigation performance by 0.36%
+SPL. Instruction-based retrieval achieves high recall (97.92%
+HR) by matching global semantics but suffers from temporal
+misalignment, retrieving entire trajectories without localizing
+the specific segment relevant to current progress (21.82%
+HA). State-based retrieval improves precision (23.49% HA)
+but suffers from path dependency; because differences in past
+paths prevent the retrieval of spatially relevant experiences
+
+=== PDF PAGE 12 ===
+12
+TABLE IX
+ABLATION OF WORLD MODEL PRETRAINING.
+IR2R Val Unseen
+GSA Test-R-Basic
+PRETRAIN
+SR ↑
+SPL ↑nDTW ↑
+SR ↑
+SPL ↑nDTW ↑
+74.93
+71.55
+78.12
+64.62
+61.52
+71.30
+✓
+78.03
+73.46
+79.46
+69.64
+64.91
+73.29
+TABLE X
+ABLATION OF OBSERVATION COMPLETION.
+IR2R Val Unseen
+GSA Test-R-Basic
+NEIGHBOR OBS
+SR ↑
+SPL ↑nDTW ↑
+SR ↑
+SPL ↑nDTW ↑
+Partial
+77.05
+72.15
+78.22
+68.35
+63.90
+72.89
+Completion
+78.03
+73.46
+79.46
+69.64
+64.91
+73.29
+even if the future goal is identical (81.86% HR). In contrast,
+our imagination-based retrieval achieves optimal navigation
+performance (73.46% SPL) and retrieval accuracy (24.58%
+OA, 24.21% HA). By querying with the imagined latents,
+Memoir grounds retrieval in navigation intent, overcoming
+the noise of static instruction matching and the rigidity of
+historical state matching. The substantial gap relative to the
+ideal world model reveals current challenges in the world
+model’s ability to capture environmental dynamics accurately,
+suggesting benefits from future data scaling.
+World Model. Table VI(a) evaluates world model variants
+comparing GRU and Transformer architectures. Transformer
+variant outperforms GRU variant by 1.16% SPL, 7.68% ob-
+servation retrieval accuracy (OA), and 2.56% history retrieval
+accuracy (HA) under 5-step overshooting distance. As illus-
+trated in Table VI(b), retrieval effectiveness generally increases
+as the exploration horizon broadens, as recall improves for
+observations (OR) and histories (HR), enabling more informed
+navigation decisions. However, retrieval accuracy decreases
+due to increasing candidates in topological graphs with greater
+distances. The overshooting objective significantly enhances
+OA and HR, contributing to robust navigation performance
+(+1.36% SPL). These results validate that effective retrieval
+requires both powerful predictive models (Transformer over
+GRU) and grounded training (overshooting) to balance explo-
+ration breadth with query precision.
+History Integration. Table VII compares strategies for incor-
+porating retrieved histories. Concatenating viewpoint features
+with state features in the dedicated encoder yields optimal
+performance, achieving 1.98% higher SPL than viewpoint
+features alone and 0.63% higher than state features alone. This
+indicates that state features carry crucial pattern information,
+while still benefiting from observation representation enhance-
+ment. Without incorporating history encoder, where historical
+representation is concatenated with coarse-scale encoder in-
+puts, performance decreases by 1.11% SPL, demonstrating the
+necessity of separating duties across three distinct encoders.
+Expert Policy Strategy. Table VIII compares training strate-
+gies when memory retrieval dynamically expands the available
+action space beyond immediate neighbors. Random sampling
+among multiple optimal paths during training (achieving
+73.46% SPL) outperforms deterministic SPL-based expert se-
+TABLE XI
+ABLATION OF NEIGHBORHOOD INCORPORATION.
+IR2R Val Unseen
+GSA Test-R-Basic
+RETRIEVE
+SR ↑
+SPL ↑nDTW ↑
+SR ↑
+SPL ↑nDTW ↑
+VP only
+76.46
+70.91
+77.45
+67.44
+63.02
+71.83
+VP + neighbors 78.03
+73.46
+79.46
+69.64
+64.91
+73.29
+Filter Rate
+0.0
+0.2
+0.4
+0.6
+0.8
+Max Width
+2
+4
+6
+8
+10
+12
+14
+16
+Success Rate (SR)
+76.5
+77.0
+77.5
+78.0
+78.5
+79.0
+77
+78
+(a) Param Search (Obs.)
+Threshold
+0.2
+0.4
+0.6
+0.8
+1.0
+Max Pairs
+5
+10
+15
+20
+25
+30
+Success Rate (SR)
+76.5
+77.0
+77.5
+78.0
+78.5
+77.25
+77.50
+77.75
+(b) Param Search (Hist.)
+Fig. 7.
+Study of hyper-parameters of retrieval on IR2R val-unseen. Left:
+Environmental observation retrieval. Right: Navigation history retrieval.
+lection (71.71% SPL) by providing better policy regularization
+and robustness to navigation choices.
+World Model Pretraining. Table IX demonstrates the im-
+portance of proper world model initialization. Pretraining the
+world model components on navigation trajectories before
+joint training improves performance by 1.91% SPL on IR2R
+and 3.39% SPL on GSA-R2R, indicating that randomly ini-
+tialized world models provide poor retrieval signals.
+Observation Completion. Table X demonstrates that com-
+pleting partial observations at non-retrieved viewpoints using
+stored features from Mo significantly enhances environmental
+understanding. When a viewpoint in the episodic graph lacks
+complete visual information, retrieving its stored panoramic
+feature enables more informed decision-making.
+Neighbor Incorporation. Table XI studies the retrieval strat-
+egy that incorporates adjacent viewpoints of retrieved nodes
+during observation retrieval. Including immediate neighbors
+provides richer spatial context about connectivity and sur-
+rounding environment, enabling the coarse-scale encoder to
+make better-informed planning decisions. This approach im-
+proves SPL by 2.55% and 1.89% on respective benchmark.
+Parameter Study. Figure 7 analyzes the impact of key
+retrieval hyperparameters. For observation retrieval, SR im-
+proves with reduced filter rates and increased search width,
+peaking at ρo = 0.2 and W = 12 before degrading as ex-
+cessive context introduces noise. This indicates incorporating
+a broader range of viewpoint observations facilitates more
+informed navigation decisions. For navigation history retrieval,
+the model prioritizes precision over recall, achieving optimal
+performance at θh = 0.2 with P = 10. A secondary optimum
+occurs at threshold θh = 1.0 and max patterns P = 20 (decay
+factor γh = 0.8), where highly restrictive similarity thresholds
+compensate through increased pattern acceptance.
+
+=== PDF PAGE 13 ===
+13
+Instruction: Walk down the hall passed the art of an eye exam. continue down the hall towards
+the room at the end with a desk and floor lamp beside it. Walk into the bedroom through the
+door nearest to the desk that has a twin bed and board game standing upright on the shelf.
+Previous 
+Episodes
+Visited
+Node
+Oracle
+Node
+Environmental
+Observation
+Filtered
+Observation
+Instruction: Walk forward, and take a left. Go down the hall and take a right before you enter
+the office. Enter the bedroom at the end of the hall. Stop once you are in the bedroom.
+Instruction: Turn left down the hallway, and turn left into the sitting room. Go into the first
+door on the left and stop once you reach the bed.
+Retrieved Observation
+Retrieved Observation
+Retrieved
+Episode A (Current)
+Episode B (Retrieved, Previously Failed)
+Episode A
+Episode C
+Episode B
+Retrieved Observation
+Episode C (Retrieved, Previously Succeeded)
+Navigation
+History
+Current
+Node
+Retrieved History: Walk out of the bedroom and 
+down the hallway past the little living area on the 
+right. Walk into the door into the next bedroom.
+Never 
+Explored
+Fig. 8. Visualization of failure modes in imagination-guided memory retrieval. Episode A (current) retrieves experiences from Episodes B (previously failed)
+and C (previously succeeded) at a critical decision point. Key instruction differences are highlighted in bold.
+E. Failure Analysis
+Figure 8 presents a scenario where Memoir fails despite
+functioning as designed. In Episode A, the agent must navigate
+to a bedroom absent from previous episodes. Observation
+retrieval identifies two distracting bedroom entrances as candi-
+dates, while history retrieval surfaces Episodes B (failed) and
+C (succeeded), both targeting a different bedroom.
+Retrieval Limitations. The retrieved observations prefer in-
+corporating abundant promising candidates as discovered in
+Figure 7(a), highlighting both bedroom entrances as seman-
+tically relevant but failing to discriminate the critical spatial
+feature—“nearest to the desk.” Retrieved histories similarly
+cannot distinguish Episodes B and C despite different goals.
+In Episode B, premature imagination termination after one
+step limits retrieval to only the nearest entrances, preventing
+correct target discovery. These failures reveal world model
+deficiencies in predictive retrieval for both memory types.
+Exploration-Exploitation Trade-off. Episode A fails when
+both retrieval types converge on the same incorrect location.
+The agent prioritizes high-similarity histories as discovered in
+Figure 7(b), defaulting to exploitation over exploration even
+when retrieval fails to cover the true goal. It also fails to
+distinguish task outcomes, treating Episodes B and C equally
+rather than learning from success. This highlights a new
+challenge: determining when accumulated experience should
+be trusted versus when novel alternatives warrant investigation.
+Future Work. These failure modes suggest two potential
+research directions for advancing imagination-guided memory
+retrieval. First, enhanced world modeling capability through
+larger-scale pretraining and explicit spatial relationship model-
+ing could address both retrieval inaccuracies in distinguishing
+spatially distinct targets and premature imagination horizons
+that affect retrieval scope. Second, confidence-aware retrieval
+to determine when retrieved experience should be trusted, re-
+quiring retrieval confidence estimation to dynamically balance
+exploitation against exploration and serve as a learned filter
+for memory maintenance to mitigate redundancy. The perfor-
+mance gap between our method (73.46% SPL) and the oracle
+retrieval upper bound (93.40% SPL in Table V) demonstrates
+significant room for improvement in these directions.
+VI. CONCLUSION
+This work introduces Memoir, a memory-persistent VLN
+agent employing predictive world modeling for adaptive ex-
+perience retrieval. Unlike traditional imagine-planning that
+generates trajectories in isolation, we ground imagination with
+explicit memory through a language-conditioned world model,
+Hybrid Viewpoint-Level Memory (HVM) storing observations
+and behavioral patterns, and an experience-augmented navi-
+gation model. Extensive experiments demonstrate 5.4% SPL
+improvement on IR2R with 8.3× training speedup and 74%
+inference memory reduction, validating that predictive retrieval
+of both environmental and behavioral memories enables more
+effective navigation. The oracle retrieval performance (93.4%
+SPL) demonstrates the potential of imagination-guided re-
+trieval. Future work should explore enhanced world modeling
+and confidence-aware exploration mechanisms to narrow this
+gap, establishing a principled framework connecting predictive
+simulation with explicit memory for embodied AI.
+
+=== PDF PAGE 14 ===
+14
+REFERENCES
+[1] P. Anderson et al., “Vision-and-language navigation: Interpreting
+visually-grounded navigation instructions in real environments,” in
+CVPR, 2018, pp. 3674–3683.
+[2] Y. Qi et al., “Reverie: Remote embodied visual referring expression in
+real indoor environments,” in CVPR, 2020, pp. 9982–9991.
+[3] A. Ku, P. Anderson, R. Patel, E. Ie, and J. Baldridge, “Room-across-
+room: Multilingual vision-and-language navigation with dense spa-
+tiotemporal grounding,” in EMNLP, 2020, pp. 4392–4412.
+[4] S. Wani, S. Patel, U. Jain, A. Chang, and M. Savva, “Multion:
+Benchmarking semantic map memory using multi-object navigation,”
+in NeurIPS, vol. 33, 2020, pp. 9700–9712.
+[5] J. Krantz et al., “Iterative vision-and-language navigation,” in CVPR,
+2023, pp. 14 921–14 930.
+[6] H. Hong, Y. Qiao, S. Wang, J. Liu, and Q. Wu, “General scene adaptation
+for vision-and-language navigation,” in ICLR, 2025.
+[7] G. Zhao, G. Li, W. Chen, and Y. Yu, “Over-nav: Elevating itera-
+tive vision-and-language navigation with open-vocabulary detection and
+structured representation,” in CVPR, 2024, pp. 16 296–16 306.
+[8] Q. Zheng, D. Liu, C. Wang, J. Zhang, D. Wang, and D. Tao, “Esceme:
+Vision-and-language navigation with episodic scene memory,” IJCV, pp.
+1–21, 2024.
+[9] S. Chen, P.-L. Guhur, M. Tapaswi, C. Schmid, and I. Laptev, “Think
+global, act local: Dual-scale graph transformer for vision-and-language
+navigation,” in CVPR, 2022, pp. 16 537–16 547.
+[10] M. Seeber et al., “Human neural dynamics of real-world and imagined
+navigation,” Nat. Hum. Behav., vol. 9, no. 4, pp. 781–793, 2025.
+[11] M. Karl, F. Kock, B. W. Ritchie, and J. Gauss, “Affective forecasting
+and travel decision-making: An investigation in times of a pandemic,”
+Ann. Tour. Res., vol. 87, p. 103139, 2021.
+[12] Y. W. Li and L. C. Wan, “Inspiring tourists’ imagination: How and when
+human presence in photographs enhances travel mental simulation and
+destination attractiveness,” Tour. Manag., vol. 106, p. 104969, 2025.
+[13] H. Wang, W. Liang, L. Van Gool, and W. Wang, “Dreamwalker: Mental
+planning for continuous vision-language navigation,” in ICCV, 2023, pp.
+10 873–10 883.
+[14] D. Fried et al., “Speaker-follower models for vision-and-language nav-
+igation,” in NeurIPS, vol. 31, 2018.
+[15] W. Hao, C. Li, X. Li, L. Carin, and J. Gao, “Towards learning a generic
+agent for vision-and-language navigation via pre-training,” in CVPR,
+2020, pp. 13 137–13 146.
+[16] Z. Wang et al., “Scaling data generation in vision-and-language naviga-
+tion,” in ICCV, 2023, pp. 12 009–12 020.
+[17] J. Zhang et al., “Navid: Video-based vlm plans the next step for vision-
+and-language navigation,” in RSS, 2024.
+[18] Y. Xu, Y. Pan, Z. Liu, and H. Wang, “Flame: Learning to navigate with
+multimodal llm in urban environments,” in AAAI, vol. 39, 2025, pp.
+9005–9013.
+[19] Y. Hong, Q. Wu, Y. Qi, C. Rodriguez-Opazo, and S. Gould, “Vln bert:
+A recurrent vision-and-language bert for navigation,” in CVPR, 2021,
+pp. 1643–1653.
+[20] S. Chen, P.-L. Guhur, C. Schmid, and I. Laptev, “History aware mul-
+timodal transformer for vision-and-language navigation,” in NeurIPS,
+vol. 34, 2021, pp. 5834–5847.
+[21] H. Wang, W. Wang, W. Liang, C. Xiong, and J. Shen, “Structured scene
+memory for vision-language navigation,” in CVPR, 2021, pp. 8455–
+8464.
+[22] E. Parisotto and R. Salakhutdinov, “Neural map: Structured memory for
+deep reinforcement learning,” in ICLR, 2018.
+[23] X. Dong et al., “Se-vln: A self-evolving vision-language navigation
+framework based on multimodal large language models,” arXiv preprint
+arXiv:2507.13152, 2025.
+[24] C. Wang, S. Wei, and J. Qi, “Matchnav: Llm-based enhanced description
+and instruction matching in vision-and-language navigation,” Inf. Fusion,
+vol. 125, p. 103444, 2026.
+[25] J. F. Henriques and A. Vedaldi, “Mapnet: An allocentric spatial memory
+for mapping environments,” in CVPR, 2018, pp. 8476–8484.
+[26] S. K. Ramakrishnan, Z. Al-Halah, and K. Grauman, “Occupancy an-
+ticipation for efficient exploration and navigation,” in ECCV, 2020, pp.
+400–418.
+[27] V. Cartillier, Z. Ren, N. Jain, S. Lee, I. Essa, and D. Batra, “Semantic
+mapnet: Building allocentric semantic maps and representations from
+egocentric views,” in AAAI, vol. 35, 2021, pp. 964–972.
+[28] C. Huang, O. Mees, A. Zeng, and W. Burgard, “Visual language maps
+for robot navigation,” in ICRA, 2023, pp. 10 608–10 615.
+[29] Z. Teng et al., “360bev: Panoramic semantic mapping for indoor bird’s-
+eye view,” in WACV, 2024, pp. 373–382.
+[30] R. Liu, X. Wang, W. Wang, and Y. Yang, “Bird’s-eye-view scene graph
+for vision-language navigation,” in ICCV, 2023, pp. 10 968–10 980.
+[31] D. S. Chaplot, R. Salakhutdinov, A. Gupta, and S. Gupta, “Neural
+topological slam for visual navigation,” in CVPR, 2020, pp. 12 875–
+12 884.
+[32] N. Kim, O. Kwon, H. Yoo, Y. Choi, J. Park, and S. Oh, “Topological
+semantic graph memory for image-goal navigation,” in CoRL, 2023, pp.
+393–402.
+[33] A. Werby, C. Huang, M. B¨uchner, A. Valada, and W. Burgard, “Hier-
+archical open-vocabulary 3d scene graphs for language-grounded robot
+navigation,” in RSS, 2024.
+[34] D. Hafner et al., “Learning latent dynamics for planning from pixels,”
+in ICML, 2019, pp. 2555–2565.
+[35] D. Hafner, T. Lillicrap, J. Ba, and M. Norouzi, “Dream to control:
+Learning behaviors by latent imagination,” in ICLR, 2020.
+[36] J. Lin et al., “Learning to model the world with language,” in ICML,
+vol. 235, 2024, pp. 29 992–30 017.
+[37] J. Wu, H. Ma, C. Deng, and M. Long, “Pre-training contextualized world
+models with in-the-wild videos for reinforcement learning,” in NeurIPS,
+vol. 36, 2024.
+[38] X. Ma, S. Chen, D. Hsu, and W. S. Lee, “Contrastive variational
+reinforcement learning for complex observations,” in CoRL, 2021, pp.
+959–972.
+[39] M. Okada and T. Taniguchi, “Dreaming: Model-based reinforcement
+learning by latent imagination without reconstruction,” in ICRA, 2021,
+pp. 4209–4215.
+[40] A. Bar, G. Zhou, D. Tran, T. Darrell, and Y. LeCun, “Navigation world
+models,” in CVPR, 2025, pp. 15 791–15 801.
+[41] J. Li and M. Bansal, “Panogen: Text-conditioned panoramic environment
+generation for vision-and-language navigation,” in NeurIPS, vol. 36,
+2023, pp. 21 878–21 894.
+[42] X. Yao, J. Gao, and C. Xu, “Navmorph: A self-evolving world model
+for vision-and-language navigation in continuous environments,” arXiv
+preprint arXiv:2506.23468, 2025.
+[43] J. Y. Koh, H. Lee, Y. Yang, J. Baldridge, and P. Anderson, “Pathdreamer:
+A world model for indoor navigation,” in ICCV, 2021, pp. 14 738–
+14 748.
+[44] G. Georgakis, K. Schmeckpeper, K. Wanchoo, S. Dan, E. Miltsakaki,
+D. Roth, and K. Daniilidis, “Cross-modal map learning for vision and
+language navigation,” in CVPR, 2022, pp. 15 460–15 470.
+[45] Y. Pan, Y. Xu, Z. Liu, and H. Wang, “Planning from imagination:
+Episodic simulation and episodic memory for vision-and-language nav-
+igation,” in AAAI, vol. 39, 2025, pp. 6345–6353.
+[46] J. Li and M. Bansal, “Improving vision-and-language navigation by
+generating future-view image semantics,” in CVPR, 2023, pp. 10 803–
+10 812.
+[47] S. Wang et al., “Monodream: Monocular vision-language navigation
+with panoramic dreaming,” arXiv preprint arXiv:2508.02549, 2025.
+[48] H. Le, T. Karimpanal George, M. Abdolshah, T. Tran, and S. Venkatesh,
+“Model-based episodic memory induces dynamic hybrid controls,” in
+NeurIPS, vol. 34, 2021, pp. 30 313–30 325.
+[49] D. P. Kingma and M. Welling, “Auto-encoding variational bayes,” in
+ICLR, 2013.
+[50] A. v. d. Oord, Y. Li, and O. Vinyals, “Representation learning with
+contrastive predictive coding,” arXiv preprint arXiv:1807.03748, 2018.
+[51] S. K. Ramakrishnan et al., “Habitat-matterport 3d dataset (hm3d): 1000
+large-scale 3d environments for embodied ai,” in NeurIPS D&B, 2021.
+[52] P. Anderson et al., “On evaluation of embodied navigation agents,” arXiv
+preprint arXiv:1807.06757, 2018.
+[53] H. Wang, W. Wang, T. Shu, W. Liang, and J. Shen, “Active visual
+information gathering for vision-language navigation,” in ECCV, 2020,
+pp. 307–322.
+[54] D. Wang, E. Shelhamer, S. Liu, B. Olshausen, and T. Darrell, “Tent:
+Fully test-time adaptation by entropy minimization,” in ICLR, 2021.
+[55] S. Niu et al., “Towards stable test-time adaptation in dynamic wild
+world,” in ICLR, 2023.
+
+=== PDF PAGE 15 ===
+15
+VII. BIOGRAPHY SECTION
+Yunzhe Xu received the bachelor’s degree in soft-
+ware engineering from Harbin Institute of Technol-
+ogy in 2022. He is currently pursuing the Ph.D.
+degree in computer science and technology with
+Shanghai Jiao Tong University. His research interests
+include embodied navigation system, robotic learn-
+ing and large language model agents.
+Yiyuan Pan received the bachelor’s degree in au-
+tomation from Shanghai Jiao Tong University in
+2025. His research focuses on multimodal learning,
+reinforcement learning and robotic learning. He has
+published papers in top-tier AI conferences, includ-
+ing AAAI and NeurIPS.
+Zhe Liu received the Ph.D. degree in control tech-
+nology and control engineering from Shanghai Jiao
+Tong University, Shanghai, China, in 2016. From
+2017 to 2020, he was a Post-Doctoral Fellow with
+the Department of Mechanical and Automation En-
+gineering, The Chinese University of Hong Kong,
+Hong Kong. From 2020 to 2022, he was a Re-
+search Associate with the Department of Computer
+Science and Technology, University of Cambridge,
+Cambridge, U.K. From 2022 to 2025, he has been an
+Associate Professor with the AI institute, Shanghai
+Jiao Tong University, where he is currently an Associate Professor with the
+Department of Automation. His current research interests include multi-robot
+cooperation and autonomous driving system.
+
+=== PDF PAGE 16 ===
+1
+Supplementary Material for “Dream to Recall:
+Imagination-Guided Experience Retrieval for
+Memory-Persistent Vision-and-Language
+Navigation”
+I. COMPUTATIONAL COMPLEXITY ANALYSIS
+To validate the efficiency of Memoir, we analyze the time complexity of its three core components: World Model Imagination,
+Observation Retrieval, and History Retrieval. Let D denote the lookahead horizon (number of imagination steps), Λ the
+maximum spatial density (node count) of a reachable neighborhood shell in the persistent graph, F the feature dimension of
+state embeddings, and P the number of candidate patterns in the experience memory.
+World Model Imagination. The world model generates future states in an autoregressive manner. Utilizing a GRU or a
+Transformer-based architecture with cached attention keys/values, the inference cost per step is dominated by weight projection
+layers (≈F 2) and remains constant with respect to the sequence length. Consequently, the total time complexity for imagining
+D steps scales linearly:
+Timg ≈O(D · F 2).
+(1)
+Observation Retrieval Standard graph search algorithms on abstract graphs typically suffer from exponential complexity
+O(BD), where B is the branching factor. However, navigation graphs G(k) in VLN are topological discretizations of 2D
+physical environments. In such planar embeddings, the number of nodes at hop-distance i, denoted as the shell size |Ni(vt)|,
+grows polynomially rather than exponentially. For short planning horizons (D ≤5), we can bound the search space by a spatial
+density constant Λ = maxi≤D |Ni(vt)|, which represents the maximum number of navigable nodes in the local geometry (e.g.,
+a room or corridor section). The retrieval algorithm computes compatibility scores for nodes within these shells:
+Tobs =
+D
+X
+i=1
+|Ni(vt)| · F ≤D · Λ · F.
+(2)
+Thus, the complexity scales linearly, O(D · Λ · F). This linear scaling holds because the algorithm exploits the spatial sparsity
+of the indoor environment, avoiding the combinatorial explosion of unconstrained graph search.
+History Retrieval. Retrieving relevant experiences involves calculating the similarity between the imagined trajectory
+sequence (length D) and the candidate trajectories stored in memory. This sequence-to-sequence matching requires O(D)
+operations per memory candidate:
+This = O(P · D · F).
+(3)
+While this term depends on the memory size P, it remains linear with respect to the planning horizon D.
+Total Complexity. Summing the components for Imagination, Observation Retrieval, and History Retrieval, the overall
+inference complexity is:
+Ttotal = O
+ D · (F 2 + Λ · F + P · F)
+
+.
+(4)
+The term D remains a linear factor, confirming the efficiency of the proposed imagination-guided retrieval mechanism.
+II. IMPLEMENTATION DETAILS
+A. World Model Architecture
+Our world model factorizes the latent dynamics through four interconnected components. We first describe the latent state
+structure, then detail how each component operates.
+1) Latent State Representation: The world model maintains a latent state zt = [st; ht] comprising two components:
+Deterministic State ht ∈Rdh: Captures temporal dependencies and sequential patterns through recurrent processing. This
+component maintains a deterministic trajectory conditioned on language, enabling consistent imagination across time steps.
+Stochastic State st ∈Rds: Models environmental uncertainty and observation variability through a continuous Gaussian
+distribution st ∼N(µt, σ2
+t ). We use ds = 96 for both variants.
+The complete state zt combines deterministic temporal structure with stochastic observation-grounded information.
+
+=== PDF PAGE 17 ===
+2
+2) Deterministic State Computation: The deterministic state ht is computed differently in GRU and Transformer variants:
+GRU Variant (dh = 4000): Uses GRU-based recurrence:
+ht = GRU(st−1, ht−1) : R96 × R4000 →R4000
+(5)
+Transformer Variant (dh = 672): Uses Transformer decoder with language cross-attention:
+zt−1 = [st−1; ht−1] ∈R768
+ht = T5Decoder(zt−1, cross attn = ˆℓ) : R768 →R768
+(6)
+Initialization: At t = 1, both variants initialize h0 from the language [CLS] token:
+h0 = MLP(ˆℓ[CLS]) : R768 →Rdh
+(7)
+3) Stochastic State Computation: Given the deterministic state ht, the stochastic component is computed through two distinct
+pathways:
+Transition Model p(zt|zt−1) - Prior Distribution:
+This model predicts the stochastic state purely from temporal dynamics, used during imagination when no observation is
+available.
+For GRU:
+[µprior
+t
+; log σprior
+t
+] = MLP(ht) : R4000 →R192
+sprior
+t
+∼N(µprior
+t
+, (σprior
+t
+)2)
+(8)
+For Transformer:
+[µprior
+t
+; log σprior
+t
+] = MLP(ht) : R672 →R192
+sprior
+t
+∼N(µprior
+t
+, (σprior
+t
+)2)
+(9)
+Inference Model q(zt|o≤t, ℓ) - Posterior Distribution:
+This model infers the stochastic state from actual observations, grounding the world model in perception during training
+and state inference.
+For GRU:
+[µpost
+t
+; log σpost
+t
+] = Linear(MLP([xt; ht])) : R(768+4000) →R192
+spost
+t
+∼N(µpost
+t
+, (σpost
+t
+)2)
+(10)
+For Transformer:
+[µpost
+t
+; log σpost
+t
+] = MLP([xt; ht]) : R(768+672) →R192
+spost
+t
+∼N(µpost
+t
+, (σpost
+t
+)2)
+(11)
+where xt ∈R768 is the observation embedding from the 2-layer observation encoder (hidden dim 768, 12 heads).
+4) Compatibility Model p(zt|ot): This model enables memory retrieval by measuring state-observation similarity (Eq. 6):
+es = ψs(zt) : R(ds+dh) →R256
+eo = ψo(xt) : R768 →R256
+f(zt, ot) = 1
+ζ
+e⊤
+s eo
+∥es∥∥eo∥,
+p(zt|ot) ∝exp(f(zt, ot))
+(12)
+Both projection networks ψs and ψo are 2-layer MLPs (512→256→256) with ReLU activations. Temperature ζ = 0.05
+controls the sharpness of the compatibility distribution.
+5) Reward Model p(γt|zt): Predicts normalized distance to goal for imagination termination:
+ˆγt = MLP(zt) : R(ds+dh) →R
+(13)
+The 3-layer MLP uses dimensions (ds + dh) →256 →128 →1 with ReLU activations. Imagination stops when ˆγt+i <
+ϵ = 0.15 or reaches horizon D = 5.
+B. Navigation Model Architecture
+1) Shared Encoders: Text Encoder: 9-layer BERT-style Transformer (dmodel = 768, nheads = 12) processes instruction ℓto
+produce ˆℓ∈RL×768 for both world model and navigation model.
+Observation Encoder: 2-layer Transformer (dmodel = 768, nheads = 12) shared across components, extracting viewpoint
+features xt ∈R768 from panoramic observations via average pooling.
+
+=== PDF PAGE 18 ===
+3
+2) Encoders for Navigation Planning: The navigation model integrates three information sources:
+Coarse-Scale Encoder: 4-layer cross-modal Transformer (dmodel = 768, nheads = 12) processes retrieved observations with
+the global topological graph.
+Fine-Scale Encoder: 4-layer Transformer (dmodel = 768, nheads = 12) processes immediate panoramic features rt for local
+navigation decisions.
+Navigation-History Encoder: 4-layer Transformer (dmodel = 768, nheads = 12) processes retrieved histories ut for global
+navigation decisions.
+C. Training Protocol
+1) World Model Pretraining:
+• Dataset: R2R training split + PREVALENT augmented trajectories
+• Iterations: 5,000, Batch size: 32
+• Optimizer: AdamW (lr=5e-5, weight decay=0.01)
+• Temperature: ζ = 0.05, Feature dropout: 0.4
+2) Joint Navigation Training:
+• IR2R: 10,000 iterations, batch size 8, lr=1e-5 (observation encoder frozen), feature dropout 0.3. Observation retrieval:
+ρo = 0.0, W = 2, γo = 1.0. History retrieval: θh = 0.6, P = 10, γh = 0.8. Checkpoint is selected based on SR + SPL.
+• GSA-R2R: 40,000 iterations, batch size 4, lr=1e-5 (observation encoder frozen), feature dropout 0.4. Observation retrieval:
+ρo = 0.5, W = 16, γo = 1.0. History retrieval: θh = 0.6, P = 50, γh = 0.7. Checkpoint is selected based on SR + SPL.
+III. DERIVATIONS
+A. Basic Variational Bound
+We maximize the joint log-likelihood:
+ln p(o1:T , γ1:T | ℓ) = ln Ep(s1:T |o1:T ,ℓ)
+ T
+Y
+t=1
+p(ot, γt | st)
+
+= ln Eq(s1:T |o1:T ,ℓ)
+ T
+Y
+t=1
+p(ot, γt | st)p(st | st−1)
+q(st | o≤t, ℓ)
+
+≥Eq(s1:T |o1:T ,ℓ)
+
+ln
+T
+Y
+t=1
+p(ot | st)p(γt | st)p(st | st−1)
+q(st | o≤t, ℓ)
+
+= Eq(s1:T |o1:T ,ℓ)
+
+T
+X
+t=1
+ln p(ot | st) + ln p(γt | st) + p(st | st−1)
+q(st | o≤t, ℓ)
+
+=
+T
+X
+t=1
+
+Eq(st|o≤t,ℓ)[ln p(ot | st) + ln p(γt | st)] −Eq(st−1|o≤t−1,ℓ)[KL[q(st | o≤t) ∥p(st|st−1)]]
+
+.
+(14)
+This decomposes into observation reconstruction JRECOVER, reward prediction JREWARD, and dynamics regularization JKL.
+B. Contrastive Objective
+We replace expensive reconstruction with contrastive learning:
+E[ln p(ot | st) + ln p(γt | st)]
++= E[ln p(ot | st) −ln p(ot) + ln p(γt | st)]
+= E[ln p(st | ot) −ln p(st) + ln p(γt | st)]
+≥E
+
+ln p(st | ot) −ln
+X
+o′
+p(st | o′) + ln p(γt | st)
+
+.
+(15)
+The negative samples D include observations from different timesteps and episodes within each batch.
+
+=== PDF PAGE 19 ===
+4
+C. Multi-Step Bound with Overshooting
+For d-step overshooting:
+ln p(o1:T , γ1:T | ℓ) = ln Ep(s1:T |o1:T ,ℓ)
+ T
+Y
+t=1
+p(ot, γt | st)
+
+≥Eq(s1:T |o1:T ,ℓ)
+
+ln
+T
+Y
+t=1
+p(ot | st−d+1)p(γt | st−d+1)p(st | st−d)
+q(st | o≤t, ℓ)
+
+= E
+
+T
+X
+t=1
+ln p(ot | st−d+1) + ln p(γt | st−d+1) + ln p(st | st−d) −ln q(st | o≤t, ℓ)
+
+= E
+
+T
+X
+t=1
+ln Ep(st|st−d+1)[p(ot | st)p(γt | st)] + ln Ep(st−1|st−d)[p(st | st−1)] −ln q(st | o≤t, ℓ)
+
+≥E
+
+T
+X
+t=1
+Ep(st|st−d+1)[ln p(ot | st) + ln p(γt | st)] + Ep(st−1|st−d)[ln p(st | st−1)] −ln q(st | o≤t, ℓ)
+
+=
+T
+X
+t=1
+
+Ep(st|st−d+1)q(st−d+1|o≤t−d+1,ℓ)[ln p(ot | st) + ln p(γt | st)]
+−Ep(st−1|st−d)q(st−d|o≤t−d,ℓ)[KL[q(st | o≤t, ℓ) ∥p(st | st−1)]]
+
+≥
+T
+X
+t=1
+
+Ep(st|st−d+1)q(st−d+1|o≤t−d+1,ℓ)[ln p(st | ot) −ln
+X
+o′
+p(st | o′) + ln p(γt | st)]
+−Ep(st−1|st−d)q(st−d|o≤t−d,ℓ)[KL[q(st | o≤t, ℓ) ∥p(st | st−1)]]
+
+.
+(16)
+This encourages accurate long-horizon prediction, critical for imagination-guided retrieval.
+TABLE I
+THE PERFORMANCE OF OUR METHOD ON IR2R-CE.
+Val Seen
+Val Unseen
+Methods
+TL ↓
+NE ↓
+OS ↑
+nDTW ↑
+SR ↑
+SPL ↑
+TL ↓
+NE ↓
+OS ↑
+nDTW ↑
+SR ↑
+SPL ↑
+Map-based Methods:
+CMA
+7.8
+8.8
+27
+42
+18
+17
+7.5
+8.8
+26
+44
+19
+18
+TourCMA
+8.0
+8.2
+30
+44
+20
+19
+7.8
+9.0
+26
+42
+18
+17
+PoolCMA
+7.2
+9.1
+24
+41
+17
+16
+7.3
+9.0
+23
+42
+16
+15
+PoolEndCMA
+7.6
+8.9
+27
+42
+18
+17
+6.9
+8.7
+25
+44
+18
+16
+MAP-CMA
+9.4
+6.4
+48
+56
+39
+36
+8.5
+6.8
+44
+54
+35
+32
+OVER-NAV
+9.5
+5.8
+49
+59
+39
+36
+8.8
+6.5
+45
+56
+35
+33
+Graph-based Methods:
+DUET*
+10.5
+5.0
+60.9
+64.7
+51.8
+46.6
+10.6
+5.8
+52.7
+58.2
+44.1
+37.5
+GR-DUET*
+7.7
+7.4
+32.4
+44.7
+24.8
+21.1
+8.3
+7.4
+30.4
+44.1
+23.7
+18.6
+Memoir (Ours)
+11.1
+5.2
+59.3
+51.1
+51.1
+45.7
+12.4
+6.2
+57.1
+49.2
+45.6
+39.6
+* Results reproduced via the same discrete-to-continuous transfer protocol.
+IV. ADDITIONAL RESULTS
+A. Evaluation on Continuous Environments
+We further evaluate Memoir on the continuous IR2R-CE benchmark using the standard discrete-to-continuous transfer
+protocol. As shown in Table I, Memoir demonstrates robust generalization, achieving state-of-the-art performance (45.6% SR,
+39.6% SPL) and significantly outperforming the memory-persistent baseline GR-DUET (23.7% SR). This performance gap
+highlights Memoir’s ability to handle candidate explosion in continuous environments, where the waypoint predictor generates
+numerous noisy candidates; unlike GR-DUET which indiscriminately incorporates these into memory, Memoir’s imagination-
+guided retrieval effectively filters noise to identify task-relevant waypoints. However, we observe a slight trade-off in path
+fidelity (lower nDTW compared to single-episode DUET), which stems from the lack of a ground-truth geodesic graph for
+perfect teacher signal generation during memory updates. This suggests that while retrieval improves goal success, the alignment
+
+=== PDF PAGE 20 ===
+5
+of retrieved paths with optimal trajectories remains a challenge, warranting future optimization in constructing more accurate
+persistent topological graphs for continuous spaces.
+0
+1
+2
+3
+4
+5
+0.1
+0.2
+0.3
+0.4
+0.5
+Accuracy
+Future Step 1
+0
+1
+2
+3
+4
+5
+0.1
+0.2
+0.3
+0.4
+0.5 Future Step 2
+0
+1
+2
+3
+4
+5
+Training Steps (K)
+0.1
+0.2
+0.3
+0.4
+0.5 Future Step 3
+0
+1
+2
+3
+4
+5
+0.1
+0.2
+0.3
+0.4
+0.5 Future Step 4
+0
+1
+2
+3
+4
+5
+0.1
+0.2
+0.3
+0.4
+0.5 Future Step 5
+GRU
+GRU + Overshooting
+Transformer
+Transformer + Overshooting
+Fig. 1. Visualization of future observation prediction accuracy across different model variants. Given the current state, models must identify the correct future
+observation from candidate observations at varying imagination horizon.
+B. World Model Prediction Accuracy
+To further analyze our language-conditioned world model’s capability in modeling dynamics, we conduct experiments to
+evaluate the quality of the compatibility measure between imagined states and observations. For each time step, the world
+model simulates a trajectory, and the model is tasked with classifying the subsequent observation from a set of distractors.
+These distractors include observations from other time steps and observations from neighboring nodes along the ground truth
+trajectory, accumulating with approximately 25 distractors per step for a trajectory.
+Figure 1 compares different model variants on future observation prediction across 5,000 training steps. We observe
+that including the overshooting objective significantly improves prediction accuracy over the non-overshooting variants, as
+validated for both model architectures. This indicates a more robust capability in retrieving episodic memory. Conversely, the
+model optimized with the single-step variational bound yields poor performance in observation prediction. This stems from
+the inadequate approximation between the transition model and the inference model, as the compatibility measurement is
+predominantly conducted between inferred states and observations. By extending the bound to a multi-step, we achieve better
+observation discrimination, which aids in successful memory retrieval.
+C. Detailed Quantitative Results on GSA-R2R
+Due to space constraints in the main manuscript, aggregated performance metrics were presented for the General Scene
+Adaptation (GSA-R2R) benchmark. In this section, we provide the granular evaluation results broken down by instruction
+taxonomy and environmental categories.
+We report the comprehensive performance comparisons in the following tables:
+• User Instructions (Table II): Evaluates adaptation to diverse user personas in residential environments.
+• Scene Instructions (Table III): Assesses performance on descriptions emphasizing scene-based spatial reasoning in
+non-residential environments.
+• Basic Instructions (Table IV): Focuses on standard directional navigational commands fundamental to VLN tasks across
+residential and non-residential environments.
+Consistent with the main results, Memoir demonstrates superior performance across these fine-grained splits, validating that
+the imagination-guided retrieval mechanism offers robust generalization not only across environmental domains but also across
+varied linguistic styles.
+
+=== PDF PAGE 21 ===
+6
+TABLE II
+COMPARISON OF NAVIGATION PERFORMANCE ON THE GSA-R2R BENCHMARK WITH USER INSTRUCTIONS.
+Child
+Keith
+Moira
+Rachel
+Sheldon
+Methods
+SR ↑
+SPL ↑
+SR ↑
+SPL ↑
+SR ↑
+SPL ↑
+SR ↑
+SPL ↑
+SR ↑
+SPL ↑
+TourHAMT
+14.6 ±0.2
+12.0 ±0.2
+15.1 ±0.2
+12.3 ±0.1
+13.9 ±0.1
+11.3 ±0.1
+15.3 ±0.1
+12.5 ±0.1
+14.4 ±0.1
+11.8 ±0.1
+OVER-NAV
+20.9 ±0.1
+16.1 ±0.2
+20.5 ±0.1
+16.4 ±0.1
+19.5 ±0.2
+15.4 ±0.2
+20.6 ±0.3
+16.2 ±0.2
+20.5 ±0.1
+16.2 ±0.1
+DUET
+54.3
+44.1
+56.0
+46.3
+52.3
+43.3
+56.3
+46.4
+54.0
+44.4
++MLM
+54.5 ±0.2
+44.7 ±0.2
+56.4 ±0.3
+46.8 ±0.3
+53.8 ±0.3
+43.6 ±0.4
+56.8 ±0.5
+46.6 ±0.6
+54.5 ±0.4
+44.2 ±0.3
++MRC
+54.4 ±0.2
+44.2 ±0.1
+56.0 ±0.1
+46.3 ±0.1
+52.3 ±0.2
+43.3 ±0.1
+56.0 ±0.1
+46.2 ±0.2
+53.7 ±0.2
+44.2 ±0.4
++BT
+57.5 ±0.7
+54.0 ±0.9
+61.2 ±0.3
+57.9 ±0.1
+57.3 ±0.5
+54.0 ±0.6
+61.6 ±0.8
+58.1 ±0.7
+57.6 ±0.5
+54.3 ±0.5
++TENT
+54.3 ±0.2
+41.7 ±0.1
+55.4 ±0.2
+43.8 ±0.2
+51.7 ±0.2
+41.0 ±0.1
+55.0 ±0.2
+43.2 ±0.2
+53.0 ±0.2
+41.9 ±0.1
++SAR
+54.5 ±0.5
+41.5 ±0.4
+54.9 ±0.3
+43.1 ±0.2
+51.0 ±0.4
+40.3 ±0.6
+55.3 ±0.5
+43.0 ±0.6
+52.9 ±0.2
+41.4 ±0.4
+VLN models pretrained with full navigation graph:
+GR-DUET
+65.2 ±0.1
+59.7 ±0.1
+66.7 ±0.1
+62.0 ±0.1
+60.9 ±0.2
+56.2 ±0.2
+67.1 ±0.1
+62.2 ±0.1
+63.9 ±0.1
+58.9 ±0.1
+GR-DUET*
+64.9 ±0.5
+60.5 ±0.4
+65.1 ±0.3
+61.4 ±0.4
+60.5 ±0.3
+56.6 ±0.2
+65.7 ±0.5
+61.7 ±0.4
+63.0 ±0.4
+59.0 ±0.4
++Memoir
+60.0 ±0.4
+49.2 ±2.3
+61.5 ±0.1
+52.5 ±0.1
+56.5 ±0.2
+47.5 ±1.2
+61.3 ±0.4
+52.1 ±0.1
+58.5 ±0.5
+49.1 ±1.0
++Memoir (Ours)
+66.5 ±0.5
+61.3 ±0.5
+68.0 ±0.1
+63.6 ±0.2
+62.5 ±0.3
+57.5 ±0.4
+68.2 ±0.1
+63.6 ±0.3
+65.3 ±0.1
+60.4 ±0.3
+* Results reproduced under aligned experimental conditions (episode ordering, training iterations, batch size, learning rate and dropout rate).
+TABLE III
+COMPARISON OF NAVIGATION PERFORMANCE ON THE GSA-R2R BENCHMARK WITH SCENE INSTRUCTIONS.
+Test-Non-Residential-Scene
+Methods
+TL ↓
+NE ↓
+SR ↑
+SPL ↑
+nDTW ↑
+TourHAMT
+7.3 ±0.1
+8.1 ±0.1
+9.7 ±0.1
+8.0 ±0.1
+32.3 ±0.1
+OVER-NAV
+11.8 ±0.1
+7.6 ±0.2
+16.7 ±0.4
+12.6 ±0.2
+34.6 ±0.3
+DUET
+14.9
+6.4
+39.6
+30.1
+40.9
++MLM
+14.3 ±0.1
+6.5 ±0.1
+39.8 ±0.1
+30.5 ±0.1
+41.1 ±0.1
++MRC
+14.9 ±0.1
+6.4 ±0.1
+39.7 ±0.1
+30.2 ±0.1
+40.9 ±0.1
++BT
+8.4 ±0.0
+6.3 ±0.2
+41.2 ±1.5
+38.2 ±1.2
+51.3 ±1.2
++TENT
+16.4 ±0.1
+6.3 ±0.1
+40.6 ±0.2
+28.9 ±0.2
+38.9 ±0.2
++SAR
+16.3 ±0.5
+6.0 ±0.2
+41.4 ±0.6
+29.1 ±0.3
+39.0 ±0.3
+VLN models pretrained with full navigation graph:
+GR-DUET
+10.1 ±0.0
+5.5 ±0.0
+48.1 ±0.1
+42.8 ±0.1
+53.7 ±0.1
+GR-DUET*
+9.9 ±0.3
+5.5 ±0.0
+47.1 ±0.5
+42.2 ±0.8
+54.1 ±0.6
++Memoir
+13.5 ±1.5
+6.2 ±0.1
+43.3 ±0.2
+34.1 ±1.7
+44.2 ±3.1
++Memoir (Ours)
+10.3 ±0.4
+5.1 ±0.0
+50.2 ±0.3
+44.8 ±0.4
+56.2 ±0.6
+* Results reproduced under aligned experimental conditions.
+TABLE IV
+COMPARISON OF NAVIGATION PERFORMANCE ON THE GSA-R2R BENCHMARK WITH BASIC INSTRUCTIONS.
+Test-Residential-Basic
+Test-Non-Residential-Basic
+Methods
+TL ↓
+NE ↓
+SR ↑
+SPL ↑
+nDTW ↑
+TL ↓
+NE ↓
+SR ↑
+SPL ↑
+nDTW ↑
+TourHAMT
+11.6 ±0.1
+7.4 ±0.1
+14.9 ±0.1
+12.2 ±0.1
+34.7 ±0.1
+9.4 ±0.1
+7.7 ±0.1
+11.0 ±0.2
+8.6 ±0.2
+32.2 ±0.1
+OVER-NAV
+14.1 ±0.1
+6.7 ±0.0
+22.3 ±0.3
+16.8 ±0.2
+37.1 ±0.1
+11.4 ±0.1
+7.1 ±0.1
+16.6 ±0.2
+13.0 ±0.1
+35.0 ±0.2
+DUET
+13.1
+4.2
+57.7
+47.0
+55.6
+14.8
+5.3
+48.1
+37.3
+45.9
++MLM
+13.1 ±0.1
+4.1 ±0.1
+57.9 ±0.2
+47.3 ±0.1
+55.9 ±0.2
+13.1 ±0.2
+5.3 ±0.1
+48.3 ±0.5
+38.8 ±0.5
+48.4 ±0.3
++MRC
+13.1 ±0.1
+4.2 ±0.1
+57.7 ±0.1
+47.0 ±0.1
+55.6 ±0.1
+14.7 ±0.1
+5.3 ±0.1
+48.1 ±0.1
+37.3 ±0.1
+45.9 ±0.1
++BT
+8.0 ±0.1
+3.8 ±0.1
+61.3 ±0.6
+57.7 ±0.3
+70.1 ±0.5
+7.9 ±0.0
+5.2 ±0.1
+49.5 ±0.8
+46.0 ±0.8
+59.4 ±0.9
++TENT
+14.6 ±0.0
+4.2 ±0.0
+57.2 ±0.4
+44.2 ±0.4
+52.9 ±0.1
+16.2 ±0.1
+5.4 ±0.1
+46.5 ±0.4
+33.7 ±0.2
+42.6 ±0.3
++SAR
+13.8 ±0.8
+4.0 ±0.1
+57.6 ±0.2
+44.6 ±0.2
+53.0 ±0.2
+16.5 ±0.0
+5.4 ±0.0
+44.6 ±1.5
+31.5 ±1.6
+40.6 ±1.3
+VLN models pretrained with full navigation graph:
+GR-DUET
+9.4 ±0.0
+3.1 ±0.0
+69.3 ±0.2
+64.3 ±0.1
+71.4 ±0.1
+8.9 ±0.0
+4.4 ±0.0
+56.6 ±0.1
+51.5 ±0.1
+61.0 ±0.1
+GR-DUET*
+8.6 ±0.2
+3.2 ±0.1
+67.6 ±0.5
+63.6 ±0.6
+71.9 ±0.5
+8.7 ±0.4
+4.4 ±0.0
+55.3 ±0.2
+50.4 ±0.3
+60.8 ±0.4
++Memoir
+11.7 ±0.1
+3.7 ±0.0
+63.0 ±0.3
+52.9 ±0.3
+61.0 ±0.5
+12.6 ±0.3
+4.9 ±0.1
+51.6 ±0.8
+40.8 ±0.1
+49.6 ±0.0
++Memoir (Ours)
+9.3 ±0.0
+3.0 ±0.0
+69.8 ±0.2
+64.9 ±0.4
+73.3 ±0.2
+9.3 ±0.2
+4.2 ±0.0
+57.7 ±0.1
+52.0 ±0.1
+61.9 ±0.4
+* Results reproduced under aligned experimental conditions (episode ordering, training iterations, batch size, learning rate and dropout rate).

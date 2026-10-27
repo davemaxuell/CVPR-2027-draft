@@ -1,0 +1,141 @@
+{
+  "recorded_on": "2026-10-23",
+  "selection_status": "four_world_model_trial_families_agreed",
+  "checkpoint_selection_status": "DINO PointMaze pair frozen; released NWM CDiT-S/2 EMA strictly loaded on CPU; NWM CE training/GPU preflight pending",
+  "execution_status": "Initial DINO scorer calibration running; NWM/CDiT paired repeat waits automatically for the DINO E pilot",
+  "architecture_check_status": "DINO trained/frozen/runtime checks complete; native NWM/VAE CPU checks passed; GPU native precision, resume and complete sampling checks precede fitting",
+  "architecture_record": "../docs/Architecture_Compatibility.md",
+  "scope": "World models only. Navigation backbones remain separately locked in Backbone_Trials.json. DINOv2 with new dynamics and CDiT with new dynamics are two separate baselines.",
+  "trials": [
+    {
+      "id": "dinowm_transfer",
+      "name": "DINO-WM transfer",
+      "family": "dino_features",
+      "dynamics_initialization": "Transfer compatible weights from a released DINO-WM dynamics checkpoint, then adapt on CE.",
+      "visual_encoder": "Shared frozen native DINOv2-S/14; all 175 tensors match the pinned Hugging Face weights",
+      "output": "Future DINOv2 patch features",
+      "official_repository": "https://github.com/gaoyuezhou/dino_wm",
+      "checkpoint": "runs/step5_smolvlm2_refined512/assets/point_maze_predictor.pt",
+      "available_source_tasks": [
+        "PointMaze",
+        "PushT",
+        "Wall"
+      ],
+      "adaptation_note": "Strict PointMaze predictor-only transfer: 3 actual frames, 196 raw patches, 384 visual + 10 zero proprio + 10 new CE command channels. Fresh control uses identical architecture, action embedding initialization, data order and full-pass budget. Wall release has one history frame and is incompatible.",
+      "run": "runs/step5_smolvlm2_refined512",
+      "status": "complete",
+      "encoder_identity": "runs/step5_smolvlm2_refined512/frozen/encoder/encoder_identity.json",
+      "checkpoint_selection": "runs/step5_smolvlm2_refined512/assets/transfer_selection.json",
+      "frozen_bundle": "runs/step5_smolvlm2_refined512/frozen/dinowm_transfer",
+      "selected_checkpoint": "runs/step5_smolvlm2_refined512/transfer/checkpoints/step_036864.pt",
+      "selected_step": 36864,
+      "validation_macro_mse": 1.347413588121223,
+      "training_samples": 2422469,
+      "validation_samples": 3072,
+      "verification": "runs/step5_smolvlm2_refined512/final_verification.json",
+      "encoder_identity_sha256": "072c391c8764fbdcdb9e00bfbf9ec016873fa9707c573e400f44ff385f01f9dd",
+      "selected_policy_identity_sha256": "729480bf5c8402b07cad653a7ef0f7124be212d50255077290316ba686777ca7"
+    },
+    {
+      "id": "nwm_transfer",
+      "name": "NWM transfer",
+      "family": "cdit_vae",
+      "dynamics_initialization": "Load released NWM CDiT dynamics weights, then adapt on CE.",
+      "visual_encoder": "Pretrained stabilityai/sd-vae-ft-ema VAE, initially frozen",
+      "output": "Future VAE latents, decodable to RGB",
+      "official_repository": "https://github.com/facebookresearch/nwm",
+      "model_repository": "facebook/nwm",
+      "metadata_revision_inspected": "0821a1a7b1ae938539e32f13f5ad82465e0f3fde",
+      "checkpoint_filename": "cdit_s_100000.pth.tar",
+      "lightweight_candidate_to_profile": "cdit_s_100000.pth.tar with CDiT-S/2",
+      "access_status": "Access approved and checkpoint downloaded 2026-10-23; all 219 EMA tensors loaded strictly on CPU 2026-10-27 KST",
+      "status": "assets_verified_CPU_GPU_preflight_pending",
+      "run": "runs/step5b_smolvlm2_refined512_nwm_pair_v1",
+      "asset_record": "runs/step5b_smolvlm2_refined512_nwm_pair_v1/assets/selection.json",
+      "source_checkpoint_sha256": "8ed9478d40e49809a1bbe6aec4df8af7f6f48c3bb427307dd8a423efb347ce6e"
+    },
+    {
+      "id": "dinov2_fresh_dynamics",
+      "name": "DINOv2 with new dynamics",
+      "family": "dino_features",
+      "dynamics_initialization": "Newly initialized action-conditioned predictor; no transferred DINO-WM dynamics weights.",
+      "visual_encoder": "Shared frozen native DINOv2-S/14; all 175 tensors match the pinned Hugging Face weights",
+      "output": "Future DINOv2 patch features",
+      "matching_requirement": "Match predictor architecture and CE action interface to the transfer trial when isolating dynamics initialization.",
+      "run": "runs/step5_smolvlm2_refined512",
+      "status": "complete",
+      "encoder_identity": "runs/step5_smolvlm2_refined512/frozen/encoder/encoder_identity.json",
+      "frozen_bundle": "runs/step5_smolvlm2_refined512/frozen/dinov2_fresh_dynamics",
+      "selected_checkpoint": "runs/step5_smolvlm2_refined512/fresh/checkpoints/step_036864.pt",
+      "selected_step": 36864,
+      "validation_macro_mse": 1.3207671881536953,
+      "training_samples": 2422469,
+      "validation_samples": 3072,
+      "verification": "runs/step5_smolvlm2_refined512/final_verification.json",
+      "encoder_identity_sha256": "072c391c8764fbdcdb9e00bfbf9ec016873fa9707c573e400f44ff385f01f9dd",
+      "selected_policy_identity_sha256": "729480bf5c8402b07cad653a7ef0f7124be212d50255077290316ba686777ca7"
+    },
+    {
+      "id": "cdit_fresh_dynamics",
+      "name": "CDiT with new dynamics",
+      "family": "cdit_vae",
+      "dynamics_initialization": "Newly initialized CDiT trained on CE; no NWM dynamics weights.",
+      "visual_encoder": "Same pretrained stabilityai/sd-vae-ft-ema VAE as the matched NWM trial, initially frozen",
+      "output": "Future VAE latents, decodable to RGB",
+      "matching_requirement": "Use the same CDiT size, representation, and action interface as the transfer trial for an initialization comparison.",
+      "status": "paired_repeat_prepared_GPU_preflight_pending",
+      "run": "runs/step5b_smolvlm2_refined512_nwm_pair_v1",
+      "architecture": "native CDiT-S/2, 49,227,680 trainable parameters"
+    }
+  ],
+  "shared_plan": {
+    "added_training_and_evaluation_datasets": [
+      "R2R-CE",
+      "RxR-CE"
+    ],
+    "data_collection": "Actual candidate first-action branches and frozen-policy continuations from training scenes. Pilot splits training scenes into model fitting, scorer fitting, and development groups, with shared R2R/RxR scene IDs grouped together. Official unseen evaluation remains separate.",
+    "policy_status": "Navigation policy is trained first and held frozen during the world-model comparison.",
+    "action_interface": "Use commanded actions and available timing/history; future realized poses or collision outcomes cannot be conditioning inputs at inference.",
+    "proposed_common_scorer_representation": "Frozen DINOv2-S/14: source resize/crop224, mean/std0.5, encoder input196px, raw196x384 pooled49x384. DINO pair is frozen. NWM/CDiT CPU asset/bridge checks passed; selected CE weights and GPU execution remain pending.",
+    "nwm_interface": "CDiT-S/2 candidate, 224 image pixels, 28x28 four-channel VAE latent, four real context frames, nominal normalized x/y/yaw command and relative time. Eight-channel denoiser output requires matching epsilon/learned-variance sampling before four-channel latent decoding.",
+    "warmup": "Base policy until required real context exists; no silent context padding. Use the same warm-up restriction across compared world models.",
+    "scorer_inputs": [
+      "Full instruction features",
+      "Actual policy context and current view",
+      "Recurrent actual observation/action history",
+      "Candidate action",
+      "Predicted next features",
+      "Elapsed action-budget fraction"
+    ],
+    "scorer_design": "../docs/Scorer_Design.md",
+    "scorer_comparison": "Fit one scorer per frozen policy using pooled predictions from available frozen world models. Hold exact scorer weights fixed across those world models; no world-model identity input.",
+    "prediction_horizon_actions": 1,
+    "candidate_actions": [
+      "FORWARD",
+      "LEFT",
+      "RIGHT",
+      "STOP"
+    ],
+    "future_samples_per_nonstop_action": 1,
+    "stop_prediction": "Identity current view; no world-model call",
+    "instruction_splitting": false,
+    "comparison_order": "Screen four world models using a fixed trained policy and common CE branch dataset; expand selected configurations across navigation backbones afterward.",
+    "initialization_controls": "Match architecture, visual representation, trainable parameter set, data, and training budget within each transfer/fresh pair. Otherwise label results as comparisons of training recipes.",
+    "efficiency_measurements": [
+      "Complete pipeline peak memory",
+      "Prediction and action-selection latency",
+      "Diffusion steps and samples",
+      "Decoder and encoder cost",
+      "Candidate count and horizon"
+    ]
+  },
+  "open_decisions": [
+    "NWM/CDiT optimization and complete-pipeline memory within the 8 GB target",
+    "CE validation of the specified scorer labels and protocol; any later usefulness-aware dynamics objective",
+    "Diffusion steps and later multi-sample or multi-action horizon extensions",
+    "Complete GPU validation of the chosen CDiT-S/2/VAE pair, then matched CE fitting and frozen prediction audit"
+  ],
+  "execution_updated_utc": "2026-10-26T22:19:55.639216+00:00",
+  "execution_result": "runs/step5_smolvlm2_refined512/result.json",
+  "next_repeat_run": "runs/step5b_smolvlm2_refined512_nwm_pair_v1"
+}

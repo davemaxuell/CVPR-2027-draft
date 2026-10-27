@@ -1,0 +1,90 @@
+{
+  "status": "selected",
+  "recorded_utc": "2026-10-25T22:39:47.033986+00:00",
+  "task": "point_maze",
+  "rationale": "Exact three-frame predictor compatibility; navigation through obstacles is a closer source-task match than object pushing. Chosen before CE validation; no claim of measured superiority.",
+  "source_checkpoint": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/step5_smolvlm2_refined512/assets/outputs/point_maze/checkpoints/model_latest.pth",
+  "source_checkpoint_sha256": "78c654baede0e9289b751e9ad251839b8045a6074cc1ec23ab54caaf11a25700",
+  "extracted_predictor": "point_maze_predictor.pt",
+  "extracted_predictor_sha256": "105a79668193b052e12ea16cfc2144970b82bf6994549f983b13bb3a0af19501",
+  "comparisons": {
+    "point_maze": {
+      "checkpoint_sha256": "78c654baede0e9289b751e9ad251839b8045a6074cc1ec23ab54caaf11a25700",
+      "epoch": 10,
+      "history": 3,
+      "position_shape": [
+        1,
+        588,
+        404
+      ],
+      "predictor_parameters": 20122600,
+      "strictly_compatible": true,
+      "predictor_config": {
+        "_target_": "models.vit.ViTPredictor",
+        "depth": 6,
+        "heads": 16,
+        "mlp_dim": 2048,
+        "dropout": 0.1,
+        "emb_dropout": 0,
+        "pool": "mean"
+      },
+      "source_config_sha256": "25acae83bc681f97f53361f37661be375687797620f58e87319e4e1e2128bcda"
+    },
+    "pusht": {
+      "checkpoint_sha256": "e909f0cec958fc0b49a79f2e85730ae6b5f83dee61a224705f91883eb3bb74c5",
+      "epoch": 2,
+      "history": 3,
+      "position_shape": [
+        1,
+        588,
+        404
+      ],
+      "predictor_parameters": 20122600,
+      "strictly_compatible": true,
+      "predictor_config": {
+        "_target_": "models.vit.ViTPredictor",
+        "depth": 6,
+        "heads": 16,
+        "mlp_dim": 2048,
+        "dropout": 0.1,
+        "emb_dropout": 0,
+        "pool": "mean"
+      },
+      "source_config_sha256": "e4d7f21b85c778ab8b83c0bb83bc7625fdfb193a6a0619fef25f4a2afd7f8049"
+    },
+    "wall_single": {
+      "checkpoint_sha256": "8441971becdae934fe08de5b163398390a32f6fe1fb0a8df113290e2468e142b",
+      "epoch": 65,
+      "history": 1,
+      "position_shape": [
+        1,
+        196,
+        404
+      ],
+      "predictor_parameters": 19964232,
+      "strictly_compatible": false,
+      "predictor_config": {
+        "_target_": "models.vit.ViTPredictor",
+        "depth": 6,
+        "heads": 16,
+        "mlp_dim": 2048,
+        "dropout": 0.1,
+        "emb_dropout": 0.1,
+        "pool": "mean"
+      },
+      "source_config_sha256": "4ed3109219ed6820ce51fd19e4c97199552b3443ed58c502fddd6441784967e1"
+    }
+  },
+  "transferred_modules": [
+    "predictor"
+  ],
+  "excluded_modules": [
+    "source action encoder",
+    "source proprio encoder",
+    "image decoder",
+    "optimizers"
+  ],
+  "CE_command_embedding": "fresh three-action embedding, width 10, shared initialization with fresh control",
+  "CE_proprio": "10 zero-valued channels",
+  "policy_identity_sha256": "729480bf5c8402b07cad653a7ef0f7124be212d50255077290316ba686777ca7"
+}

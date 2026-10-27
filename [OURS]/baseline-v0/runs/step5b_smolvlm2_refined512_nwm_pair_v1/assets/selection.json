@@ -1,0 +1,84 @@
+{
+  "status": "verified_cpu",
+  "verified_utc": "2026-10-26T21:53:41.093894+00:00",
+  "selected_policy_identity_sha256": "729480bf5c8402b07cad653a7ef0f7124be212d50255077290316ba686777ca7",
+  "source_model": "facebook/nwm",
+  "source_revision": "0821a1a7b1ae938539e32f13f5ad82465e0f3fde",
+  "source_file": "/data/shared/hf_cache/hub/models--facebook--nwm/snapshots/0821a1a7b1ae938539e32f13f5ad82465e0f3fde/cdit_s_100000.pth.tar",
+  "source_checkpoint_step": 100000,
+  "state_selected": "ema",
+  "extracted_ema": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/step5b_smolvlm2_refined512_nwm_pair_v1/assets/nwm_cdit_s_ema.pt",
+  "strict_tensor_count": 219,
+  "parameter_count": 49227680,
+  "trainable_parameter_count": 49227680,
+  "architecture": "native CDiT-S/2, depth12 width384 heads6, four contexts, 28x28 latent, epsilon+learned-variance",
+  "transfer_scope": "All 219 EMA tensors including learned positions/action/time embeddings; discard source optimizer/scaler",
+  "fresh_scope": "Exact native architecture and initialization, same trainable parameters and conditioning",
+  "vae": {
+    "repo": "stabilityai/sd-vae-ft-ema",
+    "revision": "f04b2c4b98319346dad8c65879f680b1997b204a",
+    "directory": "/data/shared/hf_cache/hub/models--stabilityai--sd-vae-ft-ema/snapshots/f04b2c4b98319346dad8c65879f680b1997b204a",
+    "frozen": true,
+    "parameters": 83653863,
+    "latent_scale": 0.18215
+  },
+  "command_order": [
+    "FORWARD",
+    "LEFT",
+    "RIGHT"
+  ],
+  "command_table": [
+    [
+      -0.06666666269302368,
+      0.0,
+      0.0
+    ],
+    [
+      -0.3333333134651184,
+      0.0,
+      0.2617993950843811
+    ],
+    [
+      -0.3333333134651184,
+      0.0,
+      -0.2617993950843811
+    ]
+  ],
+  "command_definition": "Nominal local [forward metres, left metres, left-positive yaw radians]; x/y divided by .25 then source min/max normalized. Collision never changes command.",
+  "relative_time": "1/128 for one CE command; no physical seconds assumption",
+  "preprocessing": "RGB float32 /255; antialiased tensor Resize(shortest side224), CenterCrop224, normalize mean/std .5; same CE crop as DINO and NWMVisualBridge",
+  "native_preprocessing_difference": "The official NWM source uses 4:3 crop then square resize. The agreed CE crop adaptation is kept identical in both paired trials.",
+  "index_manifest_sha256": "38cf82bcdfebee54ef2dad8d7de60c7a82a5363238435ce36c7ced3d0630c1d0",
+  "training_samples": 2422469,
+  "validation_samples": 3072,
+  "unique_images": 875174,
+  "no_GPU_used": true,
+  "no_E_data_used": true,
+  "inference_and_training_validation": "pending GPU preflight after current DINO evaluation",
+  "versions": {
+    "torch": "2.8.0+cu128",
+    "torchvision": "0.23.0+cu128",
+    "diffusers": "0.35.2",
+    "timm": "1.0.30",
+    "safetensors": "0.7.0"
+  },
+  "files_sha256": {
+    "/data/shared/hf_cache/hub/models--facebook--nwm/snapshots/0821a1a7b1ae938539e32f13f5ad82465e0f3fde/cdit_s_100000.pth.tar": "8ed9478d40e49809a1bbe6aec4df8af7f6f48c3bb427307dd8a423efb347ce6e",
+    "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/step5b_smolvlm2_refined512_nwm_pair_v1/assets/nwm_cdit_s_ema.pt": "d9d44a00e1d3f28d781f9908ffdad1d980d3916385821bf8a49a20507fa82d45",
+    "/data/shared/hf_cache/hub/models--stabilityai--sd-vae-ft-ema/snapshots/f04b2c4b98319346dad8c65879f680b1997b204a/config.json": "92d3dfb746fca211a2c9e019e285f8597412211728dce3c5bcf4eda0f2d62e7e",
+    "/data/shared/hf_cache/hub/models--stabilityai--sd-vae-ft-ema/snapshots/f04b2c4b98319346dad8c65879f680b1997b204a/diffusion_pytorch_model.safetensors": "32db726da04f06c1b6b14c0043ce115cc87a501482945c5add89a40d838fcb46"
+  },
+  "source_sha256": {
+    "third_party/nwm/models.py": "3758b07bbe7327ae48df600232375b33b480fbb18aa7f28957f1152ba6bd2a6c",
+    "third_party/nwm/train.py": "8ef647e2e4565e0b84188d9b608fa4bcc70b464260c762aa9af865b5c13fe4b3",
+    "third_party/nwm/isolated_nwm_infer.py": "896abdc939bb1132d1a2d105a2291e8e4d1c424eb6b85c5dda2b98d1280d7bd4",
+    "third_party/nwm/datasets.py": "8bd3d4b029e0f1d88853dd0f9f7812c794da081f08c3a3a621969f1569aad761",
+    "third_party/nwm/misc.py": "b7cbf2e2d7ef64852540e8528e65f97e4b4e9fbc4534d4f392cb83e8f8115173",
+    "third_party/nwm/config/data_config.yaml": "7aa54d6079677c3dc89a87b86ddc675f9a059a6278430e04554def35cc90a967",
+    "third_party/nwm/diffusion/__init__.py": "ece965de63cced15cf438f8cfdba27720c675b44217f16a61d43bd09c2d6abba",
+    "third_party/nwm/diffusion/diffusion_utils.py": "62e73ff4c5e74429ab8589fe8e0fac81a8a9235a02cf2ab97c80797d0819bba7",
+    "third_party/nwm/diffusion/gaussian_diffusion.py": "b526564245bfdb06ace88cd3c8fc6be759ec5a6b2c2500327f73157d6d9d7721",
+    "third_party/nwm/diffusion/respace.py": "43e437fb4428b8162759886b333ed9f416605d824c0f48de1a61e41ec14eebff",
+    "third_party/nwm/diffusion/timestep_sampler.py": "d6c18dd1a2b643eaa81b7452dbfc58aba8bf5ff621a2f8d7da35d2781f45af23"
+  }
+}

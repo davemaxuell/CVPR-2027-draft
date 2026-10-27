@@ -1,0 +1,554 @@
+=== PDF PAGE 1 ===
+                  This CVPR Workshop paper is the Open Access version, provided by the Computer Vision
+                         Foundation. Except for this watermark, it is identical to the accepted version;
+                            the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+
+                    Policy-Guided World Model Planning
+                  for Language-Conditioned Visual Navigation
+
+
+                            Amirhosein Chahe     Lifeng Zhou*
+                                      Drexel University
+                                    Philadelphia PA 19104, USA
+                                 {ac4462, lz457}@drexel.edu
+
+
+
+                 Abstract                            long-standing challenge in robotics and computer vision [1–
+                                                                        3]. Given a current egocentric observation ot, a goal image
+Navigating to a visually specified goal given natural lan-      og, and an instruction ℓ(e.g. “move towards the stairs”),
+guage instructions remains a fundamental challenge in em-      the agent must produce a sequence of actions that reliably
+bodied AI. Existing approaches either rely on reactive poli-     reaches the goal while respecting the semantics of the in-
+cies that struggle with long-horizon planning, or employ      struction.
+world models that suffer from poor action initialization       Recent  vision-language-action (VLA) models  [3–6]
+in high-dimensional spaces. We present PiJEPA, a two-     have made remarkable strides toward this objective. Gener-
+stage framework that combines the strengths of learned       alist policies such as Octo [4] and NoMaD [7] can be fine-
+navigation policies with latent world model planning for     tuned on domain-specific navigation data to achieve impres-
+instruction-conditioned visual navigation. In the first stage,      sive short-horizon control, while the CAST framework [6]
+we finetune an Octo-based generalist policy, augmented      further strengthens instruction following through counter-
+with a frozen pretrained vision encoder (DINOv2 or V-      factual language-action augmentation. Despite their effec-
+JEPA-2), on the CAST navigation dataset to produce an      tiveness, these reactive policies predict actions in a single
+informed action distribution conditioned on the current ob-     forward pass and thus lack the capacity to reason about the
+servation and language instruction.  In the second stage,     long-term consequences of their decisions.
+we use this policy-derived distribution to warm-start Model     A complementary line of work addresses this limitation
+Predictive Path Integral (MPPI) planning over a sepa-     by learning world models that predict future states condi-
+rately trained JEPA world model, which predicts future la-     tioned on candidate actions, enabling explicit planning to-
+tent states in the embedding space of the same frozen en-     ward the goal [8–12]. Among these, Joint-Embedding Pre-
+coder. By initializing the MPPI sampling distribution from      dictive Architecture World Models (JEPA-WMs) [12–14]
+the policy prior rather than from an uninformed Gaus-      are especially attractive: by learning dynamics in the latent
+sian, our planner converges faster to high-quality action     space of a frozen pretrained encoder, they support efficient
+sequences that reach the goal.  We systematically study      rollouts without pixel-level reconstruction.  At inference
+the effect of the vision encoder backbone, comparing DI-      time, a sampling-based optimizer such as MPPI [15, 16]
+NOv2 and V-JEPA-2, across both the policy and world     or CEM [17] searches over action sequences by unrolling
+model components. Experiments on real-world navigation      the learned predictor and minimizing the embedding-space
+tasks demonstrate that PiJEPA significantly outperforms      distance to the encoded goal. However, this search must
+both standalone policy execution and uninformed world      typically begin from an uninformed prior over a high-
+model planning, achieving improved goal-reaching accu-     dimensional action space, resulting in slow convergence and
+racy and instruction-following fidelity. Code is available      susceptibility to local minima [13].
+at: https://github.com/AmirhoseinCh/PiJEPA.             We propose PiJEPA, a framework that bridges these two
+                                                        paradigms by using a learned policy to warm-start world
+                                                    model planning. Our key insight is that a finetuned VLA
+1. Introduction                                                policy, while insufficient for long-horizon reasoning on its
+                                                     own, provides a highly informative action prior:  it con-
+Building autonomous agents that can navigate to a goal
+                                                                  centrates probability mass in the region of action space
+specified by an image and a natural language instruction is a
+                                                     most likely to make progress toward the goal. Initializing
+   *Corresponding author.                                           the MPPI sampling distribution from this prior allows the
+
+
+
+                                                      834
+
+=== PDF PAGE 2 ===
+world model planner to devote its search budget to refining     horizon performance, they share a common limitation: ac-
+already-promising trajectories rather than exploring the full      tions are selected greedily without explicit reasoning about
+action space from scratch.                                       future states, which degrades performance on tasks that re-
+   Concretely, our pipeline operates as follows (see Fig-     quire multi-step spatial planning. PiJEPA retains the rapid,
+ure 1):                                                        instruction-grounded action proposals of a reactive VLA
+1. Policy prior. Given the current observation ot and in-     policy but uses them as a warm start for a separate plan-
+   struction ℓ, a finetuned Octo model produces Nπ ac-     ning stage, thereby combining language understanding with
+   tion chunk samples via its diffusion head. We transform     long-horizon deliberation.
+   these into the world model’s local-frame action space
+   and compute their empirical mean µπ and standard devi-     2.2. Latent World Models for Planning
+   ation σπ.
+                                                    World models offer a principled route to long-horizon rea-
+2. MPPI planning. A JEPA world model, trained with the
+                                                          soning by enabling agents to simulate the consequences of
+  same frozen encoder, predicts future latent states. We
+                                                             candidate actions before committing to them.  Early ap-
+   run MPPI initialized at (µπ, σπ) and optimize against the
+                                                          proaches such as Navigation World Models (NWM) [11]
+   embedding-space distance to the encoded goal og.
+                                                              synthesize pixel-level futures, but predicting dynamics in
+3. Execution. The first action of the optimized sequence is
+                                                          a learned latent space drastically reduces computational
+   executed, and the process repeats at the next replanning
+                                                                      cost.   Joint-Embedding Predictive Architecture (JEPA)
+   step.
+                                                        world models built on frozen foundation encoders like DI-
+Our contributions are:
+                                           NOv2 have proven particularly effective for physical plan-
+1. We propose PiJEPA, a unified framework for language-
+                                                          ning tasks [12, 13].   This family of models has been
+   conditioned visual navigation that combines a finetuned
+                                                                   further advanced through continuous latent action formu-
+   Octo policy with MPPI-based planning over a JEPA
+                                                                    lations [22], principled regularization strategies such as
+   world model, using the policy output to warm-start the
+                                                LeJEPA [23], and joint VLA-latent pretraining [24]. Com-
+   planner.
+                                                          plementary  efforts have also targeted the efficiency of
+2. We train both components with modern pretrained vi-
+                                                                the planning loop  itself;  for instance, One-Step World
+   sion encoders (DINOv2 and V-JEPA-2), providing a sys-
+                                                  Model [25] reduces the computational latency of multi-
+   tematic comparison of image-based vs. video-based rep-
+                                                                step rollouts, and benchmarks like Target-Bench [26] evalu-
+   resentations for policy learning and world modeling in
+                                                                   ate world-model-based path planning toward text-specified
+   navigation.
+                                                                        targets.  Despite these advances, sampling-based planners
+3. We demonstrate on real-world navigation tasks  that
+                                                         such as MPPI and CEM remain sensitive to their initializa-
+   policy-guided planning significantly outperforms both
+                                                                       tion: starting from an uninformed Gaussian prior over high-
+   standalone policy execution and uninformed MPPI plan-
+                                                          dimensional action spaces leads to slow convergence and
+   ning, improving goal-reaching accuracy and instruction-
+                                                              frequent entrapment in local minima [13]. PiJEPA directly
+   following fidelity.
+                                                             addresses this inference-time bottleneck. Rather than con-
+                                                                 ditioning the world model itself on language, which would2. Related Work
+                                                                  conflate representation learning with instruction grounding,
+Our work draws on two active research threads, language-    we keep the latent dynamics model language-agnostic and
+conditioned policies and latent world models; and unifies      instead anchor the MPPI optimization with an instruction-
+them through policy-guided planning. We review each in     aware action prior drawn from the VLA policy. This decou-
+turn.                                                        pled design lets each component focus on what it does best:
+                                                                the policy provides efficient, semantically informed propos-
+2.1. Language-Conditioned Navigation Policies                                                                            als, while the world model evaluates and refines them over
+The integration of natural language with embodied percep-     extended horizons.
+tion has given rise to Vision-Language-Action (VLA) mod-
+els that map instructions and visual observations directly to     3. Method
+motor commands. Generalist architectures such as Octo [4]
+learn broadly from diverse robot data, while recent scalable   We present PiJEPA, a two-stage approach for instruction-
+designs including Dita [18], LAPA [19], and CLAP [20]     conditioned visual goal navigation. An overview is shown
+push the frontier of reactive instruction-following through      in Figure 1. Our pipeline consists of three learned com-
+latent action representations.  In the navigation domain     ponents: a frozen pretrained vision encoder, an Octo-based
+specifically, UrbanNav [21] extends language-guided poli-     policy that generates an informed action prior, and a JEPA
+cies to complex urban environments via web-scale trajec-     world model over which we perform MPPI planning warm-
+tory learning. Although these systems achieve strong short-      started by the policy prior.
+
+
+
+                                                      835
+
+=== PDF PAGE 3 ===
+                           Language Instruction ℓ
+
+                                      “Move forward curving
+                                                         slightly to the left”                                     Policy Prior                                                   Octo Policy πθ
+                                                               zt                                (µπ, σπ)
+
+
+               Start image ot                                                                  Goal image og
+                                                 PiJEPA
+
+                                                                 (Optimize actions via temperature-
+              Eϕ                                          weighted resampling)                          Eϕ
+                                                                                                        Iterative
+                                                                                       refinement
+                                      at                                      at+H−1
+
+                                                                               Planning cost Lp
+
+                       zt         Pψ             ˆzt+1      . . .     ˆzt+H−1       Pψ           ˆzt+H           zg
+
+                                                                Predictor unroll Fϕ,ψ
+
+Figure 1. Overview of PiJEPA. Top: The Octo policy, finetuned with a frozen vision encoder (Eϕ), takes the current latent observation
+zt and instruction ℓas input and produces action chunk samples via its diffusion head. These are transformed from the global frame to
+the world model’s local body frame. Middle: The policy’s statistics (µπ, σπ) warm-starts MPPI, which iteratively optimizes the action
+distribution over J iterations. Bottom: The JEPA world model predictor (Pψ), trained with the same frozen encoder, autoregressively
+predicts future latent states. The MPPI candidates are scored by unrolling the world model and evaluating the latent-space distance to the
+encoded goal zg (Algorithm 1).
+
+
+3.1. Problem Formulation                                next latent state:
+
+At each timestep t, the agent observes an egocentric RGB
+                                                                        \ha t  {z}_{t+1}  = P_\psi \  !\left(z_{t-w:t},\;A_\psi(a_{t-w:t})\right).\label{eq:predictor}         (1)
+image ot, is given a goal image og and a natural language
+instruction ℓ, and must produce a sequence of navigation ac-                                                  The predictor uses a causal attention mask so it can pre-
+tions a1:H ∈RH×A over a planning horizon H that guides                                                                     dict from all context lengths up to a maximum window w.
+the robot towards the goal while respecting the instruction                                                          Actions are injected into the predictor via a conditioning
+semantics.                                                   mechanism at every layer to prevent vanishing action sig-
+                                                                nals through depth [13].
+3.2. Policy Prior from Octo                                                    The predictor is trained to minimize the MSE between
+The first stage of PiJEPA extracts an action prior from a     predicted and target embeddings. Following [13], we use a
+finetuned Octo policy [4]. Octo is a transformer-based gen-      multi-step rollout loss to improve long-horizon accuracy:
+eralist policy with a diffusion action head that models the
+distribution πθ(a|ot, ℓ) over action chunks.                                                \text t l                               \
+                                      _                       } \sum _{k=1} ^{K_\text { roll} }f rac{1}{B}\sum_{b=1}^{B}\leftF_{\phi,\psi}(z^b_t,a^b_{t:t+k-1})z^b_{t+k}\right\label{eq:wm_loss} (2)  Both the policy and the world model operate on top of               \cL                                          a
+                                                               {to   =
+a shared frozen pretrained vision encoder Eϕ that maps ob-
+servations to latent tokens zt = Eϕ(ot) ∈Rn×d, where n     where Fϕ,ψ denotes the autoregressive unrolling of the pre-
+is the number of spatial tokens and d is the embedding di-      dictor (feeding each predicted ˆzt+j as context for the next
+mension. The encoder weights ϕ remain frozen throughout,      step), trained with truncated backpropagation through time.
+ensuring both components share a consistent representation
+space.                                                         3.4. Policy-Guided MPPI Planning
+
+                                                    At test time, we combine the Octo policy prior with the
+3.3. JEPA World Model
+                                                JEPA world model through MPPI-based planning [15, 16].
+The second component is a Joint-Embedding Predictive   We first draw Nπ action chunk samples from the policy
+World Model (JEPA-WM) [12, 13] that predicts future la-      diffusion head. Because the policy and world model may
+tent states given the current state and actions. The world     operate in different action coordinate frames, each sam-
+model pairs the same frozen encoder Eϕ with a learnable      ple is transformed by a mapping T into the world model
+predictor Pψ and action encoder Aψ. Given a context of en-     frame (details in Section 4.1). From the transformed sam-
+coded observations and actions, the predictor forecasts the      ples ˜a(i) = T(a(i)), we compute the initial MPPI mean and
+
+
+
+                                                     836
+
+=== PDF PAGE 4 ===
+standard deviation:                                     Algorithm 1 PiJEPA: Policy-Guided World Model MPPI
+                                                          Planning
+        ^0
+      m
+  \                    frac {  1} { N_\pi }\sum_{i=1}^ {N_\p i  } \ tilde{a}^{(i)},\quad\sigma=\text{clamp}\!\left(\text{std}(\{\tilde{a}^{(i)}\}),\;\sigma_\text{min},\;\sigma_\text{max}\right\label{eq:prior}  Require: Obs. ot, goal og, instruction ℓ, policy πθ, world
+   u               =  \                                            model Pψ, encoder Eϕ
+                                                          (3)     Require: Horizon H, samples N, elites K, iterations J,
+which defines a policy-informed initialization over action         temperature λ, policy samples Nπ
+sequences.
+                                                             Stage 1: Policy prior
+Planning objective. Given the encoded current observation
+                                                                                     1: zt ←Eϕ(ot),   zg ←Eϕ(og)
+zt and goal encoding zg, we evaluate a candidate action se-
+                                                                                     2: for i = 1, . . . , Nπ do
+quence a1:H by the terminal latent distance                                                                                     3:    a(i) ∼πθ(· | ot, ℓ)            ▷diffusion sampling
+                         1                                                                                     4:                                                                                                    ˜a(i)                                                         ←T(a(i))             ▷coordinate transform                                                 \                      _        :                                                                                                                                                 um_{i=1}^{n}\left\hat{z}^{(i)}_{t+H}z^{(i)}_g\right\label{eq:plan_cost}    (4)                                                                                     5: end                                                                       for           \cL ^p(z_ t, a                                                     =  a c}{1                            \fr                   {       z_g)                       {n}s                            H},                                          6: µ0 ←mean({˜a(i)})
+                                                                                     7: σ0 ←clamp(std({˜a(i)}), σmin, σmax)
+where ˆzt+H = Fϕ,ψ(zt, a1:H) is obtained by autoregres-
+sively rolling out the world model for H steps.                    Stage 2: MPPI planning
+MPPI refinement.  Starting from (µ0, σ0), MPPI itera-         8: for j = 0, . . . , J −1 do
+tively samples candidate action sequences, evaluates them         9:    for i = 1, . . . , N do
+using Eq. 4, and updates the sampling distribution using       10:       a(i)1:H ←clamp µj + σj ⊙ϵ(i), −1, 1
+temperature-weighted elite trajectories. At iteration j, elite       11:        ϵ(i) ∼N(0, I)
+weights are computed as                                                12:         ˆz ←zt
+                                                                             13:      for h = 1, . . . , H do
+                   _k =  \frac   {\ex        w                                                                                                  {min}c_k)\big_{k'=1}^{K}\exp\!\big(\lambda\,(c_\text{min}c_{k'})\big\label{eq:mppi_weights}        (5)       14:            ˆz ←Pψ(ˆz, a(i)h )       ▷autoregressive rollout                                                                                        c_\text                    15:     end for       p\!\b ig ( \ lambd a  \,(
+                                                                             16:       c(i) ←∥ˆz −zg∥22/n                 ▷Eq. 4
+and the Gaussian parameters are updated by                                                                             17:   end for
+  \m u   {j +1} =     \sum _ { k  w _ k\, a^{(k)},\qquad(\sigma^{j+1})^2=_{k}w_k\big(a^{(k)}^{j+1}\big\label{eq:mppi_update}     18:   E ←top-K by lowest c(i)
+                                                                             19:   wk ←exp(λ (cmin −ck)) / Pk′ exp(λ (cmin −ck′))
+         ^                          }
+                                                          (6)
+                                                          µj+1 ←Pk wk a(k)with σj+1 clamped to [σmin, σmax]. After J iterations, one       20:
+elite trajectory is sampled proportionally to wk and exe-       21:   σj+1 ←clamp qPk wk(a(k)−µj+1)2, σmin, σmax
+cuted. The full procedure is summarized in Algorithm 1.          22: end for
+Conditioning.  The language instruction ℓenters only       23: Sample k∗∈E with probability wk∗
+through the Octo policy, which shapes the initial planning                                                                             24: return a(k∗)1:H
+distribution.  The world model is language-agnostic and
+models only visual-action dynamics. The goal image og
+is encoded into zg and enters through the planning cost in
+                                                ±π. Actions are normalized to [−1, 1] using bounds nor-Eq. 4.
+                                                              malization based on the 1st and 99th percentile statistics.
+4. Experiments                                         Vision encoders. We study two frozen pretrained encoder
+                                                                   families: DINOv2 ViT-S [27], a self-supervised image en-
+4.1. Experimental Setup                                                          coder with strong spatial and object segmentation features;
+Dataset. We train and evaluate on the CAST dataset [6], a     and V-JEPA-2 ViT-L [14], a self-supervised video encoder
+large-scale visual navigation dataset augmented with coun-      that captures temporal dynamics. For V-JEPA-2, we follow
+terfactual instruction-action pairs.  CAST addresses the      the frame-duplication strategy of [13], encoding each frame
+problem of posterior collapse, where the policy ignores the     as a duplicated 2-frame video. We apply layer normaliza-
+language instruction because the observation alone suffices      tion to the encoder output to stabilize prediction targets and
+to predict the action, by using a VLM to generate alter-      the planning cost landscape.
+native instructions and an atomic policy to produce corre-     Policy training. We finetune the Octo-Small model [4] on
+sponding counterfactual action labels. Each action is a 4-    CAST, replacing its original visual encoder with the frozen
+dimensional vector a = (∆x, ∆y, sin ∆ϕ, cos ∆ϕ) spec-      pretrained encoder Eϕ followed by a learnable projection
+ifying the robot’s displacement and heading change; the     Wproj ∈Rd×docto. Language instructions are encoded with a
+(sin ∆ϕ, cos ∆ϕ) encoding avoids angle discontinuities at      pretrained T5 model [28] (16 tokens). The diffusion action
+
+
+
+                                                      837
+
+=== PDF PAGE 5 ===
+head is a 3-layer MLP with residual connections, trained      • Octo-WM: Draws Nπ samples from the policy, evaluates
+with the DDPM objective [29] using a cosine noise sched-       each via a full world model rollout, and selects the sample
+ule. Training uses the CAST-augmented data including both       with the lowest cost Lp, using the world model for scoring
+original and counterfactual trajectory segments.                  without trajectory optimization.
+Coordinate transform. The Octo policy outputs global-      • Octo: Octo predicted actions with no world model in-
+frame displacements, while the world model expects local       volvement, serving as a pure reactive policy baseline.
+body-frame actions. We bridge this gap by accumulating     We report Absolute Trajectory Error (ATE) and Rela-
+headings from the (sin ∆ϕ, cos ∆ϕ) components and rotat-      tive Pose Error (RPE) for both XY position (in meters)
+ing the displacement into the robot’s local frame at each     and heading (in degrees), computed between predicted and
+timestep:                                                     ground-truth trajectories on the CAST validation set.
+
+       \ begin  { gathered}  \ph i _ t  =  \                4.3. Results
+      texts   s um _{    \ta u t ext a       (7)     Tables 1 and 2 report the full set of trajectory metrics for         \                                                                                                              n2}(\sin\Delta\phi_\tau\cos\Delta\phi_\tau\\[2pt]\begin{pmatrix}\Deltax^\ell_t\Deltay^\ell_t\end{pmatrix}=\begin{pmatrix}\cos\phi_t\sin\phi_t-\sin\phi_t\cos\phi_t\end{pmatrix}\begin{pmatrix}\Deltax_t\Deltay_t\end{pmatrix}.\end{gathered}\label{eq:coord_transform}
+        tyle    = 0}^ {t  -1}   \   {at                 the DINOv2 and V-JEPA-2 encoder configurations, respec-
+                                                                           tively. We discuss the main findings below.
+The rotated actions are then normalized to [−1, 1] using the
+dataset bounds statistics.                             PiJEPA achieves the best positional accuracy across
+World model training. The JEPA world model predictor     both encoders.  PiJEPA leads on ATE XY metrics in both
+is a ViT with frame-causal attention and Adaptive Layer      configurations: 1.78 m RMSE and 3.12 m Final with DI-
+Normalization (AdaLN) action conditioning [13, 30], which    NOv2, and 1.65 m RMSE and 1.32 m Mean with V-JEPA-
+modulates scale and shift at every transformer block.   It      2, which is the lowest across all settings. Octo-WM nar-
+is trained on CAST trajectory segments with the multi-     rowly edges PiJEPA on V-JEPA-2 Final position (2.87 m vs.
+step rollout loss (Eq. 2) using truncated backpropagation     2.88 m), but PiJEPA dominates on the remaining trajectory-
+through time. The encoder weights remain frozen; only the      level metrics, confirming that warm-starting MPPI with a
+predictor and action encoder parameters are updated. All     policy prior enables the planner to refine already-promising
+experiments were conducted on four NVIDIA H200 GPUs.      trajectories rather than searching from scratch.
+Encoder variants. We train four model configurations to
+systematically study encoder choice: (i) DINOv2-Policy +
+                                                  Uninformed MPPI struggles with position but excels at
+DINOv2-WM, the most natural consistent-space pairing;
+                                                         heading.  MPPI exhibits a striking divergence across met-
+(ii) V-JEPA-2-Policy + V-JEPA-2-WM, leveraging tempo-
+                                                                          ric types:  it is the weakest method on ATE XY under V-
+ral features in both components; (iii) DINOv2-Policy + V-
+                                                    JEPA-2 (RMSE 1.87 m, Final 3.29 m), confirming that un-
+JEPA-2-WM; and (iv) V-JEPA-2-Policy + DINOv2-WM.
+                                                         informed initialization wastes the sampling budget, yet it
+The cross-encoder configurations test whether the action
+                                                             achieves the best heading metrics with DINOv2 encoder
+prior from one representation space transfers to planning
+                                                (ATE Hdg RMSE 18.79◦, RPE Hdg Mean 5.11◦). We at-
+in another. Prior work [13] found DINOv2 excels at fine-
+                                                                      tribute this to the embedding-space objective implicitly reg-
+grained spatial reasoning while V-JEPA-2 captures richer
+                                                                  ularizing heading alignment even when translational accu-
+temporal structure; evaluating all four combinations reveals
+                                                             racy is poor.
+which properties matter for the policy prior versus latent
+dynamics.
+MPPI hyperparameters. We use J = 4 MPPI iterations,    World model scoring captures much of the planning
+N = 32 candidate samples, K = 4 elites, inverse tem-      benefit.  Octo-WM provides large positional gains over
+perature λ = 0.8, and Nπ = 4 Octo diffusion samples      the raw Octo policy, with V-JEPA-2, ATE XY Final drops
+for the policy prior. The standard deviation is clamped to     from 3.17 m to 2.87 m, suggesting that even without itera-
+[σmin, σmax] = [0.01, 0.05].                                          tive optimization, using the world model to filter poor policy
+                                                             proposals is a powerful strategy. The relatively small gap
+4.2. Baselines and Evaluation                          between Octo-WM and PiJEPA indicates that filtering ac-
+                                                            counts for much of the benefit, though the additional MPPITo isolate the contribution of each component, we compare
+                                                             refinement still yields the best overall trajectory accuracy.four planning strategies:
+• Default MPPI: Standard MPPI initialized with µ0 = 0,
+  σ0 = σmax, serving as a pure world model planning base-    The reactive policy shows the limits of local control.
+  line.                                                   Without look-ahead, Octo ranks last on every step-level
+• PiJEPA (ours): Warm-started MPPI with µ0 = µπ, σ0 =     metric under V-JEPA-2: RPE XY Mean of 0.55 m (vs.
+  σπ from the policy prior (Algorithm 1).                     0.49 m for PiJEPA) and RPE Heading RMSE of 8.11◦(vs.
+
+
+
+                                                      838
+
+=== PDF PAGE 6 ===
+                                                                                                       (a) DINOv2 encoder
+
+
+
+
+                        Start                   Goal
+
+         Language instruction:“Move forward with
+                  minor course correction”
+
+                                                                                                 (b) V-JEPA-2 encoder
+
+Figure 2. Qualitative trajectory comparison. Given a start observation, goal image, and language instruction (left), we compare trajec-
+tories produced by each method under two encoder backbones (right). The black curve (GT) shows the ground-truth path; colored curves
+show MPPI (red), Octo policy (blue), Octo-WM scoring (orange), and PiJEPA (green). Stars mark final positions. PiJEPA most closely
+tracks the ground truth in both settings.
+
+                             Table 1. DINOv2 ViT-S on CAST validation episodes. Best in bold. All ↓.
+
+                           ATE XY (m)      ATE Hdg (◦)    RPE XY (m)  RPE Hdg (◦)
+
+                      RMSE Mean Final RMSE Mean  Final RMSE Mean RMSE Mean
+
+                      Octo       1.98   1.65  3.19  20.08  16.76 28.55  0.61   0.57   8.29   6.94
+                  MPPI      1.85   1.48  3.23  18.79  15.68 27.86  0.55   0.51   5.70   5.11
+                  Octo-WM  1.80   1.43  3.15  22.16  18.60 29.16  0.56   0.51   7.51   6.45
+                     PiJEPA     1.78   1.42  3.12  19.89  16.52 28.63  0.56   0.51   7.05   6.07
+
+
+5.75◦for MPPI), as shown in Table 2. This confirms that      tributable to the diffusion-based action sampling rather than
+planning benefits not only trajectory-level coherence but      the world model rollouts.
+also per-step accuracy.
+
+                                                            Qualitative results and failure analysis.  Figure 2 shows
+V-JEPA-2  yields  stronger  overall performance.  V-      that PiJEPA (green) most closely tracks the ground-truth
+JEPA-2 with PiJEPA achieves the best overall positional ac-     path under both encoders, while MPPI (red) deviates sub-
+curacy, and even its Octo baseline (ATE XY RMSE 1.72 m)      stantially and Octo (blue) drifts over longer horizons. Fig-
+surpasses the best DINOv2 method (1.78 m).  However,     ure 3 presents a failure case with the ambiguous instruc-
+uninformed MPPI performs worst under V-JEPA-2 (Final      tion “Follow the building,” where the Octo policy veers
+3.29 m vs. 3.23 m for DINOv2), suggesting its richer la-     toward the wrong building.  The world model itself gets
+tent dynamics create a harder optimization landscape for     stuck in its rollouts, and the predicted latent states remain
+uninformed search. Once anchored by the policy prior, this     nearly identical across the planning horizon regardless of
+space becomes an asset: the gap between PiJEPA and un-      the sampled actions, leaving the planner unable to make
+informed MPPI on ATE XY Final grows from 0.11 m (DI-      progress. PiJEPA partially mitigates this through the policy
+NOv2) to 0.41 m (V-JEPA-2).                                       prior, which bypasses the stalled rollouts by anchoring the
+                                                             search in a productive region of action space, though it still
+                                                           undershoots the ground truth, indicating that ambiguous in-
+Planning  latency.  The Octo policy  requires approxi-      structions and world model stagnation remain challenging.
+mately 2.13 s to generate its action proposals via diffusion
+sampling, while the MPPI planning stage adds only 0.35 s,     5. Conclusion
+bringing the total PiJEPA inference time to roughly 2.48 s
+for an 8-step trajectory. The lightweight MPPI overhead   We have presented PiJEPA, a framework for instruction-
+demonstrates that the planning stage is practical to layer     conditioned visual navigation that warm-starts MPPI plan-
+on top of the policy, with the vast majority of latency at-     ning over a JEPA world model using a finetuned VLA
+
+
+
+                                                      839
+
+=== PDF PAGE 7 ===
+                            Table 2. V-JEPA-2 ViT-L on CAST validation episodes. Best in bold. All ↓.
+
+                           ATE XY (m)      ATE Hdg (◦)    RPE XY (m)  RPE Hdg (◦)
+
+                      RMSE Mean Final RMSE Mean  Final RMSE Mean RMSE Mean
+
+                      Octo       1.95   1.62  3.17  20.46  17.24 28.56  0.60   0.55   8.11   6.85
+                  MPPI      1.87   1.50  3.29  19.15  15.98 28.50  0.55   0.52   5.75   5.15
+                  Octo-WM  1.67   1.35  2.87  20.63  17.27 28.06  0.54   0.49   6.93   5.99
+                     PiJEPA     1.65   1.32  2.88  19.13  15.95 27.93  0.53   0.49   6.46   5.62
+
+
+                                  Language instruction: “Follow the building”
+
+      Frame 0        Frame 1        Frame 3        Frame 5        Frame 7
+
+
+
+
+GT
+
+
+Pred.
+WM
+
+
+
+Figure 3. Failure case analysis. The language instruction “Follow the building” is inherently ambiguous, as multiple buildings are visible
+in the scene. The Octo policy (blue) misinterprets the referent and veers toward a different building, illustrating how vague instructions
+can mislead reactive policies that lack long-horizon reasoning. Meanwhile, the world model fails to make meaningful progress because it
+becomes stuck in its rollouts, predicting nearly identical latent states, which causes the planner to stagnate. The WM Pred. row confirms
+this directly. The predicted observations remain largely unchanged across the planning horizon. PiJEPA (green) partially mitigates both
+issues by grounding the planner with a policy-derived prior, though it still undershoots the ground-truth trajectory.
+
+
+policy prior.  PiJEPA achieves the best positional accu-     6. Acknowledgment
+racy across both DINOv2 and V-JEPA-2 encoders, outper-
+                                                         Computational resources were provided in part throughforming reactive policies, uninformed planning, and world
+                                          NSF MRI Award Number 2320600.model scoring baselines. Our analysis reveals a natural di-
+vision of labor: the reactive policy excels at local control
+and heading prediction, uninformed MPPI achieves strong    References
+heading alignment through its embedding-space objective,
+and world model scoring captures much of the look-ahead        [1] Y. Zhu, R. Mottaghi, E. Kolve, J. J. Lim, A. Gupta, L. Fei-
+                                                                                 Fei, and A. Farhadi, “Target-driven visual navigation in in-benefit by filtering poor proposals. PiJEPA combines these
+                                                                    door scenes using deep reinforcement learning,” in 2017
+strengths with the additional MPPI refinement, yielding the
+                                                         IEEE international conference on robotics and automation
+best trajectory-level coherence. The MPPI planning latency
+                                                                     (ICRA), pp. 3357–3364, ieee, 2017. 1
+overhead is negligible relative to the accuracy gains. How-
+                                                                            [2]  P. Anderson, Q. Wu, D. Teney,  J. Bruce, M. Johnson,
+ever, our failure analysis reveals that the world model can
+                                                                N. S¨underhauf,  I. Reid, S. Gould, and A. Van Den Hen-
+become stuck in its rollouts, producing static latent pre-
+                                                                                    gel, “Vision-and-language navigation: Interpreting visually-
+dictions that render the planner ineffective.  Addressing                                                                  grounded navigation instructions in real environments,” in
+this stagnation through improved dynamics architectures           Proceedings of the IEEE conference on computer vision and
+or diversity-promoting rollout mechanisms is a key direc-           pattern recognition, pp. 3674–3683, 2018.
+tion for future work, alongside intermediate waypoint costs,                                                                            [3] D. Shah, A. Sridhar, N. Dashora, K. Stachowicz, K. Black,
+richer action spaces, and closed-loop replanning.                   N. Hirose, and S. Levine, “Vint: A foundation model for
+                                                                              visual navigation,” arXiv preprint arXiv:2306.14846, 2023.
+                                                              1
+
+                                                                            [4] O. M. Team, D. Ghosh, H. Walke, K. Pertsch, K. Black,
+                                                                O. Mees, S. Dasari, J. Hejna, T. Kreiman, C. Xu, et al.,
+
+
+
+                                                      840
+
+=== PDF PAGE 8 ===
+     “Octo:  An open-source  generalist robot  policy,”  arXiv      [17] R. Rubinstein, “The cross-entropy method for combinatorial
+     preprint arXiv:2405.12213, 2024. 1, 2, 3, 4                        and continuous optimization,” Methodology and computing
+ [5] A. Brohan, N. Brown, J. Carbajal, Y. Chebotar, X. Chen,            in applied probability, vol. 1, no. 2, pp. 127–190, 1999. 1
+     K. Choromanski, T. Ding, D. Driess, A. Dubey, C. Finn,      [18] Z. Hou, T. Zhang, Y. Xiong, H. Duan, H. Pu, R. Tong,
+      P. Florence, C. Fu, M. G. Arenas, K. Gopalakrishnan,          C. Zhao, X. Zhu, Y. Qiao, J. Dai, et al., “Dita: Scaling dif-
+     K. Han, K. Hausman, A. Herzog, J. Hsu, B. Ichter, A. Ir-           fusion transformer for generalist vision-language-action pol-
+     pan, N. Joshi, R. Julian, D. Kalashnikov, Y. Kuang, I. Leal,             icy,” in Proceedings of the IEEE/CVF International Confer-
+     L. Lee, T.-W. E. Lee, S. Levine, Y. Lu, H. Michalewski,          ence on Computer Vision, pp. 7686–7697, 2025. 2
+        I. Mordatch, K. Pertsch, K. Rao, K. Reymann, M. Ryoo,      [19] S. Ye, J. Jang, B. Jeon, S. Joo, J. Yang, B. Peng, A. Man-
+     G. Salazar,  P. Sanketi,  P. Sermanet,  J. Singh, A. Singh,            dlekar, R. Tan, Y.-W. Chao, B. Y. Lin, et al., “Latent action
+     R. Soricut, H. Tran, V. Vanhoucke, Q. Vuong, A. Wahid,            pretraining from videos,” arXiv preprint arXiv:2410.11758,
+      S. Welker, P. Wohlhart, J. Wu, F. Xia, T. Xiao, P. Xu, S. Xu,           2024. 2
+      T. Yu, and B. Zitkovich, “Rt-2: Vision-language-action mod-      [20] C. Zhang, J. Wang, Z. Gao, Y. Su, T. Dai, C. Zhou, J. Lu,
+      els transfer web knowledge to robotic control,” in arXiv          and Y. Tang, “Clap:  Contrastive latent action pretrain-
+     preprint arXiv:2307.15818, 2023.                                    ing for learning vision-language-action models from human
+ [6] C. Glossop, W. Chen, A. Bhorkar, D. Shah, and S. Levine,            videos,” arXiv preprint arXiv:2601.04061, 2026. 2
+     “Cast:   Counterfactual  labels  improve  instruction  fol-                                                                     [21] Y. Mei, Y. Yang, L. Guo, Q. Wang, M.-M. Yu, X. He, W. Wu,
+     lowing in vision-language-action models,” arXiv preprint                                                                 and J. Liu, “Urbannav: Learning language-guided urban nav-
+     arXiv:2508.13446, 2025. 1, 4                                                                              igation from web-scale human trajectories,” arXiv preprint
+ [7] A. Sridhar, D. Shah, C. Glossop, and S. Levine, “Nomad:           arXiv:2512.09607, 2025. 2
+     Goal masked diffusion policies for navigation and explo-                                                                     [22] Q. Garrido, T. Nagarajan, B. Terver, N. Ballas, Y. LeCun,
+      ration,” in 2024 IEEE International Conference on Robotics                                                                 and M. Rabbat, “Learning latent action world models in the
+    and Automation (ICRA), pp. 63–70, IEEE, 2024. 1                                                                              wild,” arXiv preprint arXiv:2601.05230, 2026. 2
+ [8] Y. LeCun et al., “A path towards autonomous machine intel-
+                                                                     [23] R. Balestriero and Y. LeCun, “Lejepa: Provable and scal-
+     ligence version 0.9. 2, 2022-06-27,” Open Review, vol. 62,                                                                           able self-supervised learning without the heuristics,” arXiv
+     no. 1, pp. 1–62, 2022. 1                                                                             preprint arXiv:2511.08544, 2025. 2
+ [9] D. Hafner, J. Pasukonis, J. Ba, and T. Lillicrap, “Master-
+                                                                     [24]  J. Sun, W. Zhang, Z. Qi, S. Ren, Z. Liu, H. Zhu, G. Sun,
+     ing diverse domains through world models,” arXiv preprint
+                                                                X. Jin, and Z. Chen, “Vla-jepa: Enhancing vision-language-
+     arXiv:2301.04104, 2023.
+                                                                            action model with  latent world model,”  arXiv preprint
+[10] N. Hansen, H. Su, and X. Wang, “Td-mpc2: Scalable, ro-
+                                                                      arXiv:2602.10098, 2026. 2
+     bust world models for continuous control,” arXiv preprint
+                                                                     [25] W. Shen, Z. Meng, J. Ma, M. Zhou, and D. Xiang, “An effi-
+     arXiv:2310.16828, 2023.
+                                                                                cient and multi-modal navigation system with one-step world
+[11] A. Bar, G. Zhou, D. Tran, T. Darrell, and Y. LeCun, “Nav-
+                                                                      model,” arXiv preprint arXiv:2601.12277, 2026. 2
+      igation world models,” in Proceedings of the Computer Vi-
+                                                                     [26] D. Wang, H. Ye, Z. Liang, Z. Sun, Z. Lu, Y. Zhang, Y. Zhao,     sion and Pattern Recognition Conference, pp. 15791–15801,
+                                                                          Y. Gao, M. Seegert, F. Sch¨afer, et al., “Target-bench: Can
+     2025. 2
+                                                                   world models achieve mapless path planning with semantic
+[12] G. Zhou, H. Pan, Y. LeCun, and L. Pinto, “Dino-wm: World
+                                                                                    targets?,” arXiv preprint arXiv:2511.17792, 2025. 2
+     models on pre-trained visual features enable zero-shot plan-
+                                                                     [27] M. Oquab, T. Darcet, T. Moutakanni, H. Vo, M. Szafraniec,      ning,” arXiv preprint arXiv:2411.04983, 2024. 1, 2, 3
+                                                                          V. Khalidov,  P. Fernandez, D. Haziza, F. Massa, A. El-[13] B. Terver, T.-Y. Yang,  J. Ponce, A. Bardes, and Y. Le-
+                                                                Nouby, et al., “Dinov2: Learning robust visual features with-     Cun, “What  drives  success  in  physical  planning  with
+                                                                         out supervision,” arXiv preprint arXiv:2304.07193, 2023. 4     joint-embedding predictive world models?,” arXiv preprint
+                                                                     [28] C. Raffel, N. Shazeer, A. Roberts, K. Lee,  S. Narang,     arXiv:2512.24497, 2025. 1, 2, 3, 4, 5
+                                                       M. Matena, Y. Zhou, W. Li, and P. J. Liu, “Exploring the[14] M. Assran, A. Bardes, D. Fan, Q. Garrido, R. Howes,
+                                                                                  limits of transfer learning with a unified text-to-text trans-    M. Muckley, A. Rizvi, C. Roberts, K. Sinha, A. Zho-
+                                                                           former,” Journal of machine learning research,  vol. 21,      lus, et  al., “V-jepa 2:  Self-supervised video models en-
+                                                                           no. 140, pp. 1–67, 2020. 4     able understanding, prediction and planning,” arXiv preprint
+     arXiv:2506.09985, 2025. 1, 4                                   [29]  J. Ho, A. Jain, and P. Abbeel, “Denoising diffusion proba-
+                                                                                           bilistic models,” Advances in neural information processing[15] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A.
+                                                                           systems, vol. 33, pp. 6840–6851, 2020. 5     Theodorou, “Aggressive driving with model predictive path
+      integral control,” in 2016 IEEE International Conference on      [30] W. Peebles and S. Xie, “Scalable diffusion models with
+     Robotics and Automation (ICRA), pp. 1433–1440, 2016. 1,            transformers,” in Proceedings of the IEEE/CVF international
+    3                                                                 conference on computer vision, pp. 4195–4205, 2023. 5
+[16] G. Williams, N. Wagener, B. Goldfain, P. Drews, J. M. Rehg,
+     B. Boots, and E. A. Theodorou, “Information theoretic mpc
+      for model-based reinforcement learning,” in 2017 IEEE in-
+     ternational conference on robotics and automation (ICRA),
+     pp. 1714–1721, IEEE, 2017. 1, 3
+
+
+
+                                                      841

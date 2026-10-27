@@ -1,0 +1,533 @@
+                                                        StreamVLN: Streaming Vision-and-Language Navigation
+                                                                  via SlowFast Context Modeling
+                                                 Meng Wei∗1,2 , Chenyang Wan∗1,3 , Xiqian Yu∗1 , Tai Wang∗1,† , Yuqiang Yang1 , Xiaohan Mao1,4 ,
+                                                 Chenming Zhu1,2 , Wenzhe Cai1 , Hanqing Wang1 , Yilun Chen1 ,Xihui Liu2,‡ ,Jiangmiao Pang1,‡
+
+                                                                                                                            Frame 1             Frame 7            Frame 15            Frame 32
+
+                                           Abstract— Vision-and-Language Navigation (VLN) in real-
+                                        world settings requires agents to process continuous visual
+                                        streams and generate actions with low latency grounded in
+                                        language instructions. While Video-based Large Language
+                                        Models (Video-LLMs) have driven recent progress, current                            Frame 1             Frame 15           Frame 31            Frame 64
+
+
+                                        VLN methods based on Video-LLM often face trade-offs among
+                                        fine-grained visual understanding, long-term context modeling
+                                        and computational efficiency. We introduce StreamVLN, a
+                                        streaming VLN framework that employs a hybrid slow-fast
+                                        context modeling strategy to support multi-modal reasoning
+                                        over interleaved vision, language and action inputs. The fast-               Fig. 1. Visualization of the proposed 3D spatial pruning strategy. The
+                                        streaming dialogue context facilitates responsive action gener-              spatial-temporal redundancy in ego-centric VLN video data arises from fine-
+                                        ation through a sliding-window of multi-turn dialogues, while                grained low-level action trajectories. While temporal sampling alleviates part
+arXiv:2507.05240v2 [cs.RO] 9 Jul 2026
+
+
+
+
+                                                                                                                     of this redundancy, substantial patch-level redundancy remains at the spatial
+                                        the slow-updating memory context compresses historical visual                level under high input resolutions of Video-LLMs.
+                                        states using a 3D-aware token pruning strategy. With this slow-
+                                        fast design, StreamVLN achieves real-time dialogues through
+                                        KV cache reuse, supporting long video streams with bounded
+                                        context size and inference cost. Experiments on VLN-CE bench-                volume but sacrificing temporal and visual details. Further-
+                                        marks show state-of-the-art performance with low latency,                    more, these methods typically require refreshing the LLM’s
+                                        ensuring robustness and efficiency in real-world deployment.                 dialogue context at every action step. This leads to significant
+                                        The project page is: https://streamvln.github.io/.                           redundant computation during both training and inference,
+                                                                                                                     hindering data scalability and real-world deployment. In this
+                                                                 I. I NTRODUCTION                                    paper, we propose StreamVLN, a novel streaming vision-
+                                           Vision-and-Language Navigation (VLN) in continuous                        and-language navigation framework for low-latency action
+                                        real-world environments is a critical task in embodied AI,                   generation. We extend Video-LLM into an interleaved vision-
+                                        where an agent must ground linguistic cues in visual ob-                     language-action model, enabling continuous interaction with
+                                        servations and plan actionable trajectories. However, achiev-                a video stream through multi-turn dialogue. To address the
+                                        ing robust VLN remains challenging due to the need for                       challenges of long-term context modeling and computa-
+                                        fine-grained multimodal alignment, long-term sequence rea-                   tional efficiency, StreamVLN introduces a hybrid strategy
+                                        soning, and generalization to unseen environments. Recent                    that combines a fast-streaming dialogue context and a
+                                        advances in Video-LLMs offer new capabilities for VLN                        slow-updating memory context. Specifically, it employs
+                                        systems. Several research efforts [1], [2], [3] have extended                a sliding-window mechanism to cache the key/value states
+                                        Video-LLMs to vision-language-action models (VLA) for                        (KV) of tokens over a fixed number of dialogue turns for
+                                        navigation, which integrate visual observation encoding, lan-                highly responsive action decoding. After each streaming
+                                        guage understanding, and action prediction in a unified end-                 dialogue ends, the visual context within the window is
+                                        to-end framework.                                                            consolidated into memory at a slower pace, to provide long-
+                                                                                                                     term context for subsequent windows.
+                                           For real-world navigation, VLA models must process con-
+                                                                                                                        Moreover, current state-of-the-art Video-LLMs are trained
+                                        tinuously incoming video streams, where maintaining long-
+                                                                                                                     on high-resolution visual inputs, inevitably generating a large
+                                        term context and real-time responsiveness are both crucial.
+                                                                                                                     number of visual tokens which cause substantial KV cache
+                                        This poses challenges for Video-LLMs in managing linearly
+                                                                                                                     and decoding overhead. However, as shown in Figure 1, even
+                                        growing visual tokens. Some methods [3], [4] sample a fixed
+                                                                                                                     after temporal sampling, egocentric VLN videos retain high
+                                        number of video frames, but the limited temporal resolution
+                                                                                                                     spatial redundancy, where 3D spatial cues offer an effective
+                                        may fail to accurately predict low-level actions when fine-
+                                                                                                                     and efficient means to remove such redundancy. Hence,
+                                        grained temporal changes are needed. Other methods [1],
+                                                                                                                     we propose a training-free spatial pruning strategy guided
+                                        [2] compress vision tokens into sparse memory tokens via
+                                                                                                                     by voxel-based 3D proximity. Compared to video token
+                                        pooling or token merging, which helps control the token
+                                                                                                                     compression strategies for generic offline videos [5], which
+                                           1 Shanghai AI Lab, 2 The University of Hong Kong, 3 Zhejiang University   often rely on costly token feature similarity computations or
+                                        4 Shanghai Jiao Tong University                                              operations on large attention matrices, our geometry-based
+                                          ∗ Equal Contribution, † Project Lead, ‡ Corresponding Authors              spatial pruning has higher computation efficiency and sup-
+                                                                                        …                                       Vision Encoder
+
+
+                                                                                                                                   Projector
+
+
+
+
+                                                                                                                                   ……
+                                                          Timeline
+
+
+
+
+                                                            Large Language Model
+
+  KV Cache
+
+
+
+
+                                                                                             Temporal                   Instruction Token
+                                                                                             Sampling                   Observation Token
+
+                                                                                                                        Output Action Token
+
+                                                                                            Voxel-based                            Pruned Token
+                                                                                           Spatial Pruning
+                                                                                                                                   Inactive / Current
+                                                                                                                                    Sliding Window
+
+
+Fig. 2. Framework of StreamVLN. The input consists of a language instruction and a stream of RGB images. Each navigation episode is framed as a
+multi-turn dialogue, where the agent continually queries for the next actions. To support long-horizon reasoning while maintaining a manageable context
+size and low latency, we adopt a fixed-size sliding window to retain recent dialogue history. The context in inactive windows is updated by token pruning
+to to reduce memory overhead.
+
+
+
+ports streaming video processing and KV cache compression.                    flexible and scalable navigation frameworks is needed to
+   In summary, StreamVLN offers an efficient and scalable                     generalize better to long-horizon, real-world setting.
+solution to suit the continuous interaction requirements of                   Navigation with Multi-Modal Large Language Models
+real-time vision-and-language navigation. Its slow-fast con-                  (MLLMs). Recent advancements in MLLMs have opened
+text modeling design enables the model trained on short clips                 new possibilities for VLN by enabling agents to interpret
+(e.g., 16 frames), to work effectively on long video streams,                 and reason over natural language instructions in a more
+without incurring context length growth or compromising                       generalizable way. Some methods [16], [17], [18] directly use
+inference latency. Experiments on existing VLN-CE bench-                      LLMs as planner in a training-free manner within a modular
+marks shows that StreamVLN achieves superior performance                      framework. But there’s still a performance gap compared
+while maintaining low latency.                                                to task-specific models. Other lines of work [1], [2], [3],
+                                                                              [4] further fine-tune Video-based LLMs [19], [20], [21]
+                        II. R ELATED W ORK                                    to better capture spatial-temporal information and generate
+                                                                              low-level actions in an end-to-end manner, but often face
+Vision-and-Language Navigation (VLN). This task re-                           challenges in balancing computational efficiency and long-
+quires an agent to follow language instructions while per-                    horizon memory retention. StreamVLN aims to better ac-
+ceiving and acting in environments. Early progress mainly                     commodate streaming video input by introducing an efficient
+focused on discrete settings, where agents navigate by                        and scalable framework that supports action generation with
+“teleporting” between predefined nodes of a discrete scene                    coherent multi-turn reasoning with low-latency response and
+graph [6], [7], [8], [9]. This formulation emphasizes high-                   bounded memory usage.
+level decision-making but ignores the challenges of real-
+world navigation. More recent work [10], [11], [12], [13]                                                  III. M ETHOD
+has focused on continuous environments [14], where agents                        StreamVLN generates action outputs from continuous
+must perform low-level actions in realistic simulators. To                    video input in an online, multi-turn dialogue manner. Built
+address the increased complexity, some methods incorporate                    on LLaVA-Video [19], we extend it for interleaved vision,
+a waypoint predictor [13], [15] pretrained in simulators to                   language, and action modeling. The overall framework of
+propose candidate positions, which are then used to guide                     StreamVLN is shown in Figure 2. We briefly introduce the
+high-level navigation decisions. Although these approaches                    autoregressive generation in continuous multi-turn dialogues
+have achieved strong performance, the waypoint predictors                     for a streaming VLN process (Section III-A). For both
+typically rely heavily on the training scenes and exhibit                     effective context modeling of long sequence and efficient
+limited generalization to unseen scenes. Therefore, more                      computation for real-time interaction, StreamVLN has: (1) a
+fast-streaming dialogue context with a sliding-window KV                   To address the spatial redundancy without disrupting pre-
+cache (Section III-B); and (2) a slow-updating memory via               trained features, we introduce a training-free voxel-based 3D
+token pruning (Section III-C). Finally, we describe how we              spatial pruning strategy, which is also tailored for streaming
+curate the navigation data and incorporate diverse multi-               video processing and KV cache memory. Specifically, we
+modal data for multi-task training (Section III-D).                     back-project the 2D image patches from the video stream into
+                                                                        a shared 3D space using depth information. By discretizing
+A. Preliminary: Multi-Turn Autoregressive Generation
+                                                                        this 3D space into uniform voxels, we can track the voxel
+   A multi-turn dialogue session for VLN consists of a                  indices of the patch tokens over time. If multiple tokens from
+sequence of interleaved observations and actions. In each               different frames within a given duration are projected into the
+dialogue di = (oi , ai ), the VLN model receives a new obser-           same voxel, only the token from the most recent observation
+vation oi and produces an action response ai conditioned on             is retained, as detailed in Algorithm 1. The voxel pruning
+both the current input and the dialogue history. The full input         mask M is then used to select the preserved token states.
+sequence at step i is constructed as: o1 a1 o2 a2 ...oi−1 ai−1 . In
+this streaming setting, new tokens from oi are appended to              Algorithm 1 Voxel-Based Spatial Pruning
+the token stream continuously. The response ai is generated
+                                                                         1: Voxel map V ∈ ZT ×H×W , stride K, threshold θ
+token-by-token via autoregressive decoding. For each dia-
+                                                                         2: Pruning Mask M ∈ {0, 1}T ×H×W
+logue turn, Transformer-based LLMs first perform a prefill
+                                                                         3: Initialize M ← 0, map latest ← ∅
+phase to encode input tokens, caching their key/value (KV)
+                                                                         4: for each token (t, x, y) with Vt,x,y ≥ 0 do
+states in attention layers. These cached KV pairs are then
+                                                                         5:    p ← ⌊t/K⌋, v ← Vt,x,y
+used in the decoding phase to generate new tokens. If we
+                                                                         6:    if (p, v) not in latest or t is newer then
+don’t use KV cache across turns, the model will repeat this
+                                                                         7:       latest[(p, v)] ← (t, x, y)
+prefilling process of all previous tokens for a new dialogue.
+                                                                         8:    end if
+B. Fast-Streaming Dialogue Context                                       9: end for
+                                                                        10: Set Mt,x,y ← 1 for all (t, x, y) ∈ latest
+    While multi-turn KV cache reuse can eliminate over 99%                                  P
+of prefilling time, it introduces substantial memory overhead.          11: For each t, if     x,y Mt,x,y < θ · H · W , set Mt,:,: ← 0
+                                                                        12: return M
+As the number of dialogues increases, the KV cache grows
+linearly (e.g., 2K tokens can consume around 5GB of mem-
+ory), making long sessions impractical. In addition, existing           D. Co-Training with Multi-Source Data.
+Video-LLMs tend to exhibit degraded reasoning performance
+when processing overly long contexts.
+    To manage dialogue context, we adopt a sliding window                                      MMC4
+KV cache over continuous dialogues, retaining a fixed num-                                      16%
+ber N of recent dialogues in an active window: Wj =
+                                                                                                                    MP3D
+[o(i−N +1) a(i−N +1) ...oi ai ] When the window reaches capac-                                                       31%
+                                                                                                General
+ity, the key/value states are offloaded from the LLM, and the                                  Multi-modal
+                                                                                      VQA         33%
+states of non-observation dialogue tokens, such as prompts                            17%                    VLA
+and generated actions, are immediately discarded. For the
+                                                                                                             67%
+new sliding window, the token states from past windows
+are processed into memory token states {M0 , . . . , Mj } (as
+detailed in Section III-C). Formally, for the latest observation                             DAgger             HM3D
+                                                                                              16%                20%
+oi , the decoder generates ai based on the cached token states
+and the current window’s KV cache:
+ W
+ai j+1 = Decoder oi , {M0 , . . . , Mj },                                         Fig. 3.   Co-Training Data Recipe of StreamVLN
+                                                                  
+                     {k(i−N +1) v(i−N +1) , . . . , k(i−1) v(i−1) } .
+                                                                        Vision-Language Action Data. We collect navigation-
+C. Slow-Updating Memory Context                                         specific training data using the Habitat simulator across
+   We observe that most VLN trajectories, collected with                multiple public VLN datasets. Specifically, we collect 450K
+fine-grained low-level actions, contain redundant observa-              samples (video clips) from 60 Matterport3D [22] (MP3D)
+tions. To mitigate this, we first adopt a fixed-number tem-             environments, sourced from R2R [6], R2R-EnvDrop [23] and
+poral sampling strategy following [3]. However, at the spa-             RxR [7]. To further improve generalization through increased
+tial level, heavy patch-level redundancy remains under the              scene diversity, we incorporate an additional 300K samples
+high input resolution of Video-LLMs. Direct feature-level               from a subset of ScaleVLN [15], spanning 700 Habitat
+compression during training—such as average pooling or                  Matterport3D [24] (HM3D) scenes. In addition, we adopt
+learnable Q-Formers—led to substantial performance degra-               the DAgger algorithm to enhance the model’s robustness
+dation in our experiments, as it altered the pretrained input           and generalization ability in novel scenes and during error
+distribution, thereby undermining pretraining knowledge.                recovery. Using Habitat’s shortest-path follower as the expert
+policy, we collect corrective demonstrations on model roll-
+                                                                                                                Visual Question Answering
+outs after the initial training stage. These DAgger-collected
+samples (240K) are then incorporated into the training set                                                   Q:
+                                                                                                               “Describe the picture on the right.”
+for co-training.                                                                                             A:
+General Vision-Language Data. To retain the general                                                            “Picture of the Mona Lisa.”
+reasoning capabilities of the pretrained Video-LLM, we
+incorporate a diverse set of multimodal training data that
+complements navigation supervision. Specifically, we in-
+clude 248K video-based visual question-answering (VQA)
+samples sourced from publicly available datasets LLaVA-                                                                                          Position
+Video-178K [31] and ScanQA [32], which combine general                                                                                            Swap
+video QA with 3D scene understanding to support spatial-
+temporal and geometric reasoning. To further augment the
+model’s capacity for multi-turn vision-language interactions,
+                                                                        “You are facing two photos of the Mona Lisa and Einstein respectively.
+we incorporate 230K interleaved image-text samples from                 Go to the Mona Lisa and stop immediately.”
+MMC4 [33], which strengthens its ability to parse and
+generate contextually coherent responses with interleaved
+visual and textual reasoning.                                   Fig. 4. StreamVLN transfers visual reasoning ability to interpreting out-
+                                                                of-domain navigation instructions.
+
+                    IV. E XPERIMENTS
+A. Experimental Setup                                           5e-6 for the vision encoder. Each training step processes 128
+Simulation Benchmark Setup. We evaluate our method              video clips. Training is in around 1500 A100 GPU hours.
+on two public VLN-CE [14] benchmarks collected from
+Matterport3D scenes using the Habitat simulator: R2R-           C. Comparisons with State-of-the-Arts
+CE [6] and RxR-CE [7]. R2R-CE provides 5.6K English             Results on VLN-CE benchmark. Table I shows the per-
+trajectories with an average length of 10 meters, while RxR-    formance of our method on the VLN-CE R2R and RxR
+CE includes 126K multilingual instructions (English, Hindi,     benchmarks under the Val-Unseen setting, compared with
+Telugu) and features longer, more diverse paths (avg.15         existing VLN-CE methods. StreamVLN achieves state-of-
+meters). The camera HFOVs are 79° for R2R-CE and RxR-           the-art performance among RGB-only methods both without
+CE. Both benchmarks require realistic indoor navigation         and with extra navigation datasets, reaching 56.9% SR and
+under continuous control. As our goal is to assess the          51.9% SPL on R2R, and 52.9% SR and 46.0% SPL on RxR.
+generalization ability, we focus on the validation unseen       These results highlight the robustness of StreamVLN across
+splits of both benchmarks We report standard VLN metrics,       both standard and long-horizon navigation tasks. Notably,
+including Navigation Error (NE), Success Rate (SR), Oracle      StreamVLN performs comparably to ETPNav [13], despite
+Success Rate (OS), and Success weighted by Path Length          not relying on additional panoramic or waypoint supervi-
+(SPL), following prior works.                                   sion. Furthermore, compared to HMAT trained on entire
+Real-World Evaluation Setup. We perform real world              ScaleVLN dataset with 3 million trajectories, StreamVLN
+experiments based on a Unitree Go2 robotic dog. The robot       surpasses it with a small subset of ScaleVLN (150k), show-
+is equipped with a upward facing camera (Intel® RealSense™      ing better data efficiency.
+D455) for RGB-D observations. We deploy StreamVLN on            Effectiveness of Voxel-Based Spatial Pruning. Table I
+a remote workstation with an RTX 4090 GPU. The Go2              bottom shows the effect of applying voxel-based spatial
+robot continuously streams visual data to the 4090 server       pruning during inference. We further evaluate two settings:
+for inference, which returns executable action commands         1) StreamVLN-Prune-Mem. Pruning is applied only on 8
+to the robot. The averge inference (0.27s for 4 actions)        memory frames, reducing memory tokens by 28% on R2R
+and communication (0.2s for indoor and 1.0s for outdoor         and 22% on RxR without noticeably affecting performance.
+environments) latency enable real-time physical deployment.     On the shorter-horizon R2R benchmark, performance even
+                                                                improves, indicating that the current memory still contains
+B. Implementation Details                                       redundant tokens for some tasks. Proper pruning thus helps
+   We build StreamVLN based on the LLaVA-Video [19] 7B          the model focus on relevant tokens, thereby enhancing nav-
+model, which uses Qwen2-7B [34] as the language model.          igation accuracy.
+Training is conducted in two stages. First, we fine-tune it     2) StreamVLN-Prune-All. Pruning is applied to both memory
+for one epoch solely on oracle VLN trajectories. Then, we       tokens and the KV cache of streaming frame tokens, reducing
+use the model to collect DAgger trajectories and continue       visual tokens by 32% on R2R and 30% on RxR, with only
+training for an additional epoch with a mixture of VLN          a slight decrease in performance.
+and general multimodal data. During the warm-up phase, we       Results on Video Question Answering. To evaluate
+apply a peak learning rate of 2e-5 for the language model and   StreamVLN’s spatial scene understanding capabilities, we
+                                                                   TABLE I
+                       C OMPARISON WITH STATE - OF - THE - ART METHODS ON VLN-CE R2R AND R X R VAL -U NSEEN SPLIT.
+
+
+                                            Observation                          R2R Val-Unseen                         RxR Val-Unseen
+ Method
+                                Pano.     Odo.     Depth      S.RGB      NE↓      OS↑      SR↑      SPL↑      NE↓       SR↑     SPL↑      nDTW↑
+
+ HPN+DN∗ [25]                     ✓        ✓         ✓                   6.31     40.0     36.0     34.0        -        -         -             -
+ CMA∗ [26]                        ✓        ✓         ✓                   6.20     52.0     41.0     36.0      8.76      26.5     22.1       47.0
+ VLN⟳BERT ∗ [26]                  ✓        ✓         ✓                   5.74     53.0     44.0     39.0      8.98      27.0     22.6       46.7
+ Sim2Sim∗ [27]                    ✓        ✓         ✓                   6.07     52.0     43.0     36.0        -        -         -             -
+ GridMM∗ [28]                     ✓        ✓         ✓                   5.11     61.0     49.0     41.0        -        -         -             -
+ ETPNav∗ [13]                     ✓        ✓         ✓                   4.71     65.0     57.0     49.0      5.64      54.7     44.8       61.9
+ ScaleVLN∗ [15]                   ✓        ✓         ✓                   4.80       –      55.0     51.0        -        -         -             -
+
+ InstructNav [18]                 ✓        ✓         ✓          ✓        6.89       –      31.0     24.0        -        -         -             -
+ AG-CMTP [29]                     ✓        ✓         ✓                   7.90     39.2     23.1     19.1        -        -         -             -
+ R2R-CMTP [29]                    ✓        ✓         ✓                   7.90     38.0     26.4     22.7        -        -         -             -
+ LAW [10]                                  ✓         ✓          ✓        6.83     44.0     35.0     31.0      10.90     8.0       8.0       38.0
+ CM2 [11]                                  ✓         ✓          ✓        7.02     41.5     34.3     27.6        -        -         -             -
+ WS-MGMap [12]                             ✓         ✓          ✓        6.28     47.6     38.9     34.3        -        -         -             -
+ ETPNav + FF [30]                          ✓         ✓          ✓        5.95     55.8     44.9     30.4      8.79      25.5     18.1            -
+ Seq2Seq [14]                                        ✓          ✓        7.77     37.0     25.0     22.0      12.10     13.9     11.9       30.8
+ CMA [14]                                            ✓          ✓        7.37     40.0     32.0     30.0        -        -         -             -
+
+ NaVid [1]                                                      ✓        5.47     49.1     37.4     35.9        -        -         -             -
+ MapNav [4]                                                     ✓        4.93     53.0     39.7     37.2        -        -         -             -
+ NaVILA [3]                                                     ✓        5.37     57.6     49.7     45.5        -        -         -             -
+ StreamVLN                                                      ✓        5.43     62.5     52.8     47.2      6.72      48.6     42.5       60.2
+
+ NaVILA† [3]                                                    ✓        5.22     62.5     54.0     49.0      6.77      49.3     44.0       58.8
+ UniNaVid† [2]                                                  ✓        5.58     53.3     47.0     42.7      6.24      48.7     40.9            -
+ StreamVLN†                                                     ✓        4.90     63.6     56.4     50.2      5.65      54.4     45.4       63.7
+
+ StreamVLN-Prune-Mem†                      ✓∗       ✓∗          ✓        4.73     65.5     57.4     51.1      5.72      53.9     45.1       63.3
+                                             ∗
+ StreamVLN-Prune-All†                      ✓        ✓∗          ✓        4.82     65.7     56.0     48.5      5.86      53.3     44.0       63.5
+  ∗ indicates methods using the waypoint predictor from [26]. † denotes methods using additional VLN data beyond the R2R-CE and RxR-CE benchmarks.
+  ✓∗ indicates that Odo. and Depth are only used for back-projection in the training-free voxel pruning.
+
+
+
+
+   Fig. 5.   Real-world experiments conducted across hallway (easy), bedroom (medium, single-room), and office (hard, room-to-room) scenarios.
+
+
+
+conduct experiments on the widely-used ScanQA bench-                       ure 4, we observe that the strong VQA capabilities contribute
+mark for 3D question answering based on real-world scans.                  to better generalization to novel navigation instructions.
+StreamVLN answers questions by analyzing 16 multi-view                     Real-World Experimental Results. To quantitatively assess
+images from each scan. As shown in Table II, StreamVLN                     StreamVLN in real-world settings, we evaluated its perfor-
+outperforms state-of-the-art generalist navigation models                  mance in three distinct scenarios: hallway (easy), bedroom
+such as NaviLLM [41] and NaVILA [3]. As shown in Fig-                      (medium difficulty, single-room), and office (hard, room-to-
+          “Head straight to the desk with a table lamp. Look at your right and walk past the yellow chair and sofa. Reach the green plant and then stop in front of it.”
+
+
+
+
+          “Bypass the tables and walk forward. When you see the black umbrella, turn left and step into the lounge area. Turn right immediately at the sofa and go
+          straight to the TV monitor and turn right. Walk forward and then enter the door on your right side. After that walk through the hallway. Get into the door and
+          immediately turn to your right. Stop in front of the blue cabinet.”
+
+
+
+
+          “Go straight and pass the door. Continuing to move forward. When you see the shelf of goods on your right side, get into the store. Then you can stop.”
+
+
+
+
+          “Go straight and make your way through the stone path. Take the first exit, then continue walking along the road until you reach the iron railing.”
+
+
+
+Fig. 6. Qualitative results of StreamVLN in several representative real-world environments. From top to bottom are Home, Workspace, Mall and
+Outdoor. StreamVLN achieves robust performance across diverse VLN scenarios, capable of accurately following complex instructions with various
+landmarks (marked as red) and handling real-world disturbances.
+
+                              TABLE II
+                                                                                          while NaVid succeeds only on simple, short-horizon tasks.
+                   C OMPARISON ON S CAN QA VAL SET.
+                                                                                          NaVILA can follow longer-horizon instructions but fails in
+                                                                                          complex office scenarios. In contrast, StreamVLN success-
+                                                ScanQA
+ Method                                                                                   fully completes both simple and challenging long-horizon
+                        Bleu-4 ↑     Rouge ↑      Meteor ↑      Cider ↑     EM ↑
+                                                                                          navigation tasks. Qualitative results in Workspace, Mall,
+ ScanRefer [35]            7.9          30.0         55.4         11.5      18.6          and Outdoor are presented in Figure 6. Especially, the
+ ScanQA [32]               10.1         33.3         64.9         13.1      21.0          success cases in Mall and Outdoor environments highlight
+ 3D-VisTA [36]             10.4         35.7         69.6         13.9      22.4          StreamVLN’s strong generalization to novel scenes and
+                                                                                          tasks. Please refer to the demo video for full demonstrations.
+ 3D-LLM* [37]              12.0         35.7         69.4         14.5      20.5
+ LEO [38]                  13.2         49.2        101.4         20.0      24.5          D. Ablation Studies
+ ChatScene* [39]           14.0           -          87.6           -         -           Data Ablation. Table III presents an ablation study on
+ Scene-LLM* [40]           12.0         40.0         80.0         16.6      27.2          different training data compositions. All results are reported
+ NaviLLM [41]              12.0         38.4         75.9         15.4      23.0          without using voxel-based spatial pruning. The first row
+ NaVILA [3] (16)           15.2         48.3         99.8         19.6      27.4
+                                                                                          shows the first-stage performance when training with only
+                                                                                          oracle navigation data. After collecting DAgger data, we co-
+ StreamVLN (16)            15.7         48.3        100.2         19.8      28.8
+                                                                                          train oracle data, DAgger data, and vision-language (VL)
+   ∗ indicates task-specific fine-tuning. (16) means using 16 frames.                     data. In the second row, we use only VideoQA data as
+                                                                                          VL data. While the third row mixes VideoQA and MMC4
+                                                                                          (M) data in an interleaved image-text format. For a fair
+room). The baselines include the traditional learning-based                               comparison, the total number of VL Data is kept the same.
+CMA [26] and VLM-based approaches such as NaVid [1]                                       We can observe that the second-stage co-training brings
+and NaVILA [3]. For each method, we conducted 20 trials                                   significant gains (+5.3 SR / +4.1 SPL) and incorporating
+per scenario, measuring Success Rate (SR) and Navigation                                  MMC4 further improves performance (+2.0 SR / +1.5 SPL).
+Errors (NE). As shown in Figure 5, CMA performs poorly,                                   Comparing the third and fourth rows, we see that adding
+                          TABLE III
+                                                                       at 8 significantly improves navigation performance, with SR
+ A BLATION STUDY OF DIFFERENT TRAINING DATA COMPOSITIONS ON
+                                                                       rising from 37.3 to 45.5. This indicates the importance of
+                  VLN-CE R2R VAL -U NSEEN SPLIT.
+                                                                       fine-grained memory in supporting long-horizon reasoning.
+                                                                       Notably, using the entire visual context (all) as memory
+R2R RxR DAgger          VL Data        ScaleVLN NE↓ OS↑ SR↑ SPL↑
+                                                                       doesn’t yield the best results, suggesting that an overly long
+ ✓     ✓                                         5.98 51.3 45.6 42.3   and varied context token sequence may introduce bias in
+ ✓     ✓      ✓         VidQA                    5.47 57.8 50.8 45.7   training and hinder generalization at test time.
+ ✓     ✓      ✓     VidQA+MMC4                   5.43 62.5 52.8 47.2   Sliding Window Size. We also evaluate the effect of the
+ ✓     ✓      ✓     VidQA+MMC4           ✓       4.90 63.6 56.4 50.2
+                                                                       number of dialogue turns retained in the sliding window in
+                                                                       Table IV. A smaller window size leads to more frequent
+ ✓     ✓            VidQA+MMC4           ✓       5.73 56.4 50.2 47.1
+                                                                       shifts, resulting in a significantly larger number of training
+ ✓            ✓     VidQA+MMC4           ✓       5.90 55.9 47.9 43.6
+                                                                       samples. For example, a window size of 8 yields approx-
+                                                                       imately 450K samples, while sizes of 4 and 2 increase
+                           TABLE IV                                    this to 815K and 1.5M respectively. This growth not only
+  A BLATION ON THE IMPACT OF DIFFERENT MEMORY CONTEXT SIZES            raises the training cost linearly but also introduces greater
+ AND SLIDING WINDOW SIZES ON VLN-CE R2R VAL -U NSEEN SPLIT.
+                                                                       class imbalance, which may affect training stability. We
+                                                                       find that retaining 8 continuous dialogue turns achieves
+     Memory       Window        NE↓       OS↑       SR↑     SPL↑       the best balance—delivering strong navigation performance
+     2*196          8           6.96      48.2      37.3     34.2
+                                                                       while maintaining the lowest training cost.
+     4*196          8           6.62      49.1      38.9     35.4
+                                                                       Effectiveness of KV-Cache Reuse. We evaluate the impact
+                                                                       of KV cache reuse on the decoding latency under different
+     8*196          8           6.05      53.8      45.5     41.6
+                                                                       settings. As shown in Figure 7, reusing the KV cache across
+       all          8           6.76      49.5      40.0     36.4
+                                                                       all dialogue turns (Full Turns) achieves consistently low
+     8*196          4           6.31      51.1      41.4     37.5      latency—since only the current observation tokens require
+     8*196          2           6.16      52.8      43.7     40.3      prefill computation for generating the 8 action tokens—but
+                                                                       storing all the cache poses significant memory overhead. If
+                                                                       the KV cache is maintained only within 8 turns (Sliding
+ScaleVLN data brings additional gains (+2.9 SR / +3.7 SPL).            Window), the decoding latency will increase at the beginning
+To assess the importance of DAgger data, we remove it                  of each sliding window due to the need to prefill the previous
+from the co-training data, as shown in the fifth row. The              window context tokens. Under the Single Turn setting, where
+results show that DAgger data plays a crucial role in boosting         the KV cache is not reused across turns (as in prior work),
+performance (+5.5 SR / +3.8 SPL). Furthermore, the last                decoding latency steadily increases with the number of turns.
+row highlights that incorporating RxR data yields notable              Turns 0–8 incur lower latency since no historical context is
+performance gains (+7.8 SR / +7.3 SPL).                                included, while turns 8–16 and 16–24 have similar latency
+Memory Context Size. We study the impact of the memory                 growth with a fixed memory size.
+context size in the hybrid context modeling strategy. As
+shown in Table IV (results shown are from first-stage training                              V. C ONCLUSION
+using only oracle VLN data), increasing the memory size
+from 2 ∗ 196 to 8 ∗ 196 while keeping the window size fixed               This paper presents StreamVLN, a new streaming vision-
+                                                                       language-navigation framework based on Video-LLMs.
+                                                                       Compared to previous Video-LLM-based VLN methods that
+                                                                       treat each interaction as an independent dialogue and refresh
+                                                                       history at every step, StreamVLN can reuse past key/value
+                                                                       (KV) states through a hybrid memory design. By maintaining
+                                                                       a fast-updating sliding window for immediate responsiveness
+                                                                       and a slow-updating long-term memory for temporal reason-
+                                                                       ing, StreamVLN enables efficient, coherent, and scalable ac-
+                                                                       tion generation over long video streams. Empirical results on
+                                                                       standard VLN-CE benchmarks demonstrate that StreamVLN
+                                                                       achieves superior performance with lower latency, paving the
+                                                                       way for real-time long-horizon navigation.
+                                                                       Acknowledgements. This work is supported by Shanghai
+                                                                       Artificial Intelligence Laboratory. The research work de-
+                                                                       scribed in this paper was conducted in the JC STEM Lab of
+Fig. 7. Impact of KV cache reuse across multiple turns . The Sliding   Autonomous Intelligent Systems funded by The Hong Kong
+window size is 8 (8 conversation turns) in all three settings.         Jockey Club Charities Trust.
+                             R EFERENCES                                       [22] A. Chang, A. Dai, T. Funkhouser, M. Halber, M. Niessner, M. Savva,
+                                                                                    S. Song, A. Zeng, and Y. Zhang, “Matterport3D: Learning from RGB-
+ [1] J. Zhang, K. Wang, R. Xu, G. Zhou, Y. Hong, X. Fang, Q. Wu,                    D data in indoor environments,” International Conference on 3D
+     Z. Zhang, and H. Wang, “Navid: Video-based vlm plans the next step             Vision (3DV), 2017.
+     for vision-and-language navigation,” Robotics: Science and Systems,       [23] H. Tan, L. Yu, and M. Bansal, “Learning to navigate unseen environ-
+     2024.                                                                          ments: Back translation with environmental dropout,” in Proceedings
+ [2] J. Zhang, K. Wang, S. Wang, M. Li, H. Liu, S. Wei, Z. Wang,                    of NAACL-HLT, 2019.
+     Z. Zhang, and H. Wang, “Uni-navid: A video-based vision-language-         [24] S. K. Ramakrishnan, A. Gokaslan, E. Wijmans, O. Maksymets,
+     action model for unifying embodied navigation tasks,” Robotics:                A. Clegg, J. Turner, E. Undersander, W. Galuba, A. Westbury, A. X.
+     Science and Systems, 2025.                                                     Chang et al., “Habitat-matterport 3d dataset (hm3d): 1000 large-scale
+ [3] A.-C. Cheng, Y. Ji, Z. Yang, Z. Gongye, X. Zou, J. Kautz, E. Bıyık,            3d environments for embodied ai,” arXiv preprint arXiv:2109.08238,
+     H. Yin, S. Liu, and X. Wang, “Navila: Legged robot vision-language-            2021.
+     action model for navigation,” Robotics: Science and Systems, 2025.        [25] J. Krantz, A. Gokaslan, D. Batra, S. Lee, and O. Maksymets, “Way-
+ [4] L. Zhang, X. Hao, Q. Xu, Q. Zhang, X. Zhang, P. Wang, J. Zhang,                point models for instruction-guided navigation in continuous environ-
+     Z. Wang, S. Zhang, and R. Xu, “Mapnav: A novel memory represen-                ments,” in Proceedings of the IEEE/CVF International Conference on
+     tation via annotated semantic maps for vlm-based vision-and-language           Computer Vision, 2021.
+     navigation,” arXiv preprint arXiv:2502.13451, 2025.                       [26] Y. Hong, Z. Wang, Q. Wu, and S. Gould, “Bridging the gap between
+ [5] X. Huang, H. Zhou, and K. Han, “Prunevid: Visual token prun-                   learning in discrete and continuous environments for vision-and-
+     ing for efficient video large language models,” arXiv preprint                 language navigation,” in Proceedings of the IEEE/CVF Conference
+     arXiv:2412.16117, 2024.                                                        on Computer Vision and Pattern Recognition, 2022.
+ [6] P. Anderson, Q. Wu, D. Teney, J. Bruce, M. Johnson, N. Sünderhauf,       [27] J. Krantz and S. Lee, “Sim-2-sim transfer for vision-and-language
+     I. Reid, S. Gould, and A. Van Den Hengel, “Vision-and-language nav-            navigation in continuous environments,” in European Conference on
+     igation: Interpreting visually-grounded navigation instructions in real        Computer Vision, 2022.
+     environments,” in Proceedings of the IEEE conference on computer          [28] Z. Wang, X. Li, J. Yang, Y. Liu, and S. Jiang, “Gridmm: Grid
+     vision and pattern recognition, 2018.                                          memory map for vision-and-language navigation,” in Proceedings of
+ [7] A. Ku, P. Anderson, R. Patel, E. Ie, and J. Baldridge, “Room-                  the IEEE/CVF International Conference on Computer Vision, 2023.
+     across-room: Multilingual vision-and-language navigation with dense       [29] K. Chen, J. K. Chen, J. Chuang, M. Vázquez, and S. Savarese,
+     spatiotemporal grounding,” arXiv preprint arXiv:2010.07954, 2020.              “Topological planning with transformers for vision-and-language nav-
+ [8] S. Chen, P.-L. Guhur, C. Schmid, and I. Laptev, “History aware                 igation,” in Proceedings of the IEEE/CVF Conference on Computer
+     multimodal transformer for vision-and-language navigation,” Advances           Vision and Pattern Recognition, 2021.
+     in Neural Information Processing Systems, 2021.                           [30] Z. Wang, X. Li, J. Yang, Y. Liu, and S. Jiang, “Sim-to-real transfer via
+ [9] S. Chen, P.-L. Guhur, M. Tapaswi, C. Schmid, and I. Laptev, “Think             3d feature fields for vision-and-language navigation,” arXiv preprint
+     global, act local: Dual-scale graph transformer for vision-and-language        arXiv:2406.09798, 2024.
+     navigation,” in Proceedings of the IEEE/CVF Conference on Computer        [31] Y. Zhang, J. Wu, W. Li, B. Li, Z. Ma, Z. Liu, and C. Li, “Video
+     Vision and Pattern Recognition, 2022, pp. 16 537–16 547.                       instruction tuning with synthetic data,” 2024. [Online]. Available:
+[10] S. Raychaudhuri, S. Wani, S. Patel, U. Jain, and A. X. Chang,                  https://arxiv.org/abs/2410.02713
+     “Language-aligned waypoint (law) supervision for vision-and-              [32] D. Azuma, T. Miyanishi, S. Kurita, and M. Kawanabe, “Scanqa: 3d
+     language navigation in continuous environments,” arXiv preprint                question answering for spatial scene understanding,” in proceedings of
+     arXiv:2109.15207, 2021.                                                        the IEEE/CVF conference on computer vision and pattern recognition,
+[11] G. Georgakis, K. Schmeckpeper, K. Wanchoo, S. Dan, E. Miltsakaki,              2022.
+     D. Roth, and K. Daniilidis, “Cross-modal map learning for vision and      [33] W. Zhu, J. Hessel, A. Awadalla, S. Y. Gadre, J. Dodge, A. Fang, Y. Yu,
+     language navigation,” in Proceedings of the IEEE/CVF Conference on             L. Schmidt, W. Y. Wang, and Y. Choi, “Multimodal C4: An open,
+     Computer Vision and Pattern Recognition, 2022.                                 billion-scale corpus of images interleaved with text,” arXiv preprint
+[12] P. Chen, D. Ji, K. Lin, R. Zeng, T. H. Li, M. Tan, and C. Gan,                 arXiv:2304.06939, 2023.
+     “Weakly-supervised multi-granularity map learning for vision-and-         [34] A. Yang, B. Yang, B. Zhang, B. Hui, B. Zheng, B. Yu, C. Li, D. Liu,
+     language navigation,” arXiv preprint arXiv:2210.07506, 2022.                   F. Huang, H. Wei et al., “Qwen2. 5 technical report,” arXiv preprint
+[13] D. An, H. Wang, W. Wang, Z. Wang, Y. Huang, K. He, and L. Wang,                arXiv:2412.15115, 2024.
+     “Etpnav: Evolving topological planning for vision-language navigation     [35] Z. Yu, J. Yu, Y. Cui, D. Tao, and Q. Tian, “Deep modular co-
+     in continuous environments,” arXiv preprint arXiv:2304.03047, 2023.            attention networks for visual question answering,” in Proceedings of
+[14] J. Krantz, E. Wijmans, A. Majundar, D. Batra, and S. Lee, “Beyond              the IEEE/CVF conference on computer vision and pattern recognition,
+     the nav-graph: Vision and language navigation in continuous environ-           2019.
+     ments,” in European Conference on Computer Vision (ECCV), 2020.           [36] Z. Zhu, X. Ma, Y. Chen, Z. Deng, S. Huang, and Q. Li, “3d-vista: Pre-
+[15] Z. Wang, J. Li, Y. Hong, Y. Wang, Q. Wu, M. Bansal, S. Gould,                  trained transformer for 3d vision and text alignment,” in Proceedings
+     H. Tan, and Y. Qiao, “Scaling data generation in vision-and-language           of the IEEE/CVF International Conference on Computer Vision, 2023,
+     navigation,” in Proceedings of the IEEE/CVF International Conference           pp. 2911–2921.
+     on Computer Vision, 2023.                                                 [37] Y. Hong, H. Zhen, P. Chen, S. Zheng, Y. Du, Z. Chen, and C. Gan,
+[16] Y. Long, X. Li, W. Cai, and H. Dong, “Discuss before moving: Visual            “3d-llm: Injecting the 3d world into large language models,” Advances
+     language navigation via multi-expert discussions,” arXiv preprint              in Neural Information Processing Systems, 2023.
+     arXiv:2309.11382, 2023.                                                   [38] J. Huang, S. Yong, X. Ma, X. Linghu, P. Li, Y. Wang, Q. Li, S.-C. Zhu,
+[17] P. Chen, X. Sun, H. Zhi, R. Zeng, T. H. Li, G. Liu, M. Tan,                    B. Jia, and S. Huang, “An embodied generalist agent in 3d world,”
+     and C. Gan, “a2 nav: Action-aware zero-shot robot navigation by                arXiv preprint arXiv:2311.12871, 2023.
+     exploiting vision-and-language ability of foundation models,” arXiv       [39] H. Huang, Y. Chen, Z. Wang, R. Huang, R. Xu, T. Wang, L. Liu,
+     preprint arXiv:2308.07997, 2023.                                               X. Cheng, Y. Zhao, J. Pang et al., “Chat-scene: Bridging 3d scene
+[18] Y. Long, W. Cai, H. Wang, G. Zhan, and H. Dong, “Instructnav:                  and large language models with object identifiers,” arXiv preprint
+     Zero-shot system for generic instruction navigation in unexplored              arXiv:2312.08168, 2023.
+     environment,” arXiv preprint arXiv:2406.04882, 2024.                      [40] R. Fu, J. Liu, X. Chen, Y. Nie, and W. Xiong, “Scene-llm: Extending
+[19] Y. Zhang, J. Wu, W. Li, B. Li, Z. Ma, Z. Liu, and C. Li, “Video in-            language model for 3d visual understanding and reasoning,” arXiv
+     struction tuning with synthetic data,” arXiv preprint arXiv:2410.02713,        preprint arXiv:2403.11401, 2024.
+     2024.                                                                     [41] D. Zheng, S. Huang, L. Zhao, Y. Zhong, and L. Wang, “Towards learn-
+[20] J. Lin, H. Yin, W. Ping, P. Molchanov, M. Shoeybi, and S. Han, “Vila:          ing a generalist model for embodied navigation,” in Proceedings of the
+     On pre-training for visual language models,” in Proceedings of the             IEEE/CVF Conference on Computer Vision and Pattern Recognition,
+     IEEE/CVF conference on computer vision and pattern recognition,                2024.
+     2024.
+[21] Y. Li, C. Wang, and J. Jia, “Llama-vid: An image is worth 2 tokens in
+     large language models,” in European Conference on Computer Vision,
+     2024.
+

@@ -1,0 +1,128 @@
+{
+  "started_at": "2026-10-21T09:28:13.822808+00:00",
+  "purpose": "Reduce stalled transfer waits and batch barriers without increasing the existing 256 connection limit",
+  "backup": "/data/team_a/dave-workspace/RoleVLN/data/tools/.backups/rxr_tuning_20261021T092813",
+  "before": {
+    "phase": "downloading",
+    "source": "gs://rxr-data",
+    "destination": "/data/team_a/dave-workspace/RoleVLN/data/datasets/RxR",
+    "supervisor_pid": 1838091,
+    "shards": 4,
+    "elapsed_seconds": 11454.6,
+    "expected_files": 582090,
+    "expected_bytes": 190669133548,
+    "service_unit": "rolevln-rxr-download.service",
+    "verified_files": 129751,
+    "verified_bytes": 59750281850,
+    "inflight_bytes": 1770822378,
+    "failed_files": 0,
+    "average_mib_per_second": 4.15,
+    "estimated_seconds_remaining": 29667
+  },
+  "previous_settings": {
+    "workers": 4,
+    "connections_per_worker": 64,
+    "batch_size": 2048,
+    "transfer_timeout_seconds": 240,
+    "retries": 4,
+    "stall_timeout_seconds": null
+  },
+  "network_rx_observed_MBps": [
+    6.05,
+    6.478,
+    6.478,
+    6.046
+  ],
+  "protocol_decision": "Keep HTTP/1.1: repeated HTTP/2 multiplexed requests stalled in larger benchmark",
+  "benchmark_results": [
+    "logs/rxr_transport_benchmark_20261021T092241/results.json",
+    "logs/rxr_transport_benchmark_20261021T092522/results.json"
+  ],
+  "validation": {
+    "scripts_compile": true,
+    "verified_file_reuse": true,
+    "partial_resume": true,
+    "new_download": true,
+    "official_md5_matches": 3
+  },
+  "new_settings": {
+    "workers": 4,
+    "connections_per_worker": 64,
+    "batch_size": 4096,
+    "transfer_timeout_seconds": 120,
+    "stall_timeout_seconds": 30,
+    "minimum_speed_bytes_per_second": 1024,
+    "retries": 2
+  },
+  "before_restart": {
+    "phase": "downloading",
+    "source": "gs://rxr-data",
+    "destination": "/data/team_a/dave-workspace/RoleVLN/data/datasets/RxR",
+    "supervisor_pid": 1838091,
+    "shards": 4,
+    "elapsed_seconds": 11544.6,
+    "expected_files": 582090,
+    "expected_bytes": 190669133548,
+    "service_unit": "rolevln-rxr-download.service",
+    "verified_files": 131799,
+    "verified_bytes": 60648616388,
+    "inflight_bytes": 1387440856,
+    "failed_files": 0,
+    "average_mib_per_second": 4.16,
+    "estimated_seconds_remaining": 29476
+  },
+  "restarted_at": "2026-10-21T09:29:51.510444+00:00",
+  "after_restart_measurement": {
+    "measured_at": "2026-10-21T09:32:39.176642+00:00",
+    "dataset_MBps": 6.569,
+    "network_MBps": 6.263,
+    "received_gib": 58.515,
+    "failed_files": 0,
+    "confirmed_settings": [
+      {
+        "batch_size": 4096,
+        "timeout": 120,
+        "stall_timeout": 30,
+        "retries": 2
+      },
+      {
+        "batch_size": 4096,
+        "timeout": 120,
+        "stall_timeout": 30,
+        "retries": 2
+      },
+      {
+        "batch_size": 4096,
+        "timeout": 120,
+        "stall_timeout": 30,
+        "retries": 2
+      },
+      {
+        "batch_size": 4096,
+        "timeout": 120,
+        "stall_timeout": 30,
+        "retries": 2
+      }
+    ],
+    "samples": [
+      {
+        "seconds": 90.2,
+        "bytes": 189589820
+      },
+      {
+        "seconds": 90.2,
+        "bytes": 128730920
+      },
+      {
+        "seconds": 90.2,
+        "bytes": 145482085
+      },
+      {
+        "seconds": 90.2,
+        "bytes": 128668856
+      }
+    ]
+  },
+  "state": "applied_and_verified",
+  "notes": "Short post-restart sample: 6.57 MB/s dataset progress, 6.26 MB/s interface receive. Long-term improvement remains subject to network variability."
+}

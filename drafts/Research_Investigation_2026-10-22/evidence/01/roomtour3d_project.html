@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="RoomTour3D: Geometry-Aware Video-Instruction Tuning for Embodied Navigation">
+  <meta name="keywords"
+    content=Room tour videos, geometry aware, video instruction, vision-and-language navigation, embodied navigation, web videos, agent, VLM, LLM, Large Language Models, Multi-modal learning, Benchmark, Dataset, Instruction tuning, RoomTour3D">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RoomTour3D: Geometry-Aware Video-Instruction Tuning for Embodied Navigation</title>
+
+  <!-- Global site tag (gtag.js) - Google Analytics
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-PYVRSFMDRL"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'G-PYVRSFMDRL');
+  </script> -->
+
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro" rel="stylesheet">
+
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-carousel.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-slider.min.css">
+  <link rel="stylesheet" href="./static/css/fontawesome.all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="./static/css/index.css">
+  <link rel="icon" href="./static/images/favicon.svg">
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script defer src="./static/js/fontawesome.all.min.js"></script>
+  <script src="./static/js/bulma-carousel.min.js"></script>
+  <script src="./static/js/bulma-slider.min.js"></script>
+  <script src="./static/js/index.js"></script>
+
+  <style>
+    .teaser-section {
+        background-color: #f0f0f0; /* Light grey background for contrast */
+        margin-bottom: 0; /* Adjust as needed */
+    }
+
+    .news-item {
+      background-color: #f0f8ff; /* Light blue background for contrast */
+      border-left: 5px solid #007bff; /* Blue border for emphasis */
+      padding: 10px 20px; /* Padding for spacing */
+      margin: 10px 0; /* Margin for separation between items */
+      font-family: Arial, sans-serif; /* Font styling */
+    }
+
+    .news-bug-item {
+      background-color: #fffcf0; /* Light blue background for contrast */
+      border-left: 5px solid #f7b605; /* Blue border for emphasis */
+      padding: 10px 20px; /* Padding for spacing */
+      margin: 10px 0; /* Margin for separation between items */
+      font-family: Arial, sans-serif; /* Font styling */
+    }
+
+    .news-icon {
+        color: #ff4500; /* Orange color for the icon */
+        font-size: 20px; /* Larger size for the icon */
+    }
+
+    .news-title {
+        color: #007bff; /* Blue color for the title */
+        font-weight: bold; /* Bold font for the title */
+        font-size: 18px; /* Font size for the title */
+    }
+
+    .news-bug-title {
+        color: #f7b605; /* Blue color for the title */
+        font-weight: bold; /* Bold font for the title */
+        font-size: 18px; /* Font size for the title */
+    }
+
+    .news-content {
+        color: #333333; /* Dark grey for content text */
+        font-size: 14px; /* Font size for content */
+        margin-top: 10px; /* Space above the content */
+    }
+
+    .publication-videos-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+    }
+    
+    .publication-video {
+      width: 100%;
+    }
+    .publication-video iframe {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+    }
+    
+    /* Styling for the summary element */
+    summary {
+      color: #007bff; /* Blue color for the title */
+      font-weight: bold; /* Bold font for the title */
+      font-size: 18px; /* Font size for the title */
+      cursor: pointer; /* Changes cursor to pointer on hover */
+      list-style: none; /* Removes default list marker */
+      border-left: 5px solid #007bff; /* Blue border for emphasis */
+      background-color: #f8f9fa; /* Light gray background */
+      padding: 10px 15px; /* Padding for better spacing */
+      border-radius: 5px; /* Rounded corners */
+      display: block; /* Ensure it fills the container */
+  }
+
+    /* Remove default marker for all browsers */
+    summary::-webkit-details-marker,
+    summary::marker {
+      display: none;
+    }
+
+    /* Optional: Add custom icon for the collapsible indicator */
+    summary::before {
+      content: '▶'; /* Triangle pointing right */
+      font-size: 12px; /* Smaller font size for the icon */
+      color: black; /* Icon color */
+      padding-right: 5px; /* Space between icon and text */
+      transition: transform 0.2s; /* Smooth transition for icon rotation */
+    }
+
+    /* Rotate icon when details is open */
+    details[open] summary::before {
+      transform: rotate(90deg); /* Rotates the icon 90 degrees */
+    }
+
+    
+  </style>
+
+</head>
+
+<body>
+
+<nav class="navbar" role="navigation" aria-label="main navigation">
+  <div class="navbar-brand">
+    <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false">
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+    </a>
+  </div>
+  <div class="navbar-menu">
+    <div class="navbar-start" style="flex-grow: 1; justify-content: center;">
+      <a class="navbar-item" href="https://mingfei.info">
+      <span class="icon">
+          <i class="fas fa-home"></i>
+      </span>
+      </a>
+
+      <div class="navbar-item has-dropdown is-hoverable">
+        <a class="navbar-link">
+          More Research
+        </a>
+        <div class="navbar-dropdown">
+          <a class="navbar-item" href="https://roomtour3d.github.io">
+            RoomTour3D
+          </a>
+          <a class="navbar-item" href="https://mingfei.info/shot2story/">
+            Shot2Story
+          </a>
+          <a class="navbar-item" href="https://mingfei.info/PMV/">
+            Portrait-mode Videos
+          </a>
+          <a class="navbar-item" href="https://github.com/ziplab/LongVLM">
+            LongVLM for videos
+          </a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</nav>
+
+
+  <section class="hero">
+    <div class="hero-body">
+      <div class="container is-max-desktop">
+        <div class="columns is-centered">
+          <div class="column has-text-centered">
+            <h1 class="title is-1 publication-title">RoomTour3D</h1>
+            <h1 class="title is-3 publication-title">Geometry-Aware Video-Instruction Tuning for Embodied Navigation</h1>
+            <div class="is-size-5 publication-authors">
+              <span class="author-block">
+                <a href="https://mingfei.info">Mingfei Han<sup>1,3</sup></a>,
+              </span>
+              <span class="author-block">
+                Liang Ma<sup>1</sup>,
+              </span>
+              <span class="author-block">
+                Kamila Zhumakhanova<sup>1</sup>,
+              </span>
+              <span class="author-block">
+                Ekaterina Radionova,
+              </span>
+              <span class="author-block">
+                Jingyi Zhang<sup>2</sup>
+              </span>
+              <br>
+              <span class="author-block">
+                <a href="https://www.xiaojun.ai/">Xiaojun Chang<sup>1,4</sup></a>,
+              </span>
+              <span class="author-block">
+                <a href="https://scholar.google.com/citations?user=voxznZAAAAAJ">Xiaodan Liang<sup>1</sup></a>,
+              </span>
+              <span class="author-block">
+                <a href="https://www.di.ens.fr/~laptev/">Ivan Laptev<sup>1</sup></a>
+              </span>
+            </div>
+
+            <div class="is-size-5 publication-authors">
+              <span class="author-block"><sup>1</sup>Department of Computer Vision, MBZUAI,</span>
+              <span class="author-block"><sup>2</sup>Shenzhen Campus of Sun Yat-Sen University,</span>
+              <span class="author-block"><sup>3</sup>ReLER Lab, AAII, UTS,</span>
+              <span class="author-block"><sup>4</sup>University of Science and Technology of China</span>
+            </div>
+
+            <div class="column has-text-centered">
+              <div class="publication-links">
+                <!-- PDF Link. -->
+                <!-- <span class="link-block">
+                  <a href="https://mingfei.info/files/paper_shot2story20k.pdf"
+                     class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                        <i class="fas fa-file-pdf"></i>
+                    </span>
+                    <span>Paper</span>
+                  </a>
+                </span> -->
+                <span class="link-block">
+                  <a href="https://arxiv.org/abs/2412.08591"
+                     class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                        <i class="ai ai-arxiv"></i>
+                    </span>
+                    <span>arXiv</span>
+                  </a>
+                </span>
+                <!-- Link to Hugging Face Space -->
+                <!-- <span class="link-block">
+                  <a href="https://huggingface.co/spaces/mhan/Shot2Story"
+                    class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                      <img src="static/images/hf-logo.svg" alt="Huggingface logo" width="20" height="20">
+                    </span>
+                    <span>Chat-Demo</span>
+                  </a>
+                </span> -->
+                <!-- <span class="link-block">
+                  <a href="https://huggingface.co/spaces/mhan/Shot2Story-SUM"
+                    class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                      <img src="static/images/hf-logo.svg" alt="Huggingface logo" width="20" height="20">
+                    </span>
+                    <span>SUM-Demo</span>
+                  </a>
+                </span> -->
+                <!-- Code Link. -->
+                <span class="link-block">
+                  <a href="https://github.com/roomtour3d/roomtour3d-NaviLLM"
+                     class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                        <i class="fab fa-github"></i>
+                    </span>
+                    <span>Code</span>
+                    </a>
+                </span>
+                <!-- Dataset Link. -->
+                <span class="link-block">
+                  <a href="https://huggingface.co/datasets/roomtour3d/roomtour3d"
+                    class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                      <img src="static/images/hf-logo.svg" alt="Huggingface logo" width="20" height="20">
+                    </span>
+                    <span>Annotations</span>
+                  </a>
+                </span>
+                <span class="link-block">
+                  <a href="https://huggingface.co/datasets/roomtour3d/room_tour_video_3fps"
+                    class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                      <img src="static/images/hf-logo.svg" alt="Huggingface logo" width="20" height="20">
+                    </span>
+                    <span>Frames</span>
+                  </a>
+                </span>
+                <span class="link-block">
+                  <a href="https://huggingface.co/roomtour3d/roomtour3d-navillm-models"
+                    class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                      <img src="static/images/hf-logo.svg" alt="Huggingface logo" width="20" height="20">
+                    </span>
+                    <span>Models</span>
+                  </a>
+                </span>
+                <!-- Video Link. -->
+              <!-- <span class="link-block">
+                <a href="https://www.youtube.com/watch?v=uhgUrxo1r80"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="fab fa-youtube"></i>
+                  </span>
+                  <span>Video</span>
+                </a>
+              </span> -->
+              <!-- Link to Hugging Face Code -->
+              <!-- <span class="link-block">
+                <a href="https://huggingface.co/your-code-link"
+                  class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                    <i class="fas fa-code"></i>
+                  </span>
+                  <span>Hugging Face Code</span>
+                </a>
+              </span> -->
+
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="teaser-section">
+    <div class="container is-max-desktop">
+      <div class="hero-body">
+        <h2 class="subtitle has-text-centered">
+          Overview of our RoomTour3D data generation. Spatial and geometry awareness, object variety and open vocabulary are enabled by multiple expert models. Depth estimation, camera poses and texts are integrated to advance open-world embodied navigation.
+        </h2>
+        <div class="publication-videos-container">
+          <div class="publication-video">
+            <!-- <iframe src="./static/images/data_generation_pipeline.png"></iframe> -->
+            <img src="./static/images/data_generation_pipeline.png" style="width:100%;height:auto;text-align:center;">
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container is-max-desktop">
+      <!-- Abstract. -->
+      <div class="columns is-centered has-text-centered">
+        <div class="column is-four-fifths">
+          <h2 class="title is-3">Abstract</h2>
+          <div class="content has-text-justified">
+            <p>
+              Vision-and-Language Navigation (VLN) suffers from the limited diversity and scale of training data, primarily constrained by the manual curation of existing simulators. To address this, we introduce RoomTour3D, a video-instruction dataset derived from web-based room tour videos that capture real-world indoor spaces and human walking demonstrations. 
+            </p>
+            <p>
+              Unlike existing VLN datasets, RoomTour3D leverages the scale and diversity of online videos to generate open-ended human walking trajectories and open-world navigable instructions. To compensate for the lack of navigation data in online videos, we perform 3D reconstruction and obtain 3D trajectories of walking paths augmented with additional information on the room types, object locations and 3D shape of surrounding scenes. 
+            </p>
+            <p>
+              Our dataset includes ~100K open-ended description-enriched trajectories with ~200K instructions, and 17K action-enriched trajectories from 1847 room tour environments. We demonstrate experimentally that RoomTour3D enables significant improvements across multiple VLN tasks including CVDN, SOON, R2R, and REVERIE. Moreover, RoomTour3D facilitates the development of trainable zero-shot VLN agents, showcasing the potential and challenges of advancing towards open-world navigation.
+            </p>
+          </div>
+        </div>
+      </div>
+      <br>
+      <br>
+      
+  <section class="section" id="BibTeX">
+    <div class="container is-max-desktop content">
+      <h2 class="title">BibTeX</h2>
+      <pre><code>
+        @article{han2024roomtour3d,
+                title={RoomTour3D: Geometry-Aware Video-Instruction Tuning for Embodied Navigation}, 
+                author={Mingfei Han and Liang Ma and Kamila Zhumakhanova and Ekaterina Radionova and Jingyi Zhang and Xiaojun Chang and Xiaodan Liang and Ivan Laptev},
+                journal={arXiv preprint arXiv:2412.08591},
+                year={2023}
+          }
+  </code></pre>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="columns is-centered">
+        <div class="column is-8">
+          <div class="content">
+            <p>
+              Website design from <a href="https://nerfies.github.io/">Nerfies</a>.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+
+</html>

@@ -1,0 +1,1134 @@
+=== PDF PAGE 1 ===
+          IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE                                                                         1
+
+   ImagineNav++: Prompting Vision-Language Models
+    as Embodied Navigator through Scene Imagination
+
+                               Teng Wang†, Xinxin Zhao†, Wenzhe Cai, Changyin Sun
+
+
+
+
+           Abstract—Visual navigation  is a fundamental capability for   constraints. In the research community, this fundamental chal-
+        autonomous home-assistance robots, enabling the execution of   lenge is formally characterized as the open-vocabulary goal-
+         long-horizon tasks such as object search. While recent methods                                                                          oriented visual navigation problem. Depending on the type of
+         have leveraged Large Language Models (LLMs) to incorporate
+                                                                      goal specification, several sub-tasks have been studied within        commonsense reasoning and improve exploration efficiency, their
+         planning processes remain constrained by textual representa-   this paradigm. Among these, we focus on two representative
+           tions, which cannot adequately capture spatial occupancy or   categories: Object-Goal Navigation (ObjectNav), in which the
+         scene geometry–critical factors for informed navigation deci-   target is specified by a semantic category [1]–[4], and Instance-2026
+           sions. In this work, we explore whether Vision-Language Mod-                                                               Image-Goal Navigation (InsINav), where the goal is defined
+           els (VLMs) can achieve mapless visual navigation using only
+                                                            by a reference image of a specific object instance [5], [6].        onboard RGB/RGB-D streams, unlocking  their  potential  for
+                                                                   Recent advances in foundation models, including visionApr   spatial perception and planning. We achieve this by developing
+          the imagination-powered navigation framework ImagineNav++,  models [7]–[13], large language models (LLMs) [14]–[17],
+        which imagines the future observation images at valuable robot  and vision-language models (VLMs) [18]–[23], have enabled30         views and translates the complex navigation planning process                                                       new  possibilities  for developing  agents capable  of open-
+          into a rather simple best-view image selection problem for VLMs.
+                                                                     vocabulary goal-oriented visual navigation. A widely adopted           Specifically, we first introduce a future-view imagination module,
+        which distills human navigation preferences to generate seman-   framework, as  illustrated in Figure 1, employs a modular
+           tically meaningful candidate viewpoints with high exploration   approach to address this challenge, typically comprising four
+           potential. These imagined future views then serve as  visual   key components: (1) A real-time mapping and segmentation
+        prompts for the VLM to identify the most informative viewpoint.                                                              module to construct a geometric and semantic representa-[cs.RO]  To maintain spatial consistency, we develop a selective foveation
+                                                                              tion of the robot’s immediate environment through simul-        memory mechanism, which hierarchically integrates keyframe
+         observations through a sparse-to-dense framework, thereby con-   taneous localization and mapping (SLAM) combined with
+          structing a compact yet comprehensive memory for long-term   pixel-wise semantic segmentation [11], [24]; (2) A template-
+          spatial reasoning. This integrated approach effectively transforms   based translation module to transform the structured semantic
+          the challenging goal-oriented navigation problem into a series                                                     map into natural language descriptions, enabling compatibility
+          of tractable point-goal navigation tasks. Extensive experiments
+                                                                    with language models; (3) A LLM-based reasoning module to        on open-vocabulary object and instance navigation benchmarks
+         demonstrate that our ImagineNav++ achieves SOTA performance   generate step-by-step navigation plans in texts, incorporating
+          in mapless setting, even surpassing most cumbersome map-based   task constraints and commonsense reasoning; (4) Finally, a
+         methods, revealing the importance of scene imagination and scene   path-planning module to projects the LLM’s output back onto
+       memory in VLM-based spatial reasoning.                                                                          the environmental map, computing optimal collision-free tra-
+           Index Terms—Embodied Visual Navigation, Scene Imagina-   jectories towards the goal using off-the-shelf motion planning
+           tion, Keyframe-based Selective Memory, Vision-Language Model.   algorithms. This pipeline effectively combines the strengths of
+                                                                            visual perception, language understanding, and robotic control
+                                                                              to achieve open-vocabulary navigation capabilities.arXiv:2512.17435v3                                                            Although such pipelines have achieved significant success
+                                        I. INTRODUCTION                                                                              in recent years [25]–[31], these cascaded systems face several
+                useful home-assistant robot should be able to search   inherent limitations. First, both the depth camera and the robot
+                for different kinds of objects without access to precise   localization module can suffer from perception error, espe-  A
+      3D spatial coordinates. This capability becomes particularly   cially for long-range depth estimation, and this can make the
+          essential given the dynamic nature of household environments,  mapping process inaccurate. Second, the robotic system must
+        where new objects are continuously introduced through regular   maintain continuous real-time object detection and semantic
+       human acquisition patterns. Consequently, the robot’s naviga-   segmentation to simultaneously enrich spatial mapping with
+          tion system requires open-set visual grounding and search-   semantic metadata and generate structured inputs for LLM-
+         ing functionality that extends beyond predefined categorical   based reasoning. These computationally intensive operations
+                                                                        introduce a critical performance bottleneck, substantially ele-
+            Teng Wang, Xinxin Zhao, Changyin Sun are with the School of Au-   vating the processing requirements of the robotic platforms.
+           tomation, Southeast University, Nanjing 210096, China. (e-mail: {wangteng,   Third, while semantic information stored in the map can be
+           xinxin zhao, cysun}@seu.edu.cn). (Corresponding author : Teng Wang)       readily represented in textual form–for instance, by listing
+           Wenzhe Cai is with Shanghai AI Lab, Shanghai, China. (e-mail: caiwen-
+           zhe@pjlab.org.cn).                                             observed object categories–such text-only prompts struggle to
+            †These authors contributed equally to this work.                     convey explicit geometric relationships and fine-grained object
+=== PDF PAGE 2 ===
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE                                                                         2
+
+
+                                                                             Our ImagineNav++ Pipeline
+                                                                                                             VLM-Based                                                                                              Imagination                                                                                                                       Reasoning
+                                                                                                                                              Exploration direction
+                                                                                                                            based on the following.
+                                                                                                                                            (1)<Navigation Goal>
+                                                                                                                                  (2)<Composite Image>
+                                                                                                                                                           (3)<Historical trajectory>
+
+                                                                  Robot
+
+
+                                                                                                                           History                                                                                                                        PointNav
+
+
+Fig. 1.  The comparison between the conventional LLM-based navigation pipeline and our ImagineNav++ pipeline. The traditional LLM-based navigation
+framework, illustrated on the left, relies on intricate sensor data processing and pose estimation for map creation, followed by LLM-driven reasoning to decide
+the exploration direction. Instead, our ImagineNav++ directly decomposes the long-horizon object goal navigation task into a sequence of best-view image
+selection tasks for VLM, which avoids the latency and compounding error in the traditional cascaded methods.
+
+
+details. This limitation makes  it difficult and ambiguous for   process may inadvertently discard essential spatial and se-
+LLMs to infer the best navigation plan.                      mantic information inherent in raw visual data, fundamentally
+  In this work, we try to explore whether it is possible to cir-   limiting effective spatio-temporal reasoning. An alternative
+cumvent the complicated and fragile mapping→translation→   paradigm directly employs historical image sequences for end-
+planning framework, instead developing a visual navigation   to-end decision-making [40]–[42]. While architecturally sim-
+approach that operates directly on raw RGB/RGB-D observa-   pler, these approaches often exhibit limited capacity to model
+tions using pre-trained VLMs. Our proposed ImagineNav++   long-term dependencies and show reduced robustness against
+framework seeks to maximize the capabilities of VLMs in   perceptual noise in lengthy visual sequences. To overcome
+multimodal scene understanding and spatial reasoning, effec-   these limitations, we develop a Selective Foveation Memory,
+tively transforming VLMs into efficient embodied navigation  which mimics human foveation mechanisms by hierarchically
+agents. However, due to fundamental architectural constraints,   integrating keyframe observations through a sparse-to-dense
+current VLMs lack the capability for continuous 3D spatial   framework–maintaining sparse keyframes for long-range struc-
+reasoning [32], rendering them unsuitable for direct generation   tural context while preserving dense frames for proximate
+of navigable 3D waypoints. To overcome this limitation, we   details, thereby efficiently capturing both global layout and
+propose a novel paradigm that reformulates visual navigation   local semantics. In particular, we introduce the innovative use
+as an imagination-powered best-view image selection task,   of the pre-trained vision foundation model DINOv2 [43] to
+strategically harnessing VLMs’ discriminative image analy-   semantically interpret historical observations, measure inter-
+sis capabilities while circumventing their inherent limitations   frame similarity, and extract representative keyframes from
+in geometric  reasoning. Addressing  the  central  challenge   extended observation sequences,  effectively addressing the
+of generating well-founded candidate views for VLM-based   redundancy in long-term visual streams while preserving es-
+selection, we develop the Where2Imagine module, which   sential spatio-temporal structures for robust decision-making.
+distills human indoor navigation habits to generate future 3D    The above pose-aware imagination-and-selection capability,
+navigation waypoints where a human might navigate based on   integrated with the selective foveation memory allows the
+the current visual observation. Such 3D navigation waypoints   goal-oriented visual navigation task to be effectively decom-
+indicate relative poses with respect to the current frame and   posed into a sequence of point-goal sub-tasks, facilitating the
+can be readily translated into new observation images using   creation of collision-free navigation trajectories. Experimental
+novel view synthesis (NVS) models [33]–[35]. Afterwards,   results on standard benchmarks demonstrate the superiority of
+the VLMs only need to select the most relevant imagined   our ImagineNav++ in open-vocabulary object/instance naviga-
+observation with respect to the target object and drive the robot   tion. Our main contributions are highlighted as follows:
+to follow the corresponding point-goal navigation trajectory.       • We develop a mapless navigation framework Imagine-
+  Furthermore, it is well-established that agent memory plays      Nav++.  It leverages the imagination to generate image
+a crucial role in embodied navigation, allowing agents to accu-        observations  at  potential future 3D waypoints as the
+mulate, interpret, and leverage historical scene observations to     VLMs’ visual prompts, grounding the VLMs to become
+inform future decisions [36], [37]. A major open challenge that         efficient navigation agents without any fine-tuning.
+arises in the context of VLM-based view selection is how to     • We design a task-oriented model Where2Imagine to un-
+effectively encode the continuously expanding stream of obser-        derstand human navigation habits. This model is crucial
+vations to endow pre-trained VLMs with temporal reasoning        to bridge the task-agnostic high-level VLM planners and
+capabilities. A common approach leverages VLMs to caption        the low-level navigation policies.
+individual observations, subsequently aggregating these textual     • We introduce a selective foveation memory mechanism
+summaries over time [38], [39]. However,  this abstraction         that hierarchically integrates keyframe observations in a
+=== PDF PAGE 3 ===
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE                                                                         3
+
+
+     sparse-to-dense manner, thereby constructing a discrim-   B. Open-Vocabulary Navigation: From Objects to Instances
+     inative and compact scene representation for long-term                                                            Open-vocabulary navigation requires agents to respond to
+     spatial reasoning.                                                                    instructions involving object categories or specific instances
+  • For zero-shot ObjectNav, our ImagineNav++ increases                                                              not encountered during training, placing higher demands on
+     success  rate by a  large margin of 4.0% and 23.5%                                                                 the model’s generalization and grounding capabilities. In ob-
+     respectively on the complex HM3D [44] and HSSD [45],                                                                         ject goal navigation, early end-to-end methods attempted to
+     while achieving competitive result on Gibson [46]. For                                                                    integrate textual knowledge into navigation tasks by leveraging
+     InsINav, our approach attains the highest SPL on HM3D.                                                       compact multimodal feature spaces such as CLIP  [7], yet
+  This paper  is an extended version of our prior publica-   their performance remains limited [57]–[59]. Modular ap-
+tion [47]  in ICLR 2025. The main  differences from  the   proaches [18], [25], [60], on the other hand, typically rely on
+conference version are listed as follows: 1) We introduce a   sensors for localization and mapping, high-level planning, and
+selective foveation memory that maintains spatial consistency   low-level control. Their dependence on hardware precision and
+via structured trajectory reasoning, thereby mitigating prior   pre-computation constrains practical  flexibility. Meanwhile,
+decision biases through  its hierarchical keyframe selection   instance goal navigation presents greater challenges due to its
+and organization. 2) We demonstrate the method’s robust   requirement for distinguishing unique target instances. Repre-
+transferability by showing that  it could seamlessly adapt to   sentative works such as Goat [61] achieve lifelong navigation
+the InsINav task with only minimal architectural adjustments.  by constructing an instance-aware semantic memory and inte-
+3) Our empirical findings are further supported by extensive   grating classical path planning. Mod-IIN [62], is specifically
+evaluation across multiple benchmarks, complemented by de-   designed for this task, utilizing feature matching and map
+tailed ablation studies and hyperparameter analysis.             projection for goal re-localization. UniGoal [6] employs a
+                                                                   unified graph representation and graph matching to handle
+                         II. RELATED WORK                        diverse goal types. While these methods demonstrate strong
+                                                         performance on specific benchmarks, most still rely heavily onA. Large Models for Robotic Planning
+                                                                       explicit environmental representations–such as maps or scene
+  Large-scale models pre-trained on extensive internet data                                                           graphs–or extensive task-specific training. Our approach intro-
+have demonstrated formidable zero-shot reasoning capabilities                                                          duces an imagination-based, mapless navigation framework.
+in tasks such as planning [48], code generation [49], [50],                                                           This framework circumvents the need for extensive training
+and solving science questions [51]. The in-context learning                                                     by transforming the complex process of navigation planning
+capability of LLMs allows them to be applied to robotic                                                                    into a selection problem based solely on RGB inputs.
+task planning. Some methods [49], [50], [52] leverage LLMs
+to decompose tasks into subtasks, enhancing execution effi-
+                                                          C. Imagination in Embodied Navigationciency. Cap [49] generates robotic policy code directly from
+example language commands, enabling autonomous control     Recent methods [63]–[65] have adopted supervised learning
+and task execution based on natural language instructions.   to infer potential target locations, addressing the ‘Where to
+Instruct2Act [50] combines LLM with foundational models   look?’ challenge in navigation. These approaches typically
+(e.g., SAM and CLIP), reducing error rates in complex task   predict either the absolute coordinates [63] of the target, the
+execution, while SayCan [52] combines LLM task planning   shortest distance to target [64], or the nearest boundary [65]
+with the feasibility of physical skills using pre-trained value   based on local maps. Another line of research [66]–[69] has
+functions, generating actionable plans for robots. However,   focused on enhancing the prediction of unobserved regions
+one limitation of LLMs is their difficulty in embedding the   through diverse methodologies. For instance, [66] introduced
+robot’s state directly into the planning process. To address   occupancy anticipation, where the agent infers an occupancy
+this, many  studies have turned  to VLMs  as  alternatives.  map based on RGB-D  inputs. The L2M framework was
+For instance, ViLA [53] significantly improves performance   introduced [67], consisting of a two-stage segmentation model
+on multimodal tasks without compromising text capabilities   that generates a semantic map beyond the agent’s field of
+by systematically exploring VLM pretraining design choices.   view and selects long-term goals based on the uncertainty of
+CoPa [54] incorporates commonsense knowledge from VLMs,   predictions. SSCNav [68] leverages semantic scene completion
+proposing a coarse-to-fine task-oriented grasping and task-  and confidence maps  to  infer the environment and guide
+aware motion planning approach. PIVOT [55] transforms tasks   navigation decisions. A self-supervised generative map (SGM)
+into iteratively optimized visual question-answering problems    is proposed [69], which employs self-supervised approach to
+via a refinement process. Socratic model [56] integrates mul-   continually generate unobserved regions in the local map and
+tiple pretrained large models (e.g., VLMs, LLMs, and audio   predict the target’s location. These methods primarily predict
+models) in a modular fashion to enable reasoning and task   unobserved regions in top-down maps derived from egocentric
+execution through language-based interaction. These methods  RGB-D projections. By contrast, our ImagineNav++ performs
+employ a set-of-examples (SOE) approach to guide VLM   future-scene imagination directly in RGB space. We employ
+selection. We propose a new decision-making paradigm based   a compact model aligned with human navigation behavior to
+on imagined imagery, wherein decisions are made on imagina-   generate novel viewpoint locations, which are then translated
+tions, enabling more nuanced, context-aware interactions that   into corresponding visual observations through a diffusion-
+better harness VLMs’ spatial perception capabilities.           based view synthesis process.
+=== PDF PAGE 4 ===
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE                                                                         4
+
+
+
+
+
+                             Selective Foveation Memory
+     Continuous             �     Segme��� {��, ��. . . ��}                  DINOv2       Obs.  ��                    Sim. Th.
+       ���   ���   ���   ���   ���       ���−�  ��� ���+�      ���−����    ��= ��� ���||���−��||
+                                                                                    Distant
+                                                            Medium                                                    ...                             ...                                                                           Recent
+
+               Analyzing composite image combined with historical memory to find the chair.
+
+
+Point Goal
+Navigation      {‘Reason’:This image may contain chair and has not been explored. ‘Choice’:2}
+
+
+Fig. 2. The overall pipeline of our mapless, open-vocabulary navigation framework ImagineNav++. At each iteration, the agent captures a panoramic view of its
+surroundings. The Imagination Module then leverages the trained Where2Imagine module coupled with a novel view synthesis model to generate novel scene
+views. Guided by structured prompts, the VLM engages in target-oriented inference by integrating historical selective foveation memory with imagined future
+waypoint observations. Subsequently, the system executes the PointNav policy to determine the next navigational action. The above imagination, reasoning
+and planning procedure iterates until the target is reached.
+
+
+D. Memory Mechanism in Embodied Navigation               [72]–[74]. VLMNav [72] constructs dynamic  traversability
+                                                     masks in a VQA framework. Concurrently, mapless navi-
+  Memory plays a crucial role in visual navigation by improv-   gation paradigms have emerged, bypassing explicit mapping
+ing an agent’s perceptual consistency and long-term reasoning   to leverage multimodal observations. Representative methods
+capabilities in unfamiliar environments [36], [37].  Initially,   include NaVid [40], which encodes monocular RGB streams
+LLMs were predominantly applied in embodied navigation   into spatio-temporal representations using special tokens to
+systems  to support  high-level decision-making. To enable   differentiate historical and current observations; its extension
+LLMs to process perceptual inputs, earlier approaches [38],  Uni-NaVid [41] incorporating hierarchical token compression
+[39] generate descriptive captions of individual observations   for  efficient  long-context  processing; and  the GRU-based
+and aggregate these textual summaries over time. Subsequent   history aggregation approach of [42], which models temporal
+methods typically construct a globally consistent memory map   observations to predict collision-aware action distributions. In
+from visual observations, infer potential navigational way-   line with these mapless navigation paradigms, our method
+points through structured spatial reasoning, and encode these   also utilizes historical visual observations as direct input to
+into natural language representations suitable for LLMs [25]–  VLMs. However, a key distinction of our approach lies in its
+[27],  [29], such as the semantic score map  in OpenFM-   use of visually salient keyframes, which compress perceptual
+Nav [26] and the reduced Voronoi graph in VoroNav [27].   history, enhance temporal coherence, and emphasize task-
+The inherent loss of geometric information in language rep-   critical visual information, leading to more robust and efficient
+resentations has motivated the development of hybrid mem-   navigation performance.
+ory approaches that maintain structured environmental state
+                                                                                                   III. METHODOLOGY
+values  (e.g.,  target  distance and  exploration  reward). For
+                                                             A. Problem Formulation and Overall Frameworkinstance, VLMap [60] quantifies navigation value via pixel-
+level feature-text similarity, while VLFM [70] projects image-    The open-vocabulary goal-oriented navigation task requires
+text similarity into dynamic value maps using BLIP-2 [71].   an agent to locate an arbitrary target object instance in novel
+While effectively mitigating memory forgetting, these methods   environments, without prior exposure to the object category
+require  extensive precomputation and environment-specific   during training. At the beginning of each episode, the agent
+training, limiting  their  scalability  to unseen environments.    is initialized at a random pose with no prior knowledge of the
+With recent advances in multimodal learning, VLMs have   scene layout. The goal is to find a target object gi, which can
+been increasingly integrated into visual navigation systems to   belong to any category in an open-vocabulary setting. In Ob-
+improve scene interpretation and decision-making [40]–[42],   jectNav, the target is specified by semantic category, whereas
+=== PDF PAGE 5 ===
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE                                                                         5
+
+
+in InsINav, it is defined by a reference image of a particular   observation. Recent years have witnessed remarkable progress
+object instance. At each time step  t, the agent receives an   in NVS, with advanced methods ranging from few-shot 3D
+egocentric panorama view It, divided into 6 separate views,   rendering techniques [75]–[77] to generative models, partic-
+each represented by an RGB image It,i accompanied by its   ularly diffusion models [33]–[35], which have demonstrated
+depth map Dt,i. The agent operates over a discrete low-level   powerful image synthesis capabilities across diverse domains.
+action space comprising: {Stop, MoveAhead, TurnLeft,   In this work, we adopt a pre-trained diffusion model ”Polyocu-
+TurnRight, LookUp, LookDown}. The MoveAhead ac-   lus” [33] for future-view imagination owing to its capacity to
+tion moves the agent forward by 25 cm, while the rotational   generate perceptually consistent and high-fidelity novel views
+actions TurnLeft and TurnRight rotate the agent by 30  from a single RGB image and a relative pose.
+degrees. The task is considered successful if the agent reaches
+the  target object with a geodesic distance smaller than a
+defined threshold (e.g., 1m) and executes the Stop command
+within a fixed number of steps. Each episode is limited to a
+maximum of 500 steps.
+  An overview  of our proposed imagination-based open-
+vocabulary visual navigation framework, dubbed Imagine-
+Nav++, is presented in Figure 2. The agent first utilizes the
+Where2Imagine module to generate candidate waypoints for
+imagination based on the current visual observation. A novel
+view synthesis (NVS) model then renders imagined visual
+observations corresponding to these candidate locations. By
+leveraging the agent’s scene memory, the multimodal large-
+scale model evaluates the synthesized images, each annotated
+with option labels, to assess both spatial structure and semantic    Fig. 3.   Visualization of human demonstration trajectories on the MP3D
+coherence, enabling context-aware and efficient selection of    dataset  in  the Habitat-Web  project. The  trajectories  reveal a  consistent
+exploration directions. Specifically, a vision-language model   tendency for humans to prioritize directions toward semantically meaningful
+                                                                          cues (e.g., doors) that structurally facilitate efficient exploration.
+(VLM)  is prompted to reason over the six-view imagined
+future observations and select the optimal waypoint. The agent
+                                                                         Specifically,  to equip  the Where2Imagine module with
+then employs a low-level point navigation policy to reach the
+                                                          human-like spatial intuition for waypoint prediction, we train
+chosen sub-goal. Once the subgoal is deemed reached, the
+                                                           a ResNet-18 model [78] from scratch using human demon-
+memory is updated by recursively incorporating the new obser-
+                                                                      stration data sourced from the Habitat-Web project [4]. The
+vations into the hierarchical memory structure. This procedure
+                                                               data comprises 80k ObjectNav and 12k Pick&Place trajec-
+iterates recursively-each new observation serves as input to
+                                                                       tories collected via a virtual teleoperation system on Ama-
+subsequent imagination, reasoning, and navigation steps-until
+                                                       zon Mechanical Turk, capturing natural human navigation
+an instance of the  target object  is successfully  identified.
+                                                             behaviors  in indoor environments. A key  insight  derived
+Through this mechanism, the goal-oriented visual navigation
+                                                      from these demonstrations is that humans consistently favor
+task  is decomposed into a sequence of manageable point-
+                                                                   directions toward semantically meaningful  structures  (e.g.,
+goal navigation sub-tasks. A key advantage of our proposed
+                                                              doors) that facilitate exploration, as illustrated in Figure 3.
+ImagineNav++  is  its  training-free reasoning and planning
+                                             By learning from these demonstrations, the model acquires
+pipeline, which requires no object-specific data, making  it
+                                                             semantically-informed navigational preferences, enabling  it
+inherently open-vocabulary and capable of zero-shot gener-
+                                                                    to predict waypoints that are both geometrically plausible
+alization to unseen semantic targets. Section III-B introduces
+                                                       and semantically meaningful, thereby supporting efficient and
+the imagination module, Section III-C describes the memory
+                                                              contextually-aware navigation. We reformulated the human
+module, Section III-D details the VLM-based planner, and
+                                                            demonstration trajectories into a paired dataset {(Ot, Pt+T )},Section III-E describes the point navigation policy.
+                                                      where Pt+T = (∆x, ∆y, ∆θ) denotes the ground-truth relative
+B. Future-View Imagination                                waypoint pose with respect to the agent’s current frame Ot.
+                                                            Here, T defines a predictive temporal horizon that captures
+  To  better leverage the  spatial perception and reasoning
+                                               how humans  anticipate and navigate through semantically
+capabilities of VLMs for open-vocabulary visual navigation in
+                                                          meaningful spatial scales. To enhance learning efficacy, we
+unknown environments, we propose a future-view imagination
+                                                           apply a depth-based filter to exclude observations with limited
+model, which is composed of a Where2Imagine module fol-
+                                                           semantic content (e.g., close-up views of blank walls):
+lowed by a novel view synthesis (NVS) model. As illustrated
+in Figure 2, the Where2Imagine predicts the relative pose
+(∆x, ∆y, ∆θ) of a potential next waypoint from the current             Ot is retained only if d(Ot) ≥0.3           (1)
+RGB observation, where ∆x, ∆y and ∆θ denote  lateral
+displacement, longitudinal displacement, and viewing angle  where d(Ot) denotes the average depth of the visual observa-
+change, respectively. This predicted pose is subsequently fed   tion Ot. Furthermore, considering the inherent constraints of
+into the NVS module to generate a corresponding imagined   diffusion-based NVS models in handling extreme viewpoint
+=== PDF PAGE 6 ===
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE                                                                         6
+
+
+changes  (e.g., 120°, 180°, 240°), we restricted the angular   entire sequence, we measure the cosine similarity between
+deviation ∆θ in the training set to:                            consecutive frame features as:
+                                                                                                     fi · fi+1                     |∆θ| ≤30◦,                       (2)                          si,i+1 =                               (5)
+                                                                                                       |fi||fi+1|
+ensuring synthesis quality and perceptual consistency. This
+                                                           Adjacent frames  Ii and Ii+1  are grouped  into  the same
+curation procedure enhances training stability and promotes
+                                                           semantic segment  if si,i+1 >  τ; otherwise,  Ii  initiates a
+the generation of plausible, human-like waypoints through the                                                new segment. Here, τ  is a time-varying threshold control-
+Where2Imagine module. Finally, The model is trained end-                                                                    ling segmentation  granularity: a higher τ  leads to denser
+to-end using a mean squared error (MSE) loss between the                                                     memory, while a lower τ encourages sparser retention. This
+predicted and ground-truth waypoint poses:                                                              aggregation procedure  ultimately  yields M  semantic  seg-
+
+                   B                                                 2              ments {S1, S2, · · · , SM}, from each  of which we  select                    1                                           (b)       (b)
+              Lwaypoint = X Pt+T −ˆPt+T              (3)   the frame closest to the segment’s average feature as the             B                      2
+                         b=1                               keyframe. Formally, for each segment Sm containing frames
+                                                        {Im1, Im2, . . . , ImNm }, we compute its feature centroid as:where B denotes the batch size and ∥·∥2 refers to L2-norm.
+  During inference,  at navigation time step  t, the model                       Nm                                                                             1
+predicts the relative waypoint pose from each of the six current               µm =  X fmj,                   (6)
+                                                  Nmviews It,i, i ∈{1, 2, · · · , 6}, as follows:                                                  j=1
+       ˆPt+T,i = [ˆ∆xt,i, ˆ∆yt,i, ˆ∆θt,i] = ResNet-18(It,i),    (4)  The selected keyframe Ikm from Sm is then determined by:
+                                                    km = arg  min   ||fmj −µm||.            (7)where ˆPt+T,i denotes the predicted relative displacement and                              j∈1,...,Nm
+heading angle of the waypoint at a future time step t+T. The
+                                                   The resulting set of representative keyframes across all seg-set {(It,i, ˆPt+T,i)}6i=1 is then passed to the diffusion model to
+                                                       ments is denoted as M = {Ik1, Ik2, · · · , IkM }.generate imagined waypoint observations {Mt,i}6i=1.
+                                                               Furthermore, in embodied visual navigation, visual observa-
+                                                                    tions from different time steps actually serve distinct purposes.
+C. Selective Foveation Memory                          To be precise, recent observations capture fine-grained local
+                                                                          details, while far historical observations establish a coherent
+  In complex indoor navigation scenarios, keyframes serve as
+                                                               global context. Building upon these insights, we partition the
+compact yet informative representations that capture salient
+                                                               observation history O up to the current time step  t, into
+spatial and contextual information across temporal sequences.
+                                                                  three temporal segments, including distant-term T d, medium-They reduce data redundancy and preserve essential perceptual
+                                                          term T m, and recent-term T r, using a keyframe-count-drivencues, thereby enhancing memory efficiency while supporting
+                                                                         criterion. We assign decreasing thresholds τd < τm < τr tolong-term temporal reasoning. However, reliably extracting
+                                                                these segments, inducing monotonically increasing keyframe
+such keyframes from observational data remains challenging,
+                                                                density from distant to recent segments. Specifically, starting
+particularly in identifying semantically meaningful segments
+                                                      from the current frame It and moving backward:within extended visual streams. Traditional keyframe extrac-
+tion methods often rely on hand-crafted features such as color     • Recent-term memory Mr is formed by sequentially se-
+histograms [79]–[81] for clustering, which struggles to capture        lecting and adding keyframes using similarity threshold
+deep semantic similarities between frames. In contrast, modern        τr until Nr keyframes are selected.
+deep learning approaches can model complex spatio-temporal     • Medium-term memory Mm then continues backward
+dependencies but are typically heavily supervised, requiring         until Nm keyframes are collected.
+extensive manual annotations [82]–[85]. This motivates our     • Distant-term memory Md includes all other keyframes
+exploration of DINOv2 [43] for keyframe extraction in a zero-        extracted from all prior observation frames via semantic
+shot manner, where selection is driven primarily by inter-frame       segmentation using similarity threshold τd.
+visual similarity. DINOv2’s self-supervised pre-training on a   This design emulates a foveated memory mechanism, empha-
+large-scale and diverse image corpus enables it to learn unified   sizing recent high-detail contexts while preserving structural
+visual representations that inherently encode holistic scene   coherence over the long term. The resulting hierarchical mem-
+structure. Consequently,  the model  exhibits a pronounced   ory M = {Mr, Mm, Md} provides structured spatiotempo-
+sensitivity  to scene-level  variations, making  it  particularly   ral context for VLMs, balancing real-time detail with long-
+suitable for identifying semantically representative keyframes   term coherence.
+without task-specific training.                                      Efficient Variant for Real-Time Deployment. Computing
+   Specifically, given a historical observation sequence O =   global feature similarities over the entire observation history
+{I1, I2, . . . , It} up to time t, we first encode each observation   incurs O(N) complexity, which  is prohibitive for lifelong
+using DINOv2 to extract discriminative feature embeddings   navigation. To address this, we propose an online, incremental-
+F = {f1, f2, . . . , ft}. To construct a compact yet informative   update variant of the Selective Foveation Memory. Observa-
+memory, we employ a semantic similarity-based keyframe   tions are processed in a streaming manner: each new frame It
+selection strategy. Specifically, moving backward through the    is compared only with the last frame of the currently active
+=== PDF PAGE 7 ===
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE                                                                         7
+
+
+segment. If their similarity exceeds τr, It is absorbed; other-   to ObjectNav, which depends on semantic cues from the envi-
+wise, the segment is terminated and compressed by extracting   ronment, PointNav operates purely on spatial perception, using
+a representative keyframe using Eq. 7 and storing it in a short-   relative displacement commands (∆x, ∆y) without requiring
+term buffer, along with the partitioning similarity for subse-   semantic understanding. Multiple established methods exist
+quent hierarchical grouping. To strictly bound memory usage,   for PointNav implementation [87]–[90]. In our framework, we
+we further introduce a hierarchical capacity constraint. When   adopt Variable Experience Rollout (VER [89]) as the under-
+the short-term buffer reaches capacity, the oldest keyframes   lying policy for action selection at each navigation step. VER
+are transferred to the medium-term memory Mm. To preserve   combines the advantages of synchronous and asynchronous re-
+O(1) update complexity, medium- and long-term updates   inforcement learning paradigms, leading to improved training
+reuse the recorded similarities instead of recomputing them,   efficiency and sample utilization. As a result, the agent exhibits
+grouping adjacent keyframes via τm and τd and extracting   enhanced adaptability and generalization performance in novel
+higher-level representatives (“keyframes of keyframes”). This  and complex environments.
+hierarchical compression mechanism prevents out-of-memory
+(OOM) while preserving the global spatiotemporal structure.                        IV. EXPERIMENT
+
+                                                             A. Experimental Setup and Evaluation Metrics
+D. High-level Planning
+                                          We evaluate the effectiveness and navigation efficiency of
+  The high-level planning module leverages the spatial aware-                                                           our proposed ImagineNav++ using the Habitat v3.0 simu-
+ness and commonsense reasoning capabilities of the VLM to                                                                        lator [93] on both Object-Goal Navigation (ObjectNav) and
+select the direction most conducive to locating the navigation                                                           Instance-Image-Goal Navigation (InsINav). For ObjectNav,
+target. We employ GPT-4o-mini [86] as the high-level planner                                             we conduct experiments on three widely adopted datasets:
+due to its favorable balance between reasoning performance                                                       Gibson [46], HM3D [44] and HSSD [45]. Specifically, we
+and practical efficiency. To assist GPT-4o-mini in decision                                                     employ the ObjectNav training and validation splits for Gib-
+making, we designed a simple prompt template, requiring the                                                                son, as introduced in SemExp [3], covering 27 scenes and 6
+VLM to summarize its choice in a JSON format containing                                                                 object categories. The HM3D dataset, employed in the Habitat
+{ ‘Reason’, ‘Choice’ }. This format allows for a clear un-                                                     2022 ObjectNav Challenge, contains 2,000 validation episodes
+derstanding of the VLM’s reasoning process. As illustrated in                                                               across 20 unique environments and 6 object categories. The
+Figure 2, the VLM is provided with synthesized observations                                                                  recently introduced HSSD dataset comprises 40 high-quality
+of potential future waypoints, historical memory, and the navi-                                                                  synthetic scenes with 1,200 validation episodes covering 6
+gation goal. Guided by the hierarchical prompt, it analyzes the                                                                 object categories. For InsINav, we follow established protocols
+semantic content of each view to select the optimal exploration                                                      from prior works  [5], [6] to evaluate performance on the
+direction, returning its decision in a structured format. The                                     HM3D dataset [44]. The experimental configuration adheres
+complete prompt can be found in section IV. This integration                                                                    to the ObjectNav Challenge 2023 guidelines [94]. To support
+of imagined future observations and historical keyframes as                                                                 the data collection for the Where2Imagine module, we utilize
+visual prompts equips our ImagineNav++ with significantly                                                human demonstration trajectories from the MP3D dataset [95]
+enhanced  spatial reasoning and long-term decision-making                                                              within the habitat-web project, using a camera height of 0.88
+capabilities. First, VLMs are more skilled at handling multiple-                                  m and a horizontal field of view (HFOV) of 79°.
+choice decision tasks compared  to 3D geometry question                                          We evaluate visual navigation performance using two stan-
+answering (i.e., directly inferring the 3D coordinates of next                                                           dard metrics: Success Rate (SR) and Success weighted by Path
+waypoints). Furthermore, the introduction of the imagined fu-                                                        Length (SPL) [96]. SR is defined as the proportion of episodes
+ture observations augment the VLM’s scene understanding by                                                                    in which the agent executes the STOP action within 1 meter
+providing rich contextual information about distant or visually                                                               of the target object. SPL is computed as:
+unclear objects, while the historical keyframes maintain a co-
+                                                          N
+herent representation of the environment’s state over time. This                    1                 ℓi
+                                                        SPL = X Si                        ,            (8)
+complementary mechanism  effectively mitigates perceptual            N        max(pi, ℓi)
+uncertainty and facilitates robust long-horizon reasoning. The                          i=1
+proposed imagination-guided reasoning procedure–integrating  where Si is a binary success indicator for episode i, pi denotes
+waypoint imagination and high-level planning–operates on a   the path length traversed by the agent and ℓi represents the
+periodic cycle: it is triggered once every T steps, proposing a   shortest path (ground-truth) length.
+new sub-goal only after the low-level controller has success-
+fully completed navigation to the current target. This design   B. Baselines
+ensures an effective balance between computational efficiency
+                                                            For ObjectNav, we conducted a comparative analysis of
+and robust long-horizon navigation performance.
+                                                              non-zero-shot and zero-shot object navigation methods to rig-
+                                                              orously evaluate the superiority of our ImagineNav++ frame-
+E. Low-level Controller                                                          work. FBE [1] pioneered a frontier-based exploration strategy,
+  Following waypoint selection by the high-level planner,   emphasizing the boundaries between explored and unexplored
+the low-level controller executes a Point Goal Navigation   regions. SemExp [3] advanced this concept by implementing
+(PointNav) strategy to reach each designated target. In contrast   goal-directed semantic exploration through the construction of
+=== PDF PAGE 8 ===
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE                                                                         8
+
+
+
+                                                TABLE I
+ IMAGINENAV++: COMPARISON WITH PREVIOUS WORK ON OBJECT-GOAL NAVIGATION. THE WHERE2IMAGINE MODULE WITH T =11, UTILIZING
+  RESNET-18 TRAINED FROM SCRATCH AND GPT-4O-MINI AS THE VLM, WAS EVALUATED OVER 200 EPOCHS ON THE GIBSON, HM3D, AND HSSD
+  DATASETS. IMAGINENAV++ USES NVS MODEL TO GENERATE NOVEL VIEW IMAGES, WHILE IMAGINENAV++(ORACLE) USES REAL IMAGES OF THE
+                                     CANDIDATE POINTS TO FACILITATE SPATIAL REASONING.
+
+                                                           Gibson      HM3D       HSSD
+            Method         Open-Vocabulary   Mapless
+                                               SR ↑  SPL ↑  SR ↑  SPL ↑  SR ↑  SPL ↑
+           FBE [1]              ✗           ✗       64.3    28.3    33.7    15.3    36.0    17.7
+           SemExp [3]             ✗           ✗       71.7    39.6    37.9    18.8        -          -
+           Habitat-Web [4]           ✗        ✓           -          -      41.5    16.0        -          -
+         OVRL [91]             ✗        ✓           -          -      62.0    26.8        -          -
+           ESC [25]          ✓           ✗           -          -      39.2    22.3        -          -
+           VoroNav [27]         ✓           ✗           -          -      42.0    26.0    41.0    23.2
+         VLFM [70]          ✓           ✗       84.0    52.2    52.5    30.4        -          -
+              Goat [61]          ✓           ✗           -          -      50.6    24.1        -          -
+           SG-Nav [92]         ✓           ✗           -          -      54.0    24.9        -          -
+            UniGoal [6]          ✓           ✗           -          -      54.5    25.1        -          -
+          ZSON [59]          ✓        ✓       31.3    12.0    25.5    12.6        -          -
+             PixNav [2]          ✓        ✓           -          -      37.9    20.5        -          -
+            PSL [5]           ✓        ✓           -          -      42.4    19.2        -          -
+          ImagineNav [47]        ✓        ✓           -          -      53.0    23.8    51.0    24.9
+          ImagineNav++         ✓        ✓       72.4    42.8    58.5    26.6    64.5    27.9
+       ImagineNav++(Oracle)      ✓        ✓       77.1    53.2    62.5    32.8    67.5    30.3
+
+
+semantic maps. In addition, we examined non-mapping closed-  CLIP [7] and SuperGlue [100] for multimodal goal matching,
+set visual navigation baselines, including approaches based on  and integrating frontier exploration with classical path plan-
+imitation learning [4] and visual representation learning [91].   ning. In contrast, UniGoal [6] achieves universal navigation by
+For zero-shot object navigation, we evaluate several mapping-   aligning diverse goals and scene graphs into a shared space
+based baselines  [6], [25], [27], [61], [70], [92]. Among these,   through a unified graph representation and leveraging graph
+[25], [27], [61], [70] maintains a semantic 2D map of the scene   matching to dynamically guide its exploration.
+and leverages semantic knowledge  to  facilitate navigation
+                                                          C. Numerical Evaluations on ObjectNav Tasktowards target objects, while SG-Nav [92] and UniGoal [6]
+represent the observed scene with 3D scene graph and leverage     Table  I presents a comparative analysis of the proposed
+LLMs for explicit graph-based reasoning. Additionally, we  ImagineNav++ framework against prior state-of-the-art meth-
+also investigate RGB-based non-mapping navigation baselines,   ods. On the Gibson dataset, our ImagineNav++ achieves state-
+including ZSON [59], PSL[5] and PixNav [2]. Specifically,   of-the-art performance under the open-vocabulary and mapless
+ZSON and PSL employ the CLIP model [7] to embed both   setting. While VLFM [70] reports a higher SR (84.0%) on
+target images and object goals into a unified semantic space,   Gibson,  its reliance on real-time dense semantic-geometric
+enabling the training of a semantic goal-driven navigation  mapping makes it vulnerable to cumulative localization drift,
+agent; PixNav, on the other hand, utilizes pixel-level guid-   particularly in large-scale environments, which limits practical
+ance provided by VLMs and LLMs to achieve pixel-accurate   robustness and scalability. In contrast, ImagineNav++ attains a
+navigation.                                                    competitive 72.4% SR without explicit mapping, demonstrat-
+  For InsINav, we compare with the supervised methods   ing greater system robustness and deployment flexibility while
+Krantz  et  al. [97], OVRL-v2 [98], and zero-shot methods   retaining open-vocabulary understanding. This advantage  is
+Mod-IIN [62], Goat [61], UniGoal [6], and PSL [5]. Krantz   convincingly validated on the larger and more complex HM3D
+et  al. [97] pioneered the InsINav task and established an  and HSSD dataset. Specifically, on HM3D, our ImagineNav++
+end-to-end RL baseline based on proximal policy optimiza-   maintains leading performance among open-vocabulary meth-
+tion (PPO [99]) and variable experience rollout (VER [89]).   ods, achieving a 58.5% SR and a 26.6% SPL, surpassing map-
+OVRL-v2 [98] employs an architecture that integrates ViT   based VLFM [70] and graph-based Unigoal [6] by 6.0% and
+with LSTM, achieving end-to-end navigation learning through  4.0% respectively in success rate. Moreover, ImagineNav++
+self-supervised  visual  pre-training, while OVRL-v2-IIN  is   achieves the highest SR and SPL on the HSSD dataset. The
+specifically fine-tuned for InsINav task using the protocol   above observations indicate that our ImagineNav++ demon-
+from OVRL-v2 [98]. Among these zero-shot methods, Mod-   strates  outstanding  navigation performance  across  various
+IIN [62] is specifically tailored for InsINav task, which re-   settings, while maintaining low storage and computational
+identifies the goal instance in egocentric vision using feature-   complexities. Furthermore, since the pretrained NVS is di-
+matching and localizes the goal instance by projecting matched   rectly employed without finetunned on the Gibson, HM3D
+features to a map. Goat [61] enables lifelong navigation by  and HSSD datasets, we see a disparity between the quality of
+constructing an instance-aware semantic memory,  utilizing   images generated by the NVS model and real images, limiting
+=== PDF PAGE 9 ===
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE                                                                         9
+
+
+
+                                                TABLE II
+  IMAGINENAV++: COMPARISON WITH PREVIOUS WORK ON INSTANCE-IMAGE-GOAL NAVIGATION. THE WHERE2IMAGINE MODULE WITH T =11,
+   UTILIZING RESNET-18 TRAINED FROM SCRATCH AND GPT-4O-MINI AS THE VLM, WAS EVALUATED OVER 200 EPOCHS ON THE HM3D DATASET.
+
+                                                     HM3D
+                   Method         Open-Vocabulary   Mapless   Universal
+                                                              SR ↑  SPL ↑
+                   Krantz et al. [97]        ✓           ✗        ✗        8.3      3.5
+                OVRL-v2-IIN [98]          ✗        ✓        ✗       24.8    11.8
+                   Mod-IIN [62]         ✓        ✓        ✗       56.1    23.3
+                     Goat [61]          ✓           ✗      ✓       50.6    24.1
+                    UniGoal [6]          ✓           ✗      ✓       60.2    23.7
+                   PSL [5]           ✓        ✓      ✓       23.0    11.4
+                 ImagineNav++         ✓        ✓      ✓       52.4    32.8
+               ImagineNav++(Oracle)      ✓        ✓      ✓       55.6    37.1
+
+
+                                                TABLE III
+     IMAGINENAV++: ABLATION STUDY ON THE IMAGINATION AND MEMORY MODULES. ‘IMAGINATION’ REFERS TO WHETHER THE FUTURE
+IMAGINATIONS ARE USED AS VISUAL PROMPTS OF THE VLM. WHEN IT IS REMOVED, WE FEED CURRENT OBSERVATIONS INTO VLM FOR DECIDING THE
+ BEST EXPLORATION DIRECTION, AND SET THE NEXT WAYPOINT 2 METERS AWAY FROM THE CURRENT LOCATION ALONG THE DIRECTION. HERE, THE
+ DISTANCE OF 2 METERS IS CONSIDERED AS IT IS COMPARABLE TO THAT GENERATED BY T=11. ‘NVS’ INDICATES WHETHER THE IMAGE IS CAPTURED
+                             FROM A REAL ENVIRONMENT OR SYNTHESIZED VIA THE NVS MODEL.
+
+                                                                 ObjectNav     InsINav
+                 Imagination  Where2Imagine    NVS    Memory
+                                                         SR↑  SPL↑  SR↑  SPL↑
+
+                  ✗            ✗            Oracle      ✗      43.0   24.7   34.9   24.1
+              ✓           ✗            Oracle      ✗      55.0   27.6   47.2   34.4
+              ✓        ✓            Oracle      ✗      64.0   28.3   50.3   36.7
+              ✓        ✓            Oracle     ✓      70.0   36.9   51.9   38.2
+              ✓           ✗         PolyOculus     ✗      49.0   23.3   37.2   23.0
+              ✓        ✓         PolyOculus     ✗      56.0   24.3   43.4   30.3
+              ✓        ✓         PolyOculus   ✓      67.0   30.4   48.8   33.1
+
+
+the capability of our model to some extent. To explore the   imagination mechanism to synthesize and evaluate potential
+upper limits of our framework, we instead use real panoramic   gains across multiple future directions, and subsequently inte-
+images-specifically, the observation at the pose predicted by   grates historical observations to select the optimal exploratory
+the Where2Imagine module-as visual prompts for the VLM   path, thereby minimizing haphazard exploration and redundant
+model. Notably, both the success rate and SPL exhibit obvious   detours. This demonstrates that our ImagineNav++ achieves
+improvements, obtaining 77.1%, 62.5% and 67.5%  at SR   a superior navigation efficiency, excelling in both final goal
+respectively on Gibson, H3MD and HSSD benchmarks, which   attainment and the optimality of the paths taken. Among
+further demonstrates the superiority of our imagination-based  methods adhering to the same open-vocabulary, mapless, and
+navigation framework.                                           universal constraints, our ImagineNav++ delivers markedly
+                                                                      better performance than PSL [5], more than doubling both
+                                           SR (52.4% vs. 23.0%) and SPL (32.8% vs. 11.4%). These
+D. Numerical Evaluations on InsINav Task                                                                       results highlight the capability of our ImagineNav++ to en-
+  Table II summarizes the performance of our ImagineNav++   able efficient and robust navigation relying solely on visual
+and baseline methods on the InsINav task. While UniGoal [6]   observations, without requiring explicit map construction. The
+achieves the highest SR of 60.2%, it requires a graph-based   efficacy of our framework on instance-level objectives further
+planner  that introduces  significant computational overhead   validates the strong adaptability of our ImagineNav++ across
+from graph construction, graph update, and graph matching. In   diverse goal-oriented visual navigation tasks.
+comparison, our ImagineNav++ operates under a strict mapless
+setting and  still attains a competitive SR of 52.4%. More
+                                                             E. Ablation Study on Main Components
+notably, ImagineNav++ establishes a new state-of-the-art in
+path efficiency and achieves a superior SPL of 32.8%, signif-   We conducted an ablation study to systematically evaluate
+icantly outperforming all other methods, including those that   the contribution of key components in the proposed method:
+leverage map information (Mod-IIN [62]: 23.3%, Goat [61]:   Imagination, Where2Imagine, and Memory, with each variant
+24.1%, UniGoal [6]: 23.7%). This advantage stems from our   evaluated for 100 epochs. As shown in Table III, introducing
+proactive planning paradigm, wherein the agent utilizes an   Imagination (Row #2) increases SR by significant margins of
+=== PDF PAGE 10 ===
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE                                                                        10
+
+
+12.0% (55.0% vs. 43.0%) on ObjectNav and 12.3% (47.2%   labeled image data and re-train the ResNet-18 for relative
+vs. 34.9%) on InsINav by utilizing future-view imaginations as   pose prediction. Each variant was tested for 100 epochs under
+visual prompt of the VLM for deciding exploration direction.   conditions where the agent had access  to  real panoramic
+Please note that in the configuration of Row #2 (without   observations. As shown in Figure 5, the best success rate
+Where2Imagine), future views are generated at six locations,  and SPL are obtained when T  is set to 11. Furthermore,
+each positioned two meters from the agent along the directions  we visualize several navigational trajectories under different
+of its current observable viewpoints. Further addition of the   values of T  in Figure 6 to  facilitate explanation. As can
+Where2Imagine module (Row #3 and #6) boosts ObjectNav   be seen, when T  is relatively small  (i,e., 8), the agent  is
+SR by 9.0% (‘w/o NVS’) and 7.0% (‘NVS’) while improving   easily trapped as marked by red square, since it mainly resorts
+InsINav SR by 3.1% and 6.2%, respectively. The observed   to local semantic information for inferring  its exploration
+performance gain demonstrates the critical role of future imag-   direction, making it susceptible to converging on suboptimal
+ination in enhancing the VLM’s spatial reasoning capability.   local  solutions. Conversely, when T  is  excessively  large,
+Such improvements can be attributed to the greater semantic   although the agent has access to more distant information,
+disparity between different imaginations, as illustrated in Fig-    it is prone to miss some critical intermediate semantics which
+ure 4. Finally, incorporating the Memory mechanism (Row #4   are closely related to target and are worth exploring, leading
+and #7) leads to the highest performance across all metrics,   to erroneous long-range decisions,  particularly  in  intricate
+notably improving ObjectNav SR by 11.0% and InsINav SR   environments. However, an optimally calibrated T can strike a
+by 5.4% under the setting of ‘NVS’, underscoring its value   delicate balance between exploration and perception, thereby
+in maintaining long-term spatial reasoning. In particular, as   facilitating to obtain impressive navigation performance.
+previously discussed, the performance of ImagineNav++  is
+constrained by the quality of the off-the-shelf NVS model [33],
+as reflected in the performance gaps between Rows #3 and
+#6 and between Rows #4 and #7. The proposed Memory
+module, however, effectively mitigates this dependency and
+substantially alleviates the performance degradation caused by
+imperfect NVS synthesis. This is demonstrated by the rela-
+tively smaller performance drops on ObjectNav (64.0→56.0
+vs. 70.0→67.0) and on InsINav (50.3→43.4 vs. 51.9→48.8).
+This is reasonable, as the Memory module allows the agent
+to accumulate historical observations, thereby building a more
+consistent and reliable internal representation of the environ-
+ment. This process, in turn, reduces the agent’s reliance on any
+                                                                                   Fig. 5.  Where2Imagine: the impact of different sampling intervals T onsingle, and potentially flawed, NVS synthesis when making
+                                                                     ObjectNav performance on HM3D dataset.
+navigation decisions.
+
+
+
+
+                                                 You will be provided with the following elements:
+                                                        (1)<Navigation Goal>: toilet
+                                                      (2)<Candidate Images>
+                                                              (3)<Historical Trajectory>
+                                                      Evaluate these six images and choose the most
+                                                          suitable one for exploration.
+
+
+
+                                                                                   Fig. 6. Comparison of trajectories at different sampling steps T. This image
+                                                                                 presents a top-down view of the entire trajectory as the agent searches for
+                                                                                 the target (a chair). The red box highlights the situation where the agent
+                                                                            encounters a local trap during navigation.
+
+Fig.  4.   Visualization  of  future navigation waypoints generated by  the     2) Choice of Backbone.: We evaluate the impact of dif-
+imagination module shows significant semantic variation compared to the   ferent visual backbones on both waypoint prediction and final
+consistent semantics of current observations. This diversity demonstrates the   navigation performance. All backbones were adapted for our
+module’s effectiveness in enhancing VLM decision-making.
+                                                                      task: ResNet-18 and ViT were modified at their final layers
+                                                       and trained end-to-end, whereas DINOv2 and MAE were
+F. Analysis of Where2Imagine Module                         kept frozen, with their features fed into a separate trainable
+  To validate the effectiveness of the proposed design, we   five-layer MLP. All experiments used real RGB observations
+perform ablation studies under a memory-free configuration   without resorting to the NVS model and were tested for
+across all experiments reported in this section.               100 epochs. As shown in Table IV, ResNet-18 achieves the
+  1) Choice of Imagination Horizon: We explore the impact   best performance in both waypoint prediction and ObjectNav,
+of the sampling step T on the final navigation performance   despite being the most lightweight architecture. Furthermore,
+by varying T from 8 to 15. For each T, we re-generate the   the significant performance gap across different backbones
+=== PDF PAGE 11 ===
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE                                                                        11
+
+     Top-Down
+  Map
+
+                                              Agent pose    Where2Imagine points      r=2.0m points
+  Current
+   observations
+
+ r=2.0m
+
+   Where2Imagine
+
+
+                        (a)                                       (b)                                           (c)
+
+Fig. 7. The visualization of the relative pose predicted by our Where2Imagine module and uniform sampling (radius: 2.0m; angular interval: 60◦). The upper
+part shows the agent’s current position (star marker) in different environments, as well as the distribution of the relative poses predicted by the Where2Imagine
+module (red dots) and uniform sampling (blue dots). The lower part shows the first-person views from different poses. Compared to uniform sampling, our
+Where2Imagine module tends to predict more towards walkable areas and directions with higher information density.
+
+
+underscores the importance of our Where2Imagine module,     3) Where2Imagine  vs. Uniform Sampling  for  Explo-
+indicating the usefulness of learning from human demonstra-   ration: Figure 7 presents a comprehensive qualitative eval-
+tions. We also note a slight discrepancy between the waypoint   uation of our proposed Where2Imagine module on the HM3D
+prediction loss and the navigation success rate for DINOv2 and   dataset. This visualization reveals several key insights. First,
+MAE. This is likely attributable to the domain shift between   the waypoints generated by our Where2Imagine module are
+the MP3D dataset (used for waypoint evaluation) and the   concentrated in navigable regions, yielding observation views
+HM3D environment (used for navigation), which introduces   that are semantically richer and capture essential structural
+evaluation variability.                                        elements such as furniture, doors, and hallways. This stands
+                                                                    in clear contrast to the uniform sampling strategy (with a
+                      TABLE IV                              fixed radius of 2.0m and angular  interval of 60◦), which
+   WHERE2IMAGINE: THE IMPACT OF DIFFERENT BACKBONES ON       disregards scene geometry and frequently  fails  to capture
+   OBJECTNAV PERFORMANCE. LOSS REFERS TO THE TEST LOSS OF
+                                                                            critical semantic information. This observation confirms the WHERE2IMAGINE. TFS: TRAINING FROM SCRATCH, FT: FINE-TUNING.
+                                                                   capability of our Where2Imagine module for semantic-aware
+                               HM3D        planning, aligning its exploratory behavior with perceptually
+     Backbone     Params   Flops   Loss
+                                                                       salient structural cues. Another key finding emerges from com-
+                                   SR ↑  SPL ↑
+                                                              paring the ground-truth and synthesized view observations.
+  ResNet-18 (TFS)   11.4M    1.8G    0.12    64.0    28.3                                                                      Specifically, although the NVS model is prone to introducing
+  ResNet-18 (FT)    11.4M    1.8G    0.24    61.0    29.7
+                                                                          artifacts and inaccuracies, notably in the synthesis of fine    ViT (TFS)      86.0M   16.9G   0.22    61.0    29.7
+     ViT (FT)      86.0M   16.9G   0.23    58.0    31.0       details, they generally achieve fundamental consistency with
+    DINOv2       22.6M    5.5G    0.22    58.0    27.9      the  true scene observation  in both semantics and  overall
+    MAE        87.1M    4.4G    0.20    57.0    26.5      structure across diverse HM3D environments. This high-level
+=== PDF PAGE 12 ===
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE                                                                        12
+
+
+     Step 7        Step 33        Step 43       Step 54         Step 62       Step 76        Step 85       Step 94
+
+
+
+
+
+    Step 152      Step 165       Step 176       Step 201      Step 220      Step 225       Step 248       Step 259
+
+
+
+
+
+    Step 265      Step 289       Step 298       Step 300      Step 306      Step 315       Step 331       Step 340
+
+
+
+
+
+Fig. 8.  Visualization of our hierarchical keyframe-based memory, depicting RGB observations and their corresponding top-down map positions for selected
+keyframes. Color intensity encodes the temporal stage of each memory entry, with darker hues representing earlier time steps. Results indicate that our memory
+scheme effectively prioritizes structurally critical locations, such as intersections and corners, thereby optimizing memory allocation through feature saliency.
+
+
+consistency enables effective spatial reasoning in LLMs, which                        TABLE V
+explains the performance gains observed in navigation tasks.   THE IMPACT OF DIFFERENT MEMORY CONFIGURATIONS ON OBJECTNAV
+                                                                                PERFORMANCE.
+
+G. Analysis of Selective Foveation Memory                     Memory         Sim. Thresh.  Avg. Mem.   HM3D
+                                                                                      SR ↑SPL ↑  We evaluate the impact of different memory configurations
+on final ObjectNav performance. As presented in Table V,            w/o                        -                 -       56.0   24.3
+the baseline configuration ‘w/o’ (without memory) achieves a             Full                       -           122.3     56.0   26.2
+                                                               Uniform          0.8 / 0.8 / 0.8     58.3     65.0   28.2
+SR of 56.0 and SPL of 24.3. Interestingly, the ’Full’ memory
+                                                                           Selective (Global)    0.8 / 0.73 / 0.6     21.8     67.0   30.4
+approach, which utilizes all historical observations, does not    Selective (Incremental)  0.8 / 0.73 / 0.6     21.8     64.0   28.1
+improve SR compared to the no-memory baseline, though
+it does yield a slight improvement in SPL (26.2 vs. 24.3),
+                                                               frequent keyframes in recent history and sparser ones in theindicating marginally more efficient path planning. This could
+                                                                     distant past, better supports both navigation success and pathbe explained by the fact that the full memory, while providing
+                                                                    efficiency while improving inference efficiency by reducingcomplete historical information, also introduces substantial re-
+                                                                 the amount of keyframes compared to the uniform keyframedundancy and potential distraction, which hampers the identi-
+                                                memory mechanism. Furthermore, we also evaluate the real-fication of actionable navigation cues and thus fails to improve
+                                                           time incremental update variant. This streaming approach dras-the final success rate. In comparison, the ’Uniform’ keyframe-
+                                                                          tically reduces per-step memory update latency from 1.70 s tobased memory, which applies the same keyframe selection
+                                                            0.16 s (> 10× speedup). Inevitably, the hierarchical “keyframethreshold (0.8) across all temporal horizons, brings a notable
+                                                               of keyframes” approximation introduces minor informationperformance gain, achieving a SR of 65.0 and SPL of 28.2.
+                                                                quantization error compared to the global optimal variant,This result confirms the critical role of perceptually salient
+                                                                yielding an SR of 64.0 and SPL of 28.1–a marginal perfor-landmarks in visual navigation, demonstrating the efficacy of
+                                                   mance trade-off. With strict O(1) bounds on computation andour keyframe-based memory mechanism in robustly identi-
+                                                                   storage, this variant represents a highly efficient and practicalfying and retaining such structural cues. Most importantly,
+                                                                  solution for continuous real-world deployment.our proposed ‘Selective’ memory mechanism, which employs
+varying keyframe thresholds (0.8 for recent, 0.73 for medium-     Figure 8 presents exemplary keyframes  selected during
+term, and 0.6 for long-term history), achieves the best results,   navigation. The  results demonstrate that our strategy con-
+i.e., a SR of 67.0 and SPL of 30.4. This demonstrates that   structs a compact environmental representation by selecting
+a non-uniform keyframe  selection  strategy, favoring more   distinctive structural features, such as living room layouts
+=== PDF PAGE 13 ===
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE                                                                        13
+
+
+                                        Visual Prompt for Vision-Language Model
+
+
+
+
+
+   You are a wheeled mobile robot working in an indoor environment. And you are completing the object navigation task in a
+  new house. Your task is to decide a most promising exploration direction for searching the target object as soon as possible.
+   To decide the direction, you will be provided with the following elements:
+    (1) <Navigation Goal>: The object navigation target.
+    (2) <Composite Image>: This stitched image displays six directions, each depicting a scene moving forward 2 meters. Each
+   image has a corresponding number.
+    (3) <Historical trajectory>: The historical trajectory you have traveled.
+   Please carefully evaluate these six images based on the elements and choose the most suitable direction for exploration.
+   Your choice should first be based on discovering navigation targets, then on the potential of unexplored areas, and you
+   should try to avoid going to historic areas.
+   Output your answer as a dict, for example, Answer={'Reason':<Your Reason>, 'Choice':1}. Please condense your language.
+
+                                        Vision-Language Model Prediction
+   --Option1: Shows a plain wall with minimal elements. No visible features indicate a TV. Low exploration potential.
+   --Option2: Features what appears to be a dark room. No visible electronics or TV indicators.
+   --Option3: Displays a partially open area with shelving and architectural interest, while avoiding the historical trajectory
+   areas. High potential for leading to new spaces but no immediate evidence of a TV.
+   --Option4: Shows a living room-like setting, featuring what looks like a TV or a black screen prominently visible. Strong
+   indication of the target object.
+   --Option5: Dimly lit corner with no visible objects resembling a TV. Low exploration value.
+   --Option6: Dining or kitchen setting with chairs and cabinets. Unlikely to house a TV.
+   Answer={‘Reason’: ‘This image looks like an unexplored hallway that connects to other rooms. And that that black rectangle
+     is probably a TV, judging by the layout of what seems to be a living room.’, ’Choice’: 4}
+
+
+Fig. 9. Complete prompt input and decision output of the Vision-Language model for exploration direction selection in the object goal navigation task.
+
+
+and corridor characteristics. This enables the agent to form   within the same model family, strategically selecting more
+and maintain a comprehensive and  efficient spatial aware-   cost-effective variants (such as GPT-4o-mini vs. GPT-4-Turbo)
+ness. Importantly, as shown in the figure, the method allows   achieves comparable navigation performance while dramati-
+the agent to recognize previously explored areas, effectively   cally reducing operational costs by approximately 98%. This
+avoiding local hesitation or cyclic paths, which validates the   optimization enables more efficient resource allocation and
+efficacy of the keyframe extraction algorithm in improving   faster inference without sacrificing navigation performance,
+navigation  efficiency.  It  is also noteworthy  that  for long-   providing practical guidance for real-world deployment sce-
+horizon navigation (up to 500 steps), our method achieves   narios where computational efficiency and operational costs
+compact environmental representation using only an average   are significant concerns.
+of about 20 keyframes, as shown in Col #3 of Table V. This
+sparse representation significantly reduces the LLM’s input                        TABLE VI
+                                                          THE EFFECT OF DIFFERENT VLMS ON OBJECTNAV PERFORMANCE.
+tokens, enhancing inference efficiency substantially without
+compromising navigation accuracy.                                               HM3D
+                                             VLM        Cost (per Mtok.)
+                                                                                 SR ↑  SPL ↑
+H. Analysis of VLM Planner                                  LLaVa [102]         N/A         48.0   25.4
+  We conducted a comparative evaluation of the effects of       GPT-4-Turbo [101]       $20.00        66.0   36.3
+                                                               GPT-4o-mini [86]        $0.375        70.0   36.9
+different VLMs on navigation performance, as detailed in       Qwen3-vl-32b [103]      N/A         71.0   37.3
+Table VI. The experiments used real RGB without NVS model.        Qwen3.5-27b [104]       N/A         71.0   40.7
+The results demonstrate that GPT-4o-mini [86] and GPT-4-
+Turbo [101] exhibit negligible differences in success rate and    To examine the dependence on closed-source APIs and
+SPL metrics, while substantially outperforming LLaVA [102],   assess edge-deployment feasibility, we further evaluated Imag-
+demonstrating that advanced reasoning capabilities are crucial  ineNav++ using the  state-of-the-art open-source Qwen se-
+for navigation tasks. Furthermore, our results indicate that   ries [103], [104]. As reported in Table VI, locally deployed
+=== PDF PAGE 14 ===
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE                                                                        14
+
+
+
+
+
+Fig. 10.  Analysis of object-goal navigation trajectories: success vs. failure examples. The top and bottom rows compare top-down paths from successful and
+unsuccessful episodes, identifying critical factors for task completion.
+
+
+                                                                  resources. This consistent scaling behavior underscores the
+                                                               strong  potential  of deploying our mapless ImagineNav++
+                                                                     entirely  offline on  resource-constrained  robotic  platforms,
+                                                            demonstrating its practicality for edge-computing scenarios.
+
+
+                                                                                           I. Decision-Making Details of VLM Planner
+
+                                                     The input data for the VLM is constructed as follows. Based
+                                                     on the agent’s current pose, an RGB observation is captured.
+                                                   The Where2Imagine module then predicts a relative pose from
+                                                                         this observation. Both the RGB observation and the predicted
+Fig. 11.  Scaling Study of Open-source VLMs for ObjectNav.                relative pose are fed into the NVS to synthesize a novel view
+                                                           image. This procedure is repeated every 60°, generating a total
+                                                               of six novel view images. These images are stitched together
+models such as Qwen3-VL-32B [103] and Qwen3.5-27B [104]  and combined with historical context to form the complete
+surprisingly achieve SRs of 71.0% with corresponding SPLs of   input to the VLM. In the ablation studies, the VLM inputs
+37.3 and 40.7, slightly surpassing the GPT-4o-mini baseline.   vary depending on whether Where2Imagine is used for relative
+These results indicate that ImagineNav++ maintains strong   pose prediction and novel view synthesis; however, in all cases,
+performance without reliance on proprietary cloud VLMs,   the initial input at the beginning of each cycle is the RGB
+highlighting both the framework’s robustness and its practical   observation captured from the agent’s position at 60° intervals.
+applicability for edge-computing scenarios.                 The full prompts and VLM responses are provided in Figure 9.
+  Furthermore, we conducted  a  systematic  scaling  study
+across  different parameter  sizes of the Qwen3-VL family
+                                                                               J. Analysis of Successful and Failed Trajectories(ranging from 2B to 32B). As illustrated in Figure 11, the
+results reveal a clear scaling trend: SR generally increases with    As shown in Figure 10, our method enables efficient path
+model size, while SPL improves up to Qwen3-VL-8B and   planning and navigation toward diverse targets. In particular,
+exhibits a marginal decrease for the largest model, suggest-   the top-middle subfigure illustrates a scenario where the agent
+ing slight saturation. Notably, even the relatively lightweight  must traverse multiple rooms. Although such complex environ-
+models (e.g., Qwen3-VL-8B) achieve a highly competitive SR   ments increase the risk of disorientation, our ImagineNav++
+of 70.0% while demanding substantially lower computational   successfully reaches the goal after exploration, demonstrating
+=== PDF PAGE 15 ===
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE                                                                        15
+
+
+its robustness in long-horizon, multi-room settings. Further-      [5] X. Sun, L. Liu, H. Zhi, R. Qiu, and J. Liang, “Prioritized semantic
+more, as depicted in the upper-right subfigure, the memory          learning for zero-shot instance navigation,” in Proc. Eur. Conf. Comput.
+                                                                                                         Vis., 2024, pp. 161–178.
+module helps detect local search loops from historical obser-                                                                                       [6] H. Yin, X. Xu, L. Zhao, Z. Wang,  J. Zhou, and  J. Lu, “UniGoal:
+vations and autonomously adjust the exploration direction. We         Towards universal zero-shot goal-oriented navigation,” in Proc. IEEE
+also present some failure examples at the bottom of Figure 10.          Conf. Comput. Vis. Pattern Recog., 2025, pp. 19 057–19 066.
+We identified three key factors contributing to these navigation      [7] A. Radford, J. W. Kim, C. Hallacy, A. Ramesh, G. Goh, S. Agarwal,
+                                                                          G. Sastry, A. Askell, P. Mishkin, J. Clark et al., “Learning transferable
+failures. First, the synthesized image from the NVS does not           visual models from natural language supervision,” in Proc. Int. Conf.
+align with the real observation, such as creating objects that         Mach. Learn.  PMLR, 2021, pp. 8748–8763.
+are not present in the real scene as shown in the bottom left of      [8] K. He, X. Chen, S. Xie, Y. Li, P. Doll´ar, and R. Girshick, “Masked au-
+                                                                                   toencoders are scalable vision learners,” in Proc. IEEE Conf. Comput.
+Figure 10, which causes the VLM to make incorrect inference.            Vis. Pattern Recog., 2022, pp. 16 000–16 009.
+Second, some object instances are neglected for marking by      [9] X. Zhou, R. Girdhar, A. Joulin, P. Kr¨ahenb¨uhl, and I. Misra, “Detecting
+the simulator, and therefore a successful trajectory is wrongly          twenty-thousand classes using image-level supervision,” in Proc. Eur.
+                                                                                  Conf. Comput. Vis.  Springer, 2022, pp. 350–368.
+considered as a failure (a.k.a. false failure) as shown in the                                                                                [10]  T. Cheng, L. Song, Y. Ge, W. Liu, X. Wang, and Y. Shan, “YOLO-
+middle of Figure 10. Moreover, the visual ambiguity of the         World: Real-time open-vocabulary object detection,” in Proc. IEEE
+target leads directly to recognition failure, causing the agent          Conf. Comput. Vis. Pattern Recog., 2024, pp. 16 901–16 911.
+to terminate the navigation task unsuccessfully due to the lack     [11] A. Kirillov, E. Mintun, N. Ravi, H. Mao, C. Rolland, L. Gustafson,
+                                                                                           T. Xiao, S. Whitehead, A. C. Berg, W.-Y. Lo et al., “Segment anything,”
+of a key basis for the stopping decision, as shown in the bottom           in Proc. Int. Conf. Comput. Vis., 2023, pp. 4015–4026.
+right of Figure 10.                                                          [12]  J. Wu, Y. Jiang, Q. Liu, Z. Yuan, X. Bai, and S. Bai, “General object
+                                                                                   foundation model for images and videos at scale,” in Proc. IEEE Conf.
+                                                                         Comput. Vis. Pattern Recog., 2024, pp. 3783–3795.
+                    V. CONCLUSION                                [13]  S. Liu, Z. Zeng, T. Ren, F. Li, H. Zhang, J. Yang, C. Li, J. Yang,
+  In this work, we present ImagineNav++, a novel frame-         H. Su, J. Zhu et al., “Grounding dino: Marrying dino with grounded
+                                                                                           pre-training for open-set object detection,” in Proc. Eur. Conf. Comput.
+work that successfully repurposes pre-trained vision-language             Vis., 2023, pp. 38–55.
+models as efficient embodied navigators for mapless, open-     [14]  T. Brown, B. Mann, N. Ryder, M. Subbiah, J. D. Kaplan, P. Dhariwal,
+vocabulary visual navigation. Our approach leverages a learned         A. Neelakantan, P. Shyam, G. Sastry, A. Askell et  al., “Language
+                                                                          models are few-shot learners,” Adv. Neural Inform. Process.  Syst.,
+future-view  imagination module  to  generate  semantically           vol. 33, pp. 1877–1901, 2020.
+meaningful candidate observations, which then serve as direct     [15] A. Chowdhery, S. Narang, J. Devlin, M. Bosma, G. Mishra, A. Roberts,
+visual prompts for the VLM to identify the most informative            P. Barham, H. W. Chung, C. Sutton, S. Gehrmann et al., “Palm: Scaling
+                                                                               language modeling with pathways,” J Mach Learn Res, vol. 24, no. 240,
+next viewpoint. Augmented with a selective foveation memory                                                                                      pp. 1–113, 2023.
+that hierarchically preserves essential spatial and semantic in-     [16] H. Touvron,  T.  Lavril, G.  Izacard, X.  Martinet, M.-A. Lachaux,
+formation from historical observations, the framework sustains           T. Lacroix, B. Rozi`ere, N. Goyal, E. Hambro, F. Azhar et al., “Llama:
+spatial consistency and facilitates robust temporal reasoning        Open and  efficient  foundation  language  models,”  arXiv  preprint
+                                                                                 arXiv:2302.13971, 2023.
+without requiring fine-tuning. Extensive experiments confirm     [17]  S. Zhang,  S.  Roller, N. Goyal, M.  Artetxe, M. Chen,  S. Chen,
+its state-of-the-art performance in terms of both effectiveness         C. Dewan, M. Diab, X. Li, X. V. Lin et al., “Opt: Open pre-trained
+and efficiency. Future work may explore extending the frame-          transformer language models,” arXiv preprint arXiv:2205.01068, 2022.
+                                                                                [18]  J. Achiam, S. Adler, S. Agarwal, L. Ahmad, I. Akkaya, F. L. Aleman,
+work to support multimodal goal specifications (i.e., text-goal                                                                          D. Almeida, J. Altenschmidt, S. Altman, S. Anadkat et al., “Gpt-4
+navigation), and reducing inference latency to enable real-time           technical report,” arXiv preprint arXiv:2303.08774, 2023.
+operation on resource-constrained robotic platforms. Further     [19] G. Team, R. Anil, S. Borgeaud, Y. Wu, J.-B. Alayrac, J. Yu, R. Soricut,
+                                                                                                                J. Schalkwyk, A. M. Dai, A. Hauth et al., “Gemini: a family of highly
+investigation into integrating lifelong adaptation mechanisms                                                                                  capable multimodal models,” arXiv preprint arXiv:2312.11805, 2023.
+could also enhance the system’s ability to continuously evolve     [20] H. Liu, C. Li, Q. Wu, and Y. J. Lee, “Visual instruction tuning,” Adv.
+in dynamic environments, opening avenues for sustained au-         Neural Inform. Process. Syst., vol. 36, 2024.
+tonomous operation.                                                       [21] Z. Chen,  J. Wu, W. Wang, W. Su, G. Chen, S. Xing, M. Zhong,
+                                                                          Q. Zhang, X. Zhu, L. Lu et al., “Internvl: Scaling up vision foundation
+                                                                          models and aligning for generic visual-linguistic tasks,” in Proc. IEEE
+             ACKNOWLEDGMENTS                                 Conf. Comput. Vis. Pattern Recog., 2024, pp. 24 185–24 198.
+                                                                                [22] W. Dai, J. Li, D. Li, A. M. H. Tiong, J. Zhao, W. Wang, B. A. Li,
+  This work was in part supported by the National Natural            P. Fung, and S. C. H. Hoi, “InstructBLIP: Towards general-purpose
+Science Foundation of China (Grant No. 62273093).                     vision-language models with instruction tuning,” Adv. Neural Inform.
+                                                                                     Process. Syst., 2023.
+                                                                                [23]  P. Gao, J. Han, R. Zhang, Z. Lin, S. Geng, A. Zhou, W. Zhang, P. Lu,
+                 REFERENCES                                    C. He, X. Yue et al., “Llama-adapter v2: Parameter-efficient visual
+                                                                                            instruction model,” arXiv preprint arXiv:2304.15010, 2023.   [1] A. Topiwala, P. Inani, and A. Kathpal, “Frontier based exploration for
+      autonomous robot,” arXiv preprint arXiv:1806.03581, 2018.               [24] K. He, G. Gkioxari, P. Doll´ar, and R. Girshick, “Mask R-CNN,” in
+   [2] W. Cai, S. Huang, G. Cheng, Y. Long, P. Gao, C. Sun, and H. Dong,          Proc. Int. Conf. Comput. Vis., 2017, pp. 2980–2988.
+      “Bridging zero-shot object navigation and foundation models through     [25] K.-Q. Zhou, K. Zheng, C. Pryor, Y. Shen, H. Jin, L. Getoor, and X. E.
+       pixel-guided navigation skill,” in Proc. IEEE In. Conf. Robot. Autom.,        Wang, “ESC: Exploration with soft commonsense constraints for zero-
+      2024, pp. 5228–5234.                                                          shot object navigation,” in Proc. Int. Conf. Multimedia and Expo, 2023.
+   [3] D. S. Chaplot, D.  P. Gandhi, A. Gupta, and R. R. Salakhutdinov,     [26] Y. Kuang, H. Lin, and M. Jiang, “OpenFMNav: Towards open-set
+      “Object goal navigation using goal-oriented semantic exploration,” Adv.          zero-shot object navigation via vision-language foundation models,”
+      Neural Inform. Process. Syst., 2020.                                               in Findings of the Association for Computational Linguistics: NAACL,
+   [4] R. Ramrakhya, E. Undersander, D. Batra, and A. Das, “Habitat-web:          2024, pp. 338–351.
+      Learning embodied object-search strategies from human demonstra-     [27]  P. Wu, Y. Mu, B. Wu, Y. Hou, J. Ma, S. Zhang, and C. Liu, “Voronav:
+       tions at scale,” in Proc. IEEE Conf. Comput. Vis. Pattern Recog., 2022,          Voronoi-based zero-shot object navigation with large language model,”
+       pp. 5173–5183.                                                                     in Pro. Int. Conf. Mach. Learn., 2024, pp. 53 737–53 775.
+=== PDF PAGE 16 ===
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE                                                                        16
+
+
+
+ [28] L. Zhang, Q. Zhang, H. Wang, E. Xiao, Z. Jiang, H. Chen, and R. Xu,     [50]  S. Huang, Z. Jiang, H. Dong, Y. Qiao, P. Gao, and H. Li, “Instruct2act:
+       “TriHelper: Zero-shot object navigation with dynamic assistance,” in        Mapping multi-modality  instructions  to robotic actions with  large
+      Proc. IEEE Int. Conf. Intell. Rob. Syst., 2024, pp. 10 035–10 042.              language model,” arXiv preprint arXiv:2305.11176, 2023.
+ [29] D. Shah, M. Equi, B. Osinski,  F. Xia, B.  Ichter, and S. Levine,     [51] A. Lewkowycz, A. Andreassen, D. Dohan, E. Dyer, H. Michalewski,
+      “Navigation with large language models: Semantic guesswork as a          V. Ramasesh, A. Slone, C. Anil, I. Schlag, T. Gutman-Solo, Y. Wu,
+       heuristic for planning,” in Proc. Conference on Robot Learning, 2023,         B. Neyshabur, G. Gur-Ari, and V. Misra, “Solving quantitative rea-
+       pp. 19 057–19 066.                                                         soning problems with language models,” Adv. Neural Inform. Process.
+ [30] B. Yu, H. Kasaei, and M. Cao, “L3MVN: Leveraging large language            Syst., 2022.
+      models for visual target navigation,” in Proc. IEEE Int. Conf. Intell.     [52] M. Ahn, A. Brohan, N. Brown, Y. Chebotar, O. Cortes, B. David,
+      Rob. Syst., 2023, pp. 3554–3560.                                          C. Finn, C. Fu, K. Gopalakrishnan, K. Hausman, A. Herzog, D. Ho,
+ [31]  J. Loo, Z. Wu, and D. Hsu, “Open scene graphs for open-world object-             J. Hsu, J. Ibarz, B. Ichter, A. Irpan, E. Jang, R. J. Ruano, K. Jeffrey,
+      goal navigation,” The International Journal of Robotics Research, p.           S. Jesmonth, N. J. Joshi, R. Julian, D. Kalashnikov, Y. Kuang, K.-
+      02783649251369549, 2025.                                             H. Lee, S. Levine, Y. Lu, L. Luu, C. Parada, P. Pastor, J. Quiambao,
+ [32] Y. Yamada, Y. Bao, A. K. Lampinen, J. Kasai, and I. Yildirim, “Eval-         K. Rao, J. Rettinghouse, D. Reyes, P. Sermanet, N. Sievers, C. Tan,
+       uating spatial understanding of large language models,” Transactions         A. Toshev, V. Vanhoucke, F. Xia, T. Xiao, P. Xu, S. Xu, M. Yan, and
+      on Machine Learning Research, 2024.                                    A. Zeng, “Do as  i can, not as  i say: Grounding language in robotic
+ [33]  J. J. Yu, T. Aumentado-Armstrong, F. Forghani, K. G. Derpanis, and           affordances,” in Proc. Conference on Robot Learning, 2022.
+     M. A. Brubaker, “PolyOculus: Simultaneous multi-view image-based     [53]  J. Lin, H. Yin, W. Ping, Y. Lu, P. Molchanov, A. Tao, H. Mao, J. Kautz,
+      novel view synthesis,” in Proc. Eur. Conf. Comput. Vis., 2024, pp. 433–        M. Shoeybi, and S. Han, “VILA: On pre-training for visual language
+      451.                                                                       models,” in Proc. IEEE Conf. Comput. Vis. Pattern Recog., 2024, pp.
+ [34] H.-Y. Tseng, Q. Li, C. Kim, S. Alsisan, J.-B. Huang, and J. Kopf,         26 689–26 699.
+       “Consistent view synthesis with pose-guided diffusion models,” in
+                                                                                [54] H. Huang, F. Lin, Y. Hu, S. Wang, and Y. Gao, “CoPa: General robotic
+      Proc. IEEE Conf. Comput. Vis. Pattern Recog., 2023, pp. 16 773–                                                                                 manipulation through spatial constraints of parts with foundation mod-
+      16 783.                                                                                                       els,” in Proc. IEEE Int. Conf. Intell. Rob. Syst., 2024, pp. 9488–9495.
+ [35]  J. J. Yu, F. Forghani, K. G. Derpanis, and M. A. Brubaker, “Long-term
+                                                                                [55]  S. Nasiriany, F. Xia, W. Yu, T. Xiao, J. Liang, I. Dasgupta, A. Xie,
+      photometric consistent novel view synthesis with diffusion models,” in
+                                                                          D. Driess, A. Wahid, Z. Xu, Q. Vuong, T. Zhang, T.-W. E. Lee, K.-      Proc. Int. Conf. Comput. Vis., 2023, pp. 7094–7104.
+                                                                          H. Lee, P. Xu, S. Kirmani, Y. Zhu, A. Zeng, K. Hausman, N. Heess, [36] R. Fukushima, K. Ota, A. Kanezaki, Y. Sasaki, and Y. Yoshiyasu,
+                                                                              C. Finn, S. Levine, and B. Ichter, “PIVOT: Iterative visual prompting      “Object memory transformer for object goal navigation,” in Proc. Int.
+                                                                                                         elicits actionable knowledge for vlms,” in Proc.  Int. Conf. Mach.      Conf. Robot. Autom., 2022, pp. 11 288–11 294.
+                                                                                       Learn., 2024, pp. 37 321–37 341. [37] Z. Wang, X. Li, J. Yang, Y. Liu, and S. Jiang, “Gridmm: Grid memory
+     map for vision-and-language navigation,” in Proc. Int. Conf. Comput.     [56] A. Zeng, M. Attarian, B. Ichter, K. Choromanski, A. Wong, S. Welker,
+        Vis., 2023, pp. 15 625–15 636.                                                         F. Tombari, A. Purohit, M. Ryoo, V. Sindhwani, J. Lee, V. Vanhoucke,
+ [38] G. Zhou, Y. Hong, and Q. Wu, “NavGPT: Explicit reasoning in vision-         and P. Florence, “Socratic models: Composing zero-shot multimodal
+      and-language navigation with large language models,” in Proc. AAAI          reasoning with language,” in Proc. Int. Conf. Learn. Represent., 2023.
+      Conf. Artif. Intell., 2023, pp. 7641 – 7649.                                [57] A. Khandelwal, L. Weihs, R. Mottaghi, and A. Kembhavi, “Simple
+ [39] L. Zhang, Y. Liu, Z. Zhang, M. Aghaei, Y. Hu, H. Gu, M. A. Alomrani,          but effective: Clip embeddings for embodied ai,” in Proc. Int. Conf.
+      D. G. A. Bravo, R. Karimi, A. Hamidizadeh  et  al., “Mem2ego:         Comput. Vis., 2022, pp. 14 829–14 838.
+     Empowering vision-language models with global-to-ego memory for     [58]  S. Y. Gadre, M. Wortsman, G. Ilharco, L. Schmidt, and S. Song, “Cows
+      long-horizon embodied navigation,” in Proc. CVPR 2025 Workshop         on pasture: Baselines and benchmarks for language-driven zero-shot
+      Foundation Models Meet Embodied Agents, 2025.                               object navigation,” in Proc. IEEE Conf. Comput. Vis. Pattern Recog.,
+ [40]  J. Zhang, K. Wang, R. Xu, G. Zhou, Y. Hong, X. Fang, Q. Wu,          2023, pp. 23 171–23 181.
+      Z. Zhang, and H. Wang, “Navid: Video-based vlm plans the next step     [59] A. Majumdar, G. Aggarwal, B. Devnani, J. Hoffman, and D. Batra,
+       for vision-and-language navigation,” in Proc. Robotics: Science and         “Zson: Zero-shot object-goal navigation using multimodal goal embed-
+       Systems, 2024.                                                                    dings,” Adv. Neural Inform. Process. Syst., vol. 35, pp. 32 340–32 352,
+ [41]  J. Zhang, K. Wang, S. Wang, M. Li, H. Liu, S. Wei, Z. Wang, Z. Zhang,          2022.
+      and H. Wang, “Uni-navid: A video-based vision-language-action model     [60] C. Huang, O. Mees, A. Zeng, and W. Burgard, “Visual language maps
+       for unifying embodied navigation tasks,” in Proc. Robotics: Science           for robot navigation,” in Proc. Int. Conf. Robot. Autom., 2023, pp.
+      and Systems, 2025.                                                  10 608–10 615.
+ [42] Y.-H. H.  Tsai, V. Dhar,  J.  Li, B. Zhang, and  J. Zhang, “Multi-     [61] M. Chang, T. Gervet, M. Khanna, S. Yenamandra, D. Shah, S. Y. Min,
+      modal large language model for visual navigation,” arXiv preprint         K. Shah, C. Paxton, S. Gupta, D. Batra, R. Mottaghi, J. Malik, and
+      arXiv:2310.08669, 2023.                                               D. S. Chaplot, “GOAT: Go to any thing,” in Proc. Robotics: Science
+ [43] M. Oquab, T. Darcet, T. Moutakanni, and et al., “DINOv2: Learning         and Systems, 2024.
+       robust visual features without supervision,” Transactions on Machine     [62]  J. Krantz, T. Gervet, K. Yadav, A. Wang, C. Paxton, R. Mottaghi,
+      Learning Research, 2024.                                              D. Batra, J. Malik, S. Lee, and D. S. Chaplot, “Navigating to objects
+ [44]  S. K. Ramakrishnan, A.  Gokaslan,  E. Wijmans, O. Maksymets,           specified by images,” in Proc.  Int. Conf. Comput.  Vis., 2023, pp.
+      A. Clegg, J. M. Turner, E. Undersander, W. Galuba, A. Westbury, A. X.         10 916–10 925.
+      Chang, M. Savva, Y. Zhao, and D. Batra, “Habitat-matterport 3d dataset                                                                                [63] A.  J. Zhai and S. Wang, “PEANUT: Predicting and navigating to
+     (HM3d): 1000 large-scale 3d environments for embodied AI,” in Proc.                                                                             unseen targets,” in Proc. Int. Conf. Comput. Vis., 2023, pp. 10 926–
+      35th NeurIPS Datasets and Benchmarks Track (Round 2), 2021.
+                                                                        10 935.
+ [45] M. Khanna, Y. Mao, H. Jiang, S. Haresh, B. Shacklett, D. Batra,
+                                                                                [64]  S. K. Ramakrishnan, D.  S. Chaplot, Z. Al-Halah,  J. Malik, and      A. Clegg, E. Undersander, A. X. Chang, and M. Savva, “Habitat
+                                                                          K. Grauman, “Poni: Potential functions for objectgoal navigation with       synthetic scenes dataset (HSSD-200): An analysis of 3d scene scale
+                                                                                             interaction-free learning,” in Proc. IEEE Conf. Comput. Vis. Pattern      and realism tradeoffs for objectgoal navigation,” in Proc. IEEE Conf.
+                                                                                    Recog., 2022, pp. 18 890–18 900.      Comput. Vis. Pattern Recog., 2024, pp. 16 384–16 393.
+ [46]  F. Xia, A. R. Zamir, Z. He, A. Sax, J. Malik, and S. Savarese, “Gibson     [65] M. Zhu, B. Zhao, and T. Kong, “Navigating to objects in unseen
+       env: Real-world perception for embodied agents,” in Pro. IEEE Conf.          environments by distance prediction,” in Proc. IEEE Int. Conf. Intell.
+      Comput. Vis. Pattern Recog., 2018, pp. 9068–9079.                          Rob. Syst., 2022, pp. 10 571–10 578.
+ [47] X. Zhao, W. Cai, L. Tang, and T. Wang, “ImagineNav: Prompting     [66]  S. K. Ramakrishnan, Z. Al-Halah, and K. Grauman, “Occupancy
+       vision-language models as embodied navigator through scene imagi-           anticipation for efficient exploration and navigation,” in Proc. Eur.
+       nation,” in Proc. Int. Conf. Learn. Represent., 2025.                           Conf. Comput. Vis., 2020, pp. 400–418.
+ [48] W. Huang, P. Abbeel, D. Pathak, and I. Mordatch, “Language models     [67] G. Georgakis, B. Bucher, K. Schmeckpeper, S. Singh, and K. Daniilidis,
+       as zero-shot planners: Extracting actionable knowledge for embodied          “Learning to map for active semantic goal navigation,” arXiv preprint
+       agents,” in Proc. Int. Conf. Mach. Learn., 2022.                              arXiv:2106.15648, 2021.
+ [49]  J. Liang, W. Huang, F. Xia, P. Xu, K. Hausman, B. Ichter, P. Florence,     [68] Y. Liang, B. Chen, and S. Song, “SSCNav: Confidence-aware semantic
+      and A. Zeng, “Code as policies: Language model programs for embod-          scene completion for visual semantic navigation,” in Proc. Int. Conf.
+       ied control,” in Proc. Int. Conf. Robot. Autom., 2023, pp. 9493–9500.          Robot. Autom., 2021, pp. 13 194–13 200.
+=== PDF PAGE 17 ===
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE                                                                        17
+
+
+
+ [69]  S. Zhang, X. Yu, X. Song, X. Wang, and S. Jiang, “Imagine before go:           3.0: A co-habitat for humans, avatars and robots,” arXiv preprint
+       Self-supervised generative map for object goal navigation,” in Proc.          arXiv:2310.13724, 2023.
+     IEEE Conf. Comput. Vis. Pattern Recog., 2024, pp. 16 414–16 425.        [94] K. Yadav,  J. Krantz, R. Ramrakhya, S. K. Ramakrishnan,  J. Yang,
+ [70] N. Yokoyama, S. Ha, D. Batra, J. Wang, and B. Bucher, “Vlfm: Vision-         A. Wang,  J.  Turner,  A.  Gokaslan,  V.-P.  Berges,  R.  Mootaghi,
+      language frontier maps for zero-shot semantic navigation,” in Proc. Int.         O. Maksymets, A. X. Chang, M. Savva, A. Clegg, D. S. Chaplot, and
+      Conf. Robot. Autom.  IEEE, 2024, pp. 42–48.                             D. Batra, “Habitatchallenge2023,” https://aihabitat.org/challenge/2023/,
+ [71]  J. Li, D. Li, S. Savarese, and S. Hoi, “Blip-2: Bootstrapping language-          2023.
+      image pre-training with frozen image encoders and large language     [95] A. Chang, A. Dai, T. Funkhouser, M. Halber, M. Niessner, M. Savva,
+      models,” in Proc. Int. Conf. Mach. Learn.  PMLR, 2023, pp. 19 730–           S. Song, A. Zeng, and Y. Zhang, “Matterport3D: Learning from rgb-d
+      19 742.                                                                        data in indoor environments,” in Proc. Int. Conf. 3D Vis., 2017, pp.
+ [72] D. Goetting, H. G. Singh, and A. Loquercio, “End-to-end navigation         667–676.
+      with vision language models: Transforming  spatial reasoning  into     [96]  P. Anderson, A. Chang, D. S. Chaplot, A. Dosovitskiy, S. Gupta,
+       question-answering,” arXiv preprint arXiv:2411.05755, 2024.                   V. Koltun,  J. Kosecka,  J. Malik, R. Mottaghi, M. Savva  et  al.,
+ [73] Y. Tang, M. Wang, Y. Deng, Z. Zheng, J. Deng, S. Zuo, and Y. Yue,        “On  evaluation  of  embodied  navigation  agents,”  arXiv  preprint
+      “Openin: Open-vocabulary instance-oriented navigation in dynamic          arXiv:1807.06757, 2018.
+      domestic environments,” IEEE Rob. Autom. Lett., vol. 10, no. 9, pp.     [97]  J. Krantz, S. Lee, J. Malik, D. Batra, and D. S. Chaplot, “Instance-
+      9256–9263, 2025.                                                                   specific image goal navigation: Training embodied agents to find object
+ [74] C. Gao, L. Jin, X. Peng, J. Zhang, Y. Deng, A. Li, H. Wang, and S. Liu,           instances,” arXiv preprint arXiv:2211.15876, 2022.
+      “OctoNav: Towards generalist embodied navigation,” arXiv preprint     [98] K. Yadav, A. Majumdar, R. Ramrakhya, N. Yokoyama, A. Baevski,
+      arXiv:2506.09839, 2025.                                                     Z.  Kira,  O.  Maksymets,  and  D.  Batra,  “Ovrl-v2: A  simple
+ [75] K. Sargent, Z. Li, T. Shah, C. Herrmann, H.-X. Yu, Y. Zhang, E. R.            state-of-art  baseline  for imagenav and  objectnav,”  arXiv  preprint
+      Chan, D. Lagun, L. Fei-Fei, D. Sun et al., “Zeronvs: Zero-shot 360-          arXiv:2303.07798, 2023.
+      degree view synthesis from a single image,” in Proc. IEEE Conf.     [99]  J. Schulman, F. Wolski, P. Dhariwal, A. Radford, and O. Klimov, “Prox-
+      Comput. Vis. Pattern Recog., 2024, pp. 9420–9429.                           imal policy optimization algorithms,” arXiv preprint arXiv:1707.06347,
+ [76]  F. Wimbauer, N. Yang, C. Rupprecht, and D. Cremers, “Behind the          2017.
+       scenes: Density fields for single view reconstruction,” in Proc. IEEE   [100]  P.-E. Sarlin, D. DeTone, T. Malisiewicz, and A. Rabinovich, “Super-
+      Conf. Comput. Vis. Pattern Recog., 2023, pp. 9076–9086.                       glue: Learning feature matching with graph neural networks,” in Proc.
+                                                                  IEEE Conf. Comput. Vis. Pattern Recog., 2020, pp. 4938–4947. [77] A.-Q. Cao and R. De Charette, “Scenerf: Self-supervised monocular 3d
+      scene reconstruction with radiance fields,” in Proc. IEEE Conf. Comput.   [101] OpenAI, “GPT-4 Turbo,” 11 2023, large language model with 128K
+        Vis. Pattern Recog., 2023, pp. 9387–9398.                                     context window, knowledge cutoff April 2023. [Online]. Available:
+                                                                                      https://platform.openai.com/docs/models/gpt-4-turbo [78] K. He, X. Zhang, S. Ren, and J. Sun, “Deep residual learning for image
+                                                                            [102] H. Liu, C. Li, Y. Li, and Y. J. Lee, “Improved baselines with visual       recognition,” in Proc. Int. Conf. Comput. Vis., 2016, pp. 770–778.
+                                                                                            instruction tuning,” in Pro. IEEE Conf. Comput. Vis. Pattern Recog., [79]  S. E. F. D. Avila, A. P. B. Lopes, A. da Luz  Jr, and A. de Albu-
+                                                                                2024, pp. 26 286–26 296.      querque Araujo, “VSUMM: A mechanism designed to produce static
+                                                                            [103]  S. Bai, Y. Cai, R. Chen, K. Chen, X. Chen, Z. Cheng, L. Deng, W. Ding,      video summaries and a novel evaluation method,” Pattern Recognit.
+                                                                              C. Gao, C. Ge, W. Ge, Z. Guo, Q. Huang, J. Huang, F. Huang, B. Hui,        Lett., vol. 32, no. 1, pp. 56–68, 2011.
+                                                                                         S. Jiang, Z. Li, M. Li, M. Li, K. Li, Z. Lin, J. Lin, X. Liu, J. Liu, C. Liu,
+ [80] N. Ejaz, T. B. Tariq, and S. W. Baik, “Adaptive key frame extraction for
+                                                                                     Y. Liu, D. Liu, S. Liu, D. Lu, R. Luo, C. Lv, R. Men, L. Meng, X. Ren,
+      video summarization using an aggregation mechanism,” J Vis Commun
+                                                                          X. Ren, S. Song, Y. Sun, J. Tang, J. Tu, J. Wan, P. Wang, P. Wang,
+      Image R, vol. 23, no. 7, pp. 1031–1040, 2012.
+                                                                          Q. Wang, Y. Wang, T. Xie, Y. Xu, H. Xu, J. Xu, Z. Yang, M. Yang,
+ [81]  J. Wu, S. hua Zhong, J. Jiang, and Y. Yang, “A novel clustering method
+                                                                                                                J. Yang, A. Yang, B. Yu, F. Zhang, H. Zhang, X. Zhang, B. Zheng,
+       for static video summarization,” Multimed Tools Appl, vol. 76, pp.
+                                                                          H. Zhong, J. Zhou, F. Zhou, J. Zhou, Y. Zhu, and K. Zhu, “Qwen3-vl
+      9625–9641, 2017.
+                                                                                         technical report,” 2025.
+ [82] B. Zhao, X. Li, and X. Lu, “HSA-RNN: Hierarchical structure-adaptive
+                                                                            [104] Qwen Team, “Qwen3.5: Towards native multimodal agents,” February
+      rnn for video summarization,” in Proc. IEEE Conf. Comput. Vis. Pattern
+                                                                                2026. [Online]. Available: https://qwen.ai/blog?id=qwen3.5
+       Recog., 2018, pp. 7405–7414.
+ [83] M. Rochan, L. Ye, and Y. Wang, “Video summarization using fully
+       convolutional sequence networks,” in Proc. Eur. Conf. Comput. Vis.,
+      2018, pp. 347–363.
+ [84] M. Elfeki and A. Borji, “Video summarization via actionness ranking,”
+       in Proc. IEEE Winter Conf. Appl. Comput. Vis., 2019, pp. 754–763.
+ [85] H. Jiang and Y. Mu, “Joint video summarization and moment localiza-
+       tion by cross-task sample transfer,” in Proc. IEEE Conf. Comput. Vis.
+       Pattern Recog., 2022, pp. 16 388–16 398.
+ [86] OpenAI, “GPT-4o-mini,” 7 2024, large language model. [Online].
+       Available: https://platform.openai.com/docs/models/gpt-4o-mini
+ [87]  F. Yang, C. Wang, C. Cadena, and M. Hutter, “iplanner: Imperative
+      path planning,” in Proc. Robotics: Science and Systems, 2023.
+ [88]  P. Roth, J. Nubert, F. Yang, M. Mittal, and M. Hutter, “Viplanner:
+       Visual semantic imperative learning for local navigation,” in Proc. Int.
+      Conf. Robot. Autom.  IEEE, 2024, pp. 5243–5249.
+ [89] E. Wijmans, I. Essa, and D. Batra, “Ver: Scaling on-policy rl leads to
+       the emergence of navigation in embodied rearrangement,” Adv. Neural
+       Inform. Process. Syst., vol. 35, pp. 7727–7740, 2022.
+ [90]  J. Liang, P. Gao, X. Xiao, A. J. Sathyamoorthy, M. Elnoor, M. C. Lin,
+      and D. Manocha, “Mtg: Mapless trajectory generator with traversability
+      coverage for outdoor navigation,” in Proc. Int. Conf. Robot. Autom.,
+      2024, pp. 2396–2402.
+ [91] K. Yadav, R. Ramrakhya, A. Majumdar,  V.-P. Berges,  S. Kuhar,
+      D. Batra, A. Baevski, and O. Maksymets, “Offline visual representation
+       learning for embodied navigation,” in Workshop on Reincarnating
+      Reinforcement Learning at ICLR 2023, 2023.
+ [92] H. Yin, X. Xu, Z. Wu,  J. Zhou, and  J. Lu, “SG-Nav: Online 3d
+      scene graph prompting for llm-based zero-shot object navigation,” Adv.
+      Neural Inform. Process. Syst., 2024.
+ [93] X. Puig, E. Undersander, A. Szot, M. D. Cote, T.-Y. Yang, R. Partsey,
+      R.  Desai, A. W. Clegg, M. Hlavac,  S.  Y. Min  et  al.,  “Habitat

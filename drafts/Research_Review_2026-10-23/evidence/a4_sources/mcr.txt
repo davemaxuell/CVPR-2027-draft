@@ -1,0 +1,980 @@
+Latent World Models with Monotone Planning Costs for Image-Goal Navigation
+Report GitHub Issue
+×
+Title:
+Content selection saved. Describe the issue below:
+Description:
+Submit without GitHub
+Submit in GitHub
+arXiv is now an independent nonprofit!
+Learn more
+×
+Back to arXiv
+Why HTML?
+Report Issue
+Back to Abstract
+Download PDF
+Abstract
+1 Introduction
+2 Related Work
+Visual Navigation and World Models
+Latent Predictive Models for Planning
+Training Objectives for Planning-Ready World Models
+3 Method
+3.1 Problem Formulation
+3.2 Architecture
+Frozen DINO encoder.
+AdaLN ViT predictor.
+3.3 Training Objectives
+3.3.1 Rollout Loss
+3.3.2 Monotone Cost Ranking (MCR)
+3.3.3 Action-Contrastive Training (Investigated Variant)
+3.4 CEM Planning at Inference
+4 Experiments
+4.1 Experimental Setup
+Dataset.
+Implementation.
+Evaluation protocol.
+4.2 Baselines
+4.3 Metrics
+4.4 Main Results
+Latent-space world models.
+Pixel-space planner.
+Reactive policies.
+4.5 Ablation Study
+Rollout training vs. teacher forcing.
+Effect of Monotone Cost Ranking.
+Encoder choice.
+Action-contrastive training.
+4.6 Real-World Robot Demonstration
+Qualitative results.
+5 Conclusion
+References
+A Extended Related Work
+B Training Details
+B.1 Training Configuration Summary
+B.2 Base Rollout Counter-Curriculum
+B.3 MCR Hyperparameters
+B.4 ACT Hyperparameters (Investigated Variant)
+B.5 CEM Planning Hyperparameters
+B.6 Action-Contrastive Training Objective
+C Action-Contrastive Training Analysis
+Mechanism.
+Scope of the negative result.
+D Real-World Robot Platform and Deployment Details
+D.1 Real-World Trial Outcomes
+License: CC BY 4.0
+arXiv:2608.09073v1 [cs.RO] 10 Aug 2026
+Latent World Models with Monotone Planning Costs for Image-Goal Navigation
+Amirhosein Chahe
+Siwei Cai
+Lifeng Zhou
+Affiliation: Drexel University
+Affiliation: {ac4462, sc3568, lz457}@drexel.edu
+Abstract
+Image-goal navigation with latent world models requires not only accurate future prediction, but also a planning cost that reliably ranks candidate action sequences. We define the cost as the cosine distance between the predicted future embedding and the goal embedding, and show that poor cost ordering can mislead sampling-based planners such as Cross-Entropy Method (CEM). To address this, we propose a latent world model built on a frozen DINO-family encoder and train it with two complementary objectives. An autoregressive rollout loss reduces the gap between training and multi-step planning rollouts, while a Monotone Cost Ranking (MCR) loss directly encourages increasingly perturbed action sequences to receive higher planning costs. We also study InfoNCE-based action-contrastive training and find that temporal permutation negatives distort the latent geometry and degrade planning performance. On the GNM navigation dataset, our method outperforms Navigation World
+Models (NWM), DINO-WM, OmniVLA, and NoMaD, achieving state-of-the-art image-goal navigation performance while reducing orientation error by 2.7×2.7\times over the same-encoder DINO-WM baseline. We also deploy the model zero-shot on a physical robot, where it follows goal-directed paths in unseen indoor and outdoor environments.
+Keywords: Robot Navigation, World Models, Latent Space Planning, Monotone Cost
+Functions, Model Predictive Control, Image-Goal Navigation
+1 Introduction
+Image-goal robot navigation asks a robot to reach a target location specified by a reference image.
+Solving this task requires more than matching the current observation to the goal: the robot must predict how candidate actions will change its future visual observations and select an action sequence that moves toward the target view.
+o1o_{1}Encoderfrozenz1z_{1}Pred.a1a_{1}z^2\hat{z}_{2}⋯\cdotsPred.aHa_{H}z^H\hat{z}_{H}ℒrollout\mathcal{L}_{\mathrm{rollout}}zgz_{g}Encoderfrozenogo_{g}ℒmcr\mathcal{L}_{\mathrm{mcr}}:Monotone Cost RankingDINO-WMnon-monotoneOursmonotone ✓\checkmark
+Figure 1: Latent world model with monotone planning cost.
+(Architecture, top.)
+A frozen DINO-family encoder maps the current observation o1o_{1} to patch
+features z1z_{1}; an AdaLN ViT predictor then rolls out HH steps autoregressively,
+conditioned on actions (a1,…,aH)(a_{1},\ldots,a_{H}), to produce embeddings
+z^2,…,z^H\hat{z}_{2},\ldots,\hat{z}_{H} entirely in latent space.
+The planning cost compares the predicted final embedding
+to the goal embedding zgz_{g} (encoded from ogo_{g}; shared encoder weights).
+(Losses, bottom.)
+The rollout loss ℒrollout\mathcal{L}_{\mathrm{rollout}} trains the predictor on
+its own prior outputs, closing the train/test gap with multi-step CEM rollout.
+The Monotone Cost Ranking (MCR) loss ℒmcr\mathcal{L}_{\mathrm{mcr}} applies a
+pairwise margin-ranking loss over graded action perturbations, shaping the cosine
+cost landscape to be monotone near the goal (right).
+Existing learning-based navigation methods largely follow two paradigms.
+Reactive policies, including ViNT [29], NoMaD [31], and large VLA models such as OmniVLA [16], directly predict actions from the current observation and goal, but do not explicitly simulate future states.
+World-model-based methods instead couple learned dynamics with Model Predictive Control (MPC).
+Navigation World Models (NWM) [4] perform MPC over predicted video frames, while DINO-WM [38] improves efficiency by predicting future DINOv2 patch features in latent space.
+However, DINO-WM is trained with single-step teacher forcing, whereas MPC requires multi-step autoregressive rollout from the model’s own predictions.
+This train-test mismatch can accumulate error, and standard regression losses such as MSE or cosine similarity do not ensure that the induced cosine planning cost ranks candidate action sequences reliably.
+We argue that a latent world model for MPC must satisfy two key requirements: rollout consistency, where predictions remain accurate when conditioned on the model’s own previous outputs, and a monotone cost landscape, where action sequences that deviate further from a goal-reaching trajectory receive higher planning costs.
+To address these requirements, we propose a JEPA-style latent world model built on a frozen DINO-family encoder [2] and a trainable AdaLN ViT predictor.
+We train the model with an autoregressive rollout loss that matches the multi-step self-conditioned regime used during CEM planning.
+A counter-curriculum gradually increases the rollout horizon, exposing the predictor to compounding errors while avoiding gradient collapse at long horizons.
+We then apply Monotone Cost Ranking (MCR), a pairwise ranking objective that shapes the cosine planning cost over action sequences with graded perturbations.
+By dead-reckoning each perturbed sequence and comparing its trajectory deviation from the ground truth, MCR encourages larger deviations to receive higher final embedding-to-goal costs.
+We also investigate whether explicit action-contrastive learning improves planning by making predictions more discriminative across action sequences.
+Surprisingly, order-sensitive InfoNCE with temporal permutation negatives consistently degrades CEM performance.
+These negatives often share similar aggregate displacement with the ground-truth sequence, making them extremely hard to separate without distorting the latent geometry required for accurate rollout and cost-based planning.
+This negative result suggests a tension between discriminative contrastive objectives and geometry-preserving predictive objectives when the learned representation is used directly for MPC.
+Trained on the GNM robot navigation dataset [28], our model achieves state-of-the-art image-goal navigation performance against NWM [4], DINO-WM [38], OmniVLA [16], and NoMaD [31].
+It outperforms all baselines on orientation and worst-case displacement metrics, reduces orientation error by 2.7×2.7\times over the same-encoder DINO-WM baseline, and performs planning entirely in latent feature space.
+Our contributions are:
+•
+An autoregressive rollout loss with a counter-curriculum that trains latent world models under the same multi-step self-conditioned regime used during CEM planning.
+•
+A Monotone Cost Ranking objective that shapes the cosine planning cost by ranking graded action perturbations according to dead-reckoned trajectory deviation.
+•
+A systematic negative result showing that order-sensitive action-contrastive learning can distort latent geometry and degrade CEM planning.
+•
+State-of-the-art results on the GNM benchmark against both world-model-based and reactive navigation baselines.
+2 Related Work
+Visual Navigation and World Models
+Learning-based visual navigation has progressed from robot-specific policies to foundation-style models trained on diverse offline datasets.
+GNM [28] introduced a cross-embodiment goal-conditioned navigation model trained across heterogeneous robot platforms.
+ViNT [29] extended this direction with a Transformer backbone and demonstrated the benefit of large-scale pretraining for visual navigation.
+NoMaD [31] unified goal-directed navigation and exploration with a goal-masked diffusion policy, while recent vision-language-action models such as OmniVLA [16] further scale navigation policies with multimodal representations.
+These methods show strong generalization, but they are primarily reactive: they predict actions from the current observation and goal without explicitly simulating the future consequences of candidate action sequences.
+This limits their ability to compare multiple long-horizon plans at test time.
+World-model-based navigation addresses this limitation by predicting future observations under candidate actions and selecting actions through planning.
+Navigation World Models (NWM) [4] use a goal-conditioned video diffusion model to predict future pixel frames and perform MPC over generated videos, but pixel-level prediction is computationally expensive and requires modeling visual details that may be irrelevant for navigation.
+DINO-WM [38] improves efficiency by predicting future DINOv2 patch features instead of pixels, enabling planning directly in latent space.
+More recently, X-Mobility [20] has demonstrated the potential of decoupled latent world models for zero-shot sim-to-real transfer.
+Building on this direction, our work connects latent future prediction with continuous SE(2) action-sequence optimization, enabling MPC-style planning for physical image-goal navigation.
+Latent Predictive Models for Planning
+Latent predictive models avoid pixel reconstruction by predicting future representations in an embedding space.
+This idea is closely related to the Joint Embedding Predictive Architecture (JEPA) family, which learns to predict future representations rather than raw observations [3].
+Recent work further shows that frozen DINO-family features provide strong visual representations for latent world modeling [2], motivating their use as planning substrates.
+DINO-WM [38] is the closest latent-space world-model baseline to our setting.
+It predicts future DINOv2 spatial patch features and evaluates candidate actions by comparing the predicted final latent state with the goal embedding.
+However, DINO-WM is trained with single-step teacher-forced supervision, where each prediction is conditioned on the ground-truth current feature.
+During MPC, the model must instead roll out autoregressively from its own previous predictions.
+This creates a train-test mismatch that can accumulate error over multiple planning steps.
+Our rollout loss directly addresses this mismatch by training the predictor under the same self-conditioned regime used during MPC rollout.
+Training Objectives for Planning-Ready World Models
+For a latent world model to be useful for MPC, accurate prediction alone is not sufficient.
+The induced planning cost must also provide a reliable ordering over candidate action sequences.
+Teacher forcing is widely used in sequence prediction because it stabilizes optimization, but it introduces exposure bias: at test time, the model conditions on its own imperfect predictions rather than ground-truth context [5].
+Our autoregressive rollout loss follows the same motivation as prior work on mitigating train-test mismatch, but applies it directly to latent image-goal navigation by supervising multi-step predictions conditioned on the model’s own prior outputs.
+A second requirement is a well-shaped planning objective.
+In our setting, MPC evaluates each candidate action sequence using the cosine distance between the predicted final embedding and the goal embedding.
+If this cost does not increase as trajectories deviate from the goal-reaching path, CEM can select suboptimal plans even when the predictor is locally accurate.
+Our Monotone Cost Ranking (MCR) objective directly shapes this cosine planning cost by encouraging action sequences with larger trajectory deviation to receive higher final embedding-to-goal costs.
+We also investigate whether contrastive learning can improve action discriminability in latent world models.
+Although contrastive objectives have been successful in representation learning and control, our experiments reveal a negative result for planning-oriented world models: order-sensitive InfoNCE with temporal permutation negatives can distort the latent geometry required for accurate rollout and degrade CEM planning performance.
+This suggests a tension between discriminative contrastive objectives and geometry-preserving predictive objectives when the learned representation is used directly as a planning cost.
+Additional related work on visual navigation, latent world models, contrastive learning, and energy-based planning is discussed in Appendix A.
+3 Method
+3.1 Problem Formulation
+We address image-goal navigation problem; given a short history of RGB observations
+and a goal image, find an action sequence that drives the robot to the
+depicted location.
+Each action is a continuous body-frame SE(2) displacement with the yaw
+change encoded as a sine-cosine pair, giving a 4-D action vector (Δ​x,Δ​y,sin⁡Δ​θ,cos⁡Δ​θ)(\Delta x,\Delta y,\sin\Delta\theta,\cos\Delta\theta), to avoid discontinuities.
+No map, depth sensor, or GPS is assumed; inputs are RGB images alone, with
+on-robot odometry used only for action labels during training..
+3.2 Architecture
+Our model consists of two components: a frozen image encoder and a trainable
+action-conditioned predictor.
+Frozen DINO encoder.
+Each observation OtO_{t} is mapped to a spatial grid of patch features
+𝐳t=ϕ⁡(Ot)\mathbf{z}_{t}=\phi(O_{t}) by a frozen DINO-family encoder.
+The encoder weights are held fixed throughout training; only the predictor
+is learned.
+Features are layer-normalized before use: 𝐳~t=LN⁡(𝐳t)\tilde{\mathbf{z}}_{t}=\mathrm{LN}(\mathbf{z}_{t}).
+AdaLN ViT predictor.
+The trainable predictor fθf_{\theta} is a causal Vision Transformer with
+Rotary Positional Encodings (RoPE) and Adaptive Layer Normalization (AdaLN) [25].
+Given a context window of recent patch-feature maps and their corresponding
+actions, it autoregressively predicts the next-step feature map:
+𝐳^t+1=fθ(𝐳~t−C+1:t,𝐚t−C+1:t).\hat{\mathbf{z}}_{t+1}=f_{\theta}\!\left(\tilde{\mathbf{z}}_{t-C+1:t},\;\mathbf{a}_{t-C+1:t}\right).
+(1)
+A small MLP encodes the action into per-layer scale-and-shift parameters that modulate every transformer block, conditioning the prediction on the commanded motion.
+This differs from DINO-WM [38], which concatenates a flat action token onto each spatial patch.
+The single-step predictor fθf_{\theta} (Eq. 1) extends to an
+HH-step autoregressive rollout
+FθH(𝐙~ctx,𝐚1:H)↦𝐳^H,F_{\theta}^{H}\!\left(\tilde{\mathbf{Z}}_{\mathrm{ctx}},\,\mathbf{a}_{1:H}\right)\;\mapsto\;\hat{\mathbf{z}}_{H},
+(2)
+obtained by applying fθf_{\theta} recursively, appending each prediction
+𝐳^h\hat{\mathbf{z}}_{h} to the context buffer before producing
+𝐳^h+1\hat{\mathbf{z}}_{h+1}.
+3.3 Training Objectives
+Training proceeds in two phases: a base phase that trains the predictor
+via autoregressive rollout supervision, followed by a brief MCR phase
+that directly shapes the cost landscape for reliable MPC.
+We also evaluate an InfoNCE-based action-contrastive variant; its full
+formulation is given in Appendix B.6, and
+Section 4.5 shows that it degrades planning
+performance.
+3.3.1 Rollout Loss
+Define the per-step prediction loss as a combination of L2 and cosine terms:
+ℒpred​(𝐳^,𝐳)=‖𝐳^−𝐳‖22+λcos​(1−cos⁡(𝐳^,𝐳)),\mathcal{L}_{\mathrm{pred}}(\hat{\mathbf{z}},\mathbf{z})=\|\hat{\mathbf{z}}-\mathbf{z}\|_{2}^{2}+\lambda_{\mathrm{cos}}\,\bigl(1-\cos(\hat{\mathbf{z}},\mathbf{z})\bigr),
+(3)
+with λcos=0.5\lambda_{\mathrm{cos}}\!=\!0.5.
+Rather than supervising each step from ground-truth context (teacher
+forcing), we train with an autoregressive rollout loss.
+The predictor is unrolled for KK steps starting from a length-SS ground-truth
+seed, conditioning each step on the rolling buffer
+𝐮j(k)=𝐳~j\mathbf{u}^{(k)}_{j}=\tilde{\mathbf{z}}_{j} for j≤Sj\leq S and
+𝐮j(k)=𝐳^(j−S)\mathbf{u}^{(k)}_{j}=\hat{\mathbf{z}}^{(j-S)} for j>Sj>S:
+𝐳^(k)\displaystyle\hat{\mathbf{z}}^{(k)}
+=fθ(𝐮S+k−C:S+k−1(k),𝐚S+k−C:S+k−1),\displaystyle=f_{\theta}\!\left(\mathbf{u}^{(k)}_{S+k-C:\,S+k-1},\;\mathbf{a}_{S+k-C:\,S+k-1}\right),
+(4)
+ℒrollout\displaystyle\mathcal{L}_{\mathrm{rollout}}
+=1K​∑k=1Kℒpred​(𝐳^(k),𝐳~S+k).\displaystyle=\frac{1}{K}\sum_{k=1}^{K}\mathcal{L}_{\mathrm{pred}}\!\left(\hat{\mathbf{z}}^{(k)},\;\tilde{\mathbf{z}}_{S+k}\right).
+(5)
+This directly mirrors the MPC rollout at test time, eliminating the
+teacher-forcing distribution mismatch.
+To prevent collapse at long rollout horizons, we employ a
+counter-curriculum that starts at K=2K\!=\!2 and ramps to K=8K\!=\!8
+as training progresses, with the learning rate and batch size annealed
+accordingly (see Appendix B for the full schedule).
+3.3.2 Monotone Cost Ranking (MCR)
+Even after rollout training, the cosine cost between the world model’s
+predicted final embedding and the goal embedding need not be monotone in
+trajectory deviation from the optimal plan.
+Local minima in this cost surface can cause gradient-free CEM to converge
+to sub-optimal action sequences.
+The Monotone Cost Ranking (MCR) phase directly enforces this monotonicity.
+We generate action sequences perturbed around the ground-truth at three
+noise levels σ∈{0.05, 0.15, 0.35}\sigma\!\in\!\{0.05,\,0.15,\,0.35\} using AR(1)-correlated
+Gaussian noise (ρ=0.7\rho\!=\!0.7).
+For each candidate ii we compute (1) its cosine cost
+ci=1−cos(FθH(𝐙~ctx,𝐚1:H(i)),𝐳~g)c_{i}=1-\cos\!\bigl(F_{\theta}^{H}(\tilde{\mathbf{Z}}_{\mathrm{ctx}},\mathbf{a}^{(i)}_{1:H}),\;\tilde{\mathbf{z}}_{g}\bigr)
+and (2) its trajectory distance did_{i} (mean L2 deviation of the dead-reckoned
+path from the GT trajectory).
+A pairwise margin-ranking loss then enforces that candidates farther in
+trajectory space must incur a proportionally higher cost:
+ℒmcr=1|𝒫|​∑(i,j)∈𝒫max⁡(0,mi​j+cj−ci),\mathcal{L}_{\mathrm{mcr}}=\frac{1}{|\mathcal{P}|}\sum_{(i,j)\in\mathcal{P}}\max\!\bigl(0,\;m_{ij}+c_{j}-c_{i}\bigr),
+(6)
+where (i,j)∈𝒫(i,j)\in\mathcal{P} are ordered pairs with di>djd_{i}>d_{j} and
+mi​j=max⁡(0.02, 0.5​|di−dj|)m_{ij}=\max(0.02,\,0.5\,|d_{i}-d_{j}|) is a gap-proportional margin.
+The total MCR objective combines the ranking loss with a rollout anchor on
+the GT action sequence to prevent prediction quality from degrading:
+ℒMCR=ℒrollout+ℒmcr.\mathcal{L}_{\mathrm{MCR}}=\mathcal{L}_{\mathrm{rollout}}+\mathcal{L}_{\mathrm{mcr}}.
+(7)
+Full hyperparameter details are in Appendix B.
+3.3.3 Action-Contrastive Training (Investigated Variant)
+We also investigate whether an InfoNCE objective can sharpen action
+discriminability. For each trajectory, the positive is a KK-step rollout under
+the ground-truth actions; the negatives are rollouts of the same scene
+under other batch elements’ action sequences (cyclic permutation), so the
+contrast isolates action ordering rather than scene content. The loss is added
+to ℒrollout\mathcal{L}_{\mathrm{rollout}} as an auxiliary term; the full formulation
+and hyperparameters are in Appendix B.4. We find this objective
+systematically conflicts with CEM planning accuracy
+(§4.5).
+3.4 CEM Planning at Inference
+At test time, given a context window of recent observations and a goal image,
+the model plans an action sequence using the Cross-Entropy Method (CEM).
+Candidate action sequences are sampled from a unicycle kinematic prior,
+converted to 4-dimensional SE(2) actions, and evaluated by rolling out the world model
+in latent space:
+𝐀∗=arg⁡min𝐀⁡ 1−sim⁡(pool⁡(FθH​(𝐙~ctx,𝐀)),pool⁡(𝐳~g)).\mathbf{A}^{*}=\arg\min_{\mathbf{A}}\;1-\mathrm{sim}\!\left(\mathrm{pool}\!\left(F_{\theta}^{H}(\tilde{\mathbf{Z}}_{\mathrm{ctx}},\,\mathbf{A})\right),\;\mathrm{pool}(\tilde{\mathbf{z}}_{g})\right).
+(8)
+CEM iteratively refits a Gaussian over the action space to the top-kk elite
+samples; the best action from the final iteration is executed in a
+receding-horizon fashion, with replanning at every timestep.
+No pixel reconstruction is required at inference.
+4 Experiments
+4.1 Experimental Setup
+Dataset.
+We train and evaluate on the GNM dataset [28], a
+large cross-embodiment navigation corpus of 60 + hours from six heterogeneous
+robot platforms (CAST [12] adds language annotations to GNM; our world model trains on the image portion only, while the language-conditioned OmniVLA baseline uses CAST instructions for the relevant evaluation).
+Evaluation uses a held-out split of 1,316 trajectories.
+Implementation.
+We evaluate both DINOv2-ViT-S/14 and DINOv3-ViT-S/16 as frozen encoders
+(see Section 4.5).
+The AdaLN ViT predictor has 6 transformer layers, 12 attention heads,
+embedding dimension 384, RoPE, and a causal attention mask.
+Training runs on 4×\timesNVIDIA H200 GPUs.
+Base training uses a rollout counter-curriculum; MCR is then a brief
+1,000-step phase on top of the converged Base checkpoint.
+Full optimizer settings, step counts, and the counter-curriculum schedule
+are in Appendix B.
+For real-world deployment, inference runs on an NVIDIA Jetson AGX Orin with a planning horizon of 8 steps.
+Evaluation protocol.
+Our model and DINO-WM plan with CEM (S=4S\!=\!4 context frames, K=6K\!=\!6
+horizon; see Appendix B.5); NWM uses the same CEM optimizer
+over its video-diffusion rollouts.
+Reactive policies (OmniVLA, NoMaD) use their original inference procedures.
+4.2 Baselines
+DINO-WM [38]: our re-implementation using a ViT
+predictor with per-patch action concatenation, single-step teacher forcing,
+and pure L2 loss, evaluated with both DINOv2 and DINOv3 encoders.
+NWM [4]: pixel-space video diffusion world
+model with MPC.
+OmniVLA [16]: large VLA evaluated in
+image-goal (img) and language-conditioned (lang) modes.
+NoMaD (GC) [31]: goal-conditioned diffusion
+policy.
+4.3 Metrics
+Over the K=6K\!=\!6 step trajectory we report orientation error
+(AOE/MAOE, °; average and worst-case heading error,
+following 21) and displacement error
+(ADE/MADE, m; average and worst-case L2 distance from GT).
+All metrics are lower-is-better.
+4.4 Main Results
+Table 1 reports results on the GNM test split, and
+Figure 2 shows a representative example.
+Table 1: GNM test results (K=6K\!=\!6, C=4C\!=\!4); lower is better.
+Bold: best world-model planner; underline: best overall.
+TF = teacher-forced; Base = rollout; MCR = Base + monotone cost ranking;
+ACT = Base + action-contrastive (†\dagger negative result,
+§4.5).
+Method
+AOE (°) ↓\downarrow
+MAOE (°) ↓\downarrow
+ADE (m) ↓\downarrow
+MADE (m) ↓\downarrow
+Reactive policies
+OmniVLA (img) [16]
+7.73
+11.58
+0.94
+1.72
+OmniVLA (lang) [16]
+10.94
+17.31
+1.29
+2.46
+NoMaD (GC) [31]
+9.09
+14.20
+0.88
+1.67
+World-model planners, pixel space
+NWM [4]
+14.57
+26.57
+1.04
+1.72
+World-model planners, latent space (baseline)
+DINO-WM (DINOv2) [38]
+20.27
+30.14
+3.47
+6.25
+DINO-WM (DINOv3) [38]
+21.82
+32.34
+2.09
+3.69
+Ours (DINOv3)
+TF
+10.52
+15.29
+1.26
+2.10
+TF + MCR
+8.84
+12.91
+1.16
+1.93
+Base
+10.15
+14.62
+1.22
+1.97
+MCR
+8.54
+12.22
+1.17
+1.91
+ACT†
+21.17
+29.44
+1.95
+3.36
+ACT + MCR†
+11.92
+18.74
+1.66
+2.85
+Ours (DINOv2)
+TF
+12.10
+18.55
+3.28
+5.57
+TF + MCR
+10.66
+16.51
+3.23
+5.44
+Base
+9.12
+13.29
+1.12
+1.83
+MCR
+7.63
+11.11
+0.99
+1.64
+ACT†
+13.80
+21.08
+1.58
+2.69
+ACT + MCR†
+10.33
+15.50
+1.41
+2.31
+(a) Start
+(b) Goal
+(c) Trajectory comparison
+Figure 2: Qualitative image-goal navigation example (held-out set). From the
+start (a) and goal (b) observations, each method plans a trajectory in the
+robot frame (c). Our MCR model tracks the ground-truth path most closely;
+several baselines under-progress or deviate.
+Latent-space world models.
+With the DINOv2 encoder, our full recipe reduces AOE by 2.7×\mathbf{2.7\times}
+relative to the same-encoder DINO-WM baseline, with similar or larger gains on
+the displacement metrics; DINOv3 shows the same pattern. The ablations
+(§4.5) attribute this to three compounding factors
+that together convert the latent-WM recipe from uncompetitive to
+state-of-the-art: the AdaLN action-conditioned predictor, autoregressive
+rollout training, and monotone cost shaping.
+Pixel-space planner.
+NWM’s AOE is nearly twice ours, so latent planning with a shaped cost surface
+outperforms pixel-space video-diffusion MPC without pixel reconstruction.
+Reactive policies.
+Our MCR(DINOv2) achieves the lowest AOE, MAOE, and MADE across
+all evaluated methods, narrowly edging the strongest reactive baselines
+(OmniVLA, NoMaD). The sole exception is ADE, where those policies lead
+by a small margin. This gap reflects a difference in supervision: reactive
+policies imitate ground-truth trajectories, which helps when test trajectories
+follow training-distribution motion, whereas our model optimizes goal-proximity
+in embedding space and is not penalized for reaching the goal via a different
+path, an advantage in novel environments
+(Figure 2). That a latent world model can match
+or exceed reactive policies on three of four metrics, without imitation and
+entirely in latent feature space, is the central finding of this work.
+4.5 Ablation Study
+Rollout training vs. teacher forcing.
+Autoregressive rollout consistently beats single-step teacher forcing, both
+before and after MCR and on both encoders (Table 1); the gain is
+largest for DINOv2 (9.12° vs. 12.10° AOE before MCR).
+Matching the training distribution to the self-conditioned rollouts CEM uses at
+test time directly improves multi-step planning.
+Effect of Monotone Cost Ranking.
+MCR gives the largest and most consistent per-stage improvement, reducing AOE
+across every base variant and both encoders. Shaping the latent cosine cost to
+rank trajectory deviations correctly is thus critical for reliable
+sampling-based MPC.
+Encoder choice.
+DINOv2-ViT-S/14 is our best encoder under the MCR recipe (7.63° vs. 8.54° for DINOv3-ViT-S/16), but the ordering of training variants is
+identical across both, so the benefits of rollout training and MCR are not tied
+to a specific DINO backbone.
+Action-contrastive training.
+Contrary to our hypothesis, action-contrastive training with order-sensitive
+temporal-permutation negatives degrades planning: with DINOv3 it raises
+AOE to the level of the DINO-WM baseline, erasing the gains from rollout
+training. MCR partially repairs the cost landscape, but ACT++MCR stays well
+behind MCR alone on both encoders. We attribute this to the contrastive
+pressure from permutation negatives, which distorts the latent geometry that
+accurate autoregressive rollout depends on; a full mechanism and scope analysis
+are in Appendix C.
+4.6 Real-World Robot Demonstration
+We further demonstrate the proposed method on a physical Clearpath Husky A200 robot using a ROS 2 Nav2 execution stack.
+All methods are evaluated in a zero-shot setting: neither OmniVLA nor WorldModel is trained or fine-tuned on the deployment environments or on data collected from this robot platform.
+At each deployment site, the system receives a current observation and a goal image, and the model outputs a sequence of navigation waypoints for execution.
+Additional platform and deployment details are provided in Appendix D.
+Figure 3:
+Qualitative comparison of zero-shot real-world navigation rollouts in outdoor and indoor environments.
+For each scenario, the top row shows OmniVLA and the bottom row shows WorldModel (ours).
+Neither method is trained or fine-tuned on the deployment scenes or on data from the Husky robot platform.
+OmniVLA tends to produce overly short trajectories or move toward the wall, whereas WorldModel follows more feasible goal-directed paths and reaches end observations that are visually closer to the target viewpoint.
+Qualitative results.
+Figure 3 shows representative zero-shot rollouts in outdoor and indoor environments.
+WorldModel produces more goal-directed trajectories and reaches final observations that more closely match the target views.
+In the outdoor scene, OmniVLA generates an overly short trajectory and terminates before making sufficient progress toward the goal.
+In the indoor scene, OmniVLA moves toward the wall instead of continuing along the feasible corridor.
+In contrast, WorldModel follows more reasonable free-space paths in both scenes, demonstrating stronger spatial coherence and more reliable waypoint prediction under zero-shot physical deployment. A small-scale summary of the five representative physical trials is provided in Appendix D.1.
+5 Conclusion
+We presented a latent world model for image-goal navigation built
+around a monotone planning cost: the cosine distance between predicted
+and goal embeddings should rise with trajectory deviation, so that gradient-free
+CEM converges reliably. Two stages realize this principle. An autoregressive
+rollout loss closes the teacher-forcing train/test gap, and a margin-ranking
+objective shapes the cost landscape to be monotone. Together they reduce
+orientation error by 2.7×2.7\times over the same-encoder DINO-WM baseline and
+yield a new state of the art, outperforming all evaluated baselines, including
+reactive policies, on orientation and worst-case displacement, entirely in the
+latent space of a frozen encoder with no pixel reconstruction.
+We further find that order-sensitive InfoNCE with temporal-permutation
+negatives, though well-motivated, systematically degrades the embedding
+geometry CEM relies on, because separating maximally hard negatives distorts
+the manifold more than contrastive discrimination helps planning.
+This shows where discriminative objectives conflict with predictive ones, and
+points to possible fixes such as projection heads, gradient surgery, or
+alternating objectives for future work.
+Limitations.
+While we demonstrate zero-shot real-world deployment on a physical Husky platform,
+our evaluation is concentrated on static or low-traffic environments; highly
+dynamic, multi-agent scenes with moving pedestrians or vehicles remain untested,
+and the monotone cost—shaped purely by goal proximity in embedding space—does not
+explicitly account for other agents’ motion.
+A second limitation is inherent to the autoregressive predictor: rolling out from
+the model’s own outputs accumulates error over the horizon, and although our
+rollout loss is designed to reduce this train-test mismatch, very long horizons
+remain challenging as small per-step errors compound.
+Acknowledgments
+Acknowledgments to be added in the camera-ready version.
+References
+[1]
+M. Assran, N. Ballas, A. Bardes, Y. LeCun, M. Rabbat, et al. (2025)
+V-JEPA 2: self-supervised video models enable understanding, prediction and planning.
+External Links: 2506.09985,
+Link
+Cited by: Appendix A.
+[2]
+F. Baldassarre, M. Szafraniec, B. Terver, V. Khalidov, F. Massa, Y. LeCun, P. Labatut, M. Seitzer, and P. Bojanowski (2025)
+Back to the features: DINO as a foundation for video world models.
+ArXiv abs/2507.19468.
+External Links: Link
+Cited by: §1,
+§2.
+[3]
+R. Balestriero and Y. LeCun (2025)
+LeJEPA: provable and scalable self-supervised learning without the heuristics.
+ArXiv abs/2511.08544.
+External Links: Link
+Cited by: §2.
+[4]
+A. Bar, G. Zhou, D. Tran, T. Darrell, and Y. LeCun (2024)
+Navigation world models.
+2025 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), pp. 15791–15801.
+External Links: Link
+Cited by: §1,
+§1,
+§2,
+§4.2,
+Table 1.
+[5]
+S. Bengio, O. Vinyals, N. Jaitly, and N. Shazeer (2015)
+Scheduled sampling for sequence prediction with recurrent neural networks.
+In Advances in Neural Information Processing Systems (NeurIPS),
+External Links: Link
+Cited by: Appendix A,
+§2.
+[6]
+T. Chen, S. Kornblith, M. Norouzi, and G. Hinton (2020)
+A simple framework for contrastive learning of visual representations.
+In International Conference on Machine Learning (ICML),
+External Links: Link
+Cited by: Appendix A.
+[7]
+X. Chen, J. Guo, T. He, C. Zhang, P. Zhang, D. Yang, L. Zhao, and J. Bian (2024)
+IGOR: image-goal representations are the atomic control units for foundation models in embodied ai.
+External Links: Link
+Cited by: Appendix A.
+[8]
+Z. Chen, Y. Guo, Z. Chu, M. Luo, Y. Shen, M. Sun, J. Hu, S. Xie, K. Yang, P. Shi, Z. Gu, L. Liu, H. Han, X. Wu, M. Xu, and Y. Zhang (2025)
+SocialNav: training human-inspired foundation model for socially-aware embodied navigation.
+ArXiv abs/2511.21135.
+External Links: Link
+Cited by: Appendix A.
+[9]
+B. Eysenbach, T. Zhang, R. Salakhutdinov, and S. Levine (2022)
+Contrastive learning as goal-conditioned reinforcement learning.
+In Advances in Neural Information Processing Systems (NeurIPS),
+External Links: Link
+Cited by: Appendix A.
+[10]
+P. Florence, C. Lynch, A. Zeng, O. Ramirez, A. Wahid, L. Downs, A. Wong, J. Lee, I. Mordatch, and J. Tompson (2021)
+Implicit behavioral cloning.
+In Conference on Robot Learning (CoRL),
+External Links: Link
+Cited by: Appendix A.
+[11]
+Q. Garrido, T. Nagarajan, B. Terver, N. Ballas, Y. LeCun, and M. Rabbat (2026)
+Learning latent action world models in the wild.
+ArXiv abs/2601.05230.
+External Links: Link
+Cited by: Appendix A.
+[12]
+C. Glossop, W. Chen, A. Bhorkar, D. Shah, and S. Levine (2025)
+CAST: counterfactual labels improve instruction following in vision-language-action models.
+ArXiv abs/2508.13446.
+External Links: Link
+Cited by: §4.1.
+[13]
+S. Gode, A. Nayak, D. N.P. Oliveira, M. Krawez, C. Schmid, and W. Burgard (2024)
+FlowNav: combining flow matching and depth priors for efficient navigation.
+2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), pp. 17762–17768.
+External Links: Link
+Cited by: Appendix A.
+[14]
+D. Hafner, T. Lillicrap, M. Norouzi, and J. Ba (2023)
+Mastering diverse domains through world models.
+ArXiv.
+External Links: 2301.04104,
+Link
+Cited by: Appendix A.
+[15]
+H. He, Y. Ma, W. Wu, and B. Zhou (2025)
+From seeing to experiencing: scaling navigation foundation models with reinforcement learning.
+ArXiv abs/2507.22028.
+External Links: Link
+Cited by: Appendix A.
+[16]
+N. Hirose, C. Glossop, D. Shah, and S. Levine (2025)
+OmniVLA: an omni-modal vision-language-action model for robot navigation.
+ArXiv abs/2509.19480.
+External Links: Link
+Cited by: §1,
+§1,
+§2,
+§4.2,
+Table 1,
+Table 1.
+[17]
+B. Hou, G. Li, J. Jia, et al. (2026)
+World model for robot learning: a comprehensive survey.
+External Links: 2605.00080,
+Link
+Cited by: Appendix A.
+[18]
+S. Huang, J. Wu, Q. Zhou, S. Miao, and M. Long (2025)
+Vid2World: crafting video diffusion models to interactive world models.
+ArXiv abs/2505.14357.
+External Links: Link
+Cited by: Appendix A.
+[19]
+M. Laskin, A. Srinivas, and P. Abbeel (2020)
+Curl: contrastive unsupervised representations for reinforcement learning.
+In International conference on machine learning,
+pp. 5639–5650.
+External Links: Link
+Cited by: Appendix A.
+[20]
+W. Liu, H. Zhao, C. Li, J. Biswas, B. Okal, P. Goyal, Y. Chang, and S. Pouya (2025)
+X-MOBILITY: end-to-end generalizable navigation via world modeling.
+In 2025 IEEE International Conference on Robotics and Automation (ICRA),
+External Links: Link
+Cited by: §2.
+[21]
+X. Liu, J. Li, Y. Jiang, N. Sujay, Z. Yang, J. Zhang, J. Abanes, J. Zhang, and C. Feng (2024)
+CityWalker: learning embodied urban navigation from web-scale videos.
+2025 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), pp. 6875–6885.
+External Links: Link
+Cited by: §4.3.
+[22]
+X. Luo, A. Wu, H. Han, X. Wan, W. Zhang, L. Shu, and R. Wang (2026)
+StepNav: structured trajectory priors for efficient and multimodal visual navigation.
+ArXiv abs/2602.02590.
+External Links: Link
+Cited by: Appendix A.
+[23]
+Y. J. Ma, S. Sodhani, D. Jayaraman, O. Bastani, V. Kumar, and A. Zhang (2023)
+VIP: towards universal visual reward and representation via value-implicit pre-training.
+In International Conference on Learning Representations (ICLR),
+External Links: Link
+Cited by: Appendix A.
+[24]
+L. Maes, Q. L. Lidec, D. Scieur, Y. LeCun, and R. Balestriero (2026)
+LeWorldModel: stable end-to-end joint-embedding predictive architecture from pixels.
+External Links: Link
+Cited by: Appendix A.
+[25]
+W. Peebles and S. Xie (2023)
+Scalable diffusion models with transformers.
+In Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV),
+pp. 4195–4205.
+Cited by: §3.2.
+[26]
+S. Ross, G. Gordon, and D. Bagnell (2011)
+A reduction of imitation learning and structured prediction to no-regret online learning.
+In Proceedings of the Fourteenth International Conference on Artificial Intelligence and Statistics (AISTATS),
+External Links: Link
+Cited by: Appendix A.
+[27]
+P. Sermanet, C. Lynch, Y. Chebotar, J. Hsu, E. Jang, S. Schaal, and S. Levine (2018)
+Time-contrastive networks: self-supervised learning from video.
+In 2018 IEEE International Conference on Robotics and Automation (ICRA),
+External Links: Link
+Cited by: Appendix A.
+[28]
+D. Shah, A. Sridhar, A. Bhorkar, N. Hirose, and S. Levine (2023)
+GNM: a general navigation model to drive any robot.
+In 2023 IEEE International Conference on Robotics and Automation (ICRA),
+External Links: Link
+Cited by: §1,
+§2,
+§4.1.
+[29]
+D. Shah, A. Sridhar, N. Dashora, K. Stachowicz, K. Black, N. Hirose, and S. Levine (2023)
+ViNT: a foundation model for visual navigation.
+In Conference on Robot Learning (CoRL),
+External Links: Link
+Cited by: §1,
+§2.
+[30]
+V. Sobal, W. Zhang, K. Cho, R. Balestriero, T. G. J. Rudner, and Y. LeCun (2025)
+Learning from reward-free offline data: a case for planning with latent dynamics models.
+ArXiv abs/2502.14819.
+External Links: Link
+Cited by: Appendix A.
+[31]
+A. Sridhar, D. Shah, C. Glossop, and S. Levine (2024)
+NoMaD: goal masked diffusion policies for navigation and exploration.
+In 2024 IEEE International Conference on Robotics and Automation (ICRA),
+External Links: Link
+Cited by: §1,
+§1,
+§2,
+§4.2,
+Table 1.
+[32]
+J. Sun, W. Zhang, Z. Qi, S. Ren, Z. Liu, H. Zhu, G. Sun, X. Jin, and Z. Chen (2026)
+VLA-JEPA: enhancing vision-language-action model with latent world model.
+ArXiv abs/2602.10098.
+External Links: Link
+Cited by: Appendix A.
+[33]
+L. Suomela, N. Takahata, S. K. Arachchige, H. Edelman, and J. Kämäräinen (2026)
+Data scaling for navigation in unknown environments.
+IEEE Robotics and Automation Letters 11, pp. 6114–6121.
+External Links: Link
+Cited by: Appendix A.
+[34]
+B. Terver, T. Yang, J. Ponce, A. Bardes, and Y. LeCun (2025)
+What drives success in physical planning with joint-embedding predictive world models?.
+ArXiv abs/2512.24497.
+External Links: Link
+Cited by: Appendix A.
+[35]
+A. van den Oord, Y. Li, and O. Vinyals (2018)
+Representation learning with contrastive predictive coding.
+ArXiv.
+External Links: 1807.03748,
+Link
+Cited by: Appendix A.
+[36]
+D. Wang, H. Ye, Z. Liang, Z. Sun, Z. Lu, Y. Zhang, Y. Zhao, Y. Gao, M. Seegert, F. Schäfer, H. Qin, W. Li, L. Palmieri, F. Jahncke, M. Piccinini, and J. Betz (2025)
+Target-bench: can world models achieve mapless path planning with semantic targets?.
+ArXiv abs/2511.17792.
+External Links: Link
+Cited by: Appendix A.
+[37]
+W. Zhang, B. Terver, A. Zholus, S. Chitnis, H. Sutaria, M. Assran, R. Balestriero, A. Bar, A. Bardes, Y. LeCun, and N. Ballas (2026)
+Hierarchical planning with latent world models.
+External Links: 2604.03208,
+Link
+Cited by: Appendix A.
+[38]
+G. Zhou, H. Pan, Y. LeCun, and L. Pinto (2025)
+DINO-WM: world models on pre-trained visual features enable zero-shot planning.
+In International Conference on Machine Learning (ICML),
+External Links: Link
+Cited by: §1,
+§1,
+§2,
+§2,
+§3.2,
+§4.2,
+Table 1,
+Table 1.
+Appendix A Extended Related Work
+We provide additional discussion of related visual navigation, latent world-model, contrastive learning, and energy-based planning methods that are complementary to the main related work.
+Recent visual navigation methods have explored image-goal primitives, structured trajectory priors, flow- or diffusion-based action generation, socially aware navigation, data scaling, and reinforcement-learning-enhanced navigation policies [7, 22, 13, 8, 33, 15].
+Beyond navigation, latent predictive models have been applied to reward-free planning, manipulation, video prediction, latent action learning, and hierarchical planning [30, 34, 1, 32, 11, 24, 37, 18, 17].
+Our training objectives are also related to scheduled sampling, DAgger, latent rollout training, contrastive predictive learning, and energy- or value-based goal-reaching objectives [5, 26, 14, 35, 27, 6, 19, 9, 10, 23, 36].
+Appendix B Training Details
+B.1 Training Configuration Summary
+Table 2 summarises the loss objectives and key hyperparameters
+for each training variant evaluated in this work.
+All variants share the same frozen DINO-family encoder, 6-layer AdaLN ViT
+predictor (embedding dim 384, 12 heads, RoPE, causal mask), AdamW optimiser
+(β1=0.9\beta_{1}\!=\!0.9, β2=0.999\beta_{2}\!=\!0.999, weight decay 0.01, grad clip 1.0),
+bfloat16 mixed precision, and 4×\timesH200 GPUs.
+Table 2: Per-variant training configurations.
+Batch sizes are per-GPU; →\to denotes values that change with the
+rollout counter-curriculum (Table 3).
+MCR resumes from the converged Base checkpoint.
+Variant
+Objective
+Rollout KK
+Steps
+LR
+Batch/GPU
+TF
+ℒrollout\mathcal{L}_{\mathrm{rollout}} (K=1K\!=\!1)
+1 (fixed)
+20k
+×10−45\!\times\!10^{-4}
+64
+Base
+ℒrollout\mathcal{L}_{\mathrm{rollout}}
+2→\to8 (curr.)
+18k
+10−4→×10−610^{-4}\!\to\!5\!\times\!10^{-6}
+128→\to32
+ACT
+ℒrollout+0.25​ℒact\mathcal{L}_{\mathrm{rollout}}+0.25\,\mathcal{L}_{\mathrm{act}}
+2→\to8 (curr.)
+18k
+10−4→×10−610^{-4}\!\to\!5\!\times\!10^{-6}
+128→\to32
+MCR
+ℒrollout+ℒmcr\mathcal{L}_{\mathrm{rollout}}+\mathcal{L}_{\mathrm{mcr}}
+8 (fixed)
++1k
+10−510^{-5} (fixed)
+8
+B.2 Base Rollout Counter-Curriculum
+Base (and ACT) training uses a counter-curriculum that ramps the
+autoregressive rollout horizon KK from 2 to 8 steps, simultaneously
+annealing the learning rate and reducing batch size to accommodate the
+increased compute per step.
+Table 3 gives the full schedule.
+Table 3: Rollout counter-curriculum schedule (Base and ACT variants).
+All batch sizes are per-GPU (4×\timesH200 GPUs).
+Training steps
+Rollout KK
+Batch/GPU
+Learning rate
+0–2k
+2
+128
+×10−41\!\times\!10^{-4}
+2k–6k
+4
+64
+×10−55\!\times\!10^{-5}
+6k–10k
+6
+32
+×10−51\!\times\!10^{-5}
+10k–18k
+8
+32
+×10−65\!\times\!10^{-6}
+B.3 MCR Hyperparameters
+MCR resumes from the converged Base checkpoint and runs for 1,000 steps at a
+fixed LR of 10−510^{-5} (no warm-up, batch size 8 per GPU).
+The rollout horizon is fixed at K=8K\!=\!8 to match the last phase of Base
+training.
+Perturbed action sequences are generated at three noise levels
+σ∈{0.05, 0.15, 0.35}\sigma\!\in\!\{0.05,\,0.15,\,0.35\} with 1 sample per level (3 perturbed
+candidates plus the GT anchor per batch element).
+Noise is AR(1)-correlated with ρ=0.7\rho\!=\!0.7.
+The ranking margin is mi​j=max⁡(0.02, 0.5​|di−dj|)m_{ij}=\max(0.02,\;0.5\,|d_{i}-d_{j}|); the GT anchor
+loss weight is λanchor=1.0\lambda_{\mathrm{anchor}}\!=\!1.0.
+B.4 ACT Hyperparameters (Investigated Variant)
+For each trajectory in a batch, the positive is a KK-step rollout under the
+ground-truth action sequence; the negatives are rollouts of the same scene’s
+features under other batch elements’ action sequences (cyclic permutation).
+Let pool⁡(⋅)\mathrm{pool}(\cdot) denote ℓ2\ell_{2}-normalised spatial mean-pooling,
+𝐠(i)\mathbf{g}^{(i)} the pooled GT target, 𝐩+(i)\mathbf{p}_{+}^{(i)} the positive
+prediction, and 𝐩−(j)\mathbf{p}_{-}^{(j)} the negatives:
+ℒact=−1B∑iloge𝐠(i)⊤​𝐩+(i)/τe𝐠(i)⊤​𝐩+(i)/τ+∑j≠ie𝐠(i)⊤​𝐩−(j)/τ,\mathcal{L}_{\mathrm{act}}=-\frac{1}{B}\sum_{i}\log\frac{e^{\mathbf{g}^{(i)\top}\!\mathbf{p}_{+}^{(i)}/\tau}}{e^{\mathbf{g}^{(i)\top}\!\mathbf{p}_{+}^{(i)}/\tau}+\sum_{j\neq i}e^{\mathbf{g}^{(i)\top}\!\mathbf{p}_{-}^{(j)}/\tau}},
+(9)
+with temperature τ=0.1\tau\!=\!0.1. ACT uses the same Base rollout
+counter-curriculum with this additional ℒact\mathcal{L}_{\mathrm{act}} term, added
+to ℒrollout\mathcal{L}_{\mathrm{rollout}} with weight
+λact=0.25\lambda_{\mathrm{act}}\!=\!0.25 after a 100-step warm-up. Negatives are formed
+by a random cyclic shift of action sequences within the batch, so each scene is
+rolled out under B−1B-1 foreign action sequences. See
+§4.5 for the failure-mode analysis.
+B.5 CEM Planning Hyperparameters
+CEM uses a planning horizon of K=6K\!=\!6 steps and a context window of
+S=4S\!=\!4 seed frames.
+Each iteration samples 128 candidate action sequences from a unicycle
+kinematic model with AR(1)-correlated noise (ρ=0.5\rho\!=\!0.5) for temporal
+smoothness; the Gaussian is refit to the top 4 elites, and the search runs
+for 6 iterations.
+B.6 Action-Contrastive Training Objective
+We investigate whether an InfoNCE objective can improve action discriminability in the latent world model.
+For each trajectory in a batch, the positive is a KK-step rollout under the ground-truth action sequence.
+We consider two types of negatives.
+The first uses cross-scene action negatives, where the same scene features are rolled out under action sequences from other batch elements.
+The second uses order-sensitive temporal permutation negatives, where the same scene is rolled out under temporally permuted versions of the same action sequence.
+Let pool⁡(⋅)\mathrm{pool}(\cdot) denote ℓ2\ell_{2}-normalised spatial mean-pooling, 𝐠(i)\mathbf{g}^{(i)} the pooled ground-truth target, 𝐩+(i)\mathbf{p}_{+}^{(i)} the positive prediction, and 𝐩−(j)\mathbf{p}_{-}^{(j)} a negative prediction.
+The action-contrastive loss is
+ℒact=−1B∑iloge𝐠(i)⊤​𝐩+(i)/τe𝐠(i)⊤​𝐩+(i)/τ+∑j≠ie𝐠(i)⊤​𝐩−(j)/τ,\mathcal{L}_{\mathrm{act}}=-\frac{1}{B}\sum_{i}\log\frac{e^{\mathbf{g}^{(i)\top}\mathbf{p}_{+}^{(i)}/\tau}}{e^{\mathbf{g}^{(i)\top}\mathbf{p}_{+}^{(i)}/\tau}+\sum_{j\neq i}e^{\mathbf{g}^{(i)\top}\mathbf{p}_{-}^{(j)}/\tau}},
+(10)
+with temperature τ=0.1\tau=0.1.
+The contrastive term is added to the rollout loss as
+ℒ=ℒrollout+λact​ℒact,\mathcal{L}=\mathcal{L}_{\mathrm{rollout}}+\lambda_{\mathrm{act}}\mathcal{L}_{\mathrm{act}},
+(11)
+with λact=0.25\lambda_{\mathrm{act}}=0.25, activated after a 100-step warm-up.
+Section 4.5 analyzes why the order-sensitive variant conflicts with CEM planning.
+Appendix C Action-Contrastive Training Analysis
+Mechanism.
+The degradation from action-contrastive training is concentrated in the order-sensitive stage, where negatives are temporal permutations of the same action multiset.
+These negatives are extremely hard: the positive and negative sequences share similar aggregate displacement, but are forced to map to distinct embeddings because their temporal order differs.
+Separating such sequences with an InfoNCE objective introduces contrastive pressure that can distort the local geometry of the predictor’s output space.
+This is problematic for CEM, which treats cosine distance in this latent space as a planning cost and therefore relies on locally consistent geometric structure.
+MCR can partially repair the induced cost surface, but it does not directly restore the prediction accuracy lost through manifold distortion.
+Scope of the negative result.
+We observe the same qualitative pattern across both DINOv2 and DINOv3 encoders and across multiple contrastive loss weights.
+The cross-scene contrastive stage alone does not produce the same regression; the dominant degradation appears when temporal permutation negatives are introduced.
+This suggests a tension between two objectives: rollout training rewards geometric fidelity to the true future embedding, while order-sensitive contrastive training rewards separation between embeddings generated by different action sequences.
+When negatives are constructed from different temporal orderings of the same action multiset, these objectives can pull the latent space in conflicting directions.
+Future work may mitigate this conflict through a separate projection head for the contrastive loss, gradient surgery, alternating objectives, or contrastive losses applied to a detached copy of the embedding space.
+Appendix D Real-World Robot Platform and Deployment Details
+Figure 4 summarizes the physical robot platform and the deployment pipeline used for the zero-shot real-world demonstration.
+Figure 4:
+Real-world robot platform and deployment pipeline.
+(a) Clearpath Husky A200 platform equipped with a Velodyne VLP-32 lidar, a ZED2i stereo camera, and an NVIDIA Jetson AGX Orin 32GB onboard computer.
+(b) Deployment pipeline for zero-shot image-goal navigation.
+Given the current observation and goal image, the model performs onboard inference and predicts navigation waypoints.
+These waypoints are passed through vla_nav to the ROS 2 Nav2 stack, where DWB-based local obstacle avoidance generates executable robot motion.
+As shown in Figure 4(a), the real-world demonstration is conducted on a Clearpath Husky A200 unmanned ground vehicle (UGV) running ROS 2 Humble.
+The robot uses an NVIDIA Jetson AGX Orin 32GB module for onboard computation, a ZED2i stereo camera for visual observations, and a Velodyne VLP-32 lidar for geometric sensing and local navigation.
+Although the learned model predicts waypoint-level actions from RGB observations, the lidar-based navigation stack provides the low-level feasibility checks and obstacle avoidance needed for safe physical execution.
+Figure 4(b) illustrates how the learned navigation model is connected to the robot execution stack.
+At each replanning step, the system receives the current camera observation and a goal image.
+The model runs onboard the Jetson AGX Orin and predicts a sequence of navigation waypoints.
+A custom vla_nav package converts these waypoints into ROS 2 Nav2 goals and sends them to the navigation stack.
+Nav2 then plans and executes feasible robot motion using the NavFn global planner, the DWB local controller, and the BT Navigator for behavior-tree-based execution.
+This design separates semantic waypoint prediction from low-level motion control.
+The learned model operates at the image-goal planning level, while the classical navigation stack handles collision avoidance, velocity command generation, and short-horizon feasibility.
+If the predicted waypoint is reachable, the robot follows the Nav2-generated trajectory until the goal is reached or the next replanning step is triggered.
+If the waypoint is blocked or infeasible, the execution module applies a progressive sub-goal fallback strategy.
+Specifically, it attempts shortened waypoints along the same direction at 75%, 50%, 25%, and 10% of the original waypoint distance.
+These sub-goals are tried sequentially, allowing the robot to move as close as possible toward the intended action before declaring the waypoint infeasible.
+D.1 Real-World Trial Outcomes
+We additionally report the outcome of the limited-scale physical trials used in the zero-shot real-world demonstration.
+Across five representative test scenarios, WorldModel successfully reached the target in all five trials, whereas OmniVLA succeeded in two out of five trials.
+Here, a trial is considered successful if the robot reaches a final observation that is visually consistent with the goal view without collision or manual intervention.
+Although this small number of trials is not intended as a statistically comprehensive benchmark, it provides supporting evidence that the proposed latent world-model planner transfers more reliably to physical deployment than the reactive baseline in these representative indoor and outdoor settings.
+Experimental support, please
+view the build logs
+for errors. Generated by
+L
+A
+T
+E
+xml
+.
+Instructions for reporting errors
+We are continuing to improve HTML versions of papers, and your feedback helps enhance accessibility and mobile
+support. To report errors in the HTML that will help us improve conversion and rendering, choose any of the
+methods listed below:
+Click the "Report Issue" (
+) button, located in the page header.
+Tip: You can select the relevant text first, to include it in your report.
+Our team has already identified the following issues. We appreciate your time reviewing and reporting rendering errors we
+may not have found yet. Your efforts will help us improve the HTML versions for all readers, because disability
+should not be a barrier to accessing research. Thank you for your continued support in championing open access for
+all.
+Have a free development cycle? Help support accessibility at arXiv! Our collaborators at LaTeXML maintain a list of packages that need conversion, and welcome developer contributions.
+We gratefully acknowledge support from
+our major funders,
+member institutions, ,
+and all contributors.
+About
+·
+Help
+·
+Contact
+·
+Subscribe
+·
+Copyright
+·
+Privacy
+·
+Accessibility
+·
+Operational Status (opens in new tab)
+Major funding support from

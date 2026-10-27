@@ -1,0 +1,524 @@
+=== PDF PAGE 1 ===
+            Nipping the Drift in the Bud: Retrospective Rectification for Robust
+                              Vision-Language Navigation
+
+                   Gang He1 , Zhenyang Liu1 , Kepeng Xu1 , Li Xu1 , Tong Qiao1
+                             Wenxin Yu2 , Chang Wu1 , Weiying Xie1
+                                               1Xidian University
+                                2Southwest University of Science and Technology
+                                       kepengxu11@gmail.com
+
+
+                          Abstract                        where the lack of valid supervision leads to compounding er-
+                                                                               rors and catastrophic failure.
+              Vision-Language Navigation (VLN) requires em-
+                                                             To mitigate this distribution shift, existing literature pri-              bodied agents to  interpret natural language  in-
+                                                                      marily adopts two methodological paradigms:  Reinforce-2026         structions and navigate through complex contin-
+                                                             ment Learning (RL) [Tan et  al., 2019; Qi et  al., 2025;             uous 3D environments.  However, the dominant
+                                                            Zhang et al., 2025] and Interactive Imitation Learning (e.g.,                imitation learning paradigm suffers from exposure
+                                                             DAgger) [Ross et al., 2011]. RL theoretically allows theFeb          bias, where minor deviations during inference lead
+                                                                      agent to update its policy based on its own induced distri-                to compounding errors.  While DAgger-style ap-
+6                                                                  bution via online exploration. However, for samples where              proaches attempt to mitigate this by correcting error
+                                                                           the model exhibits high uncertainty, RL suffers from ex-                  states, we identify a critical limitation: Instruction-
+                                                                      tremely low exploration efficiency [Zhang et al., 2025]. Due                State Misalignment. Forcing an agent to learn re-
+                                                                              to the long-horizon nature of VLN and the vast state-action              covery actions from off-track states often creates
+                                                                          space, the spontaneous discovery of correct paths becomes               supervision signals that semantically conflict with
+                                                                      computationally intractable when relying solely on sparse,                the original instruction. In response to these chal-
+                                                                        hand-crafted reward signals, which often fail to align ef-[cs.RO]         lenges, we introduce BudVLN, an online framework
+                                                                               fectively with the fine-grained semantics of the instructions.                 that learns from on-policy rollouts by construct-
+                                                                        Conversely, DAgger-style approaches provide explicit guid-               ing supervision to match the current state distri-
+                                                                   ance for error states, effectively mitigating exposure bias to                bution. BudVLN performs retrospective rectifica-
+                                                          some degree.  However, we argue that this trajectory-level                tion via counterfactual re-anchoring and decision-
+                                                                         robustness is often achieved at the cost of semantic consis-               conditioned supervision synthesis, using a geodesic
+                                                                              tency.  Standard DAgger inherently introduces Instruction-                oracle to synthesize corrective trajectories that orig-
+                                                                            State Misalignment (Figure 1).  For instance, correcting a                inate from valid historical states, ensuring semantic
+                                                                             large deviation often requires demonstrating a path that first                consistency. Experiments on the standard R2R-CE
+                                                                             returns to the reference trajectory. Such recovery maneuvers             and RxR-CE benchmarks demonstrate that Bud-
+                                                              compel the model to learn behaviors that are semantically in-          VLN consistently mitigates distribution shift and
+                                                                            consistent with the original instruction, thereby severing the               achieves state-of-the-art performance in both Suc-
+                                                                     alignment between the linguistic directives and the optimal               cess Rate and SPL.
+                                                                               actions.
+                                                                            In this paper, we propose BudVLN, a robust framework
+       1  Introduction                                                                     designed to resolve these challenges through a unified on-
+         Vision-Language Navigation (VLN) requires an embodied     line retrospective rectification. To fundamentally mitigate ex-arXiv:2602.06356v1
+          agent to navigate through photorealistic 3D environments    posure bias, BudVLN operates on a continuous online loop
+         by following natural language instructions [Anderson et al.,    where the agent updates its policy based on-policy rollouts.
+         2018; Ku et al., 2020; Krantz et al., 2020].  While recent    Unlike static imitation, this ensures the agent learns directly
+         advances in large multimodal models have significantly im-    from its own induced observation distribution, bridging the
+         proved agent capabilities [Wei et al., 2025; Zhang et al.,    gap between training and inference. To address the ineffi-
+         2024b; Cheng et al., 2024], the dominant training paradigm    ciency of RL on hard samples, we establish a dynamic syn-
+          remains Imitation Learning (IL) via Teacher Forcing on static    ergy between exploration and supervision: we utilize Group
+          expert demonstrations. This paradigm suffers from a funda-    Relative Policy Optimization (GRPO) to refine proficient
+          mental limitation known as exposure bias: during training,    samples, allowing the agent to autonomously explore more
+           the agent mimics actions conditioned on ground-truth states,    precise and instruction-aligned paths; concurrently, for hard
+          but at inference, it must act upon its own policy-induced states    samples where stochastic exploration fails, we trigger Su-
+         [Ross et al., 2011; Tan et al., 2019]. Even minor perturbations    pervised Fine-Tuning (SFT) to provide explicit, high-quality
+         can drive the agent into Out-Of-Distribution (OOD) regions,    guidance. Crucially, to overcome the Instruction-State Mis-
+
+=== PDF PAGE 2 ===
+                                           unseenunseen // seenseen referencereference pathpath  11 // 11                                 3                                       3
+
+
+
+
+                                                                                                                                                                2                                  2
+
+                                            3                                                                           1                                                        1
+      InstructionInstruction MisalignmentMisalignment                                                              (a)                 (b)
+
+
+                      3                                                                                                                                 3                                       3
+                             2                                                                          2                                  2
+                                              target                       1                                                        1
+                                                                                          (c)                 (d)
+
+                  InstructionInstruction MatchedMatched
+                                                                                           Expert        InstructionInstruction                                               1
+    2                start                                     BudVLN     WalkWalk outout ofof thethe bedroombedroom andand turnturn                                                                                                            right,right, walk straight to the bathroom
+                                                                                        DAgger
+                                                                                                   door, turn right again and stop in
+                                                                                                      Rollout         front of the shoe cabinet.
+
+
+Figure 1: Illustration of instruction-state misalignment. The yellow line in (a) depicts a static expert demonstration. When the online
+rollout deviates due to navigational uncertainty (red line in (b)), standard DAgger forces a recovery from the error state. However, the
+required backward-correcting actions (e.g., turning back (blue line in (c))) fail to establish a semantic connection with the instruction walk
+straight, leading to further grounding confusion. In contrast, our BudVLN employs retrospective rectification (green line in (d)): it re-anchors
+to the latest progressed point on the reference path to synthesize a forward-looking demonstration that remains strictly aligned with the
+natural language instruction.
+
+
+alignment of standard DAgger, our SFT component employs          sive experiments that BudVLN achieves state-of-the-
+a Retrospective Rectification mechanism.  Instead of teach-           art performance on standard continuous VLN bench-
+ing the agent how to recover from an error state (which often        marks, yielding significant improvements in both Suc-
+conflicts with the instruction), we teach it how to avoid en-         cess Rate (SR) and SPL. Furthermore, our selective up-
+tering the error state from the outset. By re-anchoring to the         date strategy proves highly sample-efficient, achieving
+last valid progress point and synthesizing a semantically con-         these gains with only ∼25% of the training cost re-
+sistent demonstration, we ensure the synthesized supervision         quired by standard DAgger pipelines, offering a scalable
+maintains strict consistency between the visual history and        paradigm for training embodied agents.
+the linguistic directives, eliminating the adversarial signals
+found in traditional recovery behaviors.                 2  Related Work
+  Our main contributions are summarized as follows:
+                                                         2.1  Vision-Language Navigation Agents
+   • Synergistic Online Training Framework: We pro-
+                                                   The evolution of Vision-Language Navigation agents has    pose a unified online training framework that effectively
+                                                                  largely mirrored the advancements in deep learning archi-     mitigates exposure bias while resolving the exploration
+                                                                      tectures. Early approaches relied on LSTM-based sequence-     inefficiency of pure RL. By dynamically synergizing
+                                                            to-sequence models grounded in discrete environments [An-    Group Relative Policy Optimization (GRPO) for pro-
+                                                           derson et al., 2018; Tan et al., 2019].  With the advent of      ficient samples and Supervised Fine-Tuning (SFT) for
+                                                             Transformers, graph-based methods like HAMT [Chen et al.,     hard samples, our approach enables the agent to con-
+                                                       2021b] and DUET [Chen et al., 2022] achieved significant     tinuously improve via self-exploration while receiving
+                                                         performance by modeling global topological maps. However,     timely guidance where it lacks proficiency.
+                                                           deploying these agents in continuous environments (VLN-
+   • Retrospective Rectification Mechanism: We identify                                                 CE) [Krantz et al., 2020] introduces challenges related to
+    and address the Instruction-State Misalignment problem                                                                low-level control and infinite state spaces. While methods
+     inherent in standard DAgger-style learning. Instead of                                                                      like ETPNav [An et al., 2024] address this via online topolog-
+     forcing the agent to learn semantically ambiguous re-                                                                         ical mapping, they often require complex, hand-crafted navi-
+    covery actions from error states, our Retrospective Rec-                                                               gation heuristics.
+      tification re-anchors the agent to valid historical states                                                           Recent works have begun to leverage the reasoning ca-
+     to synthesize corrective demonstrations, ensuring strict                                                                       pabilities of Large Language Models (LLMs) and Vision-
+    alignment between visual observations and linguistic in-                                                     Language Models (VLMs) for embodied control.  NaVid
+     structions.                                          [Zhang et al., 2024b] and NaVILA [Cheng et al., 2024]
+   • SOTA Performance: We demonstrate through exten-    demonstrate that video-based foundation models can directly
+
+=== PDF PAGE 3 ===
+predict low-level actions from raw visual streams without     errors via historical re-anchoring. This hybrid approach com-
+explicit map building.  Similarly, StreamVLN [Wei et al.,    plements the open-ended exploration of RL with targeted
+2025] proposes a streaming architecture with slow-fast con-    guidance, retaining the benefits of online policy improvement
+text modeling to handle long-horizon visual history  effi-    while ensuring effective learning from failures.
+ciently. However, most of these agents are still optimized via
+static imitation learning, which struggles under on-policy de-                                            3  Methodology
+viations at test time. In contrast, we focus on a robust online
+training framework that explicitly targets distribution shift in    3.1  Problem Formulation
+VLM control policies.
+                                        We formulate VLN-CE [Krantz et al., 2020] as a Partially
+                                                          Observable Markov Decision Process (POMDP) defined by2.2  Imitation Learning and Supervision
+                                                                the tuple ⟨S, A, O, T , R, I⟩. At each time step t, the agent
+     Construction                                                                 receives a natural language instruction I and a visual observa-
+Imitation Learning (IL), specifically Behavior Cloning (BC)     tion ot. To adhere to the standard RGB-only setting [Zhang et
+or Teacher-Forcing, remains the dominant training paradigm      al., 2024b], we define ot as monocular RGB images, without
+for VLN [Wei et al., 2025; Zhang et al., 2024b].  It is well-    assuming access to depth, odometry, or pre-built maps. The
+established that BC suffers from exposure bias [Ross et al.,    agent maintains a history context Ht = {I, o0, a0, . . . , ot}
+2011], where the agent fails to recover once it drifts from the     to capture temporal dependencies. Based on Ht, the policy
+expert state distribution. To mitigate this, DAgger (Dataset    πθ(at  | Ht) predicts a discrete action token at ∈A (e.g.,
+Aggregation) [Ross et al., 2011] and its variants iteratively   FORWARD, TURN LEFT, TURN RIGHT, STOP), which is
+collect on-policy data and query an expert for ground-truth    then executed by a low-level controller to produce continu-
+actions.  In the VLN domain, approaches like CorrectNav    ous movements. The objective is to maximize the expected
+[Yu et al., 2025] and others [Li et al., 2022] attempt to cor-     return, which is designed to align with the SPL metric.
+rect the agent by providing expert paths starting directly from
+the error states. While effective for reducing trajectory er-    3.2  BudVLN Framework Overview
+rors, we argue that this standard DAgger practice introduces                                                   To address the challenges of exploration efficiency and adver-
+Instruction-State Misalignment.  Specifically, the geometric                                                                         sarial supervision discussed in Sec. 1, we propose BudVLN,
+maneuvers required to recover from large deviations often ex-                                                           a unified online training framework. Building upon represen-
+plicitly contradict the directional semantics of the original in-                                                                        tative policy architectures in the VLN domain, BudVLN op-
+struction (e.g., turning back vs.  walking straight), thereby                                                                   erates in iterative online rounds. Unlike traditional pipelines
+generating adversarial supervision signals that confuse the                                                                      that treat exploration and correction independently, we estab-
+agent’s language grounding. Unlike these methods, BudVLN                                                                         lish an Adaptive Mutual Exclusion Strategy to dynamically
+addresses instruction-state misalignment by retrospectively                                                                  bifurcate the training process based on the agent’s real-time
+synthesizing supervision anchored to valid historical states.                                                                   proficiency.
+This ensures the agent learns from semantically consistent
+                                                 As illustrated in Figure 2, for each instruction I in a batch,
+trajectories rather than ambiguous recovery actions.
+                                                                the process proceeds as follows:
+                                                                      1. Greedy Probe. The agent first executes a single trajectory
+2.3  Reinforcement Learning in Embodied AI
+                                                                  τprobe using deterministic greedy decoding. This serves as a
+Reinforcement Learning (RL) introduces an online interac-    low-cost probe to assess the policy’s current mastery of the
+tion paradigm, allowing agents to improve through trial and     instruction without the overhead of group sampling.
+error beyond static datasets.  Prior works like ActiveVLN     2. Dynamic Routing. We evaluate τprobe against a set of
+[Zhang et al., 2025] utilize RL to encourage active explo-     failure triggers. The training objective is then conditionally
+ration. However, relying solely on RL with sparse rewards    determined, routing the gradient flow into one of two exclu-
+faces significant challenges in the high-dimensional, long-     sive pathways:
+horizon VLN task. Especially for unsolved instructions, the
+                                                             Proficiency Pathway (via GRPO Loss).  If  τprobe  is  suc-vast action space renders stochastic exploration computation-
+                                                                       cessful (i.e., no triggers activated), we classify the sam-ally prohibitive for discovering successful trajectories. Con-
+                                                                     ple as proficient. To encourage the discovery of superiorsequently, pure RL often struggles to acquire valid learning
+                                                                        paths, the agent samples G −1 additional stochastic tra-signals for these hard samples.
+                                                                              jectories. We then update the policy using the GRPO
+  In this work, we leverage RL not merely as an opti-
+                                                                   objective (Eq. 4) to reinforce efficiency, strictly bypass-
+mizer, but as an online framework to enable dynamic super-
+                                                                  ing the SFT computation.
+vision construction. We adopt Group Relative Policy Op-
+timization (GRPO) [Shao et al., 2024; Guo et al., 2025;    Rectification Pathway (via SFT Loss).  If τprobe triggers a
+Qi et al., 2025] to drive this online loop. Unlike traditional          failure mode, we classify the sample as hard. To avoid
+architectures, our framework establishes a synergistic mech-          inefficient exploration, we discard stochastic rollouts
+anism: GRPO focuses on efficiency optimization by reinforc-        and trigger the Retrospective Rectification mechanism.
+ing successful trajectories to discover optimal, robust paths;       The policy is updated using the Weighted SFT objec-
+concurrently, our Retrospective Rectification (SFT) handles          tive (Eq. 5) based on the synthesized supervision, skip-
+failure prevention by explicitly demonstrating how to avert         ping the GRPO update.
+
+=== PDF PAGE 4 ===
+         🌟
+                   GRPOGRPO Loss                                             sample1
+                                                                            sample2
+                          dynamicdynamic
+      LLM  Encoder               🌟/⚠️  rollout          Updating                                                                              sample3                           supervisionsupervision
+   🔥    ❄️                                                (greedy)           Model
+                        constructionconstruction                     ...
+                 ⚠️
+                     SFTSFT Loss                                                                          sampleG
+
+
+          start                                                                                                                  2
+                                                                                     history
+          target            Rollouting                  🌟
+                                                                                                                                                  1                                                                                                                                                                                                1    Oracle                                                                                                         2                                                                             2        1    seen
+                                   ⚠️
+      3   unseen                                                                                                                  2                     Retrospective                                      3                               3
+  Success/Interrupt        Rectification                                                                                                    3
+    🌟/⚠️
+
+
+Figure 2: Overview of the BudVLN training framework. The framework employs an Adaptive Mutual Exclusion Strategy to harmonize
+exploration and supervision. For a given instruction, a greedy probe first evaluates the agent’s proficiency. When proficient, the framework
+routes to the optimality seeking pathway, employing GRPO to reinforce high-SPL behaviors via diverse sampling. Conversely, upon failure,
+it triggers the rectification pathway, which reverts to a valid historical state to synthesize alignment-preserving supervision. Gradients are
+back-propagated exclusively from the active pathway to ensure stable policy updates.
+
+
+  This mutual exclusion ensures that the gradients are either   GRPO Objective with KL Regularization.   Let τi =
+driven by relative efficiency optimization (for mastered skills)    {(Hi,t, ai,t)}Tit=1 denote the i-th trajectory, where Hi,t is the
+or direct error correction, but never both simultaneously for    agent history context (instruction and observations/actions up
+the same sample.                                                  to step t), and ai,t is the action taken at step t. Define the
+                                                                  probability ratio
+3.3  Optimality-Seeking Exploration via GRPO
+                                                                                             πθ(ai,t | Hi,t)
+When the greedy probe confirms the agent’s proficiency (i.e.,                           ρi,t =                                   (3)successfully reaching the goal), the learning objective shifts                                πθold(ai,t | Hi,t).
+from basic completion to optimality-seeking—specifically,   We optimize the following clipped surrogate objective while
+finding shorter, more efficient paths. We adopt Group Rel-    constraining the policy to stay close to a reference policy πref
+ative Policy Optimization (GRPO) [Shao et al., 2024] to re-    via a KL penalty:
+inforce such superior strategies.                                                       "   G      Ti                                                                  1     1
+Group Sampling and Reward. For a proficient instruction    LGRPO(θ) = E X X  min  ρi,tAi, clip(ρi,t, 1 −ϵ, 1 + ϵ)Ai
+I, we sample a group of G trajectories τ = {τ1, . . . , τG}, in-           G i=1 Ti t=1
+cluding the greedy probe and G −1 stochastic rollouts with                                                                                       #
+temperature 0.4.  Each trajectory τi yields a scalar return             −β DKL πθ(· | Hi,t) ∥πref(· | Hi,t)      .
+R(τi). To explicitly encourage efficiency, our reward incor-
+porates the SPL (Success weighted by Path Length) metric:                                                                  (4)
+ R(τi) = I(success) ·  Csucc + λ · SPLi  −Cdist · dremain, (1)      where ϵ is the clipping parameter, β controls the strength of
+                                                                the KL regularization, and the KL term is computed between
+where I(success) indicates task completion, Csucc = 2.0 is    the action distributions conditioned on the same history Hi,t.
+the base success bonus, λ weights the SPLi term, and Cdist
+scales the penalty for the remaining geodesic distance to the    3.4  Retrospective Rectification (SFT)
+goal dremain.                                               For hard samples where the greedy probe fails, stochastic
+Relative Advantage Estimation. GRPO avoids training an    exploration is inefficient. We employ Retrospective Recti-
+explicit value critic and instead estimates the baseline using     fication to construct valid, alignment-preserving supervision
+group statistics. Given the sampled trajectories {τ1, . . . , τG}    from the failed attempt.
+and their returns {R(τ1), . . . , R(τG)}, we compute the nor-    Oracle Demonstration Triggers. We define four specific
+malized group-relative advantage for each trajectory:             triggers to detect failures during the greedy probe:
+            R(τi) −mean({R(τ1), . . . , R(τG)})                 1. Off-track: Deviation from the reference path > 3.0m or
+      Ai =                                                        .     (2)                std({R(τ1), . . . , R(τG)}) + ϵ                    heading error > 120◦;
+
+=== PDF PAGE 5 ===
+  2. Progress Stall: No new reference waypoint visited for                    Algorithm 1 GRO:
+    60 steps;                                                   Greedy-Routed Optimization for BudVLN
+  3. Premature Stop: Stopping > 3.0m from the goal;              Input: Dataset D, Planner P∗
+                                                    Hyperparam: Policy πθ, Group size G, Rate η  4. Forced Stop: Failing to stop within the goal zone after a
+                                                         Output: Optimized Policy πθ∗     grace period.
+History-Aware Rollback. Upon triggering, we perform a       1: πθ ←Pretrained(πbase)
+History-Aware Rollback to synthesize a corrective demon-       2: while not converged do
+stration:                                                                   3:     I ∼D                     ▷Sample episode
+                                                                            4:      τprobe ←Rollout(πθ, I, greedy)    ▷Greedy Probe
+  1. Anchor Identification: We identify the best waypoint                                                                            5:       if IsSuccess(τprobe) then
+     state sanchor achieved in the failed trajectory, defined
+                                                                            6:       {τi}Gi=1 ∼πθ(·|I)     as the state corresponding to the furthest reference path
+                                                 −µR    on the ground-truth graph that was successfully visited       7:       Ai ←R(τi)
+     before the failure.                                           σR + ϵ
+                                                        G
+  2. Valid Context Retention: We extract the policy’s ob-       8:       g ←1 X ∇θLGRPO(τi, Ai)
+     servation history Hanchor from the start up to sanchor.           G i=1
+     Crucially, we retain this valid prefix (generated by the       9:       θ ←θ −η · g
+     agent itself) while discarding the subsequent erroneous     10:     else                   ▷Dynamic Anchoring
+     actions.                                                       11:          (sanc, Hanc) ←GetAnchorState(τprobe)
+  3. Oracle Completion: We reset the simulator state to     12:      a∗←P∗(sanc, sanc+1, ..., goal)
+     sanchor. An oracle planner then generates the optimal     13:       g ←∇θLSFT(Hanc, a∗)
+     action sequence a∗corr from sanchor to the goal.              14:       θ ←θ −η · g
+                                                                    15:    end if
+  This process yields a supervision pair (Hanchor, a∗corr). It                                                                    16: end while
+effectively teaches the agent: Given that you have success-
+fully reached sanchor via your own history Hanchor, here is
+the optimal path forward. This avoids the Instruction-State                                                            [Krantz et al., 2020] and RxR-CE [Ku et al., 2020]. R2R-
+Misalignment of correcting from an off-track state.
+                                         CE contains 5.6k trajectories with English instructions, while
+Weighted SFT Loss.  We optimize the policy using a
+                                              RxR-CE is a larger, multilingual dataset with more complex
+weighted Cross-Entropy loss on the oracle tokens:
+                                                                   paths. We perform joint training on the union of R2R-CE and
+                       |a∗corr|                           RxR-CE training splits. All experiments are conducted using
+      LRect(θ) = − X wt log πθ(a∗t |Hanchor, a∗<t)    (5)    standard supervision signals without external datasets (e.g.,
+                    t=1                       HM3D [Ramakrishnan et al., 2021]) or synthetic instructions
+                                                                              (e.g., EnvDrop). We report performance on the respective val
+To emphasize immediate correction, the weights wt decay ex-    unseen splits of each benchmark.
+ponentially from the rollback point (w0 = 1.0) to the end of                                                        Evaluation Metrics. Following standard protocols [Ander-
+the trajectory, prioritizing the critical decisions required to re-                                                         son et al., 2018], we employ four primary metrics: (1) Suc-
+sume correct navigation.                                                               cess Rate (SR): The percentage of trajectories stopping within
+                                                    3.0m of the goal; (2) Success weighted by Path Length (SPL):3.5  Optimization and Algorithm
+                                           SR penalized by the path length ratio, serving as the primary
+BudVLN employs an exclusive update strategy to stabilize                                                                  indicator of navigation efficiency and optimality; (3) Oracle
+training. In each optimization step, the loss is dynamically                                                          Success Rate (OSR): The success rate if the agent stops at the
+selected based on the outcome of the greedy probe τprobe:                                                                   closest point to the goal along its path; (4) Navigation Error
+LTotal = I(τprobe ∈Ssucc)·LGRPO +I(τprobe /∈Ssucc)·LRect    (NE): The average geodesic distance from the stopping point
+                                                            (6)     to the goal.
+where I(·) is the indicator function, and Ssucc denotes the set    Implementation Details. For the pre-training strategy, we
+of trajectories that successfully reach the goal without trig-     strictly follow the setup of StreamVLN [Wei et al., 2025].
+gering any failure modes. This formulation, as detailed in Al-    In the BudVLN fine-tuning phase, we employ a group size
+gorithm 1 GRO, ensures that gradients are derived from rel-    of G = 4 with a sampling temperature of 0.4.  The bal-
+ative efficiency optimization when τprobe demonstrates profi-    ancing coefficient α for the rectification loss is set to 1.0.
+ciency, or from retrospective rectification when it fails.       We optimize the model using AdamW with a learning rate
+                                                               of 5e-7.   Unless otherwise specified, we inherit  all ex-
+4  Experiments                                        periment settings from previous work [Wei et  al., 2025;
+                                                   Zhang et al., 2024b; Cheng et al., 2024], and only fine-tune
+4.1  Experimental Setup                                   the LLM via LoRA [Hu et al., 2022]. The training process
+Datasets. We evaluate BudVLN on two standard bench-     is conducted on NVIDIA H800 GPUs. BudVLN training re-
+marks (e.g., MP3D [Chang et al., 2017]) for Vision-Language    quires only 27 GPU hours vs. 114 hours for DAgger.  All
+Navigation in Continuous Environments (VLN-CE): R2R-CE    subsequent evaluations are performed on NVIDIA RTX 4090
+
+=== PDF PAGE 6 ===
+                                        R2R-CE Val Unseen         RxR-CE Val Unseen
+    Method                            Stage
+                                   NE↓  OS↑  SR↑  SPL↑  NE↓  SR↑  SPL↑  nDTW↑
+    Seq2Seq‡ [Krantz et al., 2020]        IL     7.77   37.0   25.0   22.0   12.10   13.9   11.9     30.8
+    R2R-CMTP‡ [Chen et al., 2021a]     IL     7.90   38.0   26.4   22.7       -         -         -           -
+   LAW‡ [Raychaudhuri et al., 2021]     IL     6.83   44.0   35.0   31.0   10.90   8.0     8.0      38.0
+   HPN+DN‡ [Krantz et al., 2021]       IL     6.31   40.0   36.0   34.0       -         -         -           -
+   CMA‡ [Hong et al., 2022]            IL     6.20   52.0   41.0   36.0    8.76   26.5   22.1     47.0
+   VLN⟳BERT‡ [Hong et al., 2022]     IL     5.74   53.0   44.0   39.0    8.98   27.0   22.6     46.7
+    GridMM‡ [Wang et al., 2023a]        IL     5.11   61.0   49.0   41.0       -         -         -           -
+    ScaleVLN‡ [Wang et al., 2023b]      IL     4.80      -    55.0   51.0       -         -         -           -
+    ETPNav‡ [An et al., 2024]           IL     4.71   65.0   57.0   49.0    5.64   54.7   44.8     61.9
+    NaVid [Zhang et al., 2024b]          IL     5.47   49.1   37.4   35.9    8.41   34.5   23.8     21.2
+    UniNaVid [Zhang et al., 2024a]       IL     5.58   53.3   47.0   42.7    6.24   48.7   40.9         -
+    NaVILA [Cheng et al., 2024]         IL     5.22   62.5   54.0   49.0    6.77   49.3   44.0     58.8
+    StreamVLN [Wei et al., 2025]        IL     4.87   64.3   57.0   50.5    6.22   52.9   46.0     61.9
+   VLN-R1 [Qi et al., 2025]         IL+RL   7.00   41.2   30.2   21.8    10.4   22.3   17.5         -
+    ActiveVLN [Zhang et al., 2025]    IL+RL   5.34   62.1   52.9   45.7    5.84   50.7   41.2     58.1
+   BudVLN (Ours)             IL+RL   4.74   65.6   57.6   51.1    5.79   56.1   46.6     63.2
+
+
+Table 1: Comparison with state-of-the-art methods on R2R-CE and RxR-CE Val Unseen splits.  Methods are categorized by learning
+paradigms: Imitation Learning (IL) and hybrid IL+RL. ‡ indicates methods utilizing auxiliary inputs (e.g., depth, maps, panoramic views).
+
+
+GPUs. The agent operates with strictly monocular RGB in-        • Role of Rectification: Comparing the Baseline with the
+puts.                                                                   variant without GRPO, we assess the impact of adding
+                                                                     the Rectification module alone. Rectification serves as
+4.2  Main Results                                                the primary driver for robustness, boosting the Success
+Table 1 presents the quantitative comparison on the R2R-CE        Rate (SR) from 57.0% to 57.2% and reducing Naviga-
+and RxR-CE benchmarks. BudVLN establishes a new state-          tion Error (NE) from 4.87m to 4.82m.  Interestingly,
+of-the-art across both datasets. Remarkably, despite relying        adding Rectification alone slightly degrades SPL (50.5%
+exclusively on monocular RGB inputs, BudVLN outperforms      →50.1%) despite improving SR. This suggests that
+not only strong RGB-based baselines but also competitive         while SFT effectively rescues hard failure cases, focus-
+methods equipped with privileged sensors.                          ing solely on error correction introduces a distributional
+Performance on R2R-CE. Our method achieves the low-         bias that inadvertently harms the execution efficiency of
+est Navigation Error (NE) of 4.74m and the highest Success         previously mastered instructions. This highlights the ne-
+Rate (SR) of 57.6% among all compared methods on R2R-          cessity of the proficiency pathway: GRPO is crucial not
+CE. Crucially, this efficiency is comparable to or even sur-           just for optimization, but for preserving and reinforcing
+passes map-based methods, validating that our GRPO-driven         the efficiency of proficient samples against the gradient
+optimality seeking effectively generates concise paths with-          interference from corrective SFT updates.
+out requiring global maps.                                                                              • Synergy with GRPO: The Full Model integrates the
+Performance on RxR-CE. On the more challenging RxR-                                          GRPO mechanism alongside rectification.   Crucially,
+CE dataset, BudVLN demonstrates exceptional generaliza-                                          GRPO reverses the decline in efficiency, significantly
+tion capabilities.  It sets new records across all key metrics,                                                                 boosting SPL from 50.1% to 51.1%, while further en-
+achieving an NE of 5.79m, an SR of 56.1%, an SPL of 46.6%,                                                              hancing SR to 57.6% and reducing NE to 4.74m. This
+and an nDTW of 63.2%. These results confirm the robustness                                                                            result confirms the synergy between the two compo-
+of our dynamic guidance framework in handling complex in-                                                                       nents: Rectification acts as a safety net to ensure high
+structions and long-horizon navigation.                                                               completion rates (fixing hard samples), while GRPO op-
+                                                                    timizes the policy to traverse these paths as efficiently4.3  Ablation Study
+                                                                    as possible, effectively mitigating the detour costs intro-
+We conduct ablation studies on the R2R-CE Validation Un-                                                           duced by correction.
+seen split to investigate the individual contributions of each
+component and validate our design choices.                    Effectiveness of Strategy. A core contribution of this work is
+Impact of Individual Components. We verify the distinct    addressing the Instruction-State Misalignment problem dur-
+roles of the Failure Prevention (Rectification) and Optimality    ing correction. In Table 3, we compare our Dynamic Anchor-
+Seeking by analyzing the incremental performance changes    ing strategy (on-policy rollback to sanc) against the standard
+reported in Table 2.                                   DAgger approach (off-policy correction from the error state
+
+=== PDF PAGE 7 ===
+      Top-Down View
+
+                                                                                                                                                                                                                                                                                                                                                           StreamVLN
+
+
+
+
+
+         Instruction
+
+    walk down the hallway
+      and turn right.
+    walk past the stairs    and stop behind the                                                                                                                                                                                                                                                                                                                                                                 BudVLN(Ours)
+          couch .
+
+
+
+
+
+Figure 3: Qualitative comparison between the Baseline and BudVLN. The top row illustrates the Baseline agent failing to ground the
+instruction, leading to a deviation from the correct path and eventually getting stuck. In contrast, the bottom row demonstrates that BudVLN,
+trained with our Retrospective Rectification and GRPO, successfully navigates the complex environment. Despite visual similarities in the
+initial steps, BudVLN exhibits superior robustness, effectively avoiding the failure mode that trapped the baseline.
+
+
+   Model Variant   GRPO   Rect.  OS ↑  SR ↑  SPL ↑  NE ↓       4.4  Qualitative Analysis
+    Baseline                                -                                          -     64.3                                             57.0                                                     50.5                                                             4.87                                                   To interpret the gains in Table 2, Figure 3 visualizes a repre-
+   w/o GRPO                                -    ✓                                      64.0                                             57.2                                                     50.1                                                             4.82
+  BudVLN (Full)   ✓   ✓    65.6   57.6    51.1    4.74        sentative episode where both agents follow the same instruc-
+                                                                   tion from the same start pose. Baseline Failure. StreamVLN
+      Table 2: Component analysis on R2R-CE Val Unseen.            starts correctly but drifts at the intermediate stage, losing
+                                                                     instruction-state alignment and stopping prematurely before
+                                                             reaching the target. BudVLN Success. BudVLN remains ro-
+       Strategy  OS ↑  SR ↑  SPL ↑  NE ↓  Time (h) ↓           bust at the critical turning point and reaches the goal, indi-
+       Baseline   64.3   57.0    50.5    4.87          -               cating that retrospective rectification improves on-policy cor-
+      DAgger    64.3   57.1    50.7    4.87     114              rection and preserves history-action consistency. Overall, the
+     Ours      65.6   57.6    51.1    4.74      27            example supports our claim that dynamic on-policy guidance
+                                                                               is crucial for long-horizon VLN.
+     Table 3: Effectiveness of different rectification strategies.
+
+                                            5  Conclusion
+serr).                                     We introduced BudVLN, a unified online framework to mit-
+  Standard DAgger yields an SR of 57.1%, which shows a     igate exposure bias and instruction-state misalignment in
+marginal improvement over the baseline 57.0% but trails be-    Vision-Language Navigation. Observing that DAgger-style
+hind our method 57.6%. We attribute this limited gain to the    corrections can induce semantic conflicts, we proposed retro-
+semantic conflict inherent in DAgger: providing oracle ac-    spective rectification to synthesize on-policy supervision by
+tions at a deviated state serr often contradicts the agent’s ac-    re-anchoring to valid historical states. We further couple fail-
+cumulated visual history, causing policy confusion. In con-    ure prevention with optimality seeking, using GRPO to re-
+trast, our history-aware rollback ensures that supervision is     fine proficient trajectories. Experiments show that BudVLN
+provided on a valid path segment anchor. This maintains con-    achieves state-of-the-art performance with only ∼25% of the
+sistency between the visual history and the ground-truth ac-     training cost of traditional methods. These results highlight
+tion, leading to superior alignment and optimal performance    the importance of strict semantic alignment for robust embod-
+SPL 51.1% vs. 50.7%.                                          ied navigation in continuous environments.
+
+=== PDF PAGE 8 ===
+References                                               [Krantz et al., 2020] Jacob Krantz,  Erik Wijmans,  Arjun
+                                                        Majumdar, Dhruv Batra, and Stefan Lee. Beyond the nav-[An et al., 2024] Dong An, Hanqing Wang, Wenguan Wang,
+                                                                graph: Vision-and-language navigation in continuous en-  Zun Wang, Yan Huang, Keji He, and Liang Wang. Etpnav:
+                                                               vironments. In European Conference on Computer Vision,   Evolving topological planning for vision-language naviga-
+                                                            pages 104–120. Springer, 2020.   tion in continuous environments. IEEE Transactions on
+   Pattern Analysis and Machine Intelligence, 2024.            [Krantz et al., 2021] Jacob Krantz, Aaron Gokaslan, Dhruv
+                                                                    Batra, Stefan Lee, and Oleksandr Maksymets. Waypoint[Anderson et al., 2018] Peter Anderson, Qi Wu, Damien
+                                                         models for instruction-guided navigation in continuous   Teney, Jake Bruce, Mark Johnson, Niko S¨underhauf, Ian
+                                                               environments.  In Proceedings of the IEEE/CVF Inter-   Reid, Stephen Gould, and Anton Van Den Hengel. Vision-
+                                                                  national Conference on Computer Vision, pages 15162–   and-language navigation: Interpreting visually-grounded
+                                                            15171, 2021.   navigation instructions in real environments. In Proceed-
+   ings of the IEEE conference on computer vision and pat-    [Ku et al., 2020] Alexander Ku,  Peter  Anderson, Roma
+   tern recognition, pages 3674–3683, 2018.                         Patel,  Eugene  Ie,  and  Jason  Baldridge.    Room-
+                                                               across-room:  Multilingual vision-and-language naviga-[Chang et al., 2017] Angel Chang,  Angela  Dai, Thomas
+                                                                      tion with dense spatiotemporal grounding. arXiv preprint   Funkhouser, Maciej Halber, Matthias Niessner, Manolis
+                                                              arXiv:2010.07954, 2020.   Savva, Shuran Song, Andy Zeng, and Yinda Zhang. Mat-
+   terport3d: Learning from rgb-d data in indoor environ-    [Li et al., 2022] Jialu  Li, Hao  Tan,  and Mohit  Bansal.
+   ments. arXiv preprint arXiv:1709.06158, 2017.                 Envedit:  Environment editing for vision-and-language
+                                                                    navigation.   In Proceedings of the IEEE/CVF Confer-[Chen et al., 2021a] Kevin  Chen,   Junshen  K  Chen,
+                                                            ence on Computer Vision and Pattern Recognition, pages   Jo Chuang,  Marynel  V´azquez,  and  Silvio  Savarese.
+                                                         15407–15417, 2022.   Topological planning with transformers for vision-and-
+   language navigation.  In Proceedings of the IEEE/CVF    [Qi et al., 2025] Zhangyang Qi, Zhixiong Zhang, Yizhou Yu,
+   Conference on Computer Vision and Pattern Recognition,        Jiaqi Wang, and Hengshuang Zhao.   Vln-r1:  Vision-
+   pages 11276–11286, 2021.                                  language navigation via reinforcement fine-tuning. arXiv
+                                                                    preprint arXiv:2506.17221, 2025.[Chen et al., 2021b] Shizhe  Chen,   Pierre-Louis  Guhur,
+   Cordelia Schmid, and Ivan Laptev.  History aware mul-    [Ramakrishnan et al., 2021] Santhosh  K  Ramakrishnan,
+   timodal transformer for vision-and-language navigation.      Aaron Gokaslan, Erik Wijmans, Oleksandr Maksymets,
+  Advances  in  neural  information  processing  systems,      Alex Clegg, John Turner, Eric Undersander, Wojciech
+   34:5834–5847, 2021.                                       Galuba,  Andrew  Westbury,  Angel X Chang,  et  al.
+                                                                  Habitat-matterport 3d dataset (hm3d): 1000 large-scale[Chen et al., 2022] Shizhe  Chen,   Pierre-Louis  Guhur,
+                                                       3d  environments  for embodied  ai.    arXiv  preprint  Makarand Tapaswi, Cordelia Schmid, and Ivan Laptev.
+                                                              arXiv:2109.08238, 2021.  Think global, act local: Dual-scale graph transformer for
+   vision-and-language navigation.  In Proceedings of the    [Raychaudhuri et al., 2021] Sonia   Raychaudhuri,   Saim
+  IEEE/CVF Conference on Computer Vision and Pattern      Wani, Shivansh Patel, Unnat Jain, and Angel Chang.
+   Recognition, pages 16537–16547, 2022.                      Language-aligned waypoint (law) supervision for vision-
+                                                             and-language navigation in continuous environments.  In[Cheng et al., 2024] An-Chieh Cheng, Yandong Ji, Zhaojing
+                                                             Proceedings of the 2021 conference on empirical methods   Yang, Zaitian Gongye, Xueyan Zou, Jan Kautz, Erdem
+                                                                      in natural language processing, pages 4018–4028, 2021.   Bıyık, Hongxu Yin, Sifei Liu, and Xiaolong Wang. Nav-
+    ila: Legged robot vision-language-action model for navi-    [Ross et al., 2011] St´ephane Ross, Geoffrey Gordon, and
+   gation. arXiv preprint arXiv:2412.04453, 2024.             Drew Bagnell. A reduction of imitation learning and struc-
+                                                                   tured prediction to no-regret online learning. In Proceed-[Guo et al., 2025] Daya Guo, Dejian Yang, Haowei Zhang,
+                                                                  ings of the fourteenth international conference on artificial   Junxiao Song, Peiyi Wang, Qihao Zhu, Runxin Xu, Ruoyu
+                                                                       intelligence and statistics, pages 627–635. JMLR Work-  Zhang, Shirong Ma, Xiao Bi, et al.  Deepseek-r1 incen-
+                                                          shop and Conference Proceedings, 2011.   tivizes reasoning in llms through reinforcement learning.
+   Nature, 645(8081):633–638, 2025.                        [Shao et al., 2024] Zhihong Shao, Peiyi Wang, Qihao Zhu,
+                                                        Runxin Xu,  Junxiao Song, Xiao Bi, Haowei Zhang,[Hong et al., 2022] Yicong Hong, Zun Wang, Qi Wu, and
+                                                      Mingchuan Zhang, YK Li, Yang Wu, et al. Deepseekmath:   Stephen Gould.   Bridging the gap between learning
+                                                           Pushing the limits of mathematical reasoning in open lan-   in discrete and continuous environments for vision-and-
+                                                         guage models. arXiv preprint arXiv:2402.03300, 2024.   language navigation.  In Proceedings of the IEEE/CVF
+   conference on computer vision and pattern recognition,    [Tan et al., 2019] Hao Tan, Licheng Yu, and Mohit Bansal.
+   pages 15439–15449, 2022.                                  Learning to navigate unseen environments: Back trans-
+                                                                        lation  with  environmental  dropout.    arXiv  preprint[Hu et al., 2022] Edward J Hu, Yelong Shen, Phillip Wallis,
+                                                              arXiv:1904.04195, 2019.  Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang,
+  Weizhu Chen, et al. Lora: Low-rank adaptation of large   [Wang et al., 2023a] Zihan Wang,  Xiangyang  Li,  Jiahao
+   language models. ICLR, 1(2):3, 2022.                        Yang, Yeqi Liu, and Shuqiang Jiang. Gridmm: Grid mem-
+
+=== PDF PAGE 9 ===
+   ory map for vision-and-language navigation. In Proceed-
+   ings of the IEEE/CVF International conference on com-
+   puter vision, pages 15625–15636, 2023.
+[Wang et al., 2023b] Zun Wang,  Jialu  Li, Yicong Hong,
+  Yi Wang, Qi Wu, Mohit Bansal, Stephen Gould, Hao
+   Tan, and Yu Qiao. Scaling data generation in vision-and-
+   language navigation. In Proceedings of the IEEE/CVF in-
+   ternational conference on computer vision, pages 12009–
+   12020, 2023.
+[Wei et al., 2025] Meng Wei, Chenyang Wan, Xiqian Yu, Tai
+  Wang, Yuqiang Yang, Xiaohan Mao, Chenming Zhu, Wen-
+   zhe Cai, Hanqing Wang, Yilun Chen, et al.  Streamvln:
+   Streaming vision-and-language navigation via slowfast
+   context modeling.   arXiv preprint arXiv:2507.05240,
+   2025.
+[Yu et al., 2025] Zhuoyuan Yu, Yuxing Long, Zihan Yang,
+  Chengyan Zeng, Hongwei Fan, Jiyao Zhang, and Hao
+  Dong.  Correctnav:  Self-correction flywheel empowers
+   vision-language-action navigation model. arXiv preprint
+   arXiv:2508.10416, 2025.
+[Zhang et al., 2024a] Jiazhao Zhang, Kunyu Wang, Shaoan
+  Wang, Minghan Li, Haoran Liu, Songlin Wei, Zhongyuan
+  Wang, Zhizheng Zhang, and He Wang.   Uni-navid:
+  A video-based  vision-language-action model  for  uni-
+   fying  embodied  navigation  tasks.     arXiv  preprint
+   arXiv:2412.06224, 2024.
+[Zhang et al., 2024b] Jiazhao Zhang, Kunyu Wang, Rongtao
+  Xu, Gengze Zhou, Yicong Hong, Xiaomeng Fang, Qi Wu,
+  Zhizheng Zhang, and He Wang. Navid: Video-based vlm
+   plans the next step for vision-and-language navigation.
+   arXiv preprint arXiv:2402.15852, 2024.
+[Zhang et al., 2025] Zekai Zhang, Weiye Zhu, Hewei Pan,
+  Xiangchen Wang, Rongtao Xu, Xing Sun, and Feng
+  Zheng. Activevln: Towards active exploration via multi-
+   turn rl in vision-and-language navigation. arXiv preprint
+   arXiv:2509.12618, 2025.

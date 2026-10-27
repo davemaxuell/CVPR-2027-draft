@@ -1,0 +1,99 @@
+{
+  "paused_at": "2026-10-21T05:45:49.636496+00:00",
+  "reason": "User requested pause until they explicitly ask to continue.",
+  "units": {
+    "rolevln-additional-datasets.service": {
+      "configuration": "# /run/user/1000/systemd/transient/rolevln-additional-datasets.service\n# This is a transient unit file, created programmatically via the systemd API. Do not edit.\n[Unit]\nDescription=Download SOON CVDN NDH HANNA and complete VLN-CE after verified RxR\nCollectMode=inactive-or-failed\n\n[Service]\nWorkingDirectory=/data/team_a/dave-workspace/RoleVLN\nRestart=on-failure\nRestartSec=5min\nStandardOutput=append:/data/team_a/dave-workspace/RoleVLN/data/logs/additional_datasets.log\nStandardError=append:/data/team_a/dave-workspace/RoleVLN/data/logs/additional_datasets.log\nExecStart=\nExecStart=\"/usr/bin/python3\" \"-u\" \"/data/team_a/dave-workspace/RoleVLN/data/tools/download_additional_datasets.py\"\n",
+      "state_after_stop": "MainPID=0\nActiveState=inactive\nSubState=dead"
+    },
+    "rolevln-rxr-download.service": {
+      "configuration": "# /run/user/1000/systemd/transient/rolevln-rxr-download.service\n# This is a transient unit file, created programmatically via the systemd API. Do not edit.\n[Unit]\nDescription=Complete and verify RoleVLN RxR dataset download\nCollectMode=inactive-or-failed\n\n[Service]\nWorkingDirectory=/data/team_a/dave-workspace/RoleVLN\nRestart=on-failure\nRestartSec=1min\nStandardOutput=append:/data/team_a/dave-workspace/RoleVLN/data/logs/rxr_completion.log\nStandardError=append:/data/team_a/dave-workspace/RoleVLN/data/logs/rxr_completion.log\nExecStart=\nExecStart=\"/usr/bin/python3\" \"-u\" \"/data/team_a/dave-workspace/RoleVLN/data/tools/complete_rxr_download.py\" \"--shards\" \"4\" \"--connections\" \"64\"\n",
+      "state_after_stop": "MainPID=0\nActiveState=inactive\nSubState=dead"
+    }
+  },
+  "resume_allowed": true,
+  "rxr_original_download_status.json": {
+    "phase": "paused",
+    "source": "gs://rxr-data",
+    "destination": "/data/team_a/dave-workspace/RoleVLN/data/datasets/RxR",
+    "supervisor_pid": 1795657,
+    "shards": 4,
+    "elapsed_seconds": 1200.1,
+    "expected_files": 582090,
+    "expected_bytes": 190669133548,
+    "service_unit": "rolevln-rxr-download.service",
+    "verified_files": 17371,
+    "verified_bytes": 9064643970,
+    "inflight_bytes": 2734496775,
+    "failed_files": 0,
+    "average_mib_per_second": 0,
+    "previous_phase": "downloading",
+    "paused_at": "2026-10-21T05:45:49.636496+00:00",
+    "pause_reason": "User requested pause until they explicitly ask to continue.",
+    "automatic_resume": false
+  },
+  "additional_datasets_status.json": {
+    "phase": "paused",
+    "updated_at": "2026-10-21T05:45:49.636496+00:00",
+    "service_unit": "rolevln-additional-datasets.service",
+    "pid": 1805276,
+    "jobs": {
+      "SOON": {
+        "phase": "queued"
+      },
+      "CVDN": {
+        "phase": "queued"
+      },
+      "NDH": {
+        "phase": "queued"
+      },
+      "HANNA": {
+        "phase": "queued"
+      },
+      "VLN-CE": {
+        "phase": "queued"
+      },
+      "shared_image_features": {
+        "phase": "queued"
+      },
+      "house_segmentations": {
+        "phase": "queued"
+      }
+    },
+    "prerequisite_phase": "downloading",
+    "previous_phase": "waiting_for_rxr",
+    "paused_at": "2026-10-21T05:45:49.636496+00:00",
+    "pause_reason": "User requested pause until they explicitly ask to continue.",
+    "automatic_resume": false
+  },
+  "verified_stopped": false,
+  "queued_datasets": [
+    "SOON",
+    "CVDN",
+    "NDH",
+    "HANNA",
+    "VLN-CE",
+    "R4R",
+    "shared_image_features",
+    "house_segmentations"
+  ],
+  "dataset_aliases": {
+    "R2R-CE": "VLN-CE",
+    "RxR-CE": "VLN-CE"
+  },
+  "queue_updated_at": "2026-10-21T05:55:39.758018+00:00",
+  "report_dataset_list_on_completion": true,
+  "resumed_at": "2026-10-21T08:59:53.339845+00:00",
+  "resume_reason": "User explicitly requested: okay proceed to downloading it",
+  "resume_events": [
+    {
+      "at": "2026-10-21T06:16:57.817973+00:00",
+      "reason": "User explicitly requested: continue the download!"
+    },
+    {
+      "at": "2026-10-21T08:59:53.339845+00:00",
+      "reason": "User explicitly requested: okay proceed to downloading it",
+      "action": "thaw existing RxR service"
+    }
+  ]
+}

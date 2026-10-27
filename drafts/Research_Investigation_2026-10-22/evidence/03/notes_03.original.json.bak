@@ -1,0 +1,192 @@
+[
+  {
+    "id": "idealvln",
+    "title": "Instruction Decomposition and Action Alignment for Vision-and-Language Navigation",
+    "authors": [
+      "Zihao Xin",
+      "Wentong Li",
+      "Yixuan Jiang",
+      "Bin Wang",
+      "Piji Li",
+      "Jianke Zhu",
+      "Jie Qin",
+      "Shengjun Huang"
+    ],
+    "year": 2026,
+    "venue": "ICML 2026, PMLR 306 (paper masthead)",
+    "source": "https://raw.githubusercontent.com/mlresearch/v306/main/assets/xin26a/xin26a.pdf",
+    "pages": "1, 3–8",
+    "problem": "Full-instruction VLM policies repeatedly encode long histories and can choose an action relevant to a different instruction stage. IDEAL-VLN targets this stage-alignment and inference-cost problem in monocular R2R/RxR-CE. Training has privileged reference paths and aligned sub-instructions; deployment uses RGB and language.",
+    "method": "Sections 3.1–3.3, Eqs.1–6: first infer semantic anchor S_t ~ Pθ(S|O_1:t,L,ρ_decomp), then action A_t ~ Pθ(A|I_t,S_t,ρ_act), withholding global L and history from the second prompt. This enforces the implemented input separation, not by itself an identifiable causal effect: writing do(S_t) does not establish causal identification. The displayed conditional independence assumes no hidden reuse of L through cached states beyond S_t. The trigger called 'entropy-based' is actually two deterministic action-sequence predicates: both Left and Right appear among N predicted micro-actions, or k same-direction rotations occur. It does not calculate Shannon entropy. During correction, word-overlap precision R=|W(S_pred)∩W(S_gt)|/|W(S_pred)| uses nearest reference-waypoint segments and replaces predictions when R<τ=.8. A degenerate short generic phrase can have high precision without covering required intent; empty-denominator behavior is unspecified in reviewed text. Expert action intervention is Bernoulli with P_int(d)=sigmoid(3(d−1.5)), where d is geodesic cross-track distance in meters, so k has inverse-meter units. This is a soft sampling policy, not a safety guarantee. The 160K alignment pairs span61MP3Dscenes. Qwen2.5-VL7B freezes vision/projector, AdamW batch128, lr2e−5 cosine, warmup.03,8H100. Extra-data version adds ScaleVLN150K and80KLLaVA-Video QA. Token-level supervised optimization is implied by fine-tuning; exact loss masking requires appendix/release inspection. Inference uses current RGB plus compact anchor; reanchoring uses history. Table6 estimates147K→77K tokens/episode. Concurrent ~2s thought is masked by3–5s physical action execution, conditional on that timing assumption.",
+    "novelty": "An explicit semantic mediator that is the only language input to action selection, plus joint thought/action correction with distance-dependent expert mixing. Related AwareVLN/AdaNav already gate reasoning; CorrectNav already collects recovery trajectories. The distinctive input bottleneck should be evaluated independently of those data improvements. Its causal terminology is stronger than the experimentally established architectural separation.",
+    "results": "Tables1–2: base R2R56.7SR/51.6SPL andRxR55.9/48.2; extra-data59.8/52.9 and59.1/50.7. Figure2 RxR42.7→51.1 with Think-Before-Act,55.9 with correction,59.1 extra data. Table3 LLM confidence trigger35.8SR, SigLIP51.5, action-pattern51.1; efficiency is competitive, not uniquely strongest accuracy. Table4 DAgger51.6, STC53.2,full55.9. This supports decomposition plus correction on these settings, not proof that spurious causal correlations were removed. As of cutoff the SOTA prose is not a global ranking: supplied CorrectNav/AwareVLN report higher SR under different training/data.",
+    "code": "Advertised project https://allenxinn.github.io/IDEALVLN returned404 during this investigation. No official implementation was inspected or executed; InternNav references are not treated as this paper's released code.",
+    "repository_status": "Advertised project unavailable; official code unverified",
+    "bottlenecks": [
+      {
+        "id": "IDEAL-1",
+        "description": "Semantic mediator errors can erase essential global constraints",
+        "conditions": "Ambiguous alignment, off-path recovery, instructions whose future condition changes current action",
+        "cause": "Compressed S_t may not be a sufficient statistic; word-overlap precision is not semantic equivalence",
+        "evidence": "§3.3 explicitly says large deviations invalidate semantic support; Eq.5 and soft-gate Eq.6",
+        "followups": "CorrectNav/AwareVLN address recovery; none establishes mediator sufficiency or calibrated semantic validity",
+        "kind": "Methodological / insufficiently tested",
+        "status": "Partially addressed; frontier remains uncertain",
+        "confidence": "Moderate"
+      }
+    ],
+    "key_findings": [
+      {
+        "claim": "'Entropy-based' trigger is action-pattern detection, and the do-operator does not prove causal identification",
+        "evidence_type": "Paper inspection and mathematical deduction",
+        "source": "Supplied PDF",
+        "locator": "§3.1–3.2, Eqs.2–4"
+      }
+    ],
+    "limitations": "Project inaccessible. Reviewed method/results rather than all appendices; exact training masks, dataset construction, and additional proofs remain unverified. No benchmark executed."
+  },
+  {
+    "id": "mapgpt",
+    "title": "MapGPT: Map-Guided Prompting with Adaptive Path Planning for Vision-and-Language Navigation",
+    "authors": [
+      "Jiaqi Chen",
+      "Bingqian Lin",
+      "Ran Xu",
+      "Zhenhua Chai",
+      "Xiaodan Liang",
+      "Kwan-Yee K. Wong"
+    ],
+    "year": 2024,
+    "venue": "ACL 2024 long papers",
+    "source": "https://aclanthology.org/2024.acl-long.529/",
+    "pages": "1, 3–7",
+    "problem": "Locally choosing a neighboring viewpoint leaves zero-shot LLM agents unable to reason about unexplored branches and backtracking. Discrete MatterSim provides connectivity and navigable candidates; this is not learned free-space discovery or continuous locomotion. REVERIE evaluation covers navigation but explicitly omits object grounding.",
+    "method": "§3 Eq.1 generates thought T_t and categorical action from task description, instruction, action history, observations and candidates. Eq.2 adds online map M_t and previous plan P_(t−1), then produces T_t,P_t,a_t. G_t=(V_t,E_t) stores observed node IDs and simulator-provided edges; textual prompts distinguish visited, currently accessible and observed-but-inaccessible nodes. Their annotations are candidate images (GPT4V) or BLIP2/FasterRCNN descriptions (GPT4). Current/visited annotations are reused from action/history; other frontier descriptions go into supplementary context. The plan is updated each step and may include multiple contingencies, but no search-optimality constraint is imposed. The action is a letter over N neighbors plus STOP. There is no navigation-training objective; pretrained caption/detection and paid GPT inference remain dependencies. REVERIE 'Surroundings' uses dataset object lists for stopping, whereas R2R does not use them (§3.1.2). Map connectivity is the DUET-style graph data structure, not the DUET learned dual-scale policy. Text-only system reports672input/115outputtokens/step vsNavGPT2465/317.",
+    "novelty": "An online linguistic topological graph and recurrent editable plan in a single expert prompt. Backtracking and graph memory predate it in learned VLN; contribution adapts their representation to frozen GPT4/4V. Analogical adds joint candidate captions; EvoNav adds retrieved cross-episode experience; HAM-VLN adds graph retrieval/compression and reflective memory.",
+    "results": "Table1 216trajectories across72scenes GPT4V47.7SR/38.1SPL; Table2 783instructions11unseen scenes43.7/34.8 vsNavGPT34/29. Text-only38.8SR improves success but25.8SPL is belowNavGPT29. Table3 REVERIE500sample31.6/20.3; trainedHAMT/DUET retested on same subset. These are subset benchmarks, not fullR2R all-instruction leaderboard numbers. §4.2 backtracking in49%episodes and successful correction within80%ofthose are descriptive operational statistics, not causal evidence that every return helps. Extra graph/context/API model differences confound broad comparisons.",
+    "bottlenecks": [
+      {
+        "id": "MAPGPT-1",
+        "description": "Exploration gains can lengthen paths and visual-to-text conversion loses discriminative cues",
+        "conditions": "Text-only GPT4, several plausible branches",
+        "cause": "Descriptions discard visual evidence and repeated planning encourages further exploration",
+        "evidence": "Table2 GPT4SR38.8/SPL25.8; §4.2 explanation",
+        "followups": "Analogical comparisons, EvoNav visual banks, HAM-VLN selective graph memory; uncertainty of detection and fair cost controls persist",
+        "kind": "Methodological / insufficiently tested",
+        "status": "Partially addressed; frontier remains uncertain",
+        "confidence": "Moderate"
+      }
+    ],
+    "key_findings": [
+      {
+        "claim": "Training-free map prompting relies on simulator candidates and omits REVERIE grounding",
+        "evidence_type": "Author protocol",
+        "source": "Supplied PDF",
+        "locator": "§3.2, §4.1"
+      }
+    ],
+    "limitations": "Main method/results read; detailed prompts/remaining ablations in appendix not yet reviewed. No benchmark executed."
+  },
+  {
+    "id": "mapnav",
+    "title": "MapNav: A Novel Memory Representation via Annotated Semantic Maps for VLM-based Vision-and-Language Navigation",
+    "authors": [
+      "Lingfeng Zhang",
+      "Xiaoshuai Hao",
+      "Qinwen Xu",
+      "Qiang Zhang",
+      "Xinyao Zhang",
+      "Pengwei Wang",
+      "Jing Zhang",
+      "Zhongyuan Wang",
+      "Shanghang Zhang",
+      "Renjing Xu"
+    ],
+    "year": 2025,
+    "venue": "ACL 2025 long papers",
+    "source": "https://aclanthology.org/2025.acl-long.638/",
+    "pages": "1, 3–8",
+    "problem": "Raw RGB-history accumulation costs memory and repeated visual encoding. MapNav substitutes an online annotated semantic top-down map for most history. Despite RGB-only-looking checkmarks in Table1, ASM construction explicitly consumes depth and pose (§3.2/Fig3), so the whole system is not a monocular RGB-only sensor baseline.",
+    "method": "Construct M∈R^((n+4)×W×H): obstacle, explored, current-position, trajectory channels plus n semantic classes. Mask2Former segments RGB, depth gives point cloud, pose aligns successive observations, and projection updates BEV. Connected components over each semantic category above areaτ get centroid text labels, making a rendered ASM. Shared SigLIP-so400M encodes currentRGB andASM; spatial unpadding/patch merge Φ_spatial produces visual patches, separate2layerGELUprojectors map to Qwen2-7Bhidden space (Eqs1–3). LLaVA-OneVision generates text commands; regex Ψ(text,patterns) maps synonyms toForward/Left/Right/Stop (Eq4). No differentiability through mapping/regex is claimed by its 'end-to-end' policy terminology. Training approximately1Mtotalpairs, about300Koracle+200KDAgger+25Kcollision perR2R/RxR, with generalVQAco-training;8A100×30h. The500KR2R-only model is transferredzero-shot toRxR; thebest2historyframeversiontrainsbothR2R/RxR. Fulloptimization/lossmasksrequireappendix/code. At inference maintainASM,currentRGB and optionally2historyframes, thenparseactions.",
+    "novelty": "Linguistically annotated map pixels align spatial memory with VLM OCR/semantic priors. Semantic maps, DAgger and collision recovery existed; novel map rendering and learned policy integration need separable controls. It is external mapping-plus-trainedVLM, not prompt-onlyMapGPT and notDUET.",
+    "results": "Table1 RGB-onlywithinMapNav27.1SR/23.5SPL→ASM36.5/34.3R2R; adding2historyframes andRxRtraining39.7/37.2 andRxR32.6/27.7. This supportsASMwithinbackbone; changingtrainingdata limits attributing allbestmodelgain tohistory. Table4 semanticmap29.1SR vsASM36.5, but prose says originalmapimprovesbaseline although26.4<27.3. Table5 oracle23.9→DAgger33.5→collision36.5SR shows substantial datacontribution. Table3 .17MBconstantrepresentation vsNaVid276MBat300steps is storedobservationmemory, notfullmodel/GPUmemory; .25svs1.22s needs wholepipeline accounting. Real50instructionsfiveenvironments showsemanticadvantages but smallsamples.",
+    "bottlenecks": [
+      {
+        "id": "MAPNAV-1",
+        "description": "Mapping and text annotation can destroy appearance, height, temporal and relational detail",
+        "conditions": "Repeated instances, depth/pose errors, map label clutter, long trajectories",
+        "cause": "Fixed semantic categories and2Dprojection compress history; ASMraster/OCRmustresolveinstanceidentity",
+        "evidence": "Fig3 sensorpipeline; Table1 adding2RGBhistoryframes helps; Fig5",
+        "followups": "NavFoM/StreamVLNretainvisualhistory; PolarMemretrievescontext; no matchedmemorybudgetproof of sufficientmaprepresentation",
+        "kind": "Methodological / insufficiently tested",
+        "status": "Partially addressed; frontier remains uncertain",
+        "confidence": "Moderate"
+      }
+    ],
+    "key_findings": [
+      {
+        "claim": "ASM construction uses depth and pose even though comparison table lists MapNav without those sensor checkmarks",
+        "evidence_type": "Paper internal protocol audit",
+        "source": "Supplied PDF",
+        "locator": "§3.2/Fig3 versusTable1"
+      }
+    ],
+    "limitations": "Appendices and exact losses pending review. No independent timing or benchmarkrun. Claims ofmemorysavingreferrepresentation only."
+  },
+  {
+    "id": "navfom",
+    "title": "Embodied Navigation Foundation Model",
+    "authors": [
+      "Jiazhao Zhang",
+      "Anqi Li",
+      "Yunpeng Qi",
+      "Minghan Li",
+      "Jiahang Liu",
+      "Shaoan Wang",
+      "Haoran Liu",
+      "Gengze Zhou",
+      "Yuze Wu",
+      "Xingxing Li",
+      "Yuxin Fan",
+      "Wenjun Li",
+      "Zhibo Chen",
+      "Fei Gao",
+      "Qi Wu",
+      "Zhizheng Zhang",
+      "He Wang"
+    ],
+    "year": 2026,
+    "venue": "ICLR 2026",
+    "source": "https://proceedings.iclr.cc/paper_files/paper/2026/hash/ceb45c48e29e7f49b0b47edb98e43691-Abstract-Conference.html",
+    "pages": "1, 3–8",
+    "problem": "Existing VLMnavigation methods are tied to one camera layout/task/embodiment. NavFoM unifies indoorwheeled/quadruped,drones,vehicles andQA under boundedvisualtoken processing. It still needs task-specific action scaling/controllers and knowncameraazimuths.",
+    "method": "DINOv2+SigLIP576patchfeatures concatenatechannels; gridpoollatestview to64patches,history to4,then2layerMLPtoQwen2-7B. TVI token E_base+P_time(TimePE(t))+P_angle(AnglePE(φ)) identifies timeandcameraangle; videoQAomitangle,imageQAomitboth. SinusoidalPEofsin/cosφpreservescircularidentity; sumsneednotprovablybeinjective overtimeandangle. BATS sampleshistorywithP(t)=(1−ε)exp(k(t−T)/T)+ε,ε=.1. Eq5 integralexpectedframes=(1−ε)(1−exp(−k))T/k+εT;Brentsolvekunder[(5E_frames)+65]N≤B_tokens. This is an expectation constraint, not a hard per-instance token cap; floorεmakesfeasibilityfailatsufficientlylargeT (authorsacknowledge1120stepsforfourcameras2048budget). Actionhiddenstate→3layerMLP predictsM=8waypointsinR4(x,y,z,yaw); taskscaleαrescalesthe[-1,1]coordinates; groundvehiclesignorez. L=10MSE(validwaypointdimensions)+QAautoregressiveCE. MSEmixespositionandyawunitsaftertasknormalization,so weightingdependsunits/scales. 12.7Mtotalexamples=8.02Mnavigation+3.15MimageQA+1.61MvideoQA;56H100×72h4032GPUh,oneepoch. 8Mnavigationincludes3.37MVLN,1.02Mobjectgoal,897Ktracking,681Kdrivingandwebvideos. SimulatorusestrajectoryactionsreplacingdiscreteForward/Left/Right;deployment19.1GB/218ms~5Hz1600tokensRTX4090.",
+    "novelty": "Sharedcross-tasktrajectoryhead plus explicit time/camera-tokenorganization and budget-dependenthistorysampling, at muchlargerdatascale. ClosestUni-NaVidunifiesnavigationtasks withtokenmerging; NaVILAseparateshigh-levelnavigation/locomotion. Sampling-policyandcross-taskbenefitsrequirematcheddata/actionrepresentation.",
+    "results": "Table1singleviewR2R56.2SR/51.2SPL,RxR57.4/49.4;fourview61.7/55.3and64.4/56.2. Table2unseenOVON43.6/31.3singleview;differentobjectgoaltrainsetsozero-shotasteriskdoesnotmeanuntrainednavigation. Table3tracking85.0SRvsTrackVLA85.1single-target,61.4vs57.6distracted. Table4NAVSIM84.3PDMSvsPARADrive84.0,UniAD83.4,LAW84.6. These broadresults supportgenerality, notsuperiorityeverymetric. Dataquantity andchangedactionspacearematerialconfounders.",
+    "code": "OfficialprojectNavFoM-Web links a placeholdergithub.com/xxxx/xxxx rather thanusableimplementationat inspection. NoNavFoMmodel,loss,dataset,evaluatorcodeinspectedorexecuted.",
+    "repository_status": "Official project found; linked code placeholder",
+    "bottlenecks": [
+      {
+        "id": "NAVFOM-1",
+        "description": "Expected token budget is not a hard memory bound and fails at sufficiently long horizons",
+        "conditions": "Longmulticameraepisodes withεfloor",
+        "cause": "Bernoullisamplingvariance andminimumεTexpectedframes",
+        "evidence": "Eqs4–5/§2.1.2 acknowledgeunsolvableverylargeT",
+        "followups": "StreamVLNboundedsegments andPolarMemretrievalofferothermemorytradeoffs; exacthardbudget/taskcoverage unresolved",
+        "kind": "Methodological / insufficiently tested",
+        "status": "Partially addressed; frontier remains uncertain",
+        "confidence": "Moderate"
+      }
+    ],
+    "key_findings": [
+      {
+        "claim": "12.7M total samples and trajectory-based simulator actions complicate direct attribution to architectural improvements",
+        "evidence_type": "Author setup and independent deduction",
+        "source": "SuppliedPDF",
+        "locator": "§2.2, §3.1"
+      }
+    ],
+    "limitations": "Officialcodeunavailable; remainingappendix/ablationsnotyetreviewed. Budgetcritiqueis mathematicaldeduction from stochasticexpectation, not measuredOOM. Noexperimentsrun.",
+    "status": "Complete with explicit implementation limitation"
+  }
+]

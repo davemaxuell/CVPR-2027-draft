@@ -1,0 +1,359 @@
+[
+  {
+    "id": "console",
+    "title": "Correctable Landmark Discovery via Large Models for Vision-Language Navigation",
+    "authors": [
+      "Bingqian Lin",
+      "Yunshuang Nie",
+      "Ziming Wei",
+      "Yi Zhu",
+      "Hang Xu",
+      "Shikui Ma",
+      "Jianzhuang Liu",
+      "Xiaodan Liang"
+    ],
+    "year": 2024,
+    "venue": "TPAMI version supplied; exact publication metadata to verify",
+    "source": "https://github.com/expectorlin/CONSOLE",
+    "pages": "1, 3-8",
+    "problem": "Use broad landmark co-occurrence knowledge to improve supervised graph VLN without blindly trusting language-model priors. Operates on panoramic candidate views with HAMT or DUET , not a training-free navigator.",
+    "method": "PAPER METHOD (§D): ChatGPT extracts navigation-order landmarks and likely co-occurring objects before navigation. A frozen CLIP representation compares the current panoramic average with adjacent landmarks to advance a pointer; a forced shift after 1–2 steps prevents stalling. Per-view CLIP similarities create landmark/co-occurrence view distributions. A learned state projection of instruction CLS and visual features produces relevance scores; weighted landmark text features are added to each observation feature before the backbone's cross-modal action predictor (Eqs.11–16). Training combines the backbone imitation/ A 2C objective, action-label consistency for corrected landmark scores, and symmetric observation/landmark contrastive loss (Eqs.14,17,18). Temperature.5, auxiliary weights.1, SGD learning rate.1 for the scoring projection, batch 4 and 300 K iterations on 3090 are specified. Large augmented sets reuse a landmark vocabulary instead of new ChatGPT calls for every item.",
+    "novelty": "A learned correction layer makes open-world co-occurrence priors useful to existing specialist policies; contrasts ESC's exploration and KERM's external knowledge. New contribution lies in weighting and representation enhancement, not language extraction alone. Component ablations separate learnable scoring and observation enhancement.",
+    "results": "PAPER EXPERIMENT: Table 2 p.8 reports DUET val-unseen 72 SR/60 SPL versus CONSOLE 73/63; test 69/59 versus 72/61. HAMT val-unseen 66/61 versus 69/63. ScaleVLN 's larger-data 81/70 is explicitly excluded from fair same-data SOTA interpretation. RxR uses English only. DEDUCTION: Eq.13 is a signed weighted sum of distributions without explicit positivity/normalization, yet Eq.14 calls it a probability inside log; implementation should clarify logits versus probabilities. The method's hard pointer may skip an unmet landmark despite corrected visual scores.",
+    "bottlenecks": [
+      {
+        "id": "03-console-prior",
+        "description": "Learned co-occurrence correction does not verify actual landmark completion",
+        "conditions": "Repeated landmarks or unusual co-occurrences",
+        "cause": "Heuristic monotone pointer and prior-based feature fusion can encode wrong stage",
+        "evidence": "§D.2.1 p.6 forced shifting and Eq.13",
+        "kind": "methodological",
+        "followups": " CA-Nav introduces explicit checks; GC-VLN uses graph feasibility; SkillNav specializes grounding skills",
+        "status": "Partially addressed",
+        "confidence": "high"
+      }
+    ],
+    "key_findings": [
+      {
+        "claim": " CONSOLE is a supervised HAMT/ DUET enhancement with explicit prior-correction losses.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "CONSOLE.pdf",
+        "locator": "§D; Table 2 p.8"
+      }
+    ],
+    "limitations": "Exact TPAMI issue/year and all supplied-version differences require further bibliography checking. Principal method and R2R evidence read; no benchmark execution."
+  },
+  {
+    "id": "context_nav",
+    "short_name": "Context-Nav",
+    "title": "Context-Nav: Context-Driven Exploration and Viewpoint-Aware 3D Spatial Reasoning for InstanceNavigation",
+    "authors": [
+      "Won Shik Jang",
+      "Ue-Hwan Kim"
+    ],
+    "year": 2026,
+    "venue": "CVPR 2026",
+    "pages": "1-7",
+    "problem": "Find one text-described object instance among same-category distractors using RGB -D and odometry. HM3D InstanceNav / CoIN -Bench are instance-navigation tasks, not R2R route following. 'Training-free' means no TGIN -specific training; pretrained perception and PointNav remain.",
+    "method": "PAPER METHOD (§3): parse/canonicalize target/context categories; open-vocabulary detect, segment, then confirm COCO categories with a detector and open-set categories by VLM . Fuse detections into per-instance clouds through center proximity or voxel intersection/min-set-size overlap. RANSAC vertical walls form room components. GOAL- CLIP long-caption dense similarity is projected to a value map to rank frontiers; a one-time same-room exploration override seeks missing context. Depth-only pretrained PointNav executes motion. Candidate intrinsic attributes are queried with paraphrases and Yes/Unknown/No bins; unknowns are retried using the highest-similarity frame from the next five steps. Extrinsic verification samples 24 bearings at four radii around pair/global anchors. For each candidate observer pose, transform object centers into reference-aligned axes and check seven geometric relations. Accept only if ONE common same-room viewpoint satisfies ALL parsed relations (Eqs.2–5). No new navigation loss is trained.",
+    "novelty": "Combines full-caption exploration with explicit shared-viewpoint relation feasibility, beyond category VLFM and viewpoint-agnostic UniGoal checks. The common-viewpoint quantifier matters: individually satisfiable relations need not be jointly satisfiable. This is direct prior art for multi-relation verification before stopping.",
+    "results": "PAPER EXPERIMENT: Table 1 p.6 gives InstanceNav 26.2 SR/9.1 SPL versus PSL 26.0/10.2 and UniGoal 20.2/11.4: highest SR is marginal and does NOT imply best SPL . CoIN unseen 11.3/5.2 versus UniGoal 2.6/2.2. InstanceNav success is 1 m/1,000 steps; CoIN .25 m/500 steps. Table 3 p.7 removes context verification, reducing synonym-split 20.3 to 12.0 SR. Baselines with category-only goals receive less information; separate description-conditioned baselines for fair mechanism comparisons.",
+    "bottlenecks": [
+      {
+        "id": "03-context_nav-absence",
+        "description": "Failure to observe a contextual object is not evidence it is absent",
+        "conditions": "Occlusion, poor viewpoint, incomplete wall/instance map",
+        "cause": "Hard geometric predicates and finite viewpoint sampling conflate missing observation with infeasibility",
+        "evidence": "§3.4 p.5 and low absolute success Table 1",
+        "kind": "methodological",
+        "followups": " PSG-Nav models semantic uncertainty; PolarMem distinguishes uncertain from negative states, but neither validates this exact embodied relation test",
+        "status": "Partially addressed",
+        "confidence": "high"
+      }
+    ],
+    "key_findings": [
+      {
+        "claim": "Joint viewpoint-aware 3 D relation verification exists; its guarantee is conditional on map and parsed constraints.",
+        "evidence_type": "DEDUCTION",
+        "source": "Context-Nav.pdf",
+        "locator": "§3.4 Eq.5 p.5"
+      }
+    ],
+    "limitations": "Main paper reviewed; supplementary failure cases and thresholds not all inspected. No benchmark executed. Predicate feasibility does not prove the narrator's intended viewpoint or true instance identity.",
+    "repo_url": "https://github.com/AutoCompSysLab/ContextNav"
+  },
+  {
+    "id": "correctnav",
+    "title": "CorrectNav: Self-Correction Flywheel Empowers Vision-Language-Action Navigation Model",
+    "authors": [
+      "Zhuoyuan Yu",
+      "Yuxing Long",
+      "Zihan Yang",
+      "Chengyan Zeng",
+      "Hongwei Fan",
+      "Jiyao Zhang",
+      "Hao Dong"
+    ],
+    "year": 2026,
+    "venue": "AAAI 2026",
+    "pages": "1-7",
+    "problem": "A monocular navigator trained only on demonstrations lacks recovery behavior once it departs the oracle path. The target is recovering without an extra reasoning model at inference. Simulator reference paths and a planner are available while collecting training data.",
+    "method": "PAPER METHOD (pp.3–5, Algorithm 1): initialize SigLIP →two-layer projector→ Qwen 2 from LLaVA-Video 7 B. Fine-tune on 2.1 M R2R / RxR step examples with camera/lighting randomization,30 K trajectory-instruction generation examples, and 240 K general multimodal examples. Run the policy on training instructions. Interpolate reference path points; detect first predicted position whose nearest-reference distance exceeds S. Project it to a reference segment and plan a correction through that segment's next waypoint and all later waypoints. Only correction suffix actions are supervised, earlier frames serve as context. Qwen -VL-Plus captions and generates QA for three key frames around deviation. Re-train on sampled correction/perception data mixed with oracle examples and repeat. Eight A 100s,80 h initial training and 20 h per flywheel iteration; inference uses 16 frames and four-action chunks. Objective is supervised token prediction; no RL evidence is supplied.",
+    "novelty": "An iterative DAgger -like error-data pipeline with targeted perception labels and suffix-only recovery supervision, extending NaVid -style navigation tuning. The contribution is not simply 'learn from failed trajectories': the deviation localization and balanced action/perception data are specific mechanisms.",
+    "results": "PAPER EXPERIMENT: Table 1 p.5 reports R2R 65.1 SR/62.3 SPL and RxR 69.3/63.3. First-round Table 2 gives 63.0 SR, falling 59.2 without trajectory correction and 60.1 without key frame perception. Figure 5/p.6 states performance drops at the fourth iteration, where training stops; improvement is not monotonic indefinitely. Real-world 120 instructions across three environments are useful transfer evidence but do not isolate correction from domain randomization/backbone/data changes. Limitations p.7 acknowledge body-relative geometry errors, including hind-leg scraping.",
+    "code": "ACCESS SCOPE: current paper-title/project searches did not locate a verifiable released official model/training repository. No official implementation was inspected or executed. Absence from this search is not proof no repository exists.",
+    "repository_status": "No official implementation verified in scoped search",
+    "bottlenecks": [
+      {
+        "id": "03-correctnav-recovery",
+        "description": "Nearest-path recovery can mistake geometric closeness for valid instruction progress",
+        "conditions": "Looping/repeated corridors, skipped landmarks, alternative valid routes",
+        "cause": "Projecting to a reference segment assumes preceding reference points were correctly traversed",
+        "evidence": "Deviation and recovery equations p.4; deduction, not reported failure rate",
+        "kind": "methodological",
+        "followups": " AwareVLN supervises semantic progress; Progress-Think learns progress alignment; NavGRPO explores non expert routes",
+        "status": "Partially addressed",
+        "confidence": "high"
+      }
+    ],
+    "key_findings": [
+      {
+        "claim": "Repeated self-correction data collection is strong prior art, but fourth-round degradation limits blanket flywheel improvement claims.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "CorrectNav.pdf",
+        "locator": "Figure 5 discussion p.6"
+      }
+    ],
+    "limitations": "Conference main text reviewed; appendix optimizer details not supplied in reviewed 9-page PDF . No code or benchmark executed.",
+    "followup_sources": [
+      "https://arxiv.org/abs/2603.15370",
+      "https://gwxuan.github.io/AwareVLN/"
+    ],
+    "status": "Complete with explicit implementation limitation"
+  },
+  {
+    "id": "discussnav",
+    "short_name": "DiscussNav",
+    "title": "Discuss Before Moving: Visual Language Navigation via Multi-expert Discussions",
+    "authors": [
+      "Yuxing Long",
+      "Xiaoqi Li",
+      "Wenzhe Cai",
+      "Hao Dong"
+    ],
+    "year": 2024,
+    "venue": "ICRA 2024",
+    "pages": "1-7",
+    "problem": "Training-free navigation must integrate instruction parsing, perception, progress estimation, and action validation without relying on one undifferentiated LLM response. Graph experiments receive panoramic directions; physical robot uses separate obstacle-aware motion.",
+    "method": "PAPER METHOD (§III): assign eight prompted expert roles across four topics. GPT-4 action decomposition and landmark extraction check ordering; InstructBLIP answers targeted scene questions across 12 directions; RAM provides object tags. ChatGPT summarizes history, GPT-4 estimates executed/in-progress/future actions, and the navigation GPT-4 samples five thought/action responses at temperature 1. Responses with common directions are fused and a decision-testing expert selects among alternatives. Most supporting experts use temperature 0 and one output. The main agent fills a fixed question corpus rather than learning routing. No navigation training loss exists. In simulator the first candidate in the predicted direction is selected; TurtleBot moves.5 m or half obstacle distance, with LiDAR used for collision avoidance.",
+    "novelty": "Role decomposition, cross-checking and multi-response decision testing extend NavGPT 's ReAct-like loop. The method is a prompted multi-model system rather than learned multi-agent policy. Ablations remove expert categories but also reduce calls and information, leaving compute-matched comparison unresolved.",
+    "results": "PAPER EXPERIMENT: Table I p.6 gives R2R^43 SR/40 SPL versus NavGPT 34/29. These are 9 and 11 percentage-point gains, not 26.47 and 37.93 points (those are relative percentages). Main evaluation uses 783 trajectories in 11 unseen environments; ablations sample one trajectory from each of 72 scenes. Table II reuses the full-row 43/40 although surrounding text describes the sampled set, creating protocol ambiguity. Physical 20-instruction SR 25% versus NavGPT 10% and DUET 0% is small and does not establish general inability of trained navigation. Increased API calls and correlated expert errors remain.",
+    "bottlenecks": [
+      {
+        "id": "03-discussnav-consensus",
+        "description": "Multiple language judgments can agree on the same wrong perceptual premise",
+        "conditions": "Missing or hallucinated landmark captions and long instructions",
+        "cause": "Experts share observations/backbones; consensus is not independent evidence",
+        "evidence": "§III pipeline; Table II perception and completion ablations",
+        "kind": "methodological",
+        "followups": " Analogical descriptions enrich comparative perception; ProFocus requests targeted views; R3/ AdaNav reduce always-on reasoning cost",
+        "status": "Partially addressed",
+        "confidence": "high"
+      }
+    ],
+    "key_findings": [
+      {
+        "claim": "Expert consultation improves the reported baseline but does not isolate benefits from extra inference budget.",
+        "evidence_type": "DEDUCTION",
+        "source": "DiscussNav.pdf",
+        "locator": "§III and TablesI–II"
+      }
+    ],
+    "limitations": "No API /robot experiments executed; full-source audit pending. Sampling five outputs is described as beam search in prose, but API n=5 sampling is not necessarily beam search."
+  },
+  {
+    "id": "ecot",
+    "short_name": "ECoT",
+    "title": "Robotic Control via Embodied Chain-of-Thought Reasoning",
+    "authors": [
+      "Michał Zawalski",
+      "William Chen",
+      "Karl Pertsch",
+      "Oier Mees",
+      "Chelsea Finn",
+      "Sergey Levine"
+    ],
+    "year": 2025,
+    "venue": "CoRL 2024 proceedings / supplied arXiv v3 March 2025; venue verification pending",
+    "source": "https://arxiv.org/abs/2407.08693",
+    "pages": "1, 3-10",
+    "problem": "Ground language reasoning in physical manipulation rather than only high-level subtask prose. Uses a third-person image and instruction to control a WidowX 6 DoF arm; this is adjacent VLA prior art, not demonstrated R2R / RxR navigation.",
+    "method": "PAPER METHOD (§4): OpenVLA 's fused SigLIP / DINOv2 visual encoder and Llama2 -7 B predict a sequence containing task paraphrase, plan, current subtask, movement reasoning, gripper pixel location, object boxes, then seven discretized action tokens (256 bins per dimension). Post-hoc annotations for 2.5 M Bridge V2 transitions use Prismatic captions, GroundingDINO boxes, proprioception-derived motion primitives, OWLv2/SAM gripper detections and per-trajectory RANSAC projection; Gemini 1.0 builds reasoning chains using those signals. Standard causal next-token supervision trains reasoning and actions jointly. Inference caches high-level reasoning for five steps or runs a second asynchronous reasoning instance; token generation grows from 7 to about 350 per step. No formal faithfulness guarantee is claimed.",
+    "novelty": "Unlike purely linguistic CoT/Naive-CoT, supervise explicit low-level spatial grounding as intermediate text. Controls share OpenVLA base and Bridge V2 robot trajectories, making grounding ablations meaningful; synthetic annotation and test-time compute still differ.",
+    "results": "PAPER EXPERIMENT: Table 1 p.7 aggregates 314 trials per method: ID-view ECoT 66% versus OpenVLA 44%, OOD-view 64% versus 30%; task-specific failures remain (tall cup). Table 2 p.9's 25-trial efficiency subset reports five-step caching 72% success/+24%speed and asynchronous 65%/+40%speed, with asynchronous doubling policy instances. Text correction improves a selected hard subset 32%→80%, not full-benchmark accuracy. §5.6 p.10 explicitly says reasoning transfer to other embodiments was largely visualization/proxy evidence; SIMPLER Google-Robot rollouts did NOT improve over OpenVLA . Hence language transfer is not validated policy transfer.",
+    "bottlenecks": [
+      {
+        "id": "03-ecot-faithfulness",
+        "description": "Correct-looking reasoning may not control the action and becomes stale between updates",
+        "conditions": "Unseen objects/embodiments and fast-changing scenes",
+        "cause": "Autoregressive language intermediates are not verified physical state; fixed-step caching trades freshness for latency",
+        "evidence": "§5.3 caveat p.7; §5.6 and limitations p.10",
+        "kind": "methodological",
+        "followups": " Aux-Think removes test-time text; AdaNav / AwareVLN trigger reasoning adaptively; RL4VLA tests generalization axes",
+        "status": "Partially addressed",
+        "confidence": "high"
+      }
+    ],
+    "key_findings": [
+      {
+        "claim": "Embodied intermediates help tested manipulation tasks, but cross-embodiment action transfer was not established.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "Embodied Chain-of-Thought.pdf",
+        "locator": "Table 1 and §5.6"
+      }
+    ],
+    "limitations": "No robot experiments executed. Appendix training specifics and all 24 pages not fully audited. Do not generalize manipulation evidence into navigation performance."
+  },
+  {
+    "id": "evonav",
+    "short_name": "EvoNav",
+    "title": "History to Future: Evolving Agent with Experience and Thought for Zero-shot Vision-and-Language Navigation",
+    "authors": [
+      "Guangzhao Dai",
+      "Shuo Wang",
+      "Zihan Wang",
+      "Guo-Sen Xie",
+      "Yang Yang",
+      "Jinshan Pan",
+      "Qianru Sun",
+      "Xiangbo Shu"
+    ],
+    "year": 2026,
+    "venue": "CVPR 2026",
+    "pages": "1, 3-7",
+    "problem": "Improve continuous-navigation decisions with prior-episode lessons and textual future landmarks. Assumes 12-view RGB -D panoramas and a pretrained waypoint predictor; no prebuilt map, but experience persists across episodes.",
+    "method": "PAPER METHOD (§4): parse instruction into ordered subactions and landmarks. Predict future action, infer completed actions by comparing history and predicted future, then identify the next landmark. This F-CoT is language prediction, not learned dynamics. An external evaluator computes terminal navigation metrics using benchmark ground truth (Eq.7); the supplement specifies that the agent receives its own rollout and terminal SR/SPL, not a ground-truth trajectory. H-CoE then asks an LLM to generate correction advice, reproduce high-quality paths, or improve inefficient successes. Store instruction/landmarks/path/advice in Chroma and retrieve by landmark embedding. Separate banks store textual visual descriptions and CLIP image embeddings across completed steps. Future landmark queries both banks. Final LLM sees retrieved trajectory/scene evidence, current views, progress and instruction. Model weights are not updated; the experience store is.",
+    "novelty": "Combines future-text guidance with cross-episode trajectory and scene retrieval, beyond Open-Nav 's direct reasoning. The distinctive protocol includes privileged post-episode metric feedback; it is not a fresh-agent one-shot condition. Broad proposals for 'learn from prior failures by retrieval' overlap directly.",
+    "results": "PAPER EXPERIMENT: sampled R2R-CE Table 1 p.6: same Gemini 2.5-Pro Open-Nav 23 SR/19.90 SPL versus EvoNav 43/37.77. NavRAG-CE 24/13.39 versus 30/17.60. Table 4 p.7: future-only 27 SR, adding trajectory experience 31, scene-description 39, both scene forms 40, full 43. These support memory utility conditional on episode ordering/outcome access. Main table includes some cited results using different waypoint predictors. No reset-memory or no-oracle-outcome control is established in reviewed main text. Source says code will be released.",
+    "code": "ACCESS SCOPE: CVPR main paper states code will be released. Title and project searches did not verify an official implementation. No retrieval bank, feedback computation or evaluation ordering was inspected in code.",
+    "repository_status": "No released official implementation verified",
+    "bottlenecks": [
+      {
+        "id": "03-evonav-feedback",
+        "description": "Experience improvement depends on reliable previous-episode outcome labels and retrieval relevance",
+        "conditions": "Deployment without reliable terminal outcome feedback; changed scenes or reset-memory evaluation",
+        "cause": "Advice is generated from privileged navigation metrics and can carry hallucinated correction into later episodes",
+        "evidence": "§4.3.1 Eq.7–9 p.4",
+        "kind": "methodological",
+        "followups": " HAM-VLN uses within-episode advisory failure memory; PolarMem adds consistency filtering but not embodied coverage evidence",
+        "status": "Shifted into another cost or limitation",
+        "confidence": "high"
+      }
+    ],
+    "key_findings": [
+      {
+        "claim": "The memory bank is updated using ground-truth-based post-episode metrics.",
+        "evidence_type": "PAPER METHOD",
+        "source": "EvoNav.pdf",
+        "locator": "§4.3.1 Eq.7 p.4"
+      }
+    ],
+    "limitations": "No code or benchmark executed. Current primary searches did not expose supplemental episode-order/reset details; compare only under matched memory and feedback protocols.",
+    "status": "Complete with explicit implementation limitation"
+  },
+  {
+    "id": "gc_vln",
+    "short_name": "GC-VLN",
+    "title": "GC-VLN: Instruction as Graph Constraints for Training-free Vision-and-Language Navigation",
+    "authors": [
+      "Hang Yin",
+      "Haoyu Wei",
+      "Xiuwei Xu",
+      "Wenxuan Guo",
+      "Jie Zhou",
+      "Jiwen Lu"
+    ],
+    "year": 2025,
+    "venue": "CoRL 2025",
+    "pages": "1, 3-8",
+    "problem": "Interpret route instructions as executable geometric constraints in RGB -D continuous environments instead of selecting actions from unconstrained language prose. Requires pose estimates, object perception, BEV mapping, and an FMM controller.",
+    "method": "PAPER METHOD (§3): DeepSeek-R1 decomposes instructions into a DAG of movement stages, waypoints and object nodes, with one displacement per stage and each mentioned object assigned to one stage. Query a six-type constraint library for direction/distance and multi-object relationships. Topological sorting determines node-coordinate solve order. Grounded- SAM2 detects object candidates; waypoint coordinates maximize summed constraint satisfaction subject to nonnegative component constraints and separation from already generated solutions (Eqs.5–7). A navigation tree enumerates alternative assignments. If no feasible continuation exists, physically backtrack to an unexplored sibling; stop at the last graph stage. No learned navigation loss. DEDUCTION: feasibility is conditional on correct parsing and detections; graph claims to preserve all language are requirements, not proved guarantees.",
+    "novelty": "Explicit symbolic graph solving and branch backtracking go beyond CA-Nav 's sequential object/location checks. This directly occupies 'instruction-as-constraints plus backtracking' novelty. Library coverage is engineered rather than universal natural-language expressiveness.",
+    "results": "PAPER EXPERIMENT: Table 1 p.6 gives R2R 33.6 SR/16.3 SPL , RxR 33.8/13.8. R2R SR exceeds InstructNav 31 but SPL is lower than 24; do not claim all-metric superiority. Table 2 p.7 removing backtracking gives 21.3 SR, random solver 7.0, relaxed constraints 21.5. Object-count ambiguity and expensive backtracking remain. Real-world figures demonstrate cases, not a large controlled success-rate experiment.",
+    "code": "INSPECTED CODE: src/solver/constraint.py defines four implementation families (direction, near, through, weave) and rasterized angular/radial masks in Constraint.draw_mask rather than directly evaluating printed nonlinear Eqs.1–3. set_constraint applies dataset-dependent angular/radius defaults. This may implement the intended geometry but is a paper-to-code formulation difference. Full solver/planner inspection remains pending.",
+    "code_files": [
+      "src/solver/constraint.py"
+    ],
+    "bottlenecks": [
+      {
+        "id": "03-gc_vln-hardconstraints",
+        "description": "A misparsed or falsely grounded constraint can make the correct route infeasible",
+        "conditions": "Repeated objects, missing detections, ambiguous temporal language",
+        "cause": "Hard constraint conjunction and single-stage object assignment do not represent epistemic alternatives in parsing",
+        "evidence": "§3.2–3.3; Table 2; inspected constraint masks",
+        "kind": "methodological",
+        "followups": " PSG-Nav maintains categorical uncertainty; Context-Nav checks shared viewpoints; neither alone proves route-language completeness",
+        "status": "Partially addressed",
+        "confidence": "high"
+      }
+    ],
+    "key_findings": [
+      {
+        "claim": "Constraint solving and explicit backtracking are established mechanisms; the released constraint implementation uses raster masks.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "https://github.com/bagh2178/GC-VLN",
+        "locator": "src/solver/constraint.py, Constraint.draw_mask"
+      }
+    ],
+    "limitations": "Main equations and results read; printed angular Eq.2 appears algebraically different from conventional angle tolerance and needs independent visual equation verification before labeling a mathematical error. No benchmark executed."
+  },
+  {
+    "id": "ham_vln",
+    "short_name": "HAM-VLN",
+    "title": "HAM-VLN: Harnessing Hierarchical Agentic Memory for Zero-Shot Vision-and-Language Navigation",
+    "authors": [
+      "An Liu",
+      "Bingxi Liu",
+      "Hongyu Ding",
+      "Yixuan Jiang",
+      "Yaran Chen",
+      "Fulin Tang",
+      "Cong Leng",
+      "Hong Zhang",
+      "Jian Cheng"
+    ],
+    "year": 2026,
+    "venue": "arXiv preprint v1,31 July 2026",
+    "source": "https://arxiv.org/abs/2607.29600v1",
+    "pages": "1, 3-7",
+    "problem": "Bound context cost while retaining semantic progress and previous branch failures in long-horizon training-free navigation. Requires RGB -D panoramas, odometry, and physical path planning; persistent graph is within an episode.",
+    "method": "PAPER METHOD (§3): Gemini 3.1-Pro high-level System 2 produces a direction/backtrack/stop and structured memory writes in the same call. Qwen 3.6-35 B grounds selected intent to a box; depth/intrinsics/pose project a target for FMM . Working memory retains K recent waypoint observations (K=1 default). A place-object graph stores spatial anchors, connectivity, object descriptions, visit metadata and failure notes. Retrieve top 3 seed places using cosine subgoal relevance +.3 recency+.3 salience; recency decays.85 per waypoint. One-hop expansion/current neighborhood is capped at five places. On backtracking, annotate abandoned suffix places with the decision rationale. Notes are advisory, do not block places or change scores, and only resurface when their place is retrieved. No navigation-specific training/optimizer is used.",
+    "novelty": "Decision-coupled graph writes and bounded task-conditioned retrieval integrate working/episodic/semantic/reflection views. Graph memory, recency retrieval and failure notes have predecessors; the specific combination and controlled memory ablations support the contribution. Broad 'negative failure memory' claims already overlap.",
+    "results": "PAPER EXPERIMENT: Table 1 p.6 reports R2R 61.0±1.7 SR/48.1±.2 SPL and RxR 52.7±1.5/35.7±2.6 on 100-episode subsets, three runs. Published full-split baselines and older foundation models are not matched comparisons. Controlled Table 3 p.7: full raw history 53.3 SR and 746.1 K API tokens/episode versus HAM 61.0 and 244.9 K. Table 4 removes reflection but retains backtracking:55.7 SR/36.9 SPL , supporting memory contribution independent of simply allowing return. The 65% context reduction is relative to full history; versus the cheapest K=3 history, episode tokens fall 34.8%.",
+    "code": "ACCESS SCOPE: supplied preprint and title searches did not establish an official released repository. No memory association, rejected-stop logic or scoring implementation was inspected.",
+    "repository_status": "No official implementation verified",
+    "bottlenecks": [
+      {
+        "id": "03-ham_vln-negative",
+        "description": "A failed visit is not a verified absence, and advisory notes can be stale or misattributed",
+        "conditions": "Changed subgoal, occluded target, place aliasing, new environmental state",
+        "cause": "Agent-authored rationale is stored without a calibrated observability/coverage certificate",
+        "evidence": "§3.4 explicitly advisory failure evidence; deduction from grounding and retrieval",
+        "kind": "methodological",
+        "followups": " PolarMem formalizes positive/negative/uncertain memory; PSG-Nav calibrates detections, but neither supplies the same coverage-conditioned branch evidence",
+        "status": "Partially addressed",
+        "confidence": "high"
+      }
+    ],
+    "key_findings": [
+      {
+        "claim": "Reflection memory already records failed branches and is separately ablated from backtracking.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "HAM-VLN.pdf",
+        "locator": "§3.4; Table 4 p.7"
+      }
+    ],
+    "limitations": "No code or experiment executed.100-episode subset representativeness is cited from another work, not established by this study for all models. API model identity, rejected-stop feedback and per-episode memory reset should be verified before reproduction.",
+    "status": "Complete with explicit implementation limitation"
+  }
+]

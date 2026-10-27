@@ -1,0 +1,1026 @@
+=== PDF PAGE 1 ===
+                           One Step at a Time:
+             Long-Horizon Vision-and-Language Navigation with Milestones
+
+
+         Chan Hee Song1     Jihyung Kil1     Tai-Yu Pan1     Brian M. Sadler2    Wei-Lun Chao1
+                                         Yu Su1
+                       1The Ohio State University   2U.S. Army Research Laboratory
+                           {song.1855, kil.5, pan.667, chao.209, su.809}@osu.edu
+2022                                  brian.m.sadler6.civ@army.mil
+                        Abstract                                         Goal: "Put a hot potato on the counter to the right of the sink"
+                                                                                                1     Navigation: Fridge        2   Interaction: Potato, Fridge     3  Navigation: MicrowaveJun         We study the problem of developing autonomous agents
+10   thatsequencecan followof actionshumanto completeinstructionsthetounderlyinginfer and task.performSig-a
+         niﬁcant progress has been made in recent years, especially
+          for tasks with short horizons.  However, when  it comes
+                                                                                                                                          "Turn around and face the fridge"    "Take a cold potato out of the fridge"   "Take the potato to the microwave"
+          to long-horizon tasks with extended sequences of actions,
+                                                                                                4   Interaction: Microwave      5    Navigation: Counter        6    Interaction: Counter
+        an agent can easily ignore some instructions or get stuck
+          in the middle of the long instructions and eventually fail[cs.AI]
+          the task. To address this challenge, we propose a model-
+         agnostic milestone-based task tracker (M-TRACK) to guide
+          the agent and monitor its progress.  Speciﬁcally, we pro-
+         pose a milestone builder that tags the instructions with nav-            "Cook the potato in the microwave"     "Turn left and go to the counter    "Put the cooked potato on the counter"
+          igation and interaction milestones which the agent needs to                                                               to the right of the sink"
+                                                                            Figure 1.  Illustration of our M-TRACK approach. We show
+         complete step by step, and a milestone checker that system-
+                                                                      an ALFRED task [46], which consists of an overall goal (text on
+           ically checks the agent’s progress in its current milestone                                                                                  the top) and six subtasks (text below each image). The blue/red
+        and determines when to proceed to the next. On the chal-                                                                                         text box within each image is our extracted navigation/interaction
+         lenging ALFRED dataset, our M-TRACK leads to a no-      milestones from the subtask instructions. An agent needs to reach
+          table 33% and 52% relative improvement in unseen suc-      the milestone of the current subtask (e.g., reaching proximity to
+         cess rate over two competitive base models.  Check our      the target object for navigation milestones, or having interacted
+        code at https://github.com/chanhee-luke/M-      with the target objects for interaction milestone; green masks for
+       Track.                                                                   target objects) before it can proceed to the next subtask.arXiv:2202.07028v3                                                               observable environment with only visual perception, and
+         1. Introduction                                          plan and perform navigation and interaction actions in the
+                                                                  environment to complete the task.
+         As autonomous agents (e.g., robots) become more inte-      One critical challenge in VLN arises when the task hori-
+         grated into our daily life, it is increasingly important to de-     zon becomes substantially longer [46]. That is, a task is so
+         velop autonomous agents that can understand natural lan-     complex that it essentially consists of multiple “subtasks”
+        guage commands and carry out the corresponding tasks. To      that need to be completed sequentially to fulﬁll the whole
+           facilitate such a goal, various benchmarks have been pro-      task. For example, in Figure 1 the task “put a hot potato
+        posed in the realm of robot instruction following such as     on the counter to the right of the sink” can be decomposed
+         vision-and-language navigation (VLN) [1, 5, 7, 12, 19, 41,      into six subtasks. Moreover, the subtask “heat the potato”
+         42,55,64], together with a number of novel algorithms that     must be carried out before the subtask “put the potato on
+          consistently push forward the state of the art [30,31,50,54].      the counter”; otherwise, the ﬁnal task is doomed to fail no
+          Speciﬁcally, to succeed in VLN, an agent must compre-     matter how accurate the subsequent planning is. Such a se-
+        hend the language instruction, ground it into the partially-      quential dependency requires the agent to closely monitor
+
+
+                                                         1
+=== PDF PAGE 2 ===
+its progress and ensure it is staying on the right track when     milestone checker proactively — before the agent executes
+carrying out a long-horizon task.                                         its predicted action — to reject actions that will lead to sub-
+  At ﬁrst glance, this challenge may seem trivial if the lan-      task failures. For instance, we reject the action of taking a
+guage instruction is detailed enough (like in Figure 1), such     “sponge” if the milestone object is “fork” (Figure 2).
+that it already deﬁnes the subtasks and their order. How-     We validate M-TRACK on ALFRED [46], a recently
+ever, as shown in the literature [4, 20, 30, 47, 54, 61] and      released large-scale VLN dataset for common household
+our experiments, an agent fed with detailed instructions still      tasks. The tasks in ALFRED are considered long-horizon
+frequently skips subtasks, or wanders around within a sub-     because on average each task needs 50 actions to com-
+task even when it is already completed. In essence, what an      plete.  In contrast, another popular dataset R2R [1] needs
+agent truly struggles with is the lack of awareness of where     only 5. We integrate M-TRACK into two baseline VLN
+it currently is in the long subtask sequence and how much     models LSTM [46] and VLN⟳BERT [18], and demonstrate
+progress it has made within a subtask.                         notable and consistent performance gains. When tested in
+                                                          seen environments, M-TRACK leads to 16%–57% relative  To address this issue, we propose to equip VLN agents
+                                                      improvement in success rate. In more challenging unseenwith an explicit task tracker, which keeps track of the
+                                                            environments, the relative gain increases to 33%–52%. Ouragent’s progress within a subtask and guides it for when to
+                                                                ablation studies and qualitative results further verify that themove on to the next. Concretely, we propose the concept of
+                                                      improvement indeed comes from agents able to better fol-milestone, which renders the necessary condition of com-
+                                                     low the sequence of subtasks and stay on the right track.pleting a subtask. Namely, for a subtask to be considered as
+completed, the milestone must be reached. Take the subtask
+“take a cold potato out of the fridge” in Figure 1 as exam-     2. Related Work
+ple. To complete it, the necessary condition is that the agent
+                                     VLN datasets. Signiﬁcant efforts have been devoted to cre-
+must see the potato and the fridge, be close enough to them,
+                                                                 ating simulated environments and datasets for VLN, where
+and perform an interaction action with the potato. We argue
+                                                          a virtual agent has egocentric perception of the environment
+that by explicitly extracting such milestones from the in-
+                                                      and takes actions to navigate in it [1, 5, 7, 12, 19, 41, 42, 55,
+structions and grounding them to the environment state, we
+                                                                  64].  However, most datasets do not consider interaction
+can systematically determine if the agent should continue
+                                                                actions with objects, signiﬁcantly limiting the complexity
+working on the current subtask or proceed to the next.
+                                                              of tasks that an agent can perform. The recent ALFRED
+  To this end, we propose the milestone-based task tracker                                                                 dataset [46] is among the ﬁrst to provide tasks that involve
+(M-TRACK), which consists of two components: milestone                                                          both navigation and interaction actions, providing a more
+builder and milestone checker. The milestone builder ex-                                                             challenging benchmark with much longer task horizons.
+tracts the milestone (i.e., the necessary completion condi-
+                                     VLN models. Most early VLN models follow an LSTM-tion) of each subtask from the corresponding language in-
+                                                         based sequence-to-sequence architecture, taking languagestruction. We model it as a named entity recognition prob-
+                                                      and visual sequences as input and predicting a sequence oflem and train a BERT-CRF tagger [9, 48] to accurately ex-
+                                                                actions [1,11,23,30,46,50]. Because of the recent successtract both the target objects and their action type (i.e., nav-
+                                                              of the Transformer [51] in vision tasks, Transformer-basedigation or interaction). The milestone checker then tries to
+                                                      models are increasingly adopted for VLN [18,27,32,40,49].ground (i.e., identify and localize) the extracted target ob-
+                                                  Our M-TRACK is model-agnostic and is compatible withjects in the perceived environment using an object detection
+                                                      models of both types (cf. §4.3).model [14] and checks if the agent is close enough to them
+and/or is about to interact with them — to decide if the agent     Natural language instructions. ALFRED provides each
+is completing the current subtask and ready to move on. It      task with both a high-level (i.e., goal) instruction and more
+is worth noting that our M-TRACK only needs to access the      detailed low-level instructions. Most previous studies train
+language instructions, the visual input to the agent, and the      the agent with the whole instruction  (i.e., concatenation
+agent’s action, not any internal states of the agent. Thus,     of the high-level and low-level instructions) at each time
+it is model-agnostic and can be easily integrated with any      step [21, 40, 46, 47, 49]. However, for long-horizon tasks
+agent model with minimal changes.                               like those in ALFRED, the low-level instructions can be
+  How can M-TRACK interacts with the agent to affect      quite long (six sentences on average). An agent fed with
+its action (e.g., to not skip a subtask)? We propose two      the whole instruction thus could have difﬁculty digesting
+simple yet effective ways. First, at any time step, we feed      the long instruction and easily lose track of the progress.
+the agent with only the part of the instructions that corre-    M-TRACK helps agents focus their attention on the most
+sponds to the current subtask determined by the milestone      pertinent instruction and reduce distraction.
+tracker. This explicitly guides the agent to focus on the cur-     Step-by-step language guidance.  To address the issues
+rent subtask. Second, and more importantly, we apply the     with long instructions, learning low-level instructions step
+
+
+                                                 2
+=== PDF PAGE 3 ===
+                                 t=8                        t=10                         t=12                       t=13                          t=14
+
+                                         Label: sink                             Label: sink
+                                                                                                                                   Label:                                                                                                                                             sink
+                                   Reachability: False                       Reachability: False                                                                                                                                                                          Reachability: True                                                                                                                                  Reachability:                                                                                                                               True
+                                                                                                                                                                        Label: fork
+
+                                                                                                                 ...                                                                ...                                          Label: sponge
+                                                                                                                                                           Reachability: True
+                                                                                                                                                                                                        Label: fork
+                                                                                                                                                                                                              Reachability: True
+
+
+
+     Predicted Actions                  MoveAhead               MoveAhead                  RotateRight                (Pickup, sponge)
+                                                                                                                                         (Pickup, fork)
+
+   Milestone Checking                  False                        False                        True                         False                       True
+
+           Milestones                                   (navigation, sink)                                                            (interaction, fork)
+
+Low-level Instructions                            "Turn and go to the sink"                                "Pick up fork from sink, to the right of the green sponge"
+
+Figure 2. Overview of the milestone checking process. Milestones are extracted from the current low-level instruction by our milestone
+builder (§4.1.1). After an action is predicted, our milestone checker (§4.1.2) examines, based on objects with reachability information (text
+in images) from its object detector, if the resultant state satisﬁes the milestone. Only when the milestone is satisﬁed, the next low-level
+instruction is provided to the agent. The agent is prevented from picking up a wrong object (sponge) by our proactive checking (§4.2).
+
+by step has been explored in several prior studies [8,17,35,     Figure 1. A VLN task can thus be represented by a tuple
+61,63]. BabyWalk [63] learns the low-level instruction step      (I, E, G), in which G is the goal test of the task.
+by step using curriculum learning. HiTUT [61] decomposes        For an agent to perform the task, it will be placed in the
+the whole instruction into hierarchical sub-problems and     environment E and have a certain pose at time step t, from
+learns sequentially with a hierarchical task network. Con-     which it can receive a visual input vt. Based on vt and the
+current to this work, FILM [35] decomposes the instruction      instruction I, the agent then predicts an action at, which
+into subtasks and learns them sequentially with the help of a     can either be a navigation one that changes the agent’s pose
+semantic map. M-TRACK shares a similar rationale. How-       (e.g., MoveAhead) or an interaction one that interacts with
+ever, M-TRACK is notably different from existing meth-      the environment (e.g., PickupObject). The agent also needs
+ods, especially regarding when to feed the next low-level      to predict a binary mask for the target object if it predicts
+instruction during test time.   First, M-TRACK explicitly     an interaction action. Both types of actions can potentially
+and systematically checks the agent’s progress, during both     change the visual input vt+1 of the next time step. The agent
+training and test time, by 1) deﬁning the completion con-      will stop when it believes the task has been completed. The
+dition, i.e., the milestone, of each subtask and 2) verifying     ﬁnal state of the environment is then compared with the goal
+the milestone by grounding it into the environment via a      state G to determine task completion.
+visual object detector. In contrast, existing methods either        Following ALFRED, we discretize an agent’s action
+train a binary classiﬁer to determine subtask completion [7],     space into 5 navigation action (MoveAhead, RotateRight, Ro-
+or simply set an upper bound for the number of actions to       tateLeft, LookUp, and LookDown), 7 interaction actions (Pick-
+execute within each subtask [61, 63], or only checks if the      upObject, PutObject, OpenObject, CloseObject, ToggleOnObject,
+agent needs to stop using a separate module [57]. As will      ToggleOffObject, and SliceObject), and 1 stop action (Stop).
+be seen in §5, M-TRACK notably outperforms these meth-
+                                                   Agent model.  Without loss of generality, we deﬁne an
+ods in tracking the agent’s progress and feeding the right
+                                                            agent model as at = f(vt, It, ht), where ht is the mem-instruction. Second, M-TRACK also proactively guides the
+                                                          ory from the previous time steps (e.g., the hidden state of
+agent for better action prediction, creating another gain in
+                                                       an LSTM). at is a tuple (action, object mask); the mask is nullperformance (cf. §4.2). Finally, M-TRACK is not embedded
+                                                                   for stop and navigation actions. It is the instruction input atin any speciﬁc VLN model; it is model-agnostic and can be
+                                                          time t, which can be the entire I or a portion of it.
+easily integrated into different VLN models (cf. §4.3).
+
+3. VLN Background                                   4. Milestone-based Task Tracker (M-TRACK)
+
+  A VLN task is generally deﬁned as follows: given a lan-        For long-horizon VLN tasks, an agent needs to complete
+guage instruction I, an agent needs to infer and perform     multiple subtasks, usually in a speciﬁc order, to complete
+a sequence of actions {a0, a1, · · · , at, · · · } in the environ-      the whole task. More speciﬁcally, each low-level instruction
+ment E to complete the task. In datasets like ALFRED [46],      in IL can be seen as a subtask. Agents then have to decide,
+the instruction I is composed of a high-level instruction IH      often implicitly, which subtask it is doing at each time step
+and a list of low-level instructions IL, as exempliﬁed in     and when to move on to the next subtask, which itself is
+
+
+                                                 3
+=== PDF PAGE 4 ===
+a challenging problem for the agent. To address that, we                Target Type   Val Seen   Val Unseen
+introduce an auxiliary module, milestone-based task tracker                  Navigation     90.16       90.62
+(M-TRACK), to explicitly and interactively guide the agent                    Interaction     96.85       97.17
+to make such decisions (see Figure 2 for an overview).
+   Next, we ﬁrst introduce the design of M-TRACK (§4.1),      Table 1. F1 score of milestone builder on ALFRED validation.
+followed by how to integrate it with agent models (§4.2).
+We then introduce two base agent models (§4.3) and how to     soap up from the back of the toilet”, the milestone builder
+train the base models with reinforcement learning (§4.4).       should output (interaction, soap).
+                                                           For an interaction milestone, it should contain the target
+4.1. Design of M-TRACK                                     objects that the agent is going to newly interact with in the
+                                                                current subtask. For instance, if the subtask is “Put down
+  The core functionality of M-TRACK is to decide when an
+                                                                the potato on the counter” (Figure 1), the agent is supposed
+agent should move on to the next subtask. On the surface,
+                                                                   to already be holding a potato (from previous subtasks).
+this may be done simply by training a (binary) classiﬁer,
+                                                          Thus, “potato” is not a milestone target for the current sub-
+which takes all the language/visual signals as input. Do-
+                                                                task but “counter” should be. For a subtask that has multi-
+ing so, however, does not exploit the fact that the (sub)tasks
+                                                                ple objects to be interacted with, the builder is designed to
+are compositional, composed of entities (e.g., objects) that
+                                                                tag all of them. For instance, in the subtask “Grab a potato
+are identiﬁable and localizable both in the environment and
+                                                        from the fridge” (Figure 1), the agent needs to 1) open the
+in the instruction. Leveraging the compositional nature of
+                                                                     fridge, 2) pick up the potato, and 3) close the fridge.  In
+the (sub)tasks has multiple advantages. First, it reduces the
+                                                                        this case, the builder tags both the potato and the fridge as
+input space for making the decision from the space of lan-
+                                                                the targets for an interaction milestone.  In cases that the
+guage/visual signals to that of discrete entities. Second, it
+                                                                 builder does not extract any target from the current subtask,
+makes the decision rule systematic and explainable: we can
+                                                                                             it will merge the current subtask with the next one and use
+make the decision by directly comparing the entities de-
+                                                                the milestone extracted from the next subtask.
+tected in both modalities. Both of them could improve the
+                                                           Without loss of generality, we adopt a BERT-CRF model
+generalizability of the decision function.
+                                                                        [9, 48] for the milestone builder, and train it with data de-
+  We design M-TRACK to explicitly consider the compo-
+                                                                rived from the ALFRED training data.  Training data is
+sitional nature of (sub)tasks. Speciﬁcally, we introduce the
+                                                           prepared using the metadata from the ALFRED simulator.
+concept of milestone, which is the necessary condition for
+                                                More details are in the supplementary materials. We show
+completing a subtask, i.e., an agent must reach the mile-
+                                                                     that our milestone builder reaches a fairly high F1 score (see
+stone in order for the corresponding subtask to be consid-
+                                                           Table 1). More analysis will be discussed in §5.3.2.
+ered as completed. For example, if the subtask is “move to
+the mug”, then the agent must navigate to the mug, see it,
+and be close enough to the it. If the subtask is “pick up the      4.1.2  Milestone Checker
+mug”, then the agent must see the mug, be close enough
+                                        We introduce a milestone checker that determines  if anto it so that it can then interact with it. These two exam-
+                                                            agent has reached a milestone (see Figure 2). Speciﬁcally,ples render the key ingredients of a milestone, which are
+                                             we design it to be explicit: we directly estimate the state ofits target entities and its type (navigation or interaction).
+                                                                the agent/environment from the visual input and compareMeanwhile, we say an agent has reached a milestone only
+                                                                                             it with the milestone. A navigation milestone is reached ifwhen it can perceive (see) the target entities, is already close
+                                                                the target object is detected in the visual input and locatedto them, and is doing the right type of action with them.
+                                                             within a reachable distance to the agent (1.5 meters in AL-
+  To this end, we represent a milestone by a tuple (type,
+                                                  FRED). An interaction milestone is reached with an extra
+target), and decompose our M-TRACK into two components:
+                                                                condition: the agent has to interact with the target.
+1) a milestone builder which constructs milestones from the
+low-level instructions IL, and 2) a milestone checker that     State estimation. We train an object detector using data
+checks if a milestone has been reached by an agent.           from the ALFRED simulator that can not only localize and
+                                                                   identify all 116 ALFRED object classes but also estimate
+                                                                       their reachability (i.e., within 1.5m or not). We build upon
+4.1.1  Milestone Builder                                                                the Mask R-CNN model [14] and introduce an additional
+                                                             binary classiﬁcation head for the reachability of each de-We generate the milestone of a subtask according to its cor-
+                                                                 tected object. The ground-truth labels for reachability areresponding low-level instruction in IL using named entity
+                                                            obtained from the ALFRED simulator for training.recognition [9]. For example, given an instruction “Turn
+to the left and face the toilet”, the milestone builder should     Milestone checking. As mentioned earlier, to reach either
+output the tag (navigation, toilet). For the instruction “Pick the     a navigation or an interaction milestone, the target objects
+
+
+                                                 4
+=== PDF PAGE 5 ===
+must be detected and located within a reachable distance.                            [CLS] Put sliced ... [SEP] Pick up apple ...          ObservationsPanoramic
+To check this, we compare the target object names, which                                                                                                         ...
+are extracted from the language instruction (e.g., “kitchen
+island”), to the class labels (e.g., countertop) of the objects                         Multi-Layer Transformer       Mask R-CNN
+detected by Mask R-CNN, essentially a symbol grounding
+                                                                                                                                                        x1                                                                                                                                                             x2      ...     xt                                                                                                                                                         v1     ...  v8     o1     ...                                                                                                                                                                              on
+task. We only consider the detected objects that are esti-                                           St-1                                                                                                                                            Scene                                                                                                                                                                                   Object                                                                                                                                         State                                                                                                         &
+mated to be reachable. We apply an off-the-shelf word sim-                                              Model       Contexts                    Feature                 Feature
+ilarity tool based on Wordnet [10] with WUP [56] similarity                            VLN                Multi-Layer Transformer
+from NLTK [29] to match the target names with the object
+                                                                                                                                                                                  St      x1   x2      ...     xt             Pointer Network
+labels. The reachable object whose label has the highest
+                                                                                                                         Updated            Object/Scene       Navigation
+similarity (above a threshold) to a milestone target is con-                                   State & Contexts         Embedding    zt            Action
+sidered as the grounded instance of that target; the target is                                                 MLP       Interaction
+then marked as a success.                                                                                 Predicted action:  (PickupObject, apple)
+   For interaction milestones, we need to further check if                    M-Track
+the agent is interacting/has interacted with the target. As                            Milestone       (interaction,     Milestone
+deﬁned in §3, an interaction action is a tuple of (action, ob-                               Builder          apple)        Checker
+ject mask); the object mask is simply a binary map over the
+input image. To determine if the agent’s action is for the                                                             (True, PickupObject, apple)
+milestone target, we calculate the intersection-over-union                                                                      Figure 3. Architecture of VLN⟳BERT with M-TRACK.
+(IoU) score between the object mask and the milestone tar-
+get (provided by Mask R-CNN): if the IoU score is over                                                    by asking it to select another (action, object mask) tuple (Fig-
+a certain threshold (0.5), it is considered matched with the                                                             ure 2).  This saves the agent from having to generate an
+target object of the milestone. For an interaction milestone                                                                action sequence for recovery, for example, to put the incor-
+with multiple targets, the agent has to perform multiple                                                                    rectly picked-up object back down.
+interaction actions to interact with all of them. We keep                                                                 In our implementation, if the ﬁrst interaction action is
+a checklist of all the milestone targets. The milestone is                                                                    rejected, we move on to the next action in the agent’s top
+reached after all the targets have been interacted with.                                N list (e.g., from a softmax classiﬁer). We iterate over the
+                                N actions until we ﬁnd an interaction action whose mask
+4.2. Planning with M-TRACK
+                                                       matches with the milestone target or we ﬁnd a navigation
+  The discussion of M-TRACK so far is detached from the      action instead (e.g., when the right object is not in sight).
+agent. The next question is, how can M-TRACK affect an       If none of those happens, the agent will take its top ranked
+agent’s actions, e.g., to prevent it from skipping a subtask?     navigation action. We set N to be 5 in the experiments.
+We propose two simple yet effective ways.  First, at any
+                                                               4.3. Agent Modelstime step, we feed the agent with only the instruction of the
+current subtask determined by M-TRACK. This explicitly      4.3.1 VLN⟳BERT Baseline
+guides the agent to focus on the current subtask. Speciﬁ-
+                                                              Recently, Transformer-based models are becoming increas-cally in ALFRED, we feed the concatenation of IH and the
+                                                               ingly popular for VLN tasks [40,40,49,61]. Following thisone sentence in IL for the current subtask as opposed to the
+                                                                     line of work, we build upon the VLN⟳BERT [18] modelentire IL. We do so starting from the beginning of a task,
+                                                     which introduces the concept of recurrent state vector intowhen the ﬁrst sentence of IL is guaranteed to be the ﬁrst
+                                                                the Transformer architecture. Since VLN⟳BERT was de-subtask. We then proceed to the next sentence only after
+                                                            signed for the R2R dataset, which contains mostly short-the current subtask is marked as completed by M-TRACK.
+                                                            horizon navigation tasks, we adapt it for ALFRED with aThe use of M-TRACK frees the agent from solely relying
+                                                                    series of modiﬁcations. Input-wise, we utilize a pre-trainedon its internal mechanism like attention and hidden states to
+                                                                vision encoder1 to extract a scene feature from 8 panoramicdecide subtask switching.
+                                                        views and also object features from each view as our vi-   Second, we apply the milestone checker proactively for
+                                                                sual input. For action prediction, unlike VLN⟳BERT thatinteraction milestones — before the agent executes its pre-
+                                                          only deals with navigation actions, we employ a pointer net-dicted action. This can prevent an agent from interacting
+                                                   work [52] to choose between navigation, interaction, andwith a wrong object, as opposed to trying to correct the mis-
+                                                              stop actions: if the pointer network chooses a scene feature,take after it has happened. For example, if the milestone is
+                                                            agent outputs the navigation actions needed to navigate to(interaction, fork) but the agent’s predicted binary mask for
+interaction does not overlap with the grounded instance of         1For simplicity, we use the same Mask R-CNN model that is used in
+fork in the image, M-TRACK will reject the agent’s action      our milestone checker, but it is not necessary.
+
+
+                                                 5
+=== PDF PAGE 6 ===
+that scene; if it chooses an object feature, agent outputs the      tasks.  ALFRED  consists of 8,055 expert demonstra-
+mask for that object, and additionally use an MLP to pre-      tions annotated with 25,743  natural language  instruc-
+dict the interaction action type; if it chooses a stop feature      tions.  The standard training/validation/test splits contain
+(added to the list of visual features as an all-zero vector),     21,023/1,641/3,062 examples, respectively. The validation
+agent outputs Stop. The MLP takes the concatenation of the     and test sets are further split into 1) a seen set where the en-
+chosen object feature and the updated state embedding as     vironments have been seen during training and 2) an unseen
+input. The architecture as well as its integration with M-      set that contains new environments. The validation/test sets
+TRACK is illustrated in Figure 3, and more implementation     include 820/1,533 seen and 821/1,529 unseen examples.
+details are provided in the supplementary materials.
+                                                        Evaluation metrics. We report the three main metrics used
+                                                    by the ALFRED leaderboard. Success Rate (SR): a binary
+4.3.2 LSTM Baseline                                                                  indicator of whether all subtasks were completed.  Path-
+                                                       Length Weighted Success Rate (PLWSR): SR weightedTo further show the model-agnostic nature of our M-
+                                                    by (expert demonstration path length)/(agent path length).TRACK, we use the LSTM baseline introduced in ALFRED
+                                                          Goal-Condition Success Rate (GC): ratio of completed[46], and extend the architecture with the same pre-trained
+                                                                 goal-conditions.2 We note that success rate on the unseenvision encoder used in VLN⟳BERT. Furthermore, to lever-
+                                                                           test set is considered the primary metric for ranking becauseage the power of the pre-trained vision encoder, we follow
+                                                      models are prone to memorizing the seen environments and[40, 47] and ask our agent to select an object from the de-
+                                                               often fail to generalize to unseen environments.tected objects instead of directly predicting a binary mask.
+The corresponding pixel mask is retrieved from the selected                                                  Models for comparison. We denote the base models de-
+object. Refer to supplementary materials for details.                                                               scribed in §4.3.1 and §4.3.2 as VLN⟳BERT and LSTM, re-
+                                                                    spectively. To improve their competence on ALFRED, we
+4.4. Learning
+                                                                   further augment them with 1) pre-training their vision en-
+  As shown in the ALFRED paper [46], base models like     coder on ALFRED images, and 2) reinforcement learning
+the LSTM performs rather poorly on ALFRED when sim-      (§4.4). We denote the enhanced models as VLN⟳BERT-L
+ply trained with behavior cloning.  Prior studies on other     and LSTM-L, indicating their improved capability for long-
+VLN tasks have demonstrated the importance of reinforce-     horizon tasks. Finally, we integrate each of them with M-
+ment learning (RL) [18,50,63], but its effectiveness has not    TRACK. Even though the focus of our evaluation is to test
+been validated on ALFRED. We train the models with a      the effectiveness of M-TRACK on improving different base
+combination of behavior cloning (using the cross-entropy     models, we still compare our results with other methods that
+loss between the predicted action sequence and the ground      are already published.  Please refer to the supplementary
+truth), object feature selection loss (for interaction actions),      materials for implementation details.
+and RL. We apply the A2C algorithm [37] which, at time
+t, samples an action at according to agent’s predicted log
+probability distribution log(pat ), and measures the advan-     5.2. Main Results
+tage for that action advt with a critic network and a re-
+                                          We summarize the main results on the ALFRED test setward. We consider four different types of reward: 1) the
+                                                                   in Table 2.  First of all, the results show that both of ourstraight line distance between the agent and the current nav-
+                                                          base models are highly competitive, performing on par origation/interaction target, 2) the interaction action match-
+                                                                    better than many recent VLN models such as E.T., LWIT,ing with the ground-truth interaction action which we can
+                                                      and HiTUT. On top of that, M-TRACK is highly effectivecompute from the environment state, 3) the visibility of the
+                                                                   in improving both base models: it improves the unseen SRtarget, i.e., whether the target is reachable (within 1.5m in
+                                                              of LSTM-L and VLN⟳BERT-L by 4.6% and 4.1% abso-ALFRED) and is in sight by the agent, and 4) the ﬁnal task
+                                                                     lute (53% and 33% relative). Finally, VLN⟳BERT-L + M-success.  Following VLNBERT [18], we combine behav-
+                                           TRACK performed as much as the best published method,ior cloning loss, cross-entropy loss for object selection and
+                                           HLSM, on unseen SR (main metric), better on PLWSR forA2C.
+                                                          both seen and unseen, similarly on seen SR. The higher seen
+                                                      and unseen PLWSR indicate that our method successfully5. Evaluation
+                                                         reduced the path length by focusing on the current subtask
+5.1. Experimental Setup                                      to complete the task.
+
+ALFRED. We validate our approach on the ALFRED [46]
+dataset which evaluates an agent’s language-guided nav-         2For example in Fig. 1, there are 3 goal conditions: a potato is heated,
+igation and interaction  abilities for common household      a potato is on the counterop, and a heated potato is on the counter.
+
+
+                                                 6
+=== PDF PAGE 7 ===
+                                                         Test Unseen                       Test Seen
+             Model
+                                  SR    PLWSR   GC     SR    PLWSR   GC
+
+         MOCA [47]                      5.30        2.72       14.28     22.05      15.10      28.29
+           LAV [39]                        6.38        3.12       17.27     13.35       6.31       23.21
+           EmBERT [49]                    7.52        3.58       16.33     31.77      23.41      39.27
+                 E.T. [40]                         8.57        4.10       18.56     38.42      27.78      45.44
+            LWIT [38]                       9.42        5.60       20.91     30.92      25.90      40.53
+            HiTUT [61]                     13.87       5.86       20.31     21.27      11.10      29.97
+           ABP [21]                       15.43       1.08       24.76     44.55       3.88       51.13
+          HLSM [4]                      16.29       4.34       27.24     25.11       6.69       35.79
+
+            LSTM-L                         8.70        4.05       16.97     14.04       7.20       21.73
+            LSTM-L + M-TRACK           13.28       6.25       20.20     22.05      12.83      30.48
+           VLN⟳BERT-L                  12.23       5.60       19.64     21.46      11.56      28.99
+           VLN⟳BERT-L + M-TRACK      16.29       7.66       22.60     24.79      13.88      33.35
+
+         Table 2. Performance on the ALFRED test set. We evaluate M-TRACK on LSTM-L and VLN⟳BERT-L. M-TRACK
+          notably improves all evaluation metrics on both test unseen and seen splits. Note that M-TRACK using VLN⟳BERT-
+       L (or LSTM-L) achieves comparable gains to other existing methods. Bold refers to the highest score and underline
+           refers to the second highest score.
+
+                LSTM-L      VLN⟳BERT-L          checking, we compare the passive checking and proac-
+     Train/Test   −    +    −    +             tive checking strategies discussed in §4.1.2.  As shown
+    −          9.37     10.48     10.35     13.29           in Table 4, proactive checking performs better than pas-
+    +         12.20     15.83     13.17     17.29          sive checking, suggesting that preventing a wrong action
+                                                        from happening is more preferable than correcting the mis-
+Table 3. Unseen SR on ALFRED validation set with (+) or     take afterwards.  In contrast to our milestone checking,
+without (−) M-TRACK during training and/or test.  For ex-                                                                   prior work [7] has proposed a binary classiﬁer to check
+ample, the 17.29 cell indicates when M-TRACK is integrated into
+                                                                the completeness of current instruction. To compare withVLN⟳BERT-L during both training and test.
+                                                                          that, we implement a binary classiﬁer using an MLP condi-
+                                                              tioned on the hidden state (LSTM-L) or the state encoding5.3. Fine-grained Analyses
+                                              (VLN⟳BERT-L) that predicts if the current milestone has
+5.3.1  When to Apply M-TRACK?                        been reached. While it also helps, our milestone checking
+                                                                  strategy is still advantageous by a large margin. Finally, we
+The ﬂexibility of M-TRACK makes it possible to be applied
+                                                                also estimate an upper bound for M-TRACK using ground-
+at training time, test time, or both. In Table 3, we show that
+                                                                     truth milestones from the environment instead of our mile-
+M-TRACK is already beneﬁcial when applied only during
+                                                              stone builder. While the results still show a decent room for
+training or test time, but the gain is most signiﬁcant when it
+                                                        improvement, the gap is not dramatic, indicating that our
+is applied during both training and test, suggesting that M-
+                                                            milestone builder is reasonably accurate, echoing Table 1.
+TRACK may be helping the base models in different ways
+during different phases.
+                                                               5.4. Case Studies
+
+5.3.2  Ablation Studies                                          We compares VLN⟳BERT-L (top) with VLN⟳BERT-
+Table 4 shows the effectiveness of different components.     L + M-TRACK (bottom) on two validation examples (left
+                                                      and right) to show the importance of M-TRACK (see Fig-
+Reinforcement learning. We show that RL, with our re-                                                             ure 4). First, VLN⟳BERT-L (top-left) skips the current in-
+ward design, dramatically improves the performance of
+                                                                   struction without completing it (“take the egg out from the
+both base models, especially in unseen environments. This
+                                                                  fridge”), showing its limitation on the long-horizon task. In
+clearly demonstrates the importance of RL for long-horizon                                                                    contrast, VLN⟳BERT-L + M-TRACK  (bottom-left) com-
+VLN tasks. While similar ﬁndings have been discussed for
+                                                                   pletes all subtasks and eventually completes the whole task.
+tasks with shorter horizons like R2R [18, 50, 63], we are                                                         Second, VLN⟳BERT-L (top-right) chooses the wrong ob-
+among the ﬁrst to validate its importance on ALFRED.
+                                                                        ject pencil instead of the correct object pen. The agent may
+Pre-training object detector on ALFRED. The default                                                       be confused between the two objects since “pencil” also
+Mask R-CNN model is pre-trained on COCO [28]. We con-                                                            appears in the current instruction and indeed is semanti-
+tinue pre-training  it on ALFRED (ALFRED-OD), which                                                                   cally/visually similar to a pen. In contrast, VLN⟳BERT-L
+further improves the performance.                                              + M-TRACK (bottom-right) correctly performs the interac-
+Different milestone checking strategies.  For milestone      tion task because of proactive milestone checking.
+
+
+                                                 7
+=== PDF PAGE 8 ===
+                                           Component                          Val Unseen      Val Seen
+   Model
+                    RL  ALFRED-OD   Binary   Passive   Proactive  GT   SR   GC   SR   GC
+
+  LSTM                                                                                   1.82    3.09    9.26    11.09
+
+                                                                                             8.03    9.83    11.88   17.75
+   LSTM-L                                                                                  9.37    12.56   15.00   18.37
+                                                                                          10.83   13.39   17.68   20.46
+                                                                                          15.22   18.88   20.97   24.73
+   LSTM-L + M-TRACK                                                                    15.83   20.34   21.70   25.45
+                                                                                          20.36   30.79   25.12   31.41
+   VLN⟳BERT                                                                            3.66    7.19    14.51   20.11
+
+                                                                                             9.37    16.42   16.83   23.12
+   VLN⟳BERT-L                                                                          10.35   18.94   21.32   25.67
+                                                                                          14.85   22.13   22.92   28.90
+                                                                                          17.05   27.37   25.48   32.07
+   VLN⟳BERT-L + M-TRACK                                                               17.29   28.98   26.70   33.21
+                                                                                          24.38   39.34   31.95   46.27
+
+
+   Table 4. Ablation studies on the validation set. RL: Reinforcement learning. ALFRED-OD: Mask R-CNN object detector pre-
+   trained on ALFRED training images. Binary: Binary milestone classiﬁer. Passive: Milestone checking after an action is executed.
+   Proactive: Milestone checking before an action is executed. GT: M-TRACK with ground-truth milestones (an upper bound).
+
+
+          Goal:               "Heat                    an                      egg                         up and                  Goal: "Put                                                              a mug                                                                    with a pen in it          tion assumes divisible language instructions corresponding            put it               back in                          the                              fridge"                                                       on                                                                      the desk"
+      No M-Track            Path Deviation            No M-Track           Wrong Object         to subtasks.  It is worth mentioning that prior work (e.g.,
+                                                  BabyWalk [63]) does try a similar task decomposition idea
+                                                    on the R2R dataset and shows promising results, and we
+                                                                believe M-Track could be adapted similarly, though it is a
+                                                                     less interesting setting for our purpose because of the short
+                             Skips                                    picking                                     up egg and                                       Picks                                                                                     up                                                                                                           pencil
+                         moves                                         to the microwave                                                                                                   instead                                                                                                        of                                                                                            pen         horizons. Nonetheless, in more general, realistic settings,
+      With M-Track          Open Fridge               With M-Track             Pickup Pen          accurate milestone building will likely be more challenging,
+                                                                 especially when milestones are implicit (e.g., “fetch a cold
+                                                              beer”). One interesting direction is to discover milestones
+                                                    by inductive reasoning over training instances instead of
+                                                                 solely from language instructions.  Event process mining
+    (navigation, fridge)      (interaction, {egg, fridge})                        (interaction, pen)              techniques [60] could potentially be leveraged to discover
+    "Open             the fridge                   and                          take                                the egg out           "Pick up                                                                the                                                         pen                                                          on the                                                                            desk,                                                                        between         that “fetch a cold X” generally entails going to a fridge and          and               then close                           the                            door"                                                             the                                                             clock                                                            and                                                                           the                                                                              pencil"
+                                                               fetching X (e.g., “beer”) from it.
+            Figure 4. Case studies for M-TRACK.              Assumptions in milestone checker. To date, most VLN
+                                                                 tasks are declarative.  Milestone/goal checking thus can
+6. Discussion and Conclusions                       be done by checking solely against the environment state.
+                                                         For procedural instructions (e.g., “turn around twice”) the
+  We introduce a novel milestone-based task tracker (M-                                                            milestone checker may need to check against the agent’s
+TRACK) for vision-and-language navigation (VLN) and                                                                action history, though such instructions are rare in existing
+show that explicit milestone detection and checking signiﬁ-                                                                    datasets.
+cantly beneﬁts long-horizon VLN tasks such as those in AL-                                                   Non-unique golden trajectories. Though uncommon in
+FRED [46]. Our empirical results show the effectiveness of                                            ALFRED, in more complex tasks and/or environments,
+M-TRACK with two strong baseline models. In summary,                                                                 there could exist multiple viable trajectories (e.g., different
+this work clearly demonstrates the importance of explicit                                                             execution orders of subtasks leading to the same goal state)
+progress monitoring (as opposed to, e.g., resorting to a sin-                                                                   to complete a task. Currently milestones are assumed to be
+gle policy network for both planning and implicit progress                                                          hard constraints that an agent has to achieve in order to pro-
+monitoring), especially for long-horizon tasks. To make the                                                              ceed.  It may be helpful to (learn to) soften the constraints
+point, we propose one instantiation with reference to the                                                      imposed by milestones to provide more ﬂexibility.
+conditions in ALFRED, and different (or more generic) in-
+stantiations for different conditions can be explored in the                                         Acknowledgement
+future. We note the following limitations of the current de-
+sign that warrant further development:                       The authors would like to thank the colleagues from the
+Assumptions in milestone builder. Our current instantia-   OSU NLP group for their thoughtful comments. This re-
+
+
+                                                 8
+=== PDF PAGE 9 ===
+search was supported in part by NSF OAC 2118240 and           and-language navigation via pre-training.  In CVPR, 2020.
+NSF OAC 2112606.  J. Kil, T. Pan, and W. Chao are also         12
+partially supported by NSF IIS 2107077 and the OSU GI      [14] Kaiming He, Georgia Gkioxari, Piotr Doll´ar, and Ross Gir-
+Development funds.                                                        shick. Mask r-cnn. In ICCV, 2017. 2, 4, 12, 14, 15
+                                                                     [15] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
+References                                               Deep residual learning for image recognition.  In CVPR,
+                                                                     2016. 12, 14
+ [1] Peter Anderson, Qi Wu, Damien Teney, Jake Bruce, Mark      [16] Yicong Hong, Cristian Rodriguez-Opazo, Yuankai Qi, Qi
+     Johnson, Niko S¨underhauf, Ian Reid, Stephen Gould, and         Wu, and Stephen Gould.   Language and visual  entity
+    Anton Van Den Hengel.  Vision-and-language navigation:            relationship graph for agent navigation.   arXiv preprint
+      Interpreting visually-grounded navigation instructions in real           arXiv:2010.09304, 2020. 12
+     environments. In CVPR, 2018. 1, 2, 12, 15                       [17] Yicong Hong,  Cristian Rodriguez-Opazo, Qi Wu,  and
+ [2] Valts Blukis, Nataly Brukhim, Andrew Bennett, Ross A          Stephen Gould. Sub-instruction aware vision-and-language
+     Knepper, and Yoav Artzi. Following high-level navigation            navigation. arXiv preprint arXiv:2004.02707, 2020. 3, 12
+      instructions on a simulated quadcopter with imitation learn-      [18] Yicong Hong, Qi Wu, Yuankai Qi,  Cristian Rodriguez-
+      ing. arXiv preprint arXiv:1806.00047, 2018. 12                    Opazo, and Stephen Gould. A recurrent vision-and-language
+ [3] Valts Blukis, Ross A Knepper, and Yoav Artzi.  Few-shot            bert for navigation. In CVPR, 2021. 2, 5, 6, 7, 12, 13, 15
+     object grounding and mapping for natural language robot in-      [19] Vihan  Jain,  Gabriel Magalhaes,  Alexander Ku,  Ashish
+      struction following. arXiv preprint arXiv:2011.07384, 2020.          Vaswani, Eugene Ie, and Jason Baldridge. Stay on the path:
+    12                                                                       Instruction ﬁdelity in vision-and-language navigation. arXiv
+                                                                             preprint arXiv:1905.12255, 2019. 1, 2, 12 [4] Valts Blukis, Chris Paxton, Dieter Fox, Animesh Garg, and
+    Yoav Artzi. A persistent spatial semantic representation      [20] Liyiming Ke, Xiujun Li, Yonatan Bisk, Ari Holtzman, Zhe
+      for high-level natural language instruction execution. arXiv          Gan, JJ (Jingjing) Liu, Jianfeng Gao, Yejin Choi, and Sid-
+     preprint arXiv:2107.05612, 2021. 2, 7, 12                            dhartha Srinivasa. Tactical rewind: Self-correction via back-
+                                                                            tracking in vision-and-language navigation. In CVPR, 2019. [5] Howard Chen, Alane Suhr, Dipendra Misra, Noah Snavely,
+                                                              2     and Yoav Artzi. Touchdown: Natural language navigation
+                                                                     [21] Byeonghwi Kim, Suvaansh Bhambri, Kunal Pratap Singh,     and spatial reasoning in visual street environments. In CVPR,
+                                                             Roozbeh Mottaghi, and Jonghyun Choi. Agent with the big     2019. 1, 2
+                                                                                 picture: Perceiving surroundings for interactive instruction
+ [6] Kevin Chen, Juan Pablo de Vicente, Gabriel Sepulveda, Fei
+                                                                            following. In Embodied AI Workshop CVPR, 2021. 2, 7, 12
+     Xia, Alvaro Soto, Marynel V´azquez, and Silvio Savarese. A
+                                                                     [22] Eric Kolve, Roozbeh Mottaghi, Winson Han, Eli VanderBilt,
+     behavioral approach to visual navigation with graph local-
+                                                              Luca Weihs, Alvaro Herrasti, Daniel Gordon, Yuke Zhu, Ab-
+      ization networks.  arXiv preprint arXiv:1903.00445, 2019.
+                                                                       hinav Gupta, and Ali Farhadi. AI2-THOR: An Interactive 3D
+    12
+                                                                  Environment for Visual AI. arXiv, 2017. 15
+ [7] Abhishek Das, Samyak Datta, Georgia Gkioxari, Stefan Lee,
+                                                                     [23] Shuhei Kurita and Kyunghyun Cho.  Generative language-
+     Devi Parikh, and Dhruv Batra. Embodied question answer-
+                                                                  grounded policy  in vision-and-language navigation with
+      ing. In CVPR, 2018. 1, 2, 3, 7
+                                                                       bayes’ rule. arXiv preprint arXiv:2009.07783, 2020. 2, 12
+ [8] Abhishek Das, Georgia Gkioxari, Stefan Lee, Devi Parikh,
+                                                                     [24] John D. Lafferty, Andrew McCallum, and Fernando C. N.
+     and Dhruv Batra.  Neural modular control for embodied
+                                                                                 Pereira. Conditional random ﬁelds: Probabilistic models for
+     question answering. In Conference on Robot Learning, 2018.                                                                    segmenting and labeling sequence data.  In Proceedings of
+    3                                                                            the Eighteenth International Conference on Machine Learn-
+ [9] Jacob Devlin, Ming-Wei Chang, Kenton Lee, and Kristina                                                                                 ing, ICML ’01, page 282–289, San Francisco, CA, USA,
+     Toutanova.     Bert:   Pre-training  of deep  bidirectional                                                                     2001. Morgan Kaufmann Publishers Inc. 12
+     transformers for language understanding.  arXiv preprint                                                                     [25] Jialu Li, Hao Tan, and Mohit Bansal. Improving cross-modal
+     arXiv:1810.04805, 2018. 2, 4, 12, 14                                                                      alignment in vision language navigation via syntactic infor-
+[10] Christiane Fellbaum.   WordNet:  An Electronic Lexical           mation. arXiv preprint arXiv:2104.09580, 2021. 12
+     Database. Bradford Books, 1998. 5                             [26] Juncheng Li, Xin Wang, Siliang Tang, Haizhou Shi, Fei Wu,
+[11] Daniel Fried, Ronghang Hu, Volkan Cirik, Anna Rohrbach,           Yueting Zhuang, and William Yang Wang. Unsupervised re-
+     Jacob  Andreas,  Louis-Philippe Morency,  Taylor  Berg-           inforcement learning of transferable meta-skills for embod-
+     Kirkpatrick, Kate Saenko, Dan Klein, and Trevor Darrell.            ied navigation. In CVPR, 2020. 12
+     Speaker-follower models for vision-and-language naviga-      [27] Xiujun Li, Chunyuan Li, Qiaolin Xia, Yonatan Bisk, Asli
+      tion. arXiv preprint arXiv:1806.02724, 2018. 2, 12, 14                Celikyilmaz, Jianfeng Gao, Noah Smith, and Yejin Choi.
+[12] Daniel Gordon, Aniruddha Kembhavi, Mohammad Raste-          Robust navigation with language pretraining and stochastic
+      gari, Joseph Redmon, Dieter Fox, and Ali Farhadi.  Iqa:           sampling. arXiv preprint arXiv:1909.02244, 2019. 2, 12
+     Visual question answering in interactive environments.  In      [28] Tsung-Yi Lin, Michael Maire, Serge Belongie, James Hays,
+    CVPR, 2018. 1, 2                                                       Pietro Perona, Deva Ramanan, Piotr Doll´ar, and C Lawrence
+[13] Weituo Hao, Chunyuan Li, Xiujun Li, Lawrence Carin, and            Zitnick.  Microsoft coco: Common objects in context.  In
+     Jianfeng Gao. Towards learning a generic agent for vision-        ECCV, 2014. 7
+
+
+                                                 9
+=== PDF PAGE 10 ===
+[29] Edward Loper and Steven Bird.   Nltk: The natural lan-          Aditya Khosla, Michael Bernstein, Alexander C. Berg, and
+     guage toolkit. In Proceedings of the ACL Workshop on Ef-           Li Fei-Fei. ImageNet Large Scale Visual Recognition Chal-
+      fective Tools and Methodologies for Teaching Natural Lan-            lenge. IJCV, 2015. 15
+     guage Processing and Computational Linguistics. Philadel-      [45] Nikolay Savinov, Alexey Dosovitskiy, and Vladlen Koltun.
+     phia: Association for Computational Linguistics, 2002. 5             Semi-parametric topological memory for navigation. arXiv
+[30] Chih-Yao Ma, Jiasen Lu, Zuxuan Wu, Ghassan AlRegib,            preprint arXiv:1803.00653, 2018. 12
+     Zsolt Kira, Richard Socher, and Caiming Xiong.   Self-      [46] Mohit Shridhar, Jesse Thomason, Daniel Gordon, Yonatan
+     monitoring navigation agent via auxiliary progress estima-           Bisk, Winson Han, Roozbeh Mottaghi, Luke Zettlemoyer,
+      tion. arXiv preprint arXiv:1901.03035, 2019. 1, 2                  and Dieter Fox. ALFRED: A Benchmark for Interpreting
+[31] Chih-Yao Ma, Zuxuan Wu, Ghassan AlRegib, Caiming         Grounded Instructions for Everyday Tasks. In CVPR, 2020.
+     Xiong, and Zsolt Kira. The regretful agent: Heuristic-aided             1, 2, 3, 6, 8, 12, 14
+     navigation through progress estimation. In CVPR, 2019. 1        [47] Kunal Pratap Singh, Suvaansh Bhambri, Byeonghwi Kim,
+[32] Arjun Majumdar, Ayush Shrivastava, Stefan Lee, Peter An-         Roozbeh Mottaghi, and Jonghyun Choi.  Factorizing per-
+     derson, Devi Parikh, and Dhruv Batra.  Improving vision-           ception and policy for interactive instruction following.  In
+     and-language navigation with image-text pairs from the web.         CVPR, 2021. 2, 6, 7, 12, 14
+     In ECCV, 2020. 2, 12                                           [48] F´abio Souza, Rodrigo Nogueira, and Roberto de Alen-
+[33] Bar Mayo, Tamir Hazan, and Ayellet Tal. Visual navigation            car Lotufo. Portuguese named entity recognition using bert-
+     with spatial attention. In CVPR, 2021. 12                                    crf. ArXiv, abs/1909.10649, 2019. 2, 4, 12
+                                                                     [49] Alessandro Suglia, Qiaozi Gao, Jesse Thomason, Govind[34] Drew McDermott, Malik Ghallab, Adele E. Howe, Craig A.
+                                                                                 Thattai, and Gaurav Sukhatme.  Embodied bert: A trans-     Knoblock, Ashwin Ram, Manuela M. Veloso, Daniel S.
+                                                                     former model for embodied, language-guided visual task     Weld, and David E. Wilkins. Pddl-the planning domain def-
+                                                                        completion. arXiv preprint arXiv:2108.04927, 2021.  2, 5,      inition language. 1998. 12
+                                                                                   7, 12
+[35] So Yeon Min, Devendra Singh Chaplot, Pradeep Ravikumar,
+                                                                     [50] Hao Tan, Licheng Yu, and Mohit Bansal. Learning to nav-     Yonatan Bisk, and Ruslan Salakhutdinov.  Film: Follow-
+                                                                                igate unseen environments: Back translation with environ-     ing instructions in language with modular methods.  arXiv
+                                                                     mental dropout. arXiv preprint arXiv:1904.04195, 2019. 1,     preprint arXiv:2110.07342, 2021. 3, 12
+                                                                                   2, 6, 7, 12, 14, 15
+[36] Dipendra Misra, Andrew Bennett,  Valts Blukis, Eyvind
+                                                                     [51] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszko-
+     Niklasson, Max Shatkhin, and Yoav Artzi. Mapping instruc-
+                                                                                                  reit, Llion Jones, Aidan N Gomez, Łukasz Kaiser, and Illia
+      tions to actions in 3d environments with visual goal predic-
+                                                                        Polosukhin. Attention is all you need. In NeurIPS, 2017. 2
+      tion. arXiv preprint arXiv:1809.00786, 2018. 12
+                                                                     [52] Oriol Vinyals, Meire Fortunato, and Navdeep Jaitly. Pointer
+[37] Volodymyr Mnih, Adria Puigdomenech Badia, Mehdi Mirza,
+                                                                        networks. In NeurIPS, 2015. 5, 13
+     Alex Graves, Timothy Lillicrap, Tim Harley, David Silver,
+                                                                     [53] Hanqing Wang, Wenguan Wang, Wei Liang, Caiming Xiong,
+     and Koray Kavukcuoglu. Asynchronous methods for deep
+                                                                 and Jianbing Shen.  Structured scene memory for vision-
+     reinforcement learning. In ICML, 2016. 6
+                                                                     language navigation. In CVPR, 2021. 12, 14
+[38] Van-Quang Nguyen, Masanori Suganuma, and Takayuki
+                                                                     [54] Hanqing Wang, Wenguan Wang, Tianmin Shu, Wei Liang,
+     Okatani.  Look wide and interpret twice: Improving per-
+                                                                 and Jianbing Shen. Active visual information gathering for
+     formance on interactive instruction-following tasks.  arXiv
+                                                                         vision-language navigation. In ECCV, 2020. 1, 2, 12
+     preprint arXiv:2106.00596, 2021. 7, 12
+                                                                     [55] Erik Wijmans, Samyak Datta, Oleksandr Maksymets, Ab-
+[39] Kolby Nottingham, Litian Liang, Daeyun Shin, Charless C                                                                       hishek Das, Georgia Gkioxari, Stefan Lee, Irfan Essa, Devi
+     Fowlkes, Roy Fox, and Sameer Singh.  Modular frame-                                                                            Parikh, and Dhruv Batra. Embodied question answering in
+    work for visuomotor language grounding.  arXiv preprint                                                                                photorealistic environments with point cloud perception. In
+     arXiv:2109.02161, 2021. 7                                                         CVPR, 2019. 1, 2
+[40] Alexander Pashevich,  Cordelia Schmid, and Chen Sun.                                                                     [56] Zhibiao Wu and Martha Palmer. Verb semantics and lexical
+     Episodic transformer for vision-and-language navigation.                                                                                  selection. In ACL, 1994. 5
+     arXiv preprint arXiv:2105.06453, 2021. 2, 5, 6, 7, 12, 14                                                                     [57] Jiannan Xiang, Xin Wang, and William Yang Wang. Learn-
+[41] Xavier Puig, Kevin Ra, Marko Boben, Jiaman Li, Tingwu           ing to stop: A simple yet effective approach to urban vision-
+    Wang, Sanja Fidler, and Antonio Torralba.  Virtualhome:          language navigation. In Findings of the Association for Com-
+     Simulating household activities via programs.  In CVPR,            putational Linguistics: EMNLP 2020, pages 699–707, On-
+     2018. 1, 2                                                                       line, Nov. 2020. Association for Computational Linguistics.
+[42] Michaela Regneri, Marcus Rohrbach, Dominikus Wetzel,         3
+     Stefan Thater, Bernt Schiele, and Manfred Pinkal. Ground-      [58] Jiannan  Xiang,  Xin  Eric  Wang,  and  William  Yang
+     ing action descriptions in videos. In TACL, 2013. 1, 2              Wang.   Learning  to  stop: A simple yet  effective ap-
+[43] Shaoqing Ren, Kaiming He, Ross Girshick, and Jian Sun.          proach to urban vision-language navigation. arXiv preprint
+     Faster r-cnn: Towards real-time object detection with region           arXiv:2009.13112, 2020. 12
+     proposal networks. NeurIPS, 2015. 12, 14                       [59] Wei Yang, Xiaolong Wang, Ali Farhadi, Abhinav Gupta, and
+[44] Olga Russakovsky, Jia Deng, Hao Su, Jonathan Krause, San-         Roozbeh Mottaghi. Visual semantic navigation using scene
+     jeev Satheesh, Sean Ma, Zhiheng Huang, Andrej Karpathy,             priors. arXiv preprint arXiv:1810.06543, 2018. 12
+
+
+                                                 10
+=== PDF PAGE 11 ===
+[60] Hongming Zhang and et al. Analogous process structure in-
+     duction for sub-event sequence prediction. In EMNLP, 2020.
+    8
+[61] Yichi Zhang and Joyce Chai.  Hierarchical task learning
+     from language instructions with uniﬁed transformers and
+     self-monitoring. arXiv preprint arXiv:2106.03427, 2021. 2,
+      3, 5, 7, 12
+[62] Fengda Zhu, Yi Zhu, Xiaojun Chang, and Xiaodan Liang.
+     Vision-language navigation with self-supervised auxiliary
+     reasoning tasks. In CVPR, 2020. 12
+[63] Wang Zhu, Hexiang Hu, Jiacheng Chen, Zhiwei Deng, Vihan
+      Jain, Eugene Ie, and Fei Sha. Babywalk: Going farther in
+     vision-and-language navigation by taking baby steps. arXiv
+     preprint arXiv:2005.04625, 2020. 3, 6, 7, 8, 12
+[64] Yuke Zhu, Daniel Gordon, Eric Kolve, Dieter Fox, Li Fei-
+      Fei, Abhinav Gupta, Roozbeh Mottaghi, and Ali Farhadi. Vi-
+      sual semantic planning using deep successor representations.
+     In ICCV, 2017. 1, 2
+
+
+
+
+
+                                                 11
+=== PDF PAGE 12 ===
+Appendices                                                 input [1, 11, 46, 63]. VLN⟳BERT [32] take as input ob-
+                                                                        ject features from Faster R-CNN [43] to encode objects’
+   In this supplementary material, we provide details omit-                                                          semantic information. Some other studies leverage both
+ted in the main text.                                                     image and object features to learn better visual represen-
+                                                                    tations [16, 18]. Recently, several papers use a pre-trained   • Appendix A: More related work
+                                                           segmentation model (e.g., Mask R-CNN [14]) to obtain
+   • Appendix B: M-TRACK implementation details         more accurate object information [21,35,40,47,49,61]. Fol-
+                                                         lowing the recent trend in VLN, M-TRACK exploits Mask
+   • Appendix C: Model implementation details          R-CNN to detect objects for milestone checking and encode
+                                                                       their visual representations to facilitate interaction tasks.
+   • Appendix D: Additional experiments
+                                               B. M-TRACK Implementation Details
+A. More Related Work
+                                                         B.1. Milestone Builder
+  Due to the space constraint, we only include the most
+related works in the main text. Here, we add some extra       To estimate an upper bound of M-TRACK, we ﬁrst build
+related works to show recent trends in VLN.                   a ground-truth dataset using ground-truth tags derived from
+                                                                the ALFRED [46] expert demonstrations. The ALFRED
+Auxiliary information in VLN. M-TRACK can be viewed
+                                                               expert demonstrations are encoded in Planning Domain
+as an auxiliary information to the agent. A variety of aux-
+                                                          Deﬁnition Language (PDDL) [34] rules. PDDL annotations
+iliary information has indeed been explored to improve the
+                                                              include task-speciﬁc goal conditions for each low-level in-
+VLN models [2–4,6,25,26,33,35,45,53,58,59,62]. Several
+                                                                     struction. Each low-level instruction in PDDL language is
+prior works proposed to build a semantic map that encodes
+                                                     deﬁned by (d, i, p), where d = (action, argument) is a discrete
+the spatial semantic information to bridge the gap between
+                                                                action tuple containing the description of the action and its
+instructions and visual observations [2, 4, 33, 35].  Other
+                                                       argument (object), i is the index of the low-level instruction,
+studies suggested a topological map that memorizes previ-
+                                                          p = (action, location/ObjectID) is a planner action which is an
+ous actions and locations to facilitate planning [6, 45, 53].
+                                                                action tuple directly applicable to the simulator. We use the
+M-TRACK is different from them by its simplicity, func-
+                                                                   discrete action tuple to tag the low-level instruction with the
+tionality, and compatibility —  it is completely detached
+                                                              ground-truth object labels. For example, “Go to the trash
+from VLN models and thus model-agnostic.
+                                                      can on the far side of the kitchen”, is labeled with the dis-
+Data Augmentation in VLN. A number of prior studies in-      crete action (GotoLocation, trashcan), based on which we au-
+vestigate data augmentation to increase generalizability in      tomatically tag the instruction as (O, O, O, B-Nav, I-Nav, O, O,
+unseen environments. One stream of works focuses on gen-      O, O, O, O, O). We apply BIO tagging format3 to turn the ob-
+erating synthetic language instructions [11, 17, 32, 40, 54].      ject labels into tags. Every ALFRED low-level instruction
+E.T. [40] constructs synthetic instructions using the expert     has annotated labels, enabling us to build the ground-truth
+path planner in ALFRED. Speaker-Follower [11] gener-     milestone training data easily. After tagging the ALFRED
+ates human-like textual instructions based on a VLN model      training and validation data with the ground truth object la-
+trained on ground-truth routes. The other stream considers      bels in this way, we train a BERT-CRF [9,48] tagger on the
+augmenting visual observations. Most of these works in-      training data to predict the milestone tags in the instruction.
+clude surrounding views to enlarge an agent’s ﬁeld of view   We choose BERT to utilize its powerful context encoding
+and thus enhance its navigation ability [4,13,16,21,38,49].      capability and add a CRF [24] layer on top of BERT to bet-
+In line with these studies, we augment visual observations      ter model the interdependence of tag predictions. BERT-
+using panoramic views with different angles and headings.    CRF is trained end to end with training data generated from
+Learning Strategies in VLN. Several studies train VLN      the training split of ALFRED and validated with validation
+models with imitation learning [1,23,27,40,46,47,58] while      set generated with validation seen and unseen annotations
+some other works apply reinforcement learning [26,36,59].      for ALFRED. The model that has the highest F1 on the val-
+To balance exploration and exploitation in navigation, some      idation set is chosen.
+recent works leverage both imitation learning and reinforce-       During the main model  (e.g., VLN⟳BERT-L + M-
+ment learning [16, 18, 19, 25, 50, 63]. Following the recent    TRACK ) execution, BERT-CRF outputs tags for a given
+studies, M-TRACK exploits both of them and shows notable     low-level instruction. For instance, in the instruction, “Turn
+improvement on ALFRED.                              and go to the sink”, BERT-CRF outputs (O, O, O, O, O, B-
+
+Visual Input. There has been signiﬁcant recent progress                                                                       3B- preﬁx indicates the tag is the beginning of an object label, I- preﬁx
+in learning visual representations of views.  Several stud-       indicates the tag is inside/end of the object label, and O refers to all non-
+ies take image features encoded by ResNet [15] as visual      tagged words.
+
+
+                                                 12
+=== PDF PAGE 13 ===
+                                                                  ure is recovered later when the agent is in a different
+                         Label: sink
+                      Reachability: False                                          pose to take a new view of the object.
+
+                                                             Label: trashcan               C. Model Implementation Details
+                                                             Reachability: False
+                                                       C.1. VLN⟳BERT
+        Walk around the island to the sink.         Go to the trashcan across the room            Our modiﬁed VLN⟳BERT [18] consists of four mod-
+                                                               next                                                                          to the counter            Milestone: (navigation, sink)
+                                                        Milestone:                                                                       (navigation,                                                                                   trashcan)              ules: a language encoder, a vision encoder, an action de-
+                                                               Label: fridge                      coder, and a pointer network with a multi-layer percep-
+                                                               Reachability: True                      tron. Given a time step t, the language encoder takes cur-
+                                                                   rent instruction (i.e., the concatenation of the high-level in-
+                          Label: tomato                                            struction and the current low-level instruction) as input and
+                         Reachability: True
+                                                              outputs the contextualized token embeddings.  Following
+                                          VLN⟳BERT, we consider the [CLS] embedding as a state
+                                                     embedding st representing an agent’s current state and de-
+      Pick up              the tomato                             at the front                                    of the table.                                                           Place                                                                    the egg in the                                                                                  fridge
+                                                      Milestone:                                                                          (interaction,                                                                                    {fridge,                                                                                egg})           notes other textual token embedding as xi4. For the vision           Milestone:                         (interaction,                                tomato)
+                                                              encoder, we leverage Mask R-CNN to obtain two types of              Figure 5. Examples of milestones.
+                                                                 visual features: 1) a scene feature vj representing a view,
+                                                      and 2) an object feature ok indicating an object in the view.
+Nav). The (tag, word) pair is our predicted milestone for the     In total, we extract 8 scene features from panoramic views
+instruction. We freeze BERT-CRF during the main model     (4 headings of 90◦and 2 elevation angles of ±30◦) and 20
+training.                                                       highest scoring object features from all scenes.  The ac-
+                                                                   tion decoder then performs a grounded language learning
+B.2. Milestone Checking                             by taking four inputs: a previous state embedding st−1, a
+                                                         sequence of textual embeddings {xi}, a sequence of scene  Here we elaborate on the design decisions for some cor-
+                                                                  features {vj}, and a sequence of object features {ok}.ner cases during milestone checking.
+                                                                                 st, {x′i}, {v′j}, {o′k} =
+   • What  if an instruction contains multiple mile-                                                                (1)
+     stones?                                              VLN⟳BERT(st−1, {xi}, {vj}, {ok})
+                                                         Unlike VLN⟳BERT, we employ a pointer network [52] to        1. Navigation + Navigation: Navigate to the ﬁrst
+                                                                              let the agent choose between navigation and interaction ac-          milestone then to the next.
+                                                                        tion. The pointer network predicts an action for the time
+        2. Navigation + Interaction: Navigate to the naviga-                                                                step t by (2), (3), and (4).
+           tion milestone ﬁrst and navigate/interact with the
+           interaction milestone.                               un = z⊤tanh(W1en + W2st),                                                                                                                             (2)
+                                                               en ∈{v′j} ∪{o′k}, n ∈(1, · · · , J + K)        3. Interaction + Interaction: Interact with both ob-
+           jects without specifying a ﬁxed order.              where z, W1, W2 are learnable parameters, en is either the
+                                                          scene feature or the object feature, and st is the updated
+   • What if an instruction contains no milestone? There
+                                                                       state embedding.
+     are only less than 1% of such cases in the validation
+    unseen environments in ALFRED (i.e., 40 out of 5,140                               ˆn =  argmax  σ(u)n               (3)
+     instructions). For those cases, we concatenate the cur-                                 n∈(1,··· ,J+K)
+     rent instruction with the next instruction that has mile-     where σ is the softmax normalizing the vector u. If ˆn repre-
+     stones detected.                                            sents a scene, the agent should navigate to the scene ˆn at the
+                                                          time step t. In contrast, if ˆn indicates an object, the agent
+   • What happens if the milestone builder makes a mis-                                                          should interact with the object ˆn at the time step t by the
+     take, e.g., missing a milestone / extracting an unnec-                                                           corresponding interaction action ˆa
+     essary milestone / detecting a wrong object? Gener-
+     ally the milestone builder is pretty accurate (c.f. Table 1                                ˆa = argmax σ(W3[st; o′ˆn])a             (4)
+                                                                                 a∈IA
+     in the main paper), so mistakes are not common. How-
+     ever, in the cases when a mistake does occur, we cur-     where W3 is the learnable parameter, o′ˆn is the feature of
+     rently have the agent skip the milestone if the checking      object ˆn, and IA is the set of 7 interaction actions.
+      fails 15 consecutive times. On the other hand, if the ob-       4We omit  t on  other  variables  (e.g.,  textual token embeddings,
+      ject detector fails to detect the object, usually the fail-       scene/object features, etc.) for simplicity except for the state embedding.
+
+
+                                                 13
+=== PDF PAGE 14 ===
+                      Observation                        Egocentric             [CLS] Put sliced ... [SEP] Pick up apple ...             spatial and reachability encoding as in VLN⟳BERT, scene
+                                                                                                                                                ...                     feature vt, language feature ˆxt, previous action embedding
+                                                            at−1, and outputs a new hidden state ht:
+                                         Prev                           Prev
+            Mask R-CNN       Hidden       BERT           Action
+                                          State                     Embedding                 ht = LSTM([{ot,z}; vt; ˆxt; at−1], ht−1)       (6)
+
+                                                                    ht-1      x1   x2      ...    xn         at-1        Object
+                 o1     ...   oz       vt       Feature                                                    The agent interacts with the environment by choosing
+                                 Scene          Attention                 an action and providing a binary mask (if the action is an                                    Feature
+                                                                     interaction). To leverage the power of the pre-trained vision
+                                       Concatenation                           encoder, we follow [40, 47] and ask our agent to choose
+                                           ut                      Model                                                       an object ot,z. The corresponding pixel mask is retrieved
+             VLN                                              from the predicted object. We formulate object choosing in                  LSTM
+                                                          a same fashion as choosing navigable directions in common
+                      o1    ...  oz        ht                      VLN models [11, 50, 53]. Action and object are generated
+                                                     from two different networks:
+                         FC                   FC
+                                                Interaction                                                 at = argmax(Wa[ht; ut])
+                      Selected                        object   Ot,z       Only              at
+                                                                                p(ot,z) = softmaxz(ot,zWoht)            (7)
+                     Predicted action:  (PickupObject, apple)                                                    ˆot,z = argmax p(ot,z)
+                                                                                                 z
+         M-Track
+                                                        where Wo and Wa are learnable parameters, and ut =              Milestone         (interaction,       Milestone
+              Checker           apple)           Builder                        [vt; ˆxt; at−1]. Action prediction is trained with the ground-
+                                                                     truth expert actions and reinforcement learning. The object
+                                                                 feature is learned end-to-end with the ground-truth object
+          (True, PickupObject, apple)
+                                                               information.
+     Figure 6. Architecture of LSTM-L with M-TRACK.
+                                                       C.3. Vision Encoder
+
+                                                           For the vision encoder for M-TRACK, we train an in-C.2. LSTM
+                                                              stance segmentation model, Mask R-CNN [14], as our vi-
+  We modify the CNN-LSTM model presented in AL-     sion encoder with training data generated from the expert
+FRED [46] with support for a pre-trained object encoder     demonstration images from ALFRED and ground-truth seg-
+inspired by common VLN models’ approach [11, 50, 53]     mentation information from Ai2Thor simulator. Mask R-
+in choosing between multiple scene features. Given a high   CNN is a two-stage detector, which the ﬁrst stage pro-
+level goal instruction G and step-by-step instructions S =     poses region of interests (RoI) by Region Proposal Network
+{s1, s2, · · · sn} of n instruction sentences, we concatenate    (RPN) [43] and the second stage extracts RoI features from
+the goal instruction with only the relevant step-by-step in-      the feature map by RoI Align [14] and makes predictions
+struction such as L = {G, <SEP>, sn} with <SEP> token     with three heads, box classiﬁcation, box regression, and
+indicating the difference between the goal and step-by-step    mask head. The box heads share the same RoI features ex-
+instruction. Then we perform a soft-attention on the lan-      tracted with proposals, while the mask head extracts with
+guage feature generated from BERT [9] to compute the at-      the predictions by the box regression head.
+tention distribution conditioned on the previous hidden state        In the milestone checking, we not only are interested in
+of the LSTM:                                                   objects and their locations but also care about whether they
+                                                                are reachable by the agent. Following the idea, we further            αt = softmax((Wxht−1)⊤)xt
+                                                          (5)     implement the fourth head, using the same manner as the
+                    ˆxt = α⊤t xt                              mask head, to predict availability for each object. We sim-
+                                                             ply deﬁne objects within 1.5 meters as available for the bi-where Wx is the learnable parameter, ht−1 is the previ-
+                                                          nary classiﬁcation by using the distance information fromous LSTM hidden state, xt is the current language fea-
+                                                     Ai2Thor simulator. Finally, the overall loss of pre-trainingture, and ˆxt is the weighted sum of xt over the attention
+                                                          our vision encoder is the summation of losses from fourdistribution αt.  Furthermore, each visual observation of
+                                                              heads,the agent’s view is encoded with a pre-trained Mask R-
+CNN [14], where we take the scene feature from its ResNet-                                            L = Lcls + Lreg + Lmask + Lavail.        (8)
+50-FPN backbone. At each time step t, the LSTM takes
+in the object feature {ot,z}, which are 20 highest-scoring       With a pre-trained vision encoder, we use its ResNet [15]
+object features from the vision encoder concatenated with     backbone to encode scene features from environments and
+
+
+                                                 14
+=== PDF PAGE 15 ===
+top-k RoI features from the mask head as object features to     C.4.2  Behavior Cloning
+attend with the language model. For milestone checking, it
+                                                         Following the prevalent approach in training VLN mod-
+also provides object labels and their reachability informa-
+                                                                      els [18,50], we combine reinforcement learning and imita-
+tion.
+                                                                   tion learning (i.e., behavior cloning) to train our model. At
+C.4. Learning                                           each time step, the model is expected to produce the ground-
+                                                                     truth action and interaction mask (for interaction actions).
+C.4.1  Reward Shaping
+                                        We apply cross-entropy loss between the predicted actions
+In addition to the progress (navigation) and stop rewards     and the ground-truth action and add it to our reinforcement
+deﬁned in VLN⟳BERT [18], we apply the interaction ac-      learning loss to ensure that the current trajectory is favored
+tion matching as an additional reward to guide the agent to     toward the expert demonstration trajectory. While we can
+perform interaction action when needed. Furthermore, we     adapt the expert demonstration directly on the LSTM-L +
+introduce a visibility reward to make the agent learn to face    M-TRACK  , it is not straightforward in VLN⟳BERT-L +
+the correct direction during the interaction.              M-TRACK  because it requires a panoramic input. Since
+                                        ALFRED does not provide panoramic expert demonstra-Navigation Reward. Following VLN⟳BERT, navigation
+                                                                        tion, we generated panoramic ground-truth trajectory infor-reward acts as a strong supervision for directing our agent
+                                                        mation from ALFRED expert demonstration using its tra-to the target object.  Formally, Dt is a distance from the
+                                                                 jectory augmentation tool5.agent to the target object at time t, and ∆Dt = Dt−1 −Dt
+is a change of distance by an action at. Reward for each at     C.5. Training Details
+is deﬁned as:
+                                                           For the LSTM, we use a pre-trained BERT as the lan-
+            (                                 guage encoder and randomly initialize the rest of the model.                    +1,  ∆Dt > 0
+            rDt =                                  (9)     For VLN⟳BERT, we use its pre-trained weights on R2R [1]
+                    −1,  otherwise
+                                                                   to initialize the model. For the vision encoder in the mile-
+Stop Reward. When the agent decides to stop at == stop,     stone builder, we use a ResNet-50-FPN [14] as the back-
+we give the agent the ﬁnal reward depending on if the task     bone for Mask R-CNN and ﬁnetune on ALFRED expert
+is successful or not:                                         demonstrations from the Ai2Thor simulator [22] with batch
+                                                                   size 16. We ﬁnetune the Mask R-CNN pretrained on Im-
+          (                  +3,  Task == Success               ageNet [44] on 4 Nvidia A6000 GPUs for 270k iterations,
+            rfinal =                                 (10)     with a learning rate of 0.02, which is decreased by 10 at the                  −3,  otherwise
+                                                    210k and 250k iteration. A weight decay of 0.0001 and mo-
+where the task success means that the agent has completed    mentum of 0.9 are applied. For all the experiments with M-
+all subtasks for the task.                           TRACK and baseline models, we use a single Nvidia 2080TI
+Interaction Reward. Since VLN⟳BERT trains the agent   GPU and AdamW optimizer is applied with a ﬁxed learn-
+in a navigation-only dataset, we need to deﬁne an additional     ing rate of 10−5 for VLN⟳BERT and 10−4 for LSTM. The
+interaction reward in order for the agent to learn to choose     batch size is set to 4, and the agent is trained for 20 epochs
+between navigation and interaction actions. Formally, at a    maximum. Early stopping is applied when the model shows
+given time step t, the agent will be rewarded if the inter-     no improvement on 3 consecutive epochs, and the model
+action action matches the ground-truth interaction action,      that shows the highest SR on the validation unseen split is
+which we retrieve from the environment state. The reward     adopted for testing. For all model training, only training
+for each at is deﬁned as:                                               split was used for training and validation split was held out.
+
+           (                   +1,  at == a∗t                D. Additional Experiments
+                 rIt =                               (11)
+                   −1,  otherwise
+                                                   Agent frequently skips subtask As mentioned in the main
+Visibility Reward. We deﬁne an additional visibility re-      paper, we perform an experiment that shows that the agent
+ward to ensure the agent learns to face the correct direction     frequently skips a subtask and tries to execute the next sub-
+of the object to be interacted with before predicting an in-      task. In Table 5, we perform an analysis of the ﬁrst fatal
+teraction action to that object. This reward is paired with      error that the agent encounters for the validation unseen
+the interaction reward, so the total reward that an agent can       split. We ﬁrst categorize the failure type by interaction fail-
+get from interacting with the right object is +2.                  ure, which the agent gets close to the interaction target but
+                                                                            fails to perform an interaction action, and navigation fail-
+          (                  +1,  o∗t is reachable                     ure, where the agent does not get close to a target object at
+            rVt =                                 (12)
+                  −1,  otherwise                                    5https://github.com/askforalfred/alfred/tree/master/gen
+
+
+                                                 15
+=== PDF PAGE 16 ===
+        Error Types                            L   L+M-TRACK  V  V+M-TRACK
+
+       No error                                        76       129       83       134
+
+          Interaction Failure                                231       255       178       199
+                               Collision                      87        99       100       121
+                                 Interact with other object         31        23        31        54
+                         Wander endlessly               66       130       22        24
+                             Navigate to next subtask location   47        0        33        0
+
+         Navigation Failure                               513       436       559       487
+                               Collision                      205       288       245       296
+                                 Interact with other object         24        18        33        13
+                         Wander endlessly               183       130       203       172
+                             Navigate to next subtask location  101        0        78        0
+
+
+   Table 5. Error cases on unseen validation. Interaction Failure: Agent gets close to the target object but fails to interact with it.
+   Navigation Failure: Agent does not navigate to the target object at all. Next Action: Next action that happens after the failure has
+   happened. L stands for LSTM-L and V stands for VLN⟳BERT-L.
+
+     Task Type      Valid Unseen   Valid Seen        We can see that M-TRACK excels at completing relatively
+                                                          simple tasks such as “Pick & Place” or “Examine” effec-
+      Pick & Place        48          63                                                                           tively, while suffers in complex tasks that require multiple
+      Stack & Place       28          25                                                                   interactions (e.g., “Heat & Place”). We attribute this phe-
+      Place Two          32          38                                                 nomenon due to the fact that the current M-TRACK does not
+     Examine           50          69                                                                    effectively learn the multi-interaction reasoning. However,
+      Heat & Place        19          18                                                    by seeing the notable improvement on the simple tasks, M-
+      Cool & Place        32          29                                           TRACK opens up the possibility of leveraging more ﬁne-
+      Clean & Place       27          29                                                             grained milestone construction to improve the agent’s task
+                                                               learning in VLN.
+Table 6.  Validation completion rate (%) by task type for
+VLN⟳BERT-L + M-TRACK .
+
+
+all. Then, we also retrieve the next sequence of actions after
+the failure and sort them into four categories:
+
+   • Collision: Agent gets stuck in the environment and can
+     not get out
+
+   • Interaction with other object: Agent interact with
+     a wrong object or interacts when interaction is not
+    needed
+
+   • Wander endlessly: Agent endlessly repeats a certain
+    sequence of actions
+
+   • Navigate to the next subtask location: Agent nav-
+     igates to the location of the next target object in the
+     next subtask
+
+We show that M-TRACK performs better on most error
+cases in both interaction and navigation. Speciﬁcally, M-
+TRACK notably prevents the agent from performing the next
+subtask without completing the current one (e.g., 101 vs. 0),
+reﬂecting M-TRACK’s idea.
+M-TRACK completion rate by task type We further ana-
+lyze M-TRACK’s completion rate by task type in Table 6.
+
+
+                                                 16

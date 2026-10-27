@@ -1,0 +1,324 @@
+[
+  {
+    "id": "navgpt",
+    "title": "NavGPT: Explicit Reasoning in Vision-and-Language Navigation with Large Language Models",
+    "authors": [
+      "Gengze Zhou",
+      "Yicong Hong",
+      "Qi Wu"
+    ],
+    "year": 2024,
+    "venue": "AAAI 2024",
+    "source": "https://ojs.aaai.org/index.php/AAAI/article/download/28597/29161",
+    "pages": "1, 3–7",
+    "problem": "Tests whether a frozen language model can execute navigation instructions without VLN training. It operates on a discrete graph with provided viewpoint IDs and candidates. Visual caption quality and historical object tracking are central challenges; 'purely LLM-based' describes its decision module, not absence of visual or simulator dependencies.",
+    "method": "Eq.1: (reasoning,action)=LLM(prompt(system,instruction,VFM(observation),history)). Twenty-four images per viewpoint cover8headings×3elevations,45°FoV. BLIP2 ViT-G FlanT5XL captions each; GPT3.5 summarizes elevations to8direction descriptions. FastRCNN detects objects; simulator depth at bounding-box center and relative heading provide object geometry, filtering within3m. GPT4 ReAct-style reasoning then chooses a valid candidateID orStop. History stores observation/reason/action triples with GPT3.5 summaries. No navigation loss or parameter update is used; captions, depth, IDs and language summaries form a lossy observation bottleneck. Navigation graph actions are not continuous motor commands. The action-space extension A∪R is a prompting formalism: emitting a thought does not interact with the environment or receive new evidence.",
+    "novelty": "Early explicit ReAct navigation and empirical analysis of frozenGPT4's planning language. Existing self-monitoring, subgoal decomposition and object grounding are reproduced as prompt behaviors, not invented navigation principles. Direct successors MapGPT and NavGPT2 target graph-memory and visual-caption bottlenecks.",
+    "results": "Table1 R2R783trajectories/11unseen scenes34SR/29SPL versusDUET72/60; an untrainedLXMERT-DUET baseline1SR does not equalize pretraining capability. GPT3.5ablation216samples across72scenes:45°FoV16.67SR versus60°10.19; objectinformation11.11→15.97, depth16.67(Table2–3). Authors explicitly acknowledgecaption/summarizationloss. Generated top-down trajectory and instructions are selected qualitative examples, not systematic spatial-reconstruction accuracy or demonstratedfaithfulness.",
+    "bottlenecks": [
+      {
+        "id": "NAVGPT-1",
+        "description": "Captioning and summarization omit landmarks and object continuity",
+        "conditions": "Long histories or instruction-critical small objects",
+        "cause": "Serial image-to-text compression and fixedcaptiongranularity",
+        "evidence": "pp.6–7 limitations andTables2–3",
+        "followups": "MapGPT uses directGPT4V; NavGPT2 learnsvisualalignment; neither makes generated explanations necessarily causal or faithful",
+        "kind": "Methodological / evaluation",
+        "status": "Partially addressed",
+        "confidence": "Moderate"
+      }
+    ],
+    "limitations": "No benchmark executed. Supplementary prompts not yet reviewed. API model/version/cost differences matter for replication."
+  },
+  {
+    "id": "navgpt2",
+    "title": "NavGPT-2: Unleashing Navigational Reasoning Capability for Large Vision-Language Models",
+    "authors": [
+      "Gengze Zhou",
+      "Yicong Hong",
+      "Zun Wang",
+      "Xin Eric Wang",
+      "Qi Wu"
+    ],
+    "year": 2024,
+    "venue": "ECCV 2024",
+    "source": "https://www.ecva.net/papers/eccv_2024/papers_ECCV/papers/01143.pdf",
+    "pages": "1, 4–10",
+    "problem": "Frozen promptedLLMs reason verbally but lag supervisedVLN. NavGPT2 adds trained visualalignment and a learnedgraphpolicy while retaining optional linguisticgeneration. It uses discrete simulatorcandidates, not end-to-endphysicalnavigation.",
+    "method": "§3: frozenEVA-CLIPViT-g/14 imagefeatures plus instruction-conditionedQ-former32queries∈R^(32×768) perview, linearprojectionintoFlanT5/Vicunahidden space. Prompt includescandidateangle andspecialimage/instruction delimiters. Stage1 instruction-tunesQ-former/projector on10KGPT4Vreasoningexamples sampled atreferencepathintermediatepoints, autoregressivetokenCE; LLM/vision frozen. Stage2 freezesVLM andtrainsDUETglobalbranch-stylepolicy: lastencoder(or decoder)hiddenimageandtextfeatures, MLPmerge32imagequeries perview, averagepoolnodeobservations,adddirection/visitstepembeddings. Crossattentiontoinstruction then graphselfattention softmax(QKᵀ/√d+A(E))V (Eq2; A islearnedspatialaffinity overpairwisedistances). GlobalFFNscoresallobservedfrontiersplusStop; visitednodesmasked; shortestgraphpathmovesagenttochosenfrontier. BC andDAgger CE lossesL=λL_BC+L_DAG(Eq3), withon-policyshortest-goal pseudoexpert. Stage1AdamW200Ksteps batch8lr1e−5,wd.05;stage2batch2lr1e−5; singleA100; bestusesPREVALENTsyntheticdata. Actionpolicy consumeslatentfeatures, notnecessarilygeneratedrationale text; optionalreasoningdoesnotguaranteeexplanationfaithfulness.",
+    "novelty": "Directly exposesfrozenLLMvisual-language latents to a specializedgraphpolicy, rather thanchoosing actionssolely throughtext. This is explicitly DUETglobalbranch-derived, outside neitherDUETlineage nortrain-freecategory. ThelargeLLMisfrozenbutQ-formerandpolicyaretrained.",
+    "results": "Table1 FlanT5XXLencoder5B+PREVALENT72SR/61SPLunseen,71/60test versusDUET72/60,69/59; R2R-only71/60. DUETwithoutlocalbranch68/59. ScaleVLN79/70hasmoredata. Supportsclosinggap atsimilar navigationdatascale, notbestlarge-data performance. Reasoningdata10K aloneisnot totalnavigationtrainingdata. Architecture-stagefreezing limitsmemory butfrozen5B+vision stillcostly.",
+    "bottlenecks": [
+      {
+        "id": "NAVGPT2-1",
+        "description": "Reasoning text and actions need not agree; graph geometry remains privileged",
+        "conditions": "Contradictoryrationales, continuousphysicaldeployment",
+        "cause": "Policy consumesLLMencoderlatents andgeometricgraph, notcausallynecessaryrationale",
+        "evidence": "§3.1–3.3/Fig2; visitedmaskandshortestpathcontrol",
+        "followups": "SkillNav addsrouteroverexpertpolicies; NaVid/NaVILAremovegraphcandidateassumption; faithfulnessunresolved",
+        "kind": "Methodological / evaluation",
+        "status": "Partially addressed",
+        "confidence": "Moderate"
+      }
+    ],
+    "limitations": "Remainingevaluation/appendixpages pending. No code executed. Exact downstreamprojectionandspatialaffinity implementation requirecodeaudit."
+  },
+  {
+    "id": "navgrpo",
+    "title": "Trajectory-Diversity-Driven Robust Vision-and-Language Navigation",
+    "authors": [
+      "Jiangyang Li",
+      "Cong Wan",
+      "Songlin Dong",
+      "Chenhao Ding",
+      "Qiang Wang",
+      "Zhiheng Ma",
+      "Yihong Gong"
+    ],
+    "year": 2026,
+    "venue": "CVPR 2026 Findings (explicit supplied-PDF watermark; not main-conference assumption)",
+    "source": "https://arxiv.org/abs/2603.15370",
+    "pages": "1, 3–8",
+    "problem": "ImproveDUET/ScaleVLNgoalseekingand recovery afterdiscreteactionperturbations usingRL beyondexpertimitation. Privilegedgoalgeodesicdistance,shortestpath andexperttrajectoriesaretrainingrewards; inferencehasnoGTgoalposition.",
+    "method": "§3 Eqs1–11: stochasticK=8rollouts perinstruction fromDUET/ScaleVLNpolicyπ. GroupadvantageA_k=r_k−mean(r) withoutstdnormalization. Trajectoryreward r=exp(−d_final²/(2ε²))1[d_final<ε]−.25max(L−L*,0)/L*. Theindicator makesitdiscontinuousatε despite'differentiability'prose; RLdoesnotrequirepathwise rewardgradient. Stepmodifierγ=1+sign(A)(d_(t−1)−d_t)/L* yieldsγA=A+|A|Δd/L*. FornegativeA, approachinggoalreducespenaltymagnitude, contraryto universal'magnitudeincreases'wording. If|Δd|>L*,γcanflip; no clippingreported. PPOclippedratio objective sumssteps(no trajectorylengthnormalization),KLtofixedreferenceβ=.01,δ=.2. This remainscreditassignment via sharedtrajectoryadvantage, notcompleteeliminationofcreditassignmentdifficulty. All-failgroupsenterhardcasebuffer200, supervisedexpertCE replay;30Kwarmup then200Koverallupdates,lr1e−5,B8,three seeds. Atinferencegreedygraphpolicy; CEtransfer useswaypointpredictor.",
+    "novelty": "AppliesDr.GRPO-stylegrouprelativeoptimization, geometricrewardshaping andhardcaseimitation toexistingDUET/ScaleVLN. Notanovelbackbone; relatedRCM/HAMTalreadyuseRL. Closestnoveltyiscontrolledtrajectorydiversity/relativecredit androbustnessstudy.",
+    "results": "Table2 ScaleVLN79/70→82/73unseenSR/SPL;DUET72/60→74/63. Table3 continuousScaleVLN55/51→57/53. Table1 least-probablefirst3actions47.77→62.66SPL. Howeverperturbationsdependoneachpolicy'sdistribution, soneithersamplednoise norargminactionsarematchedphysicaldisturbances. Table7 PPO70.68versusGRPO72.65usesdifferentrewards; claimterminalrewards'cannot'beusedwithPPO/A2Cbootstrapis mathematicallyfalse. Table8hardreplayadds72.08→72.65SPL. Table6K16only+.22SPLoverK8atdoublecost. Improvementsaresupportedunderreportedprotocol; optimizer-specificcausalclaimisnotisolated.",
+    "bottlenecks": [
+      {
+        "id": "NAVGRPO-1",
+        "description": "Robustness gains confound policy sharpness, perturbation location and reward choice",
+        "conditions": "Comparingnoisepolicies andRLalgorithms",
+        "cause": "Eachpolicyreceivesitsownsampled/argminperturbations; PPOrewarddiffers",
+        "evidence": "Table1/§4.2 andTable7/§4.4",
+        "followups": "Needscommonexternallyspecifiedperturbations, equalrewardandrolloutbudget, recovery/routefidelitymetrics",
+        "kind": "Methodological / evaluation",
+        "status": "Partially addressed",
+        "confidence": "Moderate"
+      }
+    ],
+    "key_findings": [
+      {
+        "claim": "Supplied paper is CVPR Findings; robustness noise and RL rewards are not fully matched controls",
+        "evidence_type": "Primary paper protocol audit",
+        "source": "Supplied PDF",
+        "locator": "p.1 watermark,§4.2,§4.4/Table7"
+      }
+    ],
+    "limitations": "OfficialrepoURLinPDFcocoastar/NavGRPOdiffersfromreleasedSonglin-Dong/NavGRPO-CVPR2026; releaseREADME/sourcechainshouldbechecked. Nobenchmarkexecuted."
+  },
+  {
+    "id": "navid",
+    "title": "NaVid: Video-based VLM Plans the Next Step for Vision-and-Language Navigation",
+    "authors": [
+      "Jiazhao Zhang",
+      "Kunyu Wang",
+      "Rongtao Xu",
+      "Gengze Zhou",
+      "Yicong Hong",
+      "Xiaomeng Fang",
+      "Qi Wu",
+      "Zhizheng Zhang",
+      "He Wang"
+    ],
+    "year": 2024,
+    "venue": "Robotics: Science and Systems 2024",
+    "source": "https://roboticsproceedings.org/rss20/p079.pdf",
+    "pages": "1, 3–7",
+    "problem": "Transferinstruction-followingfromsimulatortoreal monocularRGBnavigation withoutdepth,maporodometerpolicyinputs. Unlikegraphagents, outputsparameterizedmove/turncommands; lowerrobotcontrollerstillmustexecutethem.",
+    "method": "§IV Eqs1–3: LLaMA-VID/EVA-CLIP encodesframeX_t∈R^(256×C). Q-former/BERTinstructionqueryQ∈R^(M×C) crossattendsimage,meanqueries,andprojectsoneinstruction-queriedtoken. Parallelgridpool/project gives64instruction-agnosticcurrenttokens and4perhistoryframe. <HIS>,<OBS>,<NAV>distinguishhistory/current/instruction beforeVicuna7B. AutoregressivelanguageoutputsForward(distance),Left(angle),Right(angle),Stop;regexparserconvertscommands. Training320KoracleR2Rsteps+180KDAggernonoracle+10Ktrajectory-to-instructionreasoning+763KwebVQA, total1.273M;24A100×28h,oneepoch,trainLLaMA/textencoderwhileotherpretrainedmodulesfrozenper§IV-D. Noadditionaltesttimereasoningloop isrequired; 'instruction reasoning' isanauxiliarytrainingtask. Historytokensgrowlinearlywithframesdespiteperframecompression. 1.2–1.5s/actionreported.",
+    "novelty": "Task-specificvideo-tokenallocation andaction-languageformulation atopLLaMA-VID, withnonoraclecollection/auxiliaryinstructionreconstruction. NaVILAchangesbackbone/datablend/physicalcontroller; Uni-NaVidaddssemantictokenmerging; StreamVLNsegmentmemory; NavFoMcrosscamera/crosstasktrajectoryhead.",
+    "results": "TableI R2R37.4SR/35.9SPL, comparableSRbuthigherSPLthanWS-MGMap38.9/34.3. TableII RxRzero-shotfromR2R23.8/21.2. TableIII100samplebaselineLLaMA-VID-Nav29/27.5vsNaVid38/35.4supportsVLNmodeling. Fig4stablehorizonbinsdoesnotprovearbitrarylengthgeneralization; >90steptraincases5.91%. Real200instructions,fourscenes,success1.5mversussimulator3m. Pretrainedwebknowledgeandtrainingdata differstronglyfromoldRGB-CMAbaseline.",
+    "bottlenecks": [
+      {
+        "id": "NAVID-1",
+        "description": "History cost grows and compressed tokens can miss spatial details",
+        "conditions": "Long episodes, highprecisionturn/stopdecisions",
+        "cause": "4historytokensperframe andautoregressive7Bdecoding",
+        "evidence": "§IV-B,D; TableIII andFig4",
+        "followups": "Uni-NaVidtokenmerging,MapNavASM,StreamVLNstreammemory,NavFoMBATS; eachintroducesforgetting/sensor/dataassumptions",
+        "kind": "Methodological / evaluation",
+        "status": "Partially addressed",
+        "confidence": "Moderate"
+      }
+    ],
+    "limitations": "Supplementarytraining/evaluationconfigurationnotyetreviewed. Noindependentruntime/robotmeasurement."
+  },
+  {
+    "id": "navila",
+    "title": "NaVILA: Legged Robot Vision-Language-Action Model for Navigation",
+    "authors": [
+      "An-Chieh Cheng",
+      "Yandong Ji",
+      "Zhaojing Yang",
+      "Zaitian Gongye",
+      "Xueyan Zou",
+      "Jan Kautz",
+      "Erdem Bıyık",
+      "Hongxu Yin",
+      "Sifei Liu",
+      "Xiaolong Wang"
+    ],
+    "year": 2025,
+    "venue": "Robotics: Science and Systems 2025",
+    "source": "https://roboticsproceedings.org/rss21/p018.html",
+    "pages": "Alternate arXiv v2 pages1,3–8 (local image-only proceedings PDF not text-reviewed)",
+    "versions": "Local supplied PDF has no extractable text. Reviewed alternate official-author arXiv2412.04453v2 (17Feb2025), downloaded to evidence/03/navila_alternate.pdf and text. Numerical claims here refer to that version; equivalence to supplied proceedings bytes is not assumed.",
+    "associated_files_reviewed": [
+      {
+        "file": "evidence/03/navila_alternate.pdf",
+        "version": "arXiv2412.04453v2",
+        "pages": "1,3–8",
+        "reason": "Accessibletextreplacement for image-onlylocalPDF"
+      }
+    ],
+    "problem": "ConnectssemanticVLNplanningtoleggedrobotjointcontrol. SeparatesRGBVLAhighlevelcommandsfromLiDAR/proprioceptivePPOlocomotion. Thereforehigh-levelRGB-onlybenchmarkdescription mustnotbeappliedtothefullrealrobotstack.",
+    "method": "§II-A VILAimage-VLM encodescurrentframeplusuniformhistory(alwaysretainfirst);196tokens/frame,8–64frames, textualrolesratherthanspecialhistorytokens. Allvision/projector/LLMweightsSFToneepoch fromstage2VILA. Datablend: R2R/RxRoracle,EnvDropaugmentedinstructions,trajectorysummarization,ScanQA,generalVQA,and20Ktrajectoriesfrom2KYouTubetours. MASt3Rmetricpose createscontinuousactions; VLMcaptions+LLMrephrasesinstructions. Consecutivesameactionsmerge≤3andStopisrebalanced. Regexoutputs distance/angle. §II-B convertsforwardto.5m/s andturnto±π/6rad/sforcommandduration. PPOactorpredicts12desiredjointpositions; PDcontrollerconvertsmotor torque. Actorusespropriohistoryand2.5DLiDARheightmap;criticgetsprivilegedlinearvelocity/terrain. Lowestvoxelheightplusmaxfilterover5cloudsbuildmap. One-stageRLtrainedinIsaacLab; exactrewardweightsrequireappendix/legged-locorepo. FullsystemrequiresLiDARandcontrollerdynamics,notjustVLM.",
+    "novelty": "Two-levellanguageactioninterface joinsgeneralVLAwithperception-conditionedleggedlocomotion; humanvideoactionlabeling andVLN-CE-Isaacbenchmarkaremajorcontributions. Directjointpredictionwasnotused. Newbenchmarkphysicalembodimentcontrols are asimportant asVLMarchitecture.",
+    "results": "TableI R2R54SR/49SPL,RxR49.3/44trainedboth; TableII R2R-onlyRxR34.3/28.2mustnotbeconfusedwith49.3. Isaac1077selectedtraversablemeshtrajectories: Go2blind36.2SR→LiDAR50.2,oracle51.3; H1blind24.4→45.3. Proseclaims15/27pointoracle-gap butthoseareblindpolicygaps,notvisionpolicygaps(1.1/6.0); TableIVclarifiesthis. TableVcollision.81versusROA3.09. Real25instructions×3trials, humanvideodatahelpsoutdoorstrongly; platformtransferusesnewlowlevelcontrolbutsharedVLA. Smallselectedrealworldtestnotgeneral safetyguarantee.",
+    "bottlenecks": [
+      {
+        "id": "NAVILA-1",
+        "description": "Semantic command can be physically infeasible despite robust local avoidance",
+        "conditions": "Narrowdoors, embodimentshape, blockedroute, cameraheightchanges",
+        "cause": "HighlevelVLAdoesnotexplicitlyreceivebodygeometryorlocomotionfeasibility",
+        "evidence": "IsaacTableIVGo2vsH1difference andtraversablesubsetselection",
+        "followups": "NavFoMunifiesembodimentsbutstilltaskscaling/controllers; CorrectNavacknowledgesphysicalbodycollisions",
+        "kind": "Methodological / evaluation",
+        "status": "Partially addressed",
+        "confidence": "Moderate"
+      }
+    ],
+    "limitations": "Image-onlylocalPDFreplacedbyarxivv2; laterproceedingchangesnotassumedreviewed. Low-levelreward/physicsappendixpending. NoIsaac/robotexperiment."
+  },
+  {
+    "id": "polarmem",
+    "title": "PolarMem: A Training-Free Polarized Latent Graph Memory for Verifiable Vision-Language Models",
+    "authors": [
+      "Zhisheng Chen",
+      "Tingyu Wu",
+      "Zijie Zhou",
+      "Zhengwei Xie",
+      "Jinhan Li",
+      "Ziyan Weng",
+      "Liang Lin",
+      "Jingwei Song",
+      "Zikai Xiao",
+      "Yingwei Zhang"
+    ],
+    "year": 2026,
+    "venue": "arXiv2602.00415v2,30May2026; conference acceptance not verified",
+    "source": "https://arxiv.org/abs/2602.00415",
+    "pages": "1,3–7",
+    "problem": "MultimodalRAGretrievessemanticallysimilarevidenceevenwhenitcontradictsthequery. PolarMemrecordspositive/negative/uncertainconceptrelations. ItisnotVLNbenchmarkevidence anddoesnotmeasurepartial-observationnavigationabsence.",
+    "method": "§3 Eq1 frozenVLMproposesconceptsC_prop,thenmeanYesprobabilityoverensembledpromptsdefines s_c∈[0,1]. Anchors0,1augmentinstancescores; Otsu-stylebetweenclassvarianceargmaxgivesτ*. Marginδ=κσ_within leadsHAS ifs>τ+δ,NOT_HAS ifs<τ−δ,elseUncertain(Eqs2–3). Textentitychunksalignconceptnodes. Graphcontainsvisual,text,conceptnodes,typedHAS/NOT_HASedges;hybridrepresentationcombinesglobalvisual,localpatches,andserializedpolarizedconceptembedding(Eqs4–7). QueryparsespositiveQ+andavoidQ−. Algorithm1setslogicalscore−1forconflict,1ifanypositiveintersection,0otherwise; lexicographicsort(logic,cosinesimilarity),thenfirstK. This ranksratherthanstrictlyremovesconflicts: whenfewerthanKnonconflicts exist, returnedcontextcancontainconflicts. 'Entailment'checksanypositiveconcept,notallqueryrequirements. FrozenVLMgeneratesfromserializedretrievalcontext(Eqs8–9); nobackboneoptimization. Otsuthresholdisdistributionpartition,notcalibratedprobabilityorverifiedabsence.",
+    "novelty": "Negativeevidenceasfirst-classmemoryedgesandlexicographiclogicpriority. ClosestViLoMem/GraphRAGalreadyorganizeserrors/relations; distinguishespositiveandnegativeconceptstatesexplicitly. This mustbecitedfor any proposednegativeVLNmemory; spatialviewcoverageandtimevalidityremainunmodeledhere.",
+    "results": "Table1eightbackbones/sixbenchmarks:Qwen2.5VL7BMRAG60.7→70.8,VisualRAG40.2→49.9,butMMMU56.3→55.7;Qwen32BMMMU68.4→66.5. Figure3Conflict@3.067→.033andfilterrate.875→.938supportreducedcontradictions,notzero-conflictguarantee. Samepool/topKcontrolshelpisolateorganization. Gainsnotuniversal: strongerbackbonegeneralreasoningcanbe harmedbyhardconstraints. Authorsacknowledgeconceptproposalcannotrecoverunproposedanswer-criticalconcepts.",
+    "bottlenecks": [
+      {
+        "id": "POLAR-1",
+        "description": "False negative memories can suppress valid evidence; ranking does not ensure conflict exclusion",
+        "conditions": "Occluded/partialimages, missingcandidateconcepts, fewerthanKcompatiblememories",
+        "cause": "VLMscorepartition conflatesuncertaintywithabsence; hardconstraintsrelyonfallibleperception",
+        "evidence": "Eqs1–3,Algorithm1,§3.3coverageboundary andTable1degradations",
+        "followups": "Navigationwouldneedviewcoverage/temporalvalidity/abstention; HAM-VLNreflection isadvisory,ContextNavhasUnknownstatebutdifferenttask",
+        "kind": "Methodological / evaluation",
+        "status": "Partially addressed",
+        "confidence": "Moderate"
+      }
+    ],
+    "key_findings": [
+      {
+        "claim": "Algorithm1 top-K can still return contradictory records; absence labels are model judgments",
+        "evidence_type": "Algorithm counterexample and paper inspection",
+        "source": "SuppliedPDF",
+        "locator": "§3.1Eqs1–3; Algorithm1lines8–18"
+      }
+    ],
+    "limitations": "NoVLNperformanceclaimsupported. Remainingablations/indexingcostappendixpending. Noexecutedbenchmark."
+  },
+  {
+    "id": "profocus",
+    "title": "ProFocus: Proactive Perception and Focused Reasoning in Vision-and-Language Navigation",
+    "authors": [
+      "Wei Xue",
+      "Mingcheng Li",
+      "Xuecheng Wu",
+      "Jingqun Tang",
+      "Dingkang Yang",
+      "Lihua Zhang"
+    ],
+    "year": 2026,
+    "venue": "CVPR2026mainpaperwatermark",
+    "source": "https://arxiv.org/abs/2603.05530",
+    "pages": "1,3–7",
+    "problem": "FrozenLLM/VLMnavigationwastescontextonpanoramicimagesandallhistoricalwaypoints. ProFocusqueriesinstruction-specificvisualcrops andselectsbranchesforreasoning. Graphcandidatesareprovided; croppingexistingpanoramas iscomputationalactiveperception,not necessarilyphysicalinformation-gatheringaction.",
+    "method": "§3: VLMscansoverlappingpanoramaviewsforobjectboxes; SAM2masks+monoculardepthgiveobjectdistances; heading/box/category/depthbecometextegomap. OrchestratingLLMiterativelyasksfocusedcropqueries, VLManswers,LLMdeclares'sufficient'ornot(Eqs1–8). LLMassignsnewwaypointsemanticvalue[0,1]. BD-MCTSmaintainsacyclictreebydroppingcrossbranchedges; noMonteCarlorollouts: newlyobservedchildsemanticvaluemeanbacksupthroughvisitedancestorswithincrementalmeanQ←Q+(R−Q)/N(Eqs9–11). Leavesrankbyvisitweightedancestorvalue minusλnormalizedshortestpathdistance(Eq12),atmost2children/parentandtopK. DecisionLLMretrievesselectedpathcontexts andchoosesnextwaypoint(Eq13);rawgraphsupportsreachablepaths. ModelsDeepSeekV3+GLM4.5V orQwen3Max+Qwen3VLMax, nofinetuningloss. LLMsufficiency/valuesarenotcalibratedprobabilities andsearchconvergenceisnotproven.",
+    "novelty": "Combinesquery-guidedcropperceptionwithbranch-diversememoryselection. MapGPTalreadyhasgraphbacktracking; DiscussNavmulti-agentroles; distinctcontributiontargetedinformationqueries andcoarsecandidatefilter. CallingtheheuristicMCTSdoesnotinheritUCT/statisticalguarantees.",
+    "results": "Tables1–2 QwenpairR2R52.5SR/39.8SPL andREVERIE40/24.8; comparisonmodelsreimplementedwithmodernbackbonesonrandomsubsetwhoseexactsizeisnotinreviewedmainsetup. R2RProFocusTable3full52.0differsTable1 52.5. RemovingperceptionQwenR2R52→48SR,39.8→34.4SPL. RemovingBD-MCTSREVERIESR40→37.78butSPL24.83→27.37:exploration/efficiencytradeoff. Longest30episoderesults50%SRarelimitedsampleevidence. REVERIEobjectgroundingexplicitlyomitted.",
+    "code": "No verifiedofficialcodeURLfoundinreviewedpaper/search; unrelated artisticProFocusrepositorywasexcluded. Noimplementationinspectedorexecuted.",
+    "repository_status": "Official implementation unverified",
+    "bottlenecks": [
+      {
+        "id": "PROFOCUS-1",
+        "description": "Semantic value and perception sufficiency can be confidently wrong; branch pruning loses useful loops",
+        "conditions": "Ambiguouslandmarks, usefulcrossbranchroute, uncertainvisualcrops",
+        "cause": "LLMjudgmentslackcalibration; acyclicadaptationdropsedges; topKprunescontext",
+        "evidence": "Eqs6–12,Table4SPLtradeoff",
+        "followups": "PSG-Navcalibratesstructuredgoaluncertainty; HAM-VLNretrievesreflectionmemory; physicalvalue-of-informationstillunestablished",
+        "kind": "Methodological / evaluation",
+        "status": "Partially addressed",
+        "confidence": "Moderate"
+      }
+    ],
+    "limitations": "Noverifiedcode; budgets,fullsubsetidentitiesandlooplimitpendingappendix. Nobenchmarkexecuted.",
+    "status": "Complete with explicit implementation limitation"
+  },
+  {
+    "id": "progressthink",
+    "title": "Progress-Think: Semantic Progress Reasoning for Vision-Language Navigation",
+    "authors": [
+      "Shuo Wang",
+      "Yucheng Wang",
+      "Guoxin Lian",
+      "Yongcai Wang",
+      "Maiyue Chen",
+      "Kaihui Wang",
+      "Bo Zhang",
+      "Zhizhong Su",
+      "Yutian Zhou",
+      "Wanting Li",
+      "Deying Li",
+      "Zhaoxin Fan"
+    ],
+    "year": 2026,
+    "venue": "CVPR2026mainpaperwatermark",
+    "source": "https://arxiv.org/abs/2511.17097",
+    "pages": "1,3–8",
+    "problem": "Predictwhichinstructionprefixhasbeencompletedratherthanjustnumericdistanceprogress. UsesmonocularCEandtwoNVILA2Bmodels, weaktrajectoryprefixsupervisionandactioncorrection.",
+    "method": "§3 Eqs1–5 progressmodelpredictscompletedtextIhat fromhistory/currentframes. Forprefixlengthk∈[1,|I|], p(k)∝exp(−CE(Ihat_1:k,I_1:k)/τ); khat=E[k]. Prefixloss=−τlogΣ_kexp(−CE_k/τ),monotonicloss=max(0,khat_early−khat_late). Theseconstraints do notidentifycorrectalignment: constantprogresssatisfiesmonotonicity, andprefixCEreduction(sumvsmean)affectslengthbias. Nozero-lengthprefixislisted. Stage2frozenprogressconditionsfullinstruction/historypolicy;CEoverK3nextactions. Stage3jointGRPOusesr_act=longestexactlycorrectactionprefix, r_formatbinary, r_length=1ifgeneratedprogresslength≤instructionelse−βexcess. Thusshorterincorrectprogressgetsfull lengthreward; thisdoesnotcalibratesemanticcompletion. Productofprogress/actionprobabilityratiosEq14givesjointimportanceweight; stdzerohandlingnotshownEq12. Rollout4,clip.28,KL0,3000stepslr1e−6;pretrainstageslr1e−5oneepoch,8H20×(8+60+60h). TrainingmentionsR2R/RxR/ScaleVLN1200Kstate-actionpairs plus500KDAgger; 'respectively'wordingambiguousaboutcountperdataset. Predict3parameterizedactions(25/50/75cm,15/30/45°),executeall3best. Monotoniccompleted-historycanbevalid, butcurrentlocation/subtaskmayregressaftererror; prefixsufficiencyisassumption.",
+    "novelty": "Differentiablelatentprefixalignment plusseparatelytrainedsemanticprogress andjointprogress/actionRL. SemanticstagealignmentoverlapsIDEAL-VLN/AwareVLN; distinguishingfeatureweakannotationandprefixstructuralobjective. This isnottraining-free orzeroexternalpretraining:0Kexternalrefersadditionalnavigationfine-tuningdata, whileNVILApretrainingisexternal.",
+    "results": "Table1R2R60.1SR/53.6SPL; Table2R2R-onlyRxR27.5/22.7distinctmodel/protocol. Ablationbaseline33/28.3→prefix39.4/34.6→mono41.4/36.5→action+formatRL40/35→lengthreward43.8/38.5(Table4): RLwithoutlengthdegrades. Ablationfull43.8notmain60.1,so reducedsettingmustbeidentifiedbeforecomparisons. Table6successful-episode-onlytime36.60s(2B+2B)vsNaVILA56.84s8B, notmatchedmodelsizeorunconditionalruntime. Monotonicloss improvesreportedperformance, notprovenprogressidentifiability.",
+    "bottlenecks": [
+      {
+        "id": "PROGRESS-1",
+        "description": "Weak prefix objectives admit degenerate or semantically incorrect progress",
+        "conditions": "Repeatedclauses, loops, partial completion, recovery",
+        "cause": "Monotonicity andlengthboundsconstrainformbutnotobservationalalignment; actionrewardcanignoretruthfulprogress",
+        "evidence": "Eqs2–5,8–14; Table4RLdegradationwithoutlength",
+        "followups": "IDEAL-VLNaddsprivilegedalignmentthoughtcorrection; AwareVLNsparseoraclethoughts; faithfulprogressunderrecoverystilluncertain",
+        "kind": "Methodological / evaluation",
+        "status": "Partially addressed",
+        "confidence": "Moderate"
+      }
+    ],
+    "key_findings": [
+      {
+        "claim": "Length reward cannot distinguish correct progress from any shorter text; monotonicity alone does not identify alignment",
+        "evidence_type": "Mathematical counterexample from stated objectives",
+        "source": "SuppliedPDF",
+        "locator": "Eqs4,10"
+      }
+    ],
+    "limitations": "ExactprefixCEreduction,stop/emptyprefixhandling,andjointRLcode remaininspectiontargets. Nobenchmarkexecuted."
+  }
+]

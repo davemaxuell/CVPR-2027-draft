@@ -1,0 +1,673 @@
+{
+  "chasing_ghosts": [
+    {
+      "id": "02-chasing_ghosts-control",
+      "description": "Improved instruction-goal localization does not translate into competitive complete navigation.",
+      "conditions": "R2R with RGB-D panoramas, supplied poses and discrete reachable graph nodes.",
+      "cause": "The ghost endpoint belief is consumed by a separate local graph-node controller; localization quality alone does not solve route selection and stopping.",
+      "evidence": "PAPER EXPERIMENT: Tables 1–2, PDF pp.7–8: localization 44.9% versus 32.2%, but unseen navigation SR/SPL 35/31. DEDUCTION: interface bottleneck rather than measured causal attribution.",
+      "kind": "Methodological",
+      "followups": "DUET/topological planners change control and representation; HNR/SALI add predicted content. No matched belief-versus-controller intervention was reviewed.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "Medium"
+    },
+    {
+      "id": "02-chasing_ghosts-belief",
+      "description": "Normalized ghost beliefs have no demonstrated calibration under pose error or ambiguous instructions.",
+      "conditions": "Variable-length instructions, incorrect pose/depth or multiple plausible instruction routes.",
+      "cause": "Learned motion/observation likelihoods, a fixed six-step ghost rollout, and normalized products do not establish valid likelihood independence or coverage.",
+      "evidence": "DEDUCTION: Sections 3–4, PDF pp.3–6; tracker/modules/navigators.py:142–189,279–286 and tracker/modules/loss.py:20–36 at the dossier commit.",
+      "kind": "Insufficiently tested",
+      "followups": "Later map-based and imagined-view papers in this assignment do not report matched posterior-coverage tests.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "Medium"
+    }
+  ],
+  "cotvla": [
+    {
+      "id": "02-cotvla-subgoal",
+      "description": "Generated visual subgoals can fail to specify a useful reachable action target.",
+      "conditions": "Novel manipulation tasks requiring visual subgoals outside fine-tuning support.",
+      "cause": "Language/image-conditioned generation does not explicitly enforce the action-conditioned reachability of the target.",
+      "evidence": "PAPER EXPERIMENT: Table 3, PDF p.8, five trials on each of two novel tasks: generated goals 20%/0% versus demonstration goals 60%/40%. Small sample and privileged targets limit attribution.",
+      "kind": "Methodological",
+      "followups": "FantasyVLN and WorldVLN use different navigation tasks; neither supplies a matched manipulation reachability test.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "Medium"
+    },
+    {
+      "id": "02-cotvla-latency",
+      "description": "Visual-token generation slows decisions and action chunks postpone observation feedback.",
+      "conditions": "Ten-action execution chunks, especially when the environment changes within a chunk.",
+      "cause": "Autoregressive generation of 256 visual tokens precedes action prediction; the policy obtains a new real image at chunk boundaries.",
+      "evidence": "AUTHOR ACKNOWLEDGEMENT: Section 5, PDF p.8, approximately sevenfold slowdown at chunk length ten and missing high-frequency feedback.",
+      "kind": "Methodological",
+      "followups": "FantasyVLN removes explicit visual CoT at deployment and reports faster actions (Table 2); this shifts burden into training and does not verify within-chunk control in the same task.",
+      "status": "Shifted into another cost or limitation",
+      "confidence": "Medium"
+    }
+  ],
+  "cvaml": [
+    {
+      "id": "02-cvaml-estimator",
+      "description": "Finite-sample variance correction can retain bias and raise sampling costs.",
+      "conditions": "Stochastic transitions with a finite number of next-state samples.",
+      "cause": "The inspected estimator uses population variance divided by N; with iid samples and fixed value, that differs from unbiased sample variance divided by N. Sample-dependent action selection adds further dependencies.",
+      "evidence": "INSPECTED CODE: CVAML loss discussion and immutable links in 02_repository_audit.md. EXECUTED TEST: evidence/02/logic_check_results.json enumerates 16 N=4 ±1 samples; corrected mean loss 0.0625 versus approximately zero with unbiased variance. This is a restricted arithmetic counterexample, not a benchmark result.",
+      "kind": "Implementation-specific",
+      "followups": "No inspected follow-up supplies a correction for this exact estimator and dependency structure.",
+      "status": "Still unresolved in the reviewed literature",
+      "confidence": "High for the stated iid fixed-value counterexample; uncertain for benchmark impact"
+    },
+    {
+      "id": "02-cvaml-goal",
+      "description": "Value equivalence for one value function does not preserve all future instruction-dependent distinctions.",
+      "conditions": "Changing language goals or rewards after learning a task-specific latent model.",
+      "cause": "The objective preserves expected values for its selected value function, allowing state distinctions irrelevant to that function to disappear.",
+      "evidence": "DEDUCTION: main objective and Appendix proof, PDF pp.18–20; the existence argument assumes a compact connected setting and a suitable value mapping. Appendix C.4 p.23 shows auxiliary BYOL loss remains important.",
+      "kind": "Methodological",
+      "followups": "NavQ predicts goal-dependent semantic successors; WoMAP learns detector-derived rewards. Neither establishes universal goal-change preservation or action-risk calibration.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "Medium"
+    }
+  ],
+  "dinowm": [
+    {
+      "id": "02-dinowm-language",
+      "description": "Image-goal feature planning does not itself provide language-goal reward semantics.",
+      "conditions": "Tasks specified by text rather than an available target image.",
+      "cause": "The planner optimizes distance to a specified visual target in frozen DINO feature space.",
+      "evidence": "AUTHOR METHOD: Section 3 and task evaluation, PDF pp.3–6; Table 2 shows patch features help PushT but does not validate language understanding.",
+      "kind": "Methodological",
+      "followups": "WoMAP adds VLM proposals and language-conditioned distilled object rewards, with physical object-reaching tests. This adds detector and VLM errors and is not broad instruction-following validation.",
+      "status": "Partially addressed",
+      "confidence": "Medium"
+    },
+    {
+      "id": "02-dinowm-exploitation",
+      "description": "Feature similarity can reward predicted outcomes that are not achievable or task-correct.",
+      "conditions": "Out-of-support actions, aliased views or multimodal futures during CEM search.",
+      "cause": "A deterministic feature predictor and feature-distance goal objective need not preserve all physical constraints; optimizing them can select model errors.",
+      "evidence": "DEDUCTION from Section 3 and inspected planner; Table 1 task successes do not test calibrated confidence or adversarial model exploitation.",
+      "kind": "Methodological",
+      "followups": "WoMAP extends the reward interface but retains optimizer/model/reward error; no matched intervention establishes resolution.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "Medium"
+    }
+  ],
+  "dreamer": [
+    {
+      "id": "02-dreamer-planning_cost",
+      "description": "Avoiding online candidate search requires learning an actor and value model on imagined trajectories.",
+      "conditions": "Tasks where latency at action selection matters but training compute is available.",
+      "cause": "Dreamer amortizes PlaNet-style latent planning through actor/value optimization rather than solving the search anew at deployment.",
+      "evidence": "AUTHOR METHOD and PAPER EXPERIMENT: Sections 3–4 and Figure 6, PDF pp.3–6; mean score 823 after 5M steps on 20 DMC tasks. This does not establish equal compute.",
+      "kind": "Methodological",
+      "followups": "Dreamer addresses PlaNet online search cost; later Dreamer versions extend scaling. The cost moves into behavior learning and value approximation.",
+      "status": "Shifted into another cost or limitation",
+      "confidence": "Medium"
+    },
+    {
+      "id": "02-dreamer-model_bias",
+      "description": "Imagined actor improvement can exploit model or value errors outside collected support.",
+      "conditions": "Long imagined trajectories or policy updates into poorly observed regions.",
+      "cause": "Policy gradients optimize returns supplied by learned dynamics and bootstrapped values; neither provides a general off-distribution correctness guarantee.",
+      "evidence": "DEDUCTION: Dreamer latent rollout/value objectives; World Models provides a direct exploitation example, while Dreamer benchmark gains do not isolate this failure mode.",
+      "kind": "Methodological",
+      "followups": "Iterative data collection and later Dreamer models mitigate distribution mismatch, but no reviewed evidence resolves all out-of-support goal-conditioned navigation errors.",
+      "status": "Still unresolved in the reviewed literature",
+      "confidence": "Medium"
+    }
+  ],
+  "dreamwalker": [
+    {
+      "id": "02-dreamwalker-scoring",
+      "description": "Distance prediction remains a stronger bottleneck than future image fidelity in the paper intervention.",
+      "conditions": "Unseen continuous VLN episodes requiring branch ranking.",
+      "cause": "The distance evaluator scores imagined states; a visually reasonable branch can still receive the wrong task-progress score.",
+      "evidence": "PAPER EXPERIMENT: Table 2 p.7 gives SR 49 normally versus 54 with oracle views; Figure 4 reaches 100% with full privileged distance replacement. Oracle interventions are not deployable methods.",
+      "kind": "Methodological",
+      "followups": "HNR improves fixed-policy future features; NavQ adds semantic/distance supervision. Neither supplies a matched resolution of DREAMWALKER distance calibration.",
+      "status": "Partially addressed",
+      "confidence": "Medium"
+    },
+    {
+      "id": "02-dreamwalker-reproduction",
+      "description": "The printed distance/reward signs cannot be resolved against released model code.",
+      "conditions": "Attempting a faithful reimplementation of Eqs.11–12.",
+      "cause": "The text describes progress toward a goal, while printed reward/softmax signs appear to favor larger distance; retrieved official repository contains documentation rather than model source.",
+      "evidence": "UNVERIFIED: Eqs.11–12 versus prose, PDF method section; official repository README at ab7c9a5c9d07742e30e4cf99132cf1f61bb83de5.",
+      "kind": "Implementation-specific",
+      "followups": "No inspected correction or executable official implementation resolves the sign ambiguity.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "High for the documentation gap; unknown for intended implementation"
+    }
+  ],
+  "eoe": [
+    {
+      "id": "02-eoe-risk_transfer",
+      "description": "Image semantic novelty scores are not established estimates of unsafe or instruction-inconsistent navigation actions.",
+      "conditions": "Familiar objects with unsafe transitions, or unknown categories absent from generated negative labels.",
+      "cause": "The score compares CLIP similarity to generated class descriptions, without a transition/action outcome variable or exhaustive unknown-class coverage.",
+      "evidence": "PAPER EXPERIMENT: pp.6–8 fine-grained FPR95/AUROC 60.52/81.82, far-ImageNet 30.09/92.96; INSPECTED CODE: cosine overlap filter at 0.85 for ImageNet20. DEDUCTION: semantic novelty differs from navigation risk.",
+      "kind": "Insufficiently tested",
+      "followups": "No matched navigation-risk follow-up was reviewed; EOE must remain adjacent OOD prior art.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "Medium"
+    }
+  ],
+  "fantasyvln": [
+    {
+      "id": "02-fantasyvln-completion",
+      "description": "Full multi-part navigation success remains very low despite relative gains.",
+      "conditions": "The evaluated long complete-task benchmark rather than isolated subgoal success.",
+      "cause": "A long sequence of grounding/action decisions can fail even when per-subtask completion improves; the experiment does not isolate the causal distribution of these failures.",
+      "evidence": "PAPER EXPERIMENT: Table 1 p.6, SR 2.44, ISR 11.01, CSR 9.64; more than 97% of complete tasks fail. No independently reproduced decomposition.",
+      "kind": "Methodological",
+      "followups": "MonoDream/NavForesee/WorldVLN evaluate different task/sensing settings, so their headline successes do not establish a solution on this protocol.",
+      "status": "Still unresolved in the reviewed literature",
+      "confidence": "Medium"
+    },
+    {
+      "id": "02-fantasyvln-faithfulness",
+      "description": "Action-token alignment does not establish that visual reasoning is faithful or necessary at inference.",
+      "conditions": "Attributing improvements to actual reasoning rather than auxiliary representation learning.",
+      "cause": "Training aligns branches, while direct deployment can act without explicit visual CoT; multiple training changes share credit.",
+      "evidence": "PAPER EXPERIMENT: Table 3, visual-only non-CoT ISR 11.19 versus full 11.01; alignment removal SR 0. INSPECTED CODE: trainer ranges cited in dossier confirm non-CoT teacher to CoT action alignment.",
+      "kind": "Insufficiently tested",
+      "followups": "MonoDream and VLN-SIG also use auxiliary prediction. No matched counterfactual intervention establishes faithful reasoning across these systems.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "Medium"
+    }
+  ],
+  "genex": [
+    {
+      "id": "02-genex-provenance",
+      "description": "Long self-consistent generated trajectories need not describe the actual occluded environment.",
+      "conditions": "Using simulated views to answer questions about hidden physical facts or update navigation confidence.",
+      "cause": "Conditional on a fixed real observation history and fixed model, additional generated samples are computed from that information; loop closure can be satisfied by a consistently false world.",
+      "evidence": "DEDUCTION: generative pipeline; PAPER EXPERIMENT: Table 2 p.9 IELC 0.105 streets/0.092 indoors and synthetic GenEx-EQA do not measure truth of hidden real environments.",
+      "kind": "Fundamental under fixed-history conditioning",
+      "followups": "SALI persists imagined nodes; WorldVLN assimilates later real observations. Real observations add evidence, but no reviewed study establishes reliable confidence for hidden facts from generation alone.",
+      "status": "Still unresolved in the reviewed literature",
+      "confidence": "High for information distinction; medium for system-level practical impact"
+    }
+  ],
+  "hnr": [
+    {
+      "id": "02-hnr-extrapolation",
+      "description": "Semantic feature prediction degrades with distance and occlusion.",
+      "conditions": "Longer lookahead branches entering unobserved regions in R2R-CE/RxR-CE.",
+      "cause": "Rendered features must extrapolate geometry/semantics not directly contained in the observed feature field.",
+      "evidence": "PAPER EXPERIMENT: Figure 5 p.7 shows declining similarity with distance; Table 3 predicted SR 60.74 versus oracle 63.13 under fixed lookahead policy; Table 6 soft targets outperform hard targets.",
+      "kind": "Methodological",
+      "followups": "NavMorph adds contextual adaptation and improves HNR; SC²-WM adds calibration and delayed real-observation adaptation. Gains do not eliminate the equal-sensing occluded-region oracle gap.",
+      "status": "Partially addressed",
+      "confidence": "Medium"
+    },
+    {
+      "id": "02-hnr-branch_selection",
+      "description": "Maximizing descendant scores can favor an overoptimistic noisy branch.",
+      "conditions": "More candidate descendants or correlated errors in unseen-branch evaluation.",
+      "cause": "Eq.15 takes a maximum without a demonstrated uncertainty correction or calibrated confidence bound.",
+      "evidence": "DEDUCTION: Eq.15, method section; no risk-calibration or search-width bias experiment was identified in reviewed tables.",
+      "kind": "Insufficiently tested",
+      "followups": "NavQ avoids explicit rollout through successor semantics; SC²-WM adapts features. Neither directly tests or removes the maximum-selection bias in the same planner.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "Medium"
+    }
+  ],
+  "imaginenav": [
+    {
+      "id": "02-imaginenav-memory",
+      "description": "Local mapless imagination can revisit regions and spend path length on unproductive choices.",
+      "conditions": "Long object-goal searches with repeated visually similar regions.",
+      "cause": "Limited persistent spatial memory and proposal constraints restrict global exploration history.",
+      "evidence": "PAPER EXPERIMENT: Table 1 p.7 HM3D SR/SPL 53/23.8 versus VLFM 52.5/30.4. DEDUCTION: lower efficiency is compatible with, but does not prove, revisitation as its cause.",
+      "kind": "Methodological",
+      "followups": "ImagineNav++ arXiv:2512.17435 adds memory/selective foveation. Its project and forthcoming-code status were inspected, but a matched full implementation/experimental audit is outside this dossier.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "Medium"
+    },
+    {
+      "id": "02-imaginenav-views",
+      "description": "Novel-view prediction errors leave a substantial action-selection gap.",
+      "conditions": "Unseen scenes and viewpoints outside the synthesizer training distribution.",
+      "cause": "The action selector depends on generated candidate views whose appearance/content can be wrong.",
+      "evidence": "PAPER EXPERIMENT: Table 1 p.7 oracle views raise SR from 53 to 62 on HM3D and from 51 to 59 on HSSD.",
+      "kind": "Methodological",
+      "followups": "HNR changes representation and WMNav changes the scoring interface; cross-protocol gains do not resolve the matched ImagineNav oracle gap.",
+      "status": "Still unresolved in the reviewed literature",
+      "confidence": "Medium"
+    }
+  ],
+  "lcvn": [
+    {
+      "id": "02-lcvn-closed_loop",
+      "description": "Offline endpoint success does not establish collision-free closed-loop instruction following.",
+      "conditions": "Open-loop predicted trajectories, particularly novel scenes with alternate valid routes.",
+      "cause": "The evaluated endpoint threshold and expert-latent reward omit intervening collision and real-observation correction evidence.",
+      "evidence": "PAPER EXPERIMENT: Tables 1–2 pp.8–9: unified unseen SR 0.27 versus separate 0.19, despite separate model better SSIM/LPIPS; success is endpoint distance below average step size. INSPECTED CODE: actor uses detached returns and REINFORCE rather than a gradient through frozen DFOT.",
+      "kind": "Insufficiently tested",
+      "followups": "WorldVLN uses segmented real observations, while WorldMAP/PiJEPA remain current leads. No matched physical closed-loop validation was reviewed.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "Medium"
+    }
+  ],
+  "learning_to_map": [
+    {
+      "id": "02-learning_to_map-overconfidence",
+      "description": "Ensemble variance and repeated map fusion do not provide validated calibrated exploration uncertainty.",
+      "conditions": "Shared model bias or repeated correlated observations in active object-goal navigation.",
+      "cause": "Ensemble members can agree incorrectly, and registered repeated predictions are not independent evidence; UCB score construction lacks demonstrated coverage.",
+      "evidence": "DEDUCTION: ensemble prediction and UCB mechanism; PAPER EXPERIMENT: Tables 1–2 p.7 show SR/SPL 34.3/13.3 and IoU 25.6, not calibration guarantees.",
+      "kind": "Insufficiently tested",
+      "followups": "SGM uses masked map completion and WMNav heuristic VLM curiosity; neither resolves posterior coverage or shared-bias detection in this protocol.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "Medium"
+    },
+    {
+      "id": "02-learning_to_map-resources",
+      "description": "Active semantic mapping requires privileged training maps, accurate pose and multiple predictor evaluations.",
+      "conditions": "Deployment without reliable pose or training scenes with annotated semantic occupancy.",
+      "cause": "Map registration relies on known pose; supervised targets and four-model ensembles introduce annotation and inference costs.",
+      "evidence": "AUTHOR METHOD: map construction/training and ensemble details in dossier; no pose-error ablation establishes robustness.",
+      "kind": "Methodological",
+      "followups": "SGM introduces masked-map pretraining and priors, partially changing supervision, but retains semantic-map/perception dependencies.",
+      "status": "Partially addressed",
+      "confidence": "Medium"
+    }
+  ],
+  "lookbeforeleap": [
+    {
+      "id": "02-lookbeforeleap-frozen_model",
+      "description": "Teacher-heavy model data and frozen deterministic short-horizon prediction poorly cover policy errors.",
+      "conditions": "Actions and scenes outside the environment-model training distribution.",
+      "cause": "The predictor is trained before policy use and is not corrected online; deterministic features compress multiple possible outcomes.",
+      "evidence": "AUTHOR METHOD and DEDUCTION: two-stage training/rollout sections; Table 1 p.12 unseen SR 24.6 versus model-free 21.5 establishes early utility but not shift robustness.",
+      "kind": "Methodological",
+      "followups": "DREAMWALKER/HNR strengthen predictions; NavMorph and SC²-WM add adaptation. SC²-WM specifically supplies delayed real-observation residual updates, but on a different architecture and CE protocol.",
+      "status": "Partially addressed",
+      "confidence": "Medium"
+    }
+  ],
+  "monodream": [
+    {
+      "id": "02-monodream-horizon",
+      "description": "Longer future prediction supervision can hurt under partial observability.",
+      "conditions": "Monocular VLN with prediction targets beyond immediately visible geometry.",
+      "cause": "Targets become less identifiable from the current/history view, and auxiliary prediction can emphasize unreliable future details.",
+      "evidence": "PAPER EXPERIMENT: Table 6 p.7 SR 39.1/34.3/29.2 for horizons one/two/three; Table 5 current-depth-only 42.2 versus future-depth-only 39.8. DEDUCTION: target ambiguity is plausible, not experimentally isolated.",
+      "kind": "Methodological",
+      "followups": "FantasyVLN also uses training-time imagination; NavForesee keeps future structures in action computation. No matched equal-data horizon intervention demonstrates a resolution.",
+      "status": "Still unresolved in the reviewed literature",
+      "confidence": "Medium"
+    },
+    {
+      "id": "02-monodream-training_release",
+      "description": "The inspected official release does not provide the full auxiliary training pipeline needed to reproduce all four prediction objectives.",
+      "conditions": "Reproducing training ablations rather than loading published navigation weights.",
+      "cause": "The released RoboOrchardLab project exposes model, processor, inference and evaluation, but the inspected project listing lacks the complete paper-specific auxiliary trainer.",
+      "evidence": "INSPECTED CODE: HorizonRobotics/RoboOrchardLab commit 48ac43987df9ac1ba40fef72dd7a2b4679c592b4; projects/monodream and models/monodream files listed in the dossier.",
+      "kind": "Implementation-specific",
+      "followups": "Official implementation release resolves the earlier no-code search result for inference; a faithful full training reproduction remains unverified.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "High for inspected release scope; no claim about inaccessible future/private code"
+    }
+  ],
+  "navforesee": [
+    {
+      "id": "02-navforesee-counterfactuals",
+      "description": "Predicted target structures are not established as faithful consequences of alternative candidate actions.",
+      "conditions": "Using semantic/depth futures for branch choice under ambiguous or unusual layouts.",
+      "cause": "Task-conditioned future supervision may encode desired goal templates; it does not alone identify action-specific environment transitions.",
+      "evidence": "DEDUCTION: future prediction/action pipeline; PAPER EXPERIMENT: Table 2 p.7 full SR 66.2 versus 58.6 without long-horizon prediction shows utility, not physical counterfactual fidelity.",
+      "kind": "Insufficiently tested",
+      "followups": "WorldVLN and LCVN use other action/observation interfaces; SC²-WM adds observed residual adaptation. None is a matched counterfactual-validity test of NavForesee.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "Medium"
+    }
+  ],
+  "navmorph": [
+    {
+      "id": "02-navmorph-correction",
+      "description": "Online context adaptation improves scores but does not establish reliable correction of confidently wrong predictions.",
+      "conditions": "Unseen CE scenes and biased stored context.",
+      "cause": "Contextual memory supplies retrieved features without a calibrated confidence gate; latent alignment can preserve shared prediction bias.",
+      "evidence": "PAPER EXPERIMENT: Table 3 p.8 SR 47.91 versus 45.08 without self-evolution; DEDUCTION: Eq.2–3 memory weights are not correctness probabilities.",
+      "kind": "Methodological",
+      "followups": "SC²-WM adds learned feature/state refinement and delayed real-observation TTA, with further CE gains. Residual-to-correct-action reliability is still not isolated.",
+      "status": "Partially addressed",
+      "confidence": "Medium"
+    },
+    {
+      "id": "02-navmorph-episode_protocol",
+      "description": "Cross-episode memory makes evaluation depend on reset, ordering and prior test-scene exposure.",
+      "conditions": "Transductive test evaluation across multiple episodes in a scene.",
+      "cause": "Memory slots retain scene/context information, and replacement behavior changes available knowledge.",
+      "evidence": "AUTHOR ACKNOWLEDGEMENT: PDF p.8 discussion of test-scene memory/fairness; Figure 4 memory size 1000 performs best and smaller/larger settings can hurt.",
+      "kind": "Methodological",
+      "followups": "SC²-WM also adapts online, making episode-reset and matched exposure controls necessary. No reviewed ordering/reset factorial resolves comparability.",
+      "status": "Still unresolved in the reviewed literature",
+      "confidence": "Medium"
+    }
+  ],
+  "navq": [
+    {
+      "id": "02-navq-aggregation",
+      "description": "Successor semantic averaging can erase rare or route-specific evidence.",
+      "conditions": "Long discounted continuations, multiple equal shortest routes, or route-faithful instructions.",
+      "cause": "A fixed-dimensional weighted semantic target summarizes future captions under a selected continuation rather than representing all branch-specific consequences.",
+      "evidence": "PAPER EXPERIMENT: Table 4 p.8 gamma 0/.3/.5/.7 SR 51.12/51.95/53.22/50.89; Table 3 p.7 predicted full SR 53.22 versus oracle 59.27. INSPECTED CODE: dataset uses one stored shortest path per target.",
+      "kind": "Methodological",
+      "followups": "UNeMo adds task-conditioned future features and SC²-WM works in CE, but neither supplies a matched remedy for aggregated-semantic ambiguity.",
+      "status": "Still unresolved in the reviewed literature",
+      "confidence": "Medium"
+    },
+    {
+      "id": "02-navq-uniqueness",
+      "description": "Shortest continuation is not mathematically unique without a tie-breaking or graph assumption.",
+      "conditions": "Graphs containing equal-length shortest paths to the same destination.",
+      "cause": "Distinct first actions can share a shortest destination path length; the implementation chooses one stored path operationally.",
+      "evidence": "DEDUCTION/EXECUTED TEST: diamond-graph counterexample in evidence/02/logic_check_results.json; source dataset target construction, lines 180–244 at the dossier commit.",
+      "kind": "Methodological",
+      "followups": "The released target construction resolves operational labeling via a stored path, but does not establish the printed general uniqueness claim.",
+      "status": "Still unresolved in the reviewed literature",
+      "confidence": "High: the unqualified uniqueness claim has a counterexample; stored-path labeling remains well defined"
+    }
+  ],
+  "nwm": [
+    {
+      "id": "02-nwm-planning_cost",
+      "description": "Diffusion-based trajectory evaluation and restricted CEM candidates impose compute and expressivity costs.",
+      "conditions": "Online action planning over multiple imagined time steps.",
+      "cause": "Each candidate requires generated predictions; the released planner repeats one displacement across the horizon with a final yaw adjustment instead of optimizing fully independent per-step actions.",
+      "evidence": "INSPECTED CODE: planner.py:217–299 at the dossier commit; PAPER EXPERIMENT: Table 2 p.7 is offline ATE/RPE, not closed-loop SR.",
+      "kind": "Implementation-specific",
+      "followups": "LCVN trains an actor and unifies language/video/action generation, moving cost into training and changing the evaluation. No matched cost/expressivity resolution was reviewed.",
+      "status": "Shifted into another cost or limitation",
+      "confidence": "Medium"
+    },
+    {
+      "id": "02-nwm-physical_validity",
+      "description": "Offline video/trajectory errors do not establish safe causal action predictions in deployment.",
+      "conditions": "Actions outside logged support, moving obstacles or long physical navigation.",
+      "cause": "Observational action-conditioned training plus endpoint error metrics does not identify unsupported interventions or validate all intermediate transitions.",
+      "evidence": "PAPER EXPERIMENT: Tables 1–2 pp.6–7 report LPIPS and ATE/RPE; no physical safety claim follows. Access limit: high-resolution SACSoN/HuRoN data are not redistributable in official README.",
+      "kind": "Insufficiently tested",
+      "followups": "Vid2World improves causal masking/guidance; LCVN adds language. Different datasets and offline metrics do not resolve this validity gap.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "Medium"
+    }
+  ],
+  "pathdreamer": [
+    {
+      "id": "02-pathdreamer-geometry",
+      "description": "Image-generation gains were evaluated with a privileged future navigation graph.",
+      "conditions": "Interpreting navigation results as planning through completely unknown geometry.",
+      "cause": "The navigation evaluation supplies future graph connectivity while replacing only future visual observations.",
+      "evidence": "PAPER EXPERIMENT: Table 3 p.8 horizon-three SR 50.4 versus repetition 40.6 and oracle 59.3; evaluation explicitly uses ground-truth future graph.",
+      "kind": "Methodological",
+      "followups": "DREAMWALKER predicts waypoints and HNR evaluates continuous candidates, partly reducing the oracle-graph assumption while introducing waypoint/geometry prediction error.",
+      "status": "Partially addressed",
+      "confidence": "Medium"
+    },
+    {
+      "id": "02-pathdreamer-horizon",
+      "description": "Generated structure degrades over successive unseen views.",
+      "conditions": "One to six synthesized steps into occluded geometry.",
+      "cause": "Autoregressive structure hallucinations accumulate; training RGB generation with ground-truth structure adds stage mismatch.",
+      "evidence": "PAPER EXPERIMENT: Table 1 p.7 unseen semantic mIoU 78.3 one-step versus 50.8 across one to six steps.",
+      "kind": "Methodological",
+      "followups": "HNR reduces pixel-generation cost and SALI preserves imagined nodes; neither validates the truth of long-horizon occluded structure under equal sensing.",
+      "status": "Partially addressed",
+      "confidence": "Medium"
+    }
+  ],
+  "planet": [
+    {
+      "id": "02-planet-online_search",
+      "description": "Receding-horizon latent CEM requires repeated candidate rollouts at each action decision.",
+      "conditions": "Latency-limited control with long horizons or many candidate sequences.",
+      "cause": "Compute grows with candidate count, horizon and optimizer iterations; one sampled stochastic rollout per candidate can also produce noisy ranking.",
+      "evidence": "AUTHOR METHOD: latent CEM procedure and inspected planner source; Figures 4–5 test performance, not a universal latency bound.",
+      "kind": "Methodological",
+      "followups": "Dreamer amortizes search into a learned actor/value model. Online cost is reduced by accepting training cost and approximation error.",
+      "status": "Shifted into another cost or limitation",
+      "confidence": "Medium"
+    },
+    {
+      "id": "02-planet-model_bias",
+      "description": "Selecting high predicted reward can exploit transition and reward-model errors.",
+      "conditions": "Long rollouts or actions poorly supported by real experience.",
+      "cause": "The same learned model both predicts outcomes and supplies the objective optimized by search.",
+      "evidence": "DEDUCTION: RSSM/reward planning pipeline; World Models supplies direct virtual-versus-real exploitation evidence, while PlaNet tests do not establish general calibration.",
+      "kind": "Methodological",
+      "followups": "Dreamer changes policy optimization and CVAML corrects a different value-aware estimator bias; neither is proof of physically correct unsupported rollouts.",
+      "status": "Still unresolved in the reviewed literature",
+      "confidence": "Medium"
+    }
+  ],
+  "sali": [
+    {
+      "id": "02-sali-persistent_hallucination",
+      "description": "Persistent imagined nodes can retain incorrect room/object structure as planning evidence.",
+      "conditions": "Atypical layouts or errors in generated unseen views.",
+      "cause": "Heuristic pruning and score fusion do not provide calibrated provenance weights separating observed from synthesized content.",
+      "evidence": "DEDUCTION: imagined graph/memory method; qualitative imagery and PSNR are not hidden-world truth tests.",
+      "kind": "Methodological",
+      "followups": "HNR/NavMorph/SC²-WM alter representations and adaptation; GenEx improves consistency. None directly demonstrates correct recovery from false persistent SALI memory.",
+      "status": "Still unresolved in the reviewed literature",
+      "confidence": "Medium"
+    },
+    {
+      "id": "02-sali-replication",
+      "description": "Headline and ablation performance cannot be fully reconciled from the inspected material.",
+      "conditions": "Attributing the large reported gain to imagination rather than a configuration or baseline difference.",
+      "cause": "Main R2R SPL 78 differs from full-system ablation SPL 70/71, and no verified official code resolves the configuration mapping.",
+      "evidence": "PAPER EXPERIMENT: Table 1 p.6 versus Table 2 p.7; source/access record in dossier. These numbers are author-reported and unexecuted.",
+      "kind": "Implementation-specific",
+      "followups": "No reviewed follow-up supplies a matched independent reproduction or configuration reconciliation.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "Medium"
+    }
+  ],
+  "sc2wm": [
+    {
+      "id": "02-sc2wm-feedback_timing",
+      "description": "The broad ambiguity about whether correction uses any real next observation is resolved by the released asynchronous TTA branch.",
+      "conditions": "Interpreting immediate endogenous latent delta versus delayed deployment adaptation.",
+      "cause": "Main-paper notation mixes current/next targets; immediate state refinement and delayed TTA use different signals.",
+      "evidence": "INSPECTED CODE: ss_trainer_ETP.py:2246–2308 compares prior predicted candidate features with the next real panorama using cosine residual; supplement PDF pp.15–16 describes FRL and Table 6. Immediate Eq.9 delta remains predicted next latent minus current latent.",
+      "kind": "Implementation-specific",
+      "followups": "The paper supplement and official release resolve existence/timing for this inspected branch. This does not certify correctness of all formulas or confidence calibration.",
+      "status": "Resolved within a clearly specified setting",
+      "confidence": "High for inspected branch only"
+    },
+    {
+      "id": "02-sc2wm-calibration",
+      "description": "Residual-triggered adaptation is not yet established to improve decisions under confidently wrong dynamics or residual misalignment.",
+      "conditions": "Domain shifts, ambiguous action selection, prediction/observation mismatch, or entropy confidently favoring a wrong action.",
+      "cause": "Internal latent delta is not prediction error; delayed feature residual and percentile thresholds are proxies, and the active code updates a broader global encoder than a world-model-only reading suggests.",
+      "evidence": "PAPER EXPERIMENT: Table 3 p.8 full SR 50.90 versus fixed-interval 50.30; supplement Table 6 no adaptation 49.86, entropy 49.48, asynchronous 50.19, FRL 50.90. INSPECTED CODE: TTA_setup_trainable_params:1030–1035 and ss_trainer_ETP.py:2246–2308.",
+      "kind": "Insufficiently tested",
+      "followups": "WorldMAP and PiJEPA are current primary-source leads reserved for follow-up audit; no reviewed matched residual-to-action-risk validation resolves this concern.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "Medium"
+    }
+  ],
+  "sgm": [
+    {
+      "id": "02-sgm-target_bias",
+      "description": "Predicted semantic targets can attract exploration toward confidently wrong room/object context.",
+      "conditions": "Unusual layouts, segmentation errors or category combinations outside training.",
+      "cause": "Map completion and argmax target selection use scores without demonstrated probability calibration; observed-map override protects observed cells but not unknown predictions.",
+      "evidence": "PAPER EXPERIMENT: Table 2 p.7 full Gibson SR/SPL 78.0/44.0 versus oracle target 91.7/72.3. DEDUCTION: oracle gap does not uniquely identify calibration as the cause.",
+      "kind": "Methodological",
+      "followups": "WMNav uses VLM curiosity and L2M ensembles uncertainty; neither establishes reliable recovery after confidently wrong semantic-map completion.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "Medium"
+    },
+    {
+      "id": "02-sgm-iou_gradient",
+      "description": "The inspected hard IoU term cannot train the decoder through its detached thresholded mask.",
+      "conditions": "The released main masked-map pretraining loss.",
+      "cause": "Thresholding and detach remove the differentiable path for IoU, although weighted MSE and BCE still supply gradients.",
+      "evidence": "INSPECTED CODE: main pretrainer imports models_mae_cross (lines 38,172); models_mae_cross.py:254–295 computes detached hard IoU. No training run was executed.",
+      "kind": "Implementation-specific",
+      "followups": "No inspected patch or follow-up establishes the empirical effect of replacing the detached term with a differentiable surrogate.",
+      "status": "Still unresolved in the reviewed literature",
+      "confidence": "High for gradient path; unknown for benchmark impact"
+    }
+  ],
+  "unemo": [
+    {
+      "id": "02-unemo-future_branch",
+      "description": "One provisional predicted state can bias all final action candidates.",
+      "conditions": "The provisional action is wrong or several action-conditioned futures are plausible.",
+      "cause": "A shared predicted future is fused back into action reasoning instead of maintaining separately validated counterfactual branches.",
+      "evidence": "DEDUCTION: multimodal world-model/action pipeline; Tables 3–4 p.7 give best final-action-only 72.9 versus joint two-action 72.1, complicating a simple auxiliary-action-benefit claim.",
+      "kind": "Methodological",
+      "followups": "SC²-WM uses feature refinement and observed residual adaptation in CE; this is not a matched resolution of UNeMo candidate conditioning.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "Medium"
+    },
+    {
+      "id": "02-unemo-specification",
+      "description": "Missing world-model objective/attention details and unavailable verified training source prevent faithful reproduction.",
+      "conditions": "Implementing the printed CVAE and single-key attention description or reconciling headline versus best ablation.",
+      "cause": "The supplied specification does not establish all training losses and tensor semantics; no complete official repository was verified.",
+      "evidence": "UNVERIFIED: method equations and Tables 1,3–4, PDF pp.4–7; headline SR 72.1 versus final-action-only 72.9 is not a single interchangeable configuration.",
+      "kind": "Implementation-specific",
+      "followups": "No inspected supplementary implementation or follow-up resolves these details.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "Medium"
+    }
+  ],
+  "vid2world": [
+    {
+      "id": "02-vid2world-causality",
+      "description": "Temporal causal masking and guidance do not establish intervention-valid or calibrated transition probabilities.",
+      "conditions": "Unsupported actions, abrupt dynamics changes or physical policy deployment.",
+      "cause": "Chronological conditioning prevents future leakage but does not remove confounding in logged action data; guidance changes conditional distributions and linear extrapolation assumes local regularity.",
+      "evidence": "DEDUCTION: transfer/masking/guidance mechanism. PAPER EXPERIMENT: Table 1 p.8 RECON FVD/LPIPS 59.4/.3236 versus NWM 31.2/.295, and the real-to-sim study ranks only three drawer-policy checkpoints.",
+      "kind": "Insufficiently tested",
+      "followups": "NWM/LCVN/WorldVLN use video prediction differently; no reviewed cross-task intervention study establishes broad causal validity.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "Medium"
+    }
+  ],
+  "visualimaginations": [
+    {
+      "id": "02-visualimaginations-attribution",
+      "description": "Generated landmark prototypes may improve representation learning without faithfully predicting the current hidden scene.",
+      "conditions": "Unusual object appearances or claims that foresight causes the navigation gain.",
+      "cause": "Images are semantic prototypes derived from instruction phrases, not action-conditioned scene transitions; training losses remain beneficial when prototypes are removed at test time.",
+      "evidence": "PAPER EXPERIMENT: Table 3 p.6 correct/none/wrong imagination SR 67.26/66.92/66.24 versus baseline 66.24; selected attention maps do not establish causality.",
+      "kind": "Insufficiently tested",
+      "followups": "MonoDream/FantasyVLN also exploit auxiliary prediction. Separate prototype alignment from actual-state prediction in any comparison; no causal deployment mediation test was reviewed.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "Medium"
+    }
+  ],
+  "visualplanning": [
+    {
+      "id": "02-visualplanning-verifier",
+      "description": "Exact grid-state validators do not transfer automatically to noisy embodied outcomes.",
+      "conditions": "Replacing synthetic grids with real visual navigation or manipulation.",
+      "cause": "RL rewards and exact-match/progress scoring use a rule-based interpreter and known transition/task structure; a learned real-world validator can be wrong or exploitable.",
+      "evidence": "AUTHOR METHOD and DEDUCTION: interpreter/reward formulation; Table 1 p.6 EM/PR 80.6/84.9 establishes gains within the synthetic domain only.",
+      "kind": "Methodological",
+      "followups": "CoT-VLA/FantasyVLN/WorldVLN use richer tasks without inheriting the exact validator. No reviewed real-world counterpart preserves the same correctness guarantees.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "Medium"
+    }
+  ],
+  "vlnsig": [
+    {
+      "id": "02-vlnsig-causal_use",
+      "description": "Auxiliary future-token prediction has not been shown to improve actions specifically by forecasting correct future content.",
+      "conditions": "Distinguishing representation regularization from deployed foresight.",
+      "cause": "Future-token and semantic objectives train the encoder; dVAE/CLIP targets and vocabulary select what information is retained, while prediction heads are not an explicit deployment simulator.",
+      "evidence": "PAPER EXPERIMENT: Table 2 p.6 baseline SR/SPL 64.4/58.8 versus all 68.1/62.3; supplement p.3 visual reconstructions use 70% ground-truth tokens, so they are not autonomous predicted images.",
+      "kind": "Insufficiently tested",
+      "followups": "MonoDream/FantasyVLN share training-time prediction; NavQ inserts predicted semantics during inference. No matched intervention demonstrates causal future-content use in VLN-SIG.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "Medium"
+    }
+  ],
+  "wmnav": [
+    {
+      "id": "02-wmnav-recovery",
+      "description": "An ordinary cell that receives a falsely low curiosity score cannot recover merely because a later score rises.",
+      "conditions": "Minimum-merge updates to non-goal cells.",
+      "cause": "The ordinary update takes the minimum of old and new values, creating irreversible pessimism; identified goal-mask cells are an explicit exception reset to 10.",
+      "evidence": "INSPECTED CODE: _merge_evalue and update_curiosity_value:1263–1287. EXECUTED TEST: isolated 10→2→9 merge gives 10→2→2; goal reset produces 10. Not a simulator performance test.",
+      "kind": "Implementation-specific",
+      "followups": "Goal-mask reset resolves recovery for those identified cells only. SGM/L2M use different maps, with no matched ordinary-cell recovery intervention reviewed.",
+      "status": "Partially addressed",
+      "confidence": "High for update behavior; unknown for aggregate success impact"
+    },
+    {
+      "id": "02-wmnav-backbone",
+      "description": "Heuristic VLM curiosity scores and stopping choices vary substantially with backbone and configuration.",
+      "conditions": "Transferring the recipe to smaller VLMs or comparing different HM3D versions.",
+      "cause": "Prompt responses are not calibrated probabilities; paper and source stopping thresholds differ and models differ in semantic judgment.",
+      "evidence": "PAPER EXPERIMENT: Table III p.6 Qwen3B SR 29.7 versus Gemini1.5Pro 58.1; INSPECTED CODE uses 0.8m internally, while printed 1.0/0.1m threshold is inconsistent. Evaluation success threshold is a separate setting.",
+      "kind": "Methodological",
+      "followups": "ImagineNav++ adds memory and SGM/L2M change score sources; none establishes backbone-invariant calibration under a matched protocol.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "Medium"
+    }
+  ],
+  "womap": [
+    {
+      "id": "02-womap-reward_exploitation",
+      "description": "Optimizing detector-derived reward can favor visible/confident objects without ensuring physically valid goal reaching.",
+      "conditions": "Background/lighting shift or candidate actions outside the learned dynamics support.",
+      "cause": "Gradient search amplifies errors in learned dynamics and rewards; evaluation success also uses detector confidence/box-size thresholds, potentially sharing reward bias.",
+      "evidence": "PAPER EXPERIMENT: Table 2 p.8 nominal success 63% falls to 50% lighting and 30% background shift. INSPECTED CODE: optional reward/std score exists; joint planner differs from printed smoothing objective.",
+      "kind": "Methodological",
+      "followups": "DINO-WM/NWM offer other models and CVAML addresses value-objective bias. None is a matched resolution of detector-based goal/reward validity.",
+      "status": "Still unresolved in the reviewed literature",
+      "confidence": "Medium"
+    }
+  ],
+  "worldmodels": [
+    {
+      "id": "02-worldmodels-exploitation",
+      "description": "A controller can achieve high imagined reward by exploiting a poorly supported world model.",
+      "conditions": "Low-temperature learned Doom dynamics and policy-induced distribution shift.",
+      "cause": "Random-policy training undercovers controller-induced states, and the controller searches weaknesses of the learned transition/reward process.",
+      "evidence": "PAPER EXPERIMENT: Table 2 p.4 temperature .1 gives virtual/real survival 2086/193; at 1.15, 918/1092. Section 4.2 p.6 explicitly discusses exploitation.",
+      "kind": "Methodological",
+      "followups": "PlaNet/Dreamer collect policy experience iteratively and use stronger latent training. This mitigates mismatch but does not prove robustness of unsupported imagined trajectories.",
+      "status": "Partially addressed",
+      "confidence": "Medium"
+    }
+  ],
+  "worldvln": [
+    {
+      "id": "02-worldvln-feedback_delay",
+      "description": "Segmented imagined execution can delay correction until a new real observation arrives.",
+      "conditions": "Aerial navigation with environment changes or prediction errors inside an action segment.",
+      "cause": "Real-history assimilation is intermittent; within-segment decisions can depend on predicted video rather than fresh measurements.",
+      "evidence": "AUTHOR METHOD and DEDUCTION: segmented rollout/observation assimilation; Table 1 aerial UAVFlow results do not isolate feedback-delay sensitivity.",
+      "kind": "Methodological",
+      "followups": "CoT-VLA has a related chunk-feedback issue; LCVN/NWM use different offline protocols. No matched delay-versus-risk intervention was reviewed.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "Medium"
+    },
+    {
+      "id": "02-worldvln-reward_scaling",
+      "description": "A time-dependent common positive reward scale can cancel under per-group standardized advantages.",
+      "conditions": "Advantages normalized separately for a group sharing the same positive temporal scale, apart from epsilon effects.",
+      "cause": "Both mean-subtracted rewards and their standard deviation scale by the same factor; this does not hold automatically if groups mix times or the implementation normalizes differently.",
+      "evidence": "DEDUCTION/EXECUTED TEST: evidence/02/logic_check_results.json verifies the algebra numerically for a toy reward vector. The official snapshot is a project site, and the unreleased trainer grouping remains unknown.",
+      "kind": "Insufficiently tested",
+      "followups": "No inspected official trainer or correction determines whether the printed temporal factor has the intended effect in the actual training run.",
+      "status": "Uncertain because evidence is insufficient",
+      "confidence": "High for conditional algebra; unknown for actual trainer behavior"
+    }
+  ]
+}

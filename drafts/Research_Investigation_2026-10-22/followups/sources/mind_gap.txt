@@ -1,0 +1,752 @@
+=== PDF PAGE 1 ===
+     Mind the Gap: Improving Success Rate of Vision-and-Language
+             Navigation by Revisiting Oracle Success Routes
+
+                     Chongyang Zhao                               Yuankai Qi
+                     Australian Institute for Machine Learning                  Australian Institute for Machine Learning
+                      The University of Adelaide                          The University of Adelaide
+                                Adelaide, Australia                                        Adelaide, Australia
+                       chongyang.zhao@adeaide.edu.au                            qykshr@gmail.com
+
+                                                Qi Wu∗
+                                                 Australian Institute for Machine Learning
+                                              The University of Adelaide
+                                                             Adelaide, Australia2023
+                                                      qi.wu01@adeaide.edu.au
+
+      ABSTRACT                                                                    80       SR (REVERIE)       SR (R2R)                       8181818181
+                                                                                          OSR (REVERIE)     OSR (R2R)
+                                                                                                                                                         7373737373            7272727272Aug    Vision-and-Language Navigation (VLN) aims to navigate to the                                           7171717171
+7    target location by following a given instruction. Unlike existing            70            6969696969                             6666666666
+          methods focused on predicting a more accurate action at each step                        6363636363               6464646464
+            in navigation, in this paper, we make the first attempt to tackle a            60
+           long-ignored problem in VLN: narrowing the gap between Success                                                                       5151515151
+           Rate (SR) and Oracle Success Rate (OSR). We observe a consistently            50                                                      4747474747
+            large gap (up to 9%) on four state-of-the-art VLN methods across
+         two benchmark datasets: R2R and REVERIE. The high OSR indi-           40                                                                                                                   3535353535               3636363636               3737373737
+                                                                                                                                                  3333333333[cs.CV]    cates the robot agent passes the target location, while the low SR                   3131313131               3232323232
+           suggests the agent actually fails to stop at the target location at            30
+               last. Instead of predicting actions directly, we propose to mine the
+            target location from a trajectory given by off-the-shelf VLN mod-           20
+                                                                                            RecBERT       HOP       HAMT       DUET
+              els. Specially, we design a multi-module transformer-based model
+            for learning compact discriminative trajectory viewpoint represen-                                                                      Figure 1: Significant gap exists between success rate (SR)
+            tation, which is used to predict the confidence of being a target                                                            and oracle success rate (OSR) of state-of-the-art methods
+           location as described in the instruction. The proposed method is                                                                         across VLN tasks, Room-to-Room[3] and REVERIE [48] on
+           evaluated on three widely-adopted datasets: R2R, REVERIE and                                                                          validation unseen splits.
+        NDH, and shows promising results, demonstrating the potential
+            for more future research.
+                                                                                     variety of VLN tasks have been proposed, including indoor room-to-
+      CCS CONCEPTS                                      room navigation according to detailed instructions (e.g., R2R [3] and
+             • Computing methodologies Ñ Knowledge representation     RxR [29]) or dialogue-based instructions (e.g., NDH [57]); remote
+        and reasoning; • Information systems Ñ Information sys-      object navigation according to concise instructions (REVERIE [48])
+         tems applications.                                                 or detailed instructions (SOON [78]). Currently, there are both dis-arXiv:2308.03244v1                                                                             crete [3] and continuous [27, 59] simulators. Our work is based
+      KEYWORDS                                          on the discrete simulator, which provides predefined navigation
+                                                                              graphs, thus encouraging researchers to focus on textual-visual
+          Vision-and-Language Navigation; Multi-Modality Transformer; Vi-
+                                                                                alignment, excluding the impact from tasks like topology mapping
+            sual Context Modeling
+                                                                    and obstacle avoidance.
+                                                                      Most existing methods formulate VLN as a sequential text-image
+        1  INTRODUCTION                                     matching problem. To be specific, positioned at a node of a nav-
+          Vision-and-Language Navigation (VLN) has received increasing      igation graph, the agent traverses the environment by selecting
+           attention in computer vision, natural language processing, and     one of its neighbouring nodes (represented by images) that has the
+            robotics communities due to its great potential for real-world appli-     maximal similarity to instruction. To improve the performance of
+            cations such as domestic assistants. The VLN task requires an agent       visual-textual matching, many approaches have been developed.
+            to navigate to a target location in a 3D simulated environment based      Data augmentation is explored to overcome the scarcity of training
+         on visual observation and a given natural language instruction. A      data via generating pseudo trajectory-instruction pairs [16, 34],
+                                                                                       collecting extra data [9, 20], and editing environments from differ-
+             ∗Corresponding author.                                                  ent houses [32, 39]. In [1, 11, 23, 47], instructions are decomposed
+
+=== PDF PAGE 2 ===
+MM ’23, October 29–November 3, 2023, Ottawa, ON, Canada.                                                        Chongyang Zhao, Yuankai Qi, and Qi Wu
+
+into landmark, action, and scene components via the attention    2  RELATED WORK
+mechanism to enable fine-grained cross-modality matching. Vision-     Vision-and-Language Navigation. The R2R [3], REVERIE [48],
+language pretraining has been employed in previous works such     and NDH [57] are three well-known benchmarks in the field of VLN,
+as [8, 10, 20, 22, 24, 46, 50, 51]. Most recently, memory and maps      each presenting distinctive challenges for navigation agents. R2R
+for navigation history and planning have been utilized to further       offers low-level instructions in natural language and photo-realistic
+enhance textual-visual matching in the works of [2, 8, 10, 18, 37,     environments for navigation purposes. REVERIE presents the task
+51, 65, 75].                                                              of remote object localization using concise high-level instructions.
+  Although these methods have boosted the VLN performance,    NDH focuses on dialog-based navigation. A number of existing
+there is one problem that remains open and has long been ignored:     works have focused on visual-textual matching to tackle the VLN
+the performance gap between Success Rate (SR, the agent stops at       tasks. Ma et al. [42] propose a visual-textual co-grounding module
+a graph node within 3 meters to the target location) and Oracle     and a progress monitor to estimate progress towards the goal. Qi et
+Success Rate (OSR, the agent passes by or stops at a graph node        al. [47] use an object- and action-aware module framework to match
+within 3 meters to the destination). Instead of only happening to      the decomposed instruction and candidate visual features. Hong et
+one specific method, this gap exists among most existing state-of-        al. [23] model inter-and-intra relationships among the scene, ob-
+the-art methods and across datasets. Figure 1 presents the statistics       jects and directions via a language and visual entity relation graph.
+of SR and OSR of four cutting-edge methods on two popular VLN      Recent works in VLN have leveraged transformer-based architec-
+tasks R2R and REVERIE. It shows that the performance gap ranges       tures to encode vision and language information. PRESS [33] adopts
+from 2.9% to 4.4% on the REVERIE task and consistently remains     BERT [14], while [24] reuses the build-in [CLS] token to maintain
+around 7-9% for all four methods on the R2R task. This significant      history information recurrently. To improve generalization abil-
+gap suggests existing VLN models may successfully find the correct        ity, data augmentation has been applied in [16, 31, 32, 39, 55, 66].
+trajectory (because it passes the target location.), however fail to      Furthermore, adversarial learning was utilized to mine hard train-
+stop at the target spot finally. Such a large gap demonstrates a      ing samples in [17], while [9, 20] leverage additional training data
+great potential to advance VLN performance, and why not mine      to improve performance. ADAPT [36] proposes modality-aligned
+the passed target nodes in trajectories?                                action prompts to effectively guide agents in completing complex
+   In this paper, we study how to find the target node in a given      navigation tasks. CCC [60] explores the intrinsic correlation be-
+trajectory. Interestingly, we find this task could be formulated as     tween instruction following and instruction generation by jointly
+a video grounding [19, 28, 56, 74, 77] task, i.e., localise the target      learning both tasks. CITL [35] employs contrastive learning to ac-
+frame (location) from a given video (trajectory) based on a given      quire the alignment between trajectory and instruction. SIG [30]
+textual description (instruction). However, there are still two signif-      generates potential future views to benefit the agent during naviga-
+icant differences: (a) each node in a trajectory is represented by a       tion. History memories are specially maintained in [8, 10, 51, 61, 76]
+panorama (usually consists of 3ˆ12 discrete observation views, i.e.,      to capture long-range dependencies across past observations and
+3 elevation levels and 12 views at each elevation) and panoramas       actions. All the above methods have advanced the progress of VLN.
+between two consecutive nodes present sever instant visual transi-     However, they all suffer from a performance gap between success
+tion (i.e., it is full of cutaway). (b) There may be only a few images       rate and oracle success rate, indicating they pass by the target loca-
+(usually less than three) that match the textual description for the      tion but fail to stop on it. In this paper, we design a multi-module
+destination, which is much less than that in the video grounding.      transformer-based model to mitigate this issue and hope to give
+  To overcome these challenges, we design a transformer-based      hints for future work.
+model consisting of three modules: Cross-Modality Elevation Trans-
+former, Spatial-Temporal Transformer, and Target Selection Trans-     Video Grounding. Visual grounding involves localizing an object
+former. The Cross-Modality Elevation Transformer learns to fuse      using a referring expression, researched extensively in both image
+visual perceptions across three elevations, which helps reduce re-     domain [12, 13, 49, 70] and video domain. For video grounding,
+dundant information. The Spatial-Temporal Transformer is used to     two tasks are distinguished: Spatial-Temporal Video Grounding
+exchange information across different time steps and heading views     (STVG) aims to localize both the frames and bounding boxes of an
+at each step. The Target Selection Transformer takes advantage of       object specified by a language description [54, 68, 69], and Temporal
+learnable queries to summarize visual information at each time step      Video Grounding (TVG) that only localizes frames [6, 52]. Our for-
+and generate the representation for confidence prediction of being      mulation of VLN, localizing the image representing the navigation
+the target location. In summary, our contributions are three-fold:       destination in an image sequence of the navigation trajectory, can
+                                                             be reformulated as part of the TVG task. Early TVG approaches
+  ‚ To the best of our knowledge, this is the first work to study the     employ a proposal-based architecture [6, 19, 67, 71, 73], and sev-
+   SR and OSR gap issue on the VLN tasks.                             eral proposal-free methods [45, 52, 72] are proposed to reduce the
+  ‚ We design a multi-module transformer-based model to mini-     computation cost of proposal feature exacting. Techniques such as
+    mize the SR and OSR gap.                                         attention mechanism [45, 52, 72], reinforcement-learning [21, 63]
+  ‚ Extensive experiments on three popular VLN benchmarks: R2R,     and language parsing [45] have been explored to improve video-
+   REVERIE and NDH, show the effectiveness of the proposed       description matching. However, a simple direct application of these
+    method, indicating the possibility for more future research.       methods on our VLN task does not perform well due to the visual
+
+=== PDF PAGE 3 ===
+Mind the Gap: Improving Success Rate of Vision-and-Language Navigation by Revisiting Oracle Success Routes MM ’23, October 29–November 3, 2023, Ottawa, ON, Canada.
+
+                                             70%           90%                                                                                                                                                                    Selection                                                                             60%                                               Target   Viewpoint                                20%                                                                                                                                                   Transformer   Query                              …                                                                                                                    Spatial-Temporal       …                                                                                                               Transformer           …                              …   Temporal Pos +
+       …                              Target Selection Transformer                                                     Add & Norm
+                              …                          Add & Norm
+                                                                                                           FFN
+                                                   Spatial-Temporal Transformer
+                                                                                       FFN
+                              …               heading                                Add & Norm
+                View +                                                                           Add & Norm                    Trajectory
+                     Spatial Pos +                   Cross-Modality Elevation Transformer                                                                         Selection                                                                                                                              Spatial-Temporal                                                                                                                                                                               cross-attention                Temporal Pos +                                                                                  elevation                                                                                                                                                      self-attention
+            [CLS] Token                      …               heading          Add & Norm             Add & Norm
+         Text Encoder                                    Vision Encoder                                             Heading                 Viewpoint Query
+                                                                                                                                                      self-attention                     self-attention
+   Turn  right  at  the  hallway
+    intersection. Turn left into the      …       …       …  …     …
+     first room. Wait by the table.                                               …
+
+
+Figure 2: The main architecture of the proposed trajectory grounding model. The model takes an instruction-trajectory pair as
+input and utilizes a text encoder and a vision encoder to extract their own representations xt𝑐𝑙𝑠, O11, ¨ ¨ ¨ , O1𝑇y. The Cross-Modality
+Elevation Transformer module integrates information across different elevations while taking into account the contextual
+guidance provided by the instruction description. Then, the Spatial-Temporal Transformer exchanges information across
+discrete views and temporal navigation steps. Finally, the Target Selection Transformer summarizes the information of each
+viewpoint using learnable queries and predicts the confidence of each viewpoint as the destination.
+
+
+representation difference: consecutive frames with smooth transi-      confidence of each viewpoint of being the destination. Below we
+tions v.s. sparse image sequences full of cutaways. And therefore,      give more details about each module.
+we design a new grounding method specifically for VLN tasks.
+                                                         3.1  Text and Vision Encoder
+3 METHOD                                            Text Encoder. Given the natural language instruction X, we uti-
+                                                                                  lize the linguistic embedding model BERT [14] to exact features.
+Problem Formulation. In this work, we propose to minimize                                                                  Here, we use the BERT embedding of the first token (i.e., [CLS]
+the SR and OSR gap of a given VLN model by formulating it as a
+                                                                     token) as the feature of instruction, denoted as t𝑐𝑙𝑠, which has been
+trajectory grounding task. Given a natural language instruction
+                                                             proven being able to represent comprehensive information of the
+X “ r𝑥1,𝑥2, ¨ ¨ ¨ ,𝑥𝐿s consisting of 𝐿words and a navigation trajec-                                                            whole instruction [10, 22, 50], and this can also significantly reduce
+tory T “ rV1, V2, ¨ ¨ ¨ V𝑇s consisting of 𝑇viewpoints, trajectory                                                               computation and resource costs.
+grounding aims to find out the viewpoint that matches the specified                                                             Vision Encoder. A trajectory T is represented by a sequence of vi-
+destination in the instruction so as to reduce the gap between SR                                                                         sual panorama observations at each viewpoint T “ rV1, V2, ¨ ¨ ¨ V𝑇s.
+and OSR. Each viewpoint has a panorama observation represented
+                                                          Each panorama V𝑡“ tv𝑡,𝑖u36𝑖“1 consists of 36 discrete images (3
+by 36 discrete images V𝑡“ tv𝑡,𝑖u36𝑖“1 (3 elevations ˆ 12 headings)      elevations and 12 headings in each elevation), each for one ob-
+as in previous VLN works [3, 48]. The trajectories are harvested
+                                                                   serving view (i.e., viewpoint). As in [8, 10], we use ViT-B/16 [15]
+via pre-trained VLN methods. Note that the destination may not
+                                                                      pre-trained on ImageNet [53] to encode each image, obtaining its
+appear in the given trajectories. In this case, our model fails as well.                                                                      feature o𝑡,𝑖P R1ˆ𝑑and thus O𝑡P R36ˆ𝑑for the viewpoint V𝑡.
+But considering our aim is only to reduce the gap between SR and
+                                                              Then, we add navigation step encoding E𝑡𝑡P R36ˆ𝑑and spatialOSR in this work, this is acceptable.
+                                                                        sinusoidal positional encoding E𝑠𝑡P R36ˆ𝑑as [4, 58, 69] onto each
+                                                                viewpoint representation:Method Overview. Figure 2 illustrates the main architecture of the
+proposed model, which contains three transformer-based modules:                        O1𝑡“ O𝑡` E𝑡𝑡` E𝑠𝑡.                       (1)
+Cross-Modality Elevation Transformer, Spatial-Temporal Trans-
+former, and Target Selection Transformer. The model takes as input     The trajectory-instruction pair representations xt𝑐𝑙𝑠, O11, ¨ ¨ ¨ , O1𝑇y
+an instruction-trajectory pair and utilizes a text encoder and a      are fed into the Cross-Modality Elevation Transformer.
+vision encoder to extract their own representations. Then, the rep-
+resentations are fed into the Cross-Modality Elevation Transformer     3.2  Cross-Modality Elevation Transformer
+that fuses information across elevations. Next, the Spatial-Temporal      This module is designed to fuse information across elevations with
+Transformer module exchanges information across discrete views      the awareness of the instruction description. To this end, we first
+and across temporal navigation steps. Finally, the Target Selection      fuse vision-language information from the observing view level
+Transformer utilizes learnable queries to summarize the informa-      because the described destination is one of these views. Specifically,
+tion of each viewpoint, and its outputs are used to predict the      the feature o𝑡,𝑖of each observing view is fused with the instruction
+
+=== PDF PAGE 4 ===
+MM ’23, October 29–November 3, 2023, Ottawa, ON, Canada.                                                        Chongyang Zhao, Yuankai Qi, and Qi Wu
+
+
+Table 1: Comparison with the state-of-the-art methods on R2R. Blue and Bold denote the best and runner-up results, respectively.
+Ò denotes the performance improvement after applying our method. ♠denotes that we crop the original path from the starting
+location to the viewpoint predicted.
+
+
+                             R2R Val Seen                 R2R Val Unseen                R2R Test Unseen
+      Methods
+                     TL   NE  SPL   SR   OSR   TL   NE  SPL    SR   OSR   TL   NE  SPL    SR   OSR
+
+     Human                  -        -       -        -         -        -        -       -        -         -    11.85   1.61   76     86     90
+
+       Seq2Seq [3]         11.33   6.01     -     39     53    8.39   7.81     -     21     28    8.13   7.85     -     20     27
+       SF [16]                   -     3.36     -     66     74       -     6.62     -     36     45    14.82   6.62   28     35     44
+     RCM [64]           10.65   3.53     -     67     75    11.46   6.09     -     43     50    11.97   6.12   38     43     50
+        Regretful [43]           -     3.23   63     69        -        -     5.32   41     50        -    13.69   5.69   40     48     56
+       FAST-short [26]        -        -       -        -         -    21.17   4.97   43     56        -    22.08   5.14   41     54     64
+      EnvDrop [55]       11.00   3.99   59     62        -    10.70   5.22   48     52        -    11.66   5.23   47     51     59
+    OAAM [47]         10.20     -    62     65     73    9.95      -    50     54     61    10.40   5.30   50     53     61
+       EntityGraph [23]   10.13   3.47   65     67        -     9.99   4.73   53     57        -    10.29   4.75   52     55     61
+     NvEM [1]          11.09   3.44   65     69        -    11.83   4.27   55     60        -    12.98   4.37   54     58     66
+       ActiveVLN[62]     19.70   3.20   52     70        -    20.60   4.36   40     58        -    21.60   4.33   41     60        -
+      PRESS [33]         10.57   4.39   55     58        -    10.36   5.28   45     49        -    10.77   5.49   45     49        -
+     PREVALENT [22]   10.32   3.67   65     69        -    10.19   4.71   53     58        -    10.51   5.30   51     54     61
+     VLNœBERT [24]   11.13   2.90   68     72     79    12.01   3.93   57     63     69    12.35   4.09   57     63     70
+      AirBERT [20]       11.09   2.68   70     75        -    11.78   4.01   56     62        -    12.41   4.13   57     62        -
+       SEvol [7]           11.97   3.56   63     67        -    12.26   3.99   57     62        -    13.40   4.13   57     62        -
+     ADAPT [36]        10.97   2.54   72     76        -    12.21   3.77   58     64        -    12.99   3.79   59     65        -
+    HAMT [8]          11.15   2.51   72     76     82    11.46   2.29   61     66     73    12.27   3.93   60     65     72
+
+     HOP [50]           11.26   2.72   70     75     80    12.27   3.80   57     64     71    12.68   3.83   59     64     71
+    ` Ours             11.72   2.72   70    77(Ò2)   80    13.05   3.68   57    67(Ò3)   71    13.24   3.78   58    66(Ò2)   71
+    ` Ours♠             9.95   2.72   73   77(Ò2)   79    9.69   3.68   62    67(Ò3)   70    10.23   3.78   61    66(Ò2)   69
+
+     SIG_HAMT [30]    11.68   2.80   70     73     79    11.96   3.37   62     68     75    12.83   3.81   60     65     72
+    ` Ours             12.24   2.80   69    76(Ò3)   79    12.62   3.36   62    70(Ò2)   75    13.42   3.73   59    66(Ò1)   72
+    ` Ours♠            10.08   2.80   73   76(Ò3)   78    9.65   3.36   66   70(Ò2)   73    10.09   3.73   62   66(Ò1)   70
+
+     DUET [10]         12.32   2.28   73    79     86    13.94   3.31   60     72     81    14.73   3.65   59     69     76
+    ` Ours             12.83   2.33   72   82(Ò3)   86    14.65   3.27   60   75(Ò3)   81    15.33   3.62   58   71pÒ2)   76
+    ` Ours♠            11.24   2.33   77   82(Ò2)   85    11.95   3.27   65   75(Ò3)   79    12.98   3.62   61   71pÒ2)   75
+
+      SIG_DUET [30]     13.96   2.73   67     75     83    14.31   3.13   62     72     81    15.36   3.37   60    72     80
+    ` Ours             14.68   2.73   66   79(Ò4)   83    15.09   3.10   61   76(Ò4)   81    16.02   3.31   59   74(Ò2)   80
+    ` Ours♠            11.81   2.73   72   79(Ò4)   81    11.90   3.10   67   76(Ò4)   79    12.88   3.31   64   74(Ò2)   78
+
+
+embedding separately:                                           each h𝑡,𝑗to exchange information across elevations:
+                                                                               Q𝐸𝑡,𝑗 JK𝐸𝑡,𝑗
+                                                                                                                        ˆh𝐸𝑡,𝑗“ softmaxp  ?    qV𝐸𝑡,𝑗,
+                 o1𝑡,𝑖“ FCpr𝜎po𝑡,𝑖W𝑜q, 𝜎pt𝑐𝑙𝑠W𝑡qsq               (2)                                      𝑑
+                                                              Q𝐸𝑡,𝑗“ h𝑡,𝑗W𝑄𝑒, K𝐸𝑡,𝑗“ h𝑡,𝑗W𝐾𝑒, V𝐸𝑡,𝑗“ h𝑡,𝑗W𝑉𝑒,          (3)
+
+where W𝑜and W𝑡are learnable parameter matrix, 𝜎denotes the
+                                                           where W˚𝑒is a learnable parameter matrix, and 𝑑is the embedding
+activation function, and r¨s denotes concatenation.
+                                                               dimension of ˆh𝐸𝑡,𝑗. Finally, we further aggregate information across  Then, we further fuse the information across elevations. In each
+observing heading direction, there are three elevation views, as      elevation via average pooling: rh𝑡,𝑗𝐸“ AvgPoolpˆh𝐸𝑡,𝑗q P R1ˆ𝑑on
+shown in Figure 2. Images of these elevations present significant                                                                      elevation dimension. In this way, the instruction-informed repre-
+overlap and thus redundant information. To address this problem,                                                                     sentation at each trajectory viewpoint O1𝑡is converted to H𝐸𝑡“
+we leverage a transformer module to fuse information based on       Ă
+attention mechanism. Another benefit of this module is that the        rrh𝐸𝑡,1, ¨ ¨ ¨ , h𝐸𝑡,12s P R12ˆ𝑑.
+number of vision tokens also sharply decreases to 1{3 of the original.
+Specifically, observations at each heading angle can be denoted as     3.3  Spatial-Temporal Transformer
+h𝑡,𝑗“ to1𝑡,𝑗, o1𝑡,𝑗`12, o1𝑡,𝑗`24u, where 𝑗P  r0, 12q. Then, we can     To make each visual token aware of the existence of other tokens
+                                                        Next,      in both spatial and temporal dimensions, we first perform spatialreformulate O1𝑡in terms of h: O1𝑡“ th𝑡,𝑗u11𝑗“0 P R12ˆ3ˆ𝑑.
+we feed it to a stack of transformer layers with self-attention on       attention within each viewpoint representation H𝐸𝑡P R12ˆ𝑑across
+
+=== PDF PAGE 5 ===
+Mind the Gap: Improving Success Rate of Vision-and-Language Navigation by Revisiting Oracle Success Routes MM ’23, October 29–November 3, 2023, Ottawa, ON, Canada.
+
+
+Table 2: Comparison with the state-of-the-art methods on REVERIE. Blue and Bold denote the best and runner-up results,
+respectively. Ò denotes the performance improvement after applying our method. ♠denotes that we crop the original path
+from the starting location to the viewpoint predicted.
+
+
+                           REVERIE Val Seen                      REVERIE Val Unseen                    REVERIE Test Unseen
+  Methods                  Navigation                                  Navigation                                  Navigation
+                                      RGS  RGSPL                        RGS  RGSPL                        RGS  RGSPL
+                  SPL      SR     OSR                 SPL      SR     OSR                 SPL      SR     OSR
+
+ Human                  -             -             -        -          -          -             -             -        -          -      53.66      81.51      86.83   77.84    51.44
+
+ RCM [64]           21.82      23.33      29.44   16.23    15.36     6.97        9.29       14.23   4.89     3.89     6.67        7.84       11.68   3.67     3.14
+ SMNA [42]         39.61      41.25      43.29   30.07    28.98     6.44        8.15       11.28   4.54     3.61     4.53        5.80        8.39    3.10     2.39
+  FAST-Short [26]    40.18      45.12      49.68   31.41    28.11     6.17       10.08      20.48   6.24     3.97     8.74       14.18      23.36   7.07     4.52
+ MATTN [48]       45.50      50.53      55.17   31.97    29.66     7.19       14.40      28.20   7.84     4.67    11.61      19.88      30.63   11.28    6.08
+  ORIST [46]         42.21      45.19      49.12   29.87    27.77    15.14      16.84      25.02   8.52     7.58    18.97      22.19      29.20   10.68    9.28
+ VLNœBERT [24]   47.96      51.79      53.90   38.23    35.61    24.90      30.67      35.02   18.77    15.27    23.99      29.61      32.91   16.50    13.51
+  AirBERT [20]       42.34      47.01      48.98   32.75    30.01    21.88      27.89      34.51   18.23    14.18    23.61      30.28      34.20   16.83    13.28
+
+ HOP [50]           47.19      53.76      54.88   38.65    33.85    26.11      31.78      36.24   18.86    15.73    24.34      30.17      33.06   17.69    14.34
+ ` Ours             46.43   54.11(Ò0.35)   54.88   38.65    33.56    25.79   32.83(Ò1.05)   36.24   18.86    15.71    24.28   31.29(Ò1.12)   33.06   17.69    14.12
+ ` Ours♠            50.61   54.11(Ò0.35)   27.64   38.65    26.23    54.63   32.83(Ò1.05)   36.09   18.86    32.98    35.12   31.29(Ò1.12)   36.09   17.69    14.51
+
+ HAMT [8]          40.19      43.29      47.65   27.20    25.18    30.16      32.95      36.84   18.92    17.28    26.67      30.40      33.41   14.88    13.08
+ ` Ours             39.73   44.60(Ò1.31)   47.65   27.20    24.90    29.56   34.17(Ò1.22)   36.84   18.92    16.93    26.61   31.19(Ò0.79)   33.41   14.88    12.82
+ ` Ours♠            42.37   44.60(Ò1.31)   47.40   27.20    25.37    31.58   34.17(Ò1.22)   36.68   18.92    17.56    27.92   31.19(Ò0.79)   33.28   14.88    13.47
+
+ DUET [10]        63.94     71.75      73.86   57.41    51.14    33.73      46.98      51.07   32.15    23.03    36.06      52.51      56.91   31.88    22.06
+ ` Ours             63.21   72.48(Ò0.73)   73.86   57.41    50.92    33.57   48.31(Ò1.33)   51.07   32.15    22.84    35.30   54.08(Ò1.57)   56.91   31.88    21.84
+ ` Ours♠          66.80   72.48(Ò0.73)   73.46   57.41    53.18    34.96   48.31(Ò1.33)   50.93   32.15    23.33    38.19   54.08(Ò1.57)   56.56   31.88    22.18
+
+ HM3D [9]          55.70      65.00      66.76   48.42    41.67   40.84     55.89      62.14   36.58    26.75   38.88     55.17      62.30   32.23    22.68
+ ` Ours             55.60   65.50(Ò0.50)   66.76   48.42    41.48    40.61   58.22(Ò2.33)   62.14   36.58    26.52    38.72   56.78(Ò1.61)   62.30   32.23    22.53
+ ` Ours♠            58.22   65.50(Ò0.50)   66.54   48.42    43.69   43.04   58.22(Ò2.33)   61.73   36.58    26.98   41.76   56.78(Ò1.61)   61.82   32.23    23.03
+
+
+12 headings:
+                                                         where W˚𝑡are learnable parameters, and the dimension of the re-                 pH𝐸𝑡W𝑄ℎqJpH𝐸𝑡W𝐾ℎq    H𝐻𝑡 “ softmaxp    ?        qpH𝐸𝑡W𝑉ℎq,      (4)      sulting ˆq𝑡is compressed to R1ˆ𝑑. The final representation of the                              𝑑                                                           whole trajectory turns to ˆQ “ rˆq1, ¨ ¨ ¨ , ˆq𝑇s P R𝑇ˆ𝑑. Next, we uti-
+where W˚ℎare learnable parameters and H𝐻𝑡  P R12ˆ𝑑. In this        lize a two-layer MLP followed by a sigmoid function to predict the
+way, we obtain the updated representation for the whole trajectory       probability of each viewpoint being the described target location:
+rH𝐻1  , ¨ ¨ ¨ , H𝐻𝑇s P R𝑇ˆ12ˆ𝑑.
+  Then, we expand the spatial attention from one viewpoint to all                𝑝𝑡“ SigmoidpMLPpˆq𝑡qq.                     (7)
+the viewpoints, attending to all 𝑇ˆ 12 observation representations:
+                                 𝑠𝑡qJpH𝐻W𝐾𝑠𝑡q                       Considering there might be more than one positive viewpoints in a    H𝑆𝑇“ softmaxppH𝐻W𝑄 ?       qpH𝐻W𝑉𝑠𝑡q,     (5)       trajectory, we hope our model can discover all these viewpoints,                              𝑑
+                                                                  so we view this as a step-wise two-class classification problem for
+where W˚𝑠𝑡are learnable parameters and H𝑆𝑇P R𝑇ˆ12ˆ𝑑. This      each viewpoint. While during inference, the final prediction is de-
+helps the model to mine the long-range dependency in the whole      termined by selecting the viewpoint with the maximum probability,
+trajectory.                                                  which allows high prediction confidence.
+
+3.4  Target Selection Transformer                    3.5  Loss Function
+After cross-modality elevation and spatial-temporal transformers,    We employ two loss functions for training: Focal Loss [38] and Dice
+the information of each viewpoint has been fully exchanged. How-     Loss [44]. Focal Loss is a balanced version of cross-entropy loss
+ever, the representation dimension for a trajectory is still very high:      that puts more emphasis on hard-to-classify examples. The focal
+R𝑇ˆ12ˆ𝑑, which leads to a large amount of computational cost for       loss function is defined as follows:
+the end-to-end training of the whole model. First we use viewpoint
+query self-attention layer to make the𝑇input queries attend to each                                                                 L𝑓𝑜𝑐𝑎𝑙“ ´𝛼𝑡p1 ´ 𝑝𝑡q𝛾logp𝑝𝑡q,                (8)
+other. To extract discriminative information, we leverage the query
+to adaptively summarize the information within each viewpoint
+representation H𝑆𝑇𝑡   via cross attention:                          where 𝑝𝑡is the predicted probability of the ground truth target
+                                                                   viewpoint, 𝛼𝑡is a weighting factor that depends on the class fre-
+                     𝑡qJpH𝑆𝑇𝑡 W𝐾𝑡q                          quency, and𝛾is a hyper-parameter that controls how easy examples       ˆq𝑡“ softmaxppq𝑡W𝑄 ?        qpH𝑆𝑇𝑡 W𝑉𝑡q       (6)
+                             𝑑                                   are downweighted.
+
+=== PDF PAGE 6 ===
+MM ’23, October 29–November 3, 2023, Ottawa, ON, Canada.                                                        Chongyang Zhao, Yuankai Qi, and Qi Wu
+
+
+Table 3: Comparison with the state-of-the-art methods on     Table 4: Ablation study on R2R validation unseen split using
+NDH validation seen and unseen splits. Blue and Bold denote    HOP [50] as our baseline. E Trans. denotes the cross-modality
+the best and runner-up results, respectively. Ò denotes the      elevation transformer, S-T Trans. means the spatial-temporal
+performance improvement after applying our method.          transformer, and T Trans. represents target selection trans-
+                                                             former.
+
+                   NDH Val Seen            NDH Val Unseen
+  Methods
+                  GP         SR     OSR     GP         SR     OSR
+                                                                                              Component           R2R Val Unseen
+ PREVALENT [22]         -                -             -        3.15               -             -               Model    #  E Trans.  S-T Trans.  T Trans.   SR   OSR  Gap
+ HOP [50]                   -                -             -        5.13               -             -
+                                                            HOP [50]  0                                     63.52   71.48   7.96
+ HAMT [8]              6.90          20.68      31.15      5.09          16.87      27.89
+  + Ours              7.28(Ò0.38)   25.19(Ò4.51)   31.15   5.52(Ò0.43)   19.52(Ò2.65)   27.89                        1   ✓     ✓     ✓      66.92   71.48   4.56
+ SIG_HAMT [30]       8.13         23.56      33.77      5.60         15.33      28.45                        2    ✗                              65.79   71.48   5.69
+                                                  ` Ours
+  + Ours              8.51(Ò0.38)   27.33(Ò3.77)   33.77   5.89(Ò0.29)   17.24(Ò1.91)   28.45                                                                                                3             ✗                  64.82   71.48   6.66
+                                                                                                4                      ✗      65.33   71.48   6.15
+
+  Dice Loss is a similarity-based loss function that measures the
+overlap between the prediction and ground truth labels:
+                   ř𝑁                                 stops within 3 meters to the target location, while Oracle Success                                         𝑦𝑖𝑝𝑡                             2  𝑖“1                                                                                           ,                (9)     Rate (OSR) considers a task as successful when at least one of            L𝑑𝑖𝑐𝑒“ 1 ´ ř𝑁                       ř𝑁
+                             𝑖“1 𝑦𝑖`  𝑖“1 𝑝𝑡                             its trajectory viewpoints is within 3 meters to the target location.
+where 𝑦𝑖is the binary ground truth label (1 for positive viewpoints      Success Rate weighted by Path Length (SPL) evaluates the accu-
+and 0 for negative viewpoints).                                      racy and efficiency of navigation simultaneously, which considers
+  The final loss is a weighted sum of Focal Loss and Dice Loss:        both the success rate and the length of the navigation path. For
+                                                                   the REVERIE [48] task, the same metrics as R2R are utilized to
+           L𝑡𝑜𝑡𝑎𝑙“ 𝜆𝑓𝑜𝑐𝑎𝑙L𝑓𝑜𝑐𝑎𝑙` 𝜆𝑑𝑖𝑐𝑒L𝑑𝑖𝑐𝑒,           (10)                                                                    evaluate the navigation sub-task. REVERIE introduces additional
+where 𝜆𝑓𝑜𝑐𝑎𝑙and 𝜆𝑑𝑖𝑐𝑒are trade-offweights between Focal Loss      metrics to evaluate the object grounding performance, Remote
+and Dice Loss.                                            Grounding Success Rate (RGS) measures the proportion of tasks
+                                                                       that successfully locate the target object, and RGS weighted by
+4  EXPERIMENTS                                    Path Length (RGSPL) which considers both grounding accuracy
+                                                            and the navigation path length. For the NDH [57] task, the primaryWe evaluate our proposed method on three downstream tasks:
+                                                                      evaluation metric in this study is Goal Progress (GP), which quan-R2R [3], REVERIE [48] and NDH [57] based on the Matterport3D [5]
+                                                                                           tifies the distance (in meters) that the agent has progressed towardssimulator. These tasks evaluate the agent from different perspec-
+                                                                   the target location. We also introduce the SR of the R2R task as atives and have different characteristics.
+                                                            complementary measurement.R2R benchmark. The Room-to-Room (R2R) dataset [3] is a VLN
+task that involves navigating through photo-realistic indoor en-
+vironments by following low-level natural language instructions,     4.2  Implementation Details
+such as “Turn left and walk across the hallway. Turn left again and    We conducted all experiments on a single NVIDIA RTX 3090 GPU.
+walk across this hallway ...”. This task consists of 90 houses with     The batch size is set to 48. The image features are exacted by ViT-
+10,567 viewpoints and 7,189 shortest-path trajectories with 21,567      B/16 [15] pretrained on ImageNet [53], and we adopt RoBERTa [40]
+manually annotated instructions.                                     as the text encoder. For each VLN benchmark, we trained our
+REVERIE benchmark. REVERIE dataset [48] is a VLN task that     model using both generated data from the original data and HM3D-
+focuses on localizing a remote target object based on high-level     AutoVLN data [9]. The Cross-Modality Elevation Transformer, Spatial-
+human instructions, such as "Bring me the bench from the foyer".     Temporal Transformer and Target Selection Transformer in our
+The target object is not visible at the starting location. The agent has     model use 2, 2 and 2 transformer layers, respectively. Our trans-
+to navigate to an appropriate location without detailed guidance.      former has 8 heads, and feed-forward layers are with a hidden
+NDH benchmark. NDH dataset [57] is a VLN task that evaluates      dimension of 768. We freeze the vision encoder and set the initial
+an agent’s ability to arrive at goal regions based on multi-turn      learning rates to 1ˆ10´5 for the language encoder and 1ˆ10´4 for
+question-answering dialogs. The task poses challenges due to the      the rest of the network. The text encoder has a linear schedule learn-
+ambiguity and under-specification of starting instructions, as well      ing rate with warm-up while the rest of the network has a constant
+as the long lengths of both instructions and paths.                     learning rate. We apply the AdamW [41] optimizer with weight-
+                                                             decay 1ˆ10´2 and use dropout probability of 0.1 in transformer
+4.1  Evaluation Metrics                                         layers and 0.5 in the prediction head. We also apply a dropout with
+We adopt widely-used metrics on each of these three VLN tasks.     a probability of 0.4 followed by a linear layer on image features.
+For the R2R task, Trajectory Length (TL) measures the average       Lastly, we use an exponential moving average with a decay rate
+distance navigated by the agent. Navigation Error (NE) is used       of 0.9998. For loss functions, we set hyper-parameters 𝜆𝑓𝑜𝑐𝑎𝑙“ 1,
+to measure the mean deviation between the agent’s stop location     𝜆𝑑𝑖𝑐𝑒“ 0.1, 𝛼𝑡“ 0.25, and 𝛾“ 2. We train our networks for
+and the target location in meters. The Success Rate (SR) is com-     40000 iterations, and the final model is selected based on the best
+puted as the ratio of successfully completed tasks, where the agent      performance on the validation unseen split.
+
+=== PDF PAGE 7 ===
+Mind the Gap: Improving Success Rate of Vision-and-Language Navigation by Revisiting Oracle Success Routes MM ’23, October 29–November 3, 2023, Ottawa, ON, Canada.
+
+
+Table 5: The performance of HOP [50] with our model on     Table 6: The performance of HOP [50] with our model on
+R2R validation unseen split obtained via models trained with    R2R validation unseen split with different training losses.
+different data.
+
+                                                                                              R2R Val Unseen
+                                                                             Model  Trainning Loss
+                        Training Data     R2R Val Unseen                                                 SR   OSR  Gap
+           Model
+                  R2R  HM3D [9]   SR   OSR   Gap                                1    BCE             63.62   71.48   7.86
+       HOP [50]                      63.52   71.43   7.96                                2     Focal            65.05   71.48   6.43
+              1    ✓                64.75   71.48   6.73                                3    BCE ` Dice      65.43   71.48   6.05
+              2          ✓       45.52   71.48   25.96                                4     Focal ` Dice     66.92   71.48   4.56
+              3    ✓    ✓       66.92   71.48   4.56
+
+                                                             Table 7: The performance of HOP [50] with our model on R2R
+                                                               validation unseen split with different training loss hyper-
+Training Data Preparation. The ground-truth trajectories are     parameters (HP).
+not suitable for training our model because the target viewpoint
+is always the last one in each trajectory, which might lead to our                             Training Loss HP   R2R Val Unseen
+                                                                                 Model   𝜆𝑓𝑜𝑐𝑎𝑙     𝜆𝑑𝑖𝑐𝑒     SR   OSR  Gapmodel to learn this bias instead of the ability to match visual repre-
+sentation to textual ones. To overcome this problem, we construct                      1       1.0        1.0     65.42   71.48   6.06
+new training data based on original trajectories. Specifically, for                      2       1.0        0.5     65.53   71.48   5.95
+each original trajectory, we first find out all the viewpoints 𝑍that                      3       1.0        0.2     66.31   71.48   5.17
+are located within 3 meters of the target location. These viewpoints                      4       1.0        0.1     66.92   71.48   4.56
+are viewed as positive because if an agent stops at any of these
+viewpoints, the navigation is regarded as successful. Then, we sam-
+ple 1„2 viewpoints (e.g., {A, B}) from 𝑍as the positive viewpoints     ORIST [46], VLNœBERT [24], and AirBERT [20]. REVERE evalu-
+of a newly constructed trajectory. The reason we sample multiple       ates both navigation and grounding performance. As our method is
+positive viewpoints is that a VLN method may pass by the target      designed to improve navigation ability, the navigation success rate
+location several times, such as before and after the target loca-        is the main metric for reference. As shown in Table 2, our method
+tion. Next, we connect the original starting location with one of A      boosts the navigation success of all four top-performing baselines,
+and/or B using the shortest path. Then, from the other viewpoint      with improvement ranging from 0.35% to 2.33% across three splits.
+(if there is any), we expand to another sub-path within 6 meters.     As our method only modifies pre-obtained navigation trajectories,
+By connecting these two sub-paths with A and/or B, we obtain a         it cannot change the object grounding results and thus there is no
+new path. In this way, we construct 396,866 trajectories for R2R,     performance difference in terms of the RGS metric.
+331,533 trajectories for REVERIE, and 376,871 trajectories for NDH.     Results on NDH. The results of our baselines and our method
+                                                                    are presented in Table 3. By applying our method to HAMT [8]
+4.3  Comparison to State-of-the-Art Methods         and SIG_HAMT [30], we achieved 2.65% and 1.91% improvements
+                                                                       in success rate on the NDH validation unseen split, respectively.Results on R2R. We assess the efficacy of the proposed method
+                                                        More improvements are observed on the validation seen split: 4.51%on top of four state-of-the-art methods: HOP [50], SIG_HAMT [30],
+                                                           and 3.77%. Regarding the GP metric, our method also improve ourDUET [10] and SIG_DUET [30]. The results are presented in Ta-
+                                                                        baselines to the new state-of-the-art performance from 5.6 to 5.89.ble 1. It shows that our method brings significant performance
+improvements for these four top-performing methods. Specifically,
+on validation unseen, our method improves the success rate with     4.4  Ablation Study
+an absolute increase of 4% for SIG_DUET, 3% for HOP and DUET,      In this section, we investigate the effectiveness of the three transformer-
+and 2% for SIG_HAMT. On the test split, our method yields 2%      based modules of our method, additional training data, loss func-
+absolute improvement for 3 out of the 4 top-performing methods,       tions, and hyperparameters of loss functions.
+boosting the success rate to 74%. In terms of SPL, we report two    The Effectiveness of Different Components. We conduct ab-
+types of results: one is computed based on the path that adds the       lation experiments over the main components, cross-modality el-
+shortest return path from the original stop location to the viewpoint      evation transformer (E Trans.), spatial-temporal transformer (S-T
+predicted by our method, and the other one is computed using the       Trans.), and target selection transformer (T Trans.), of our method
+path cropped from the starting location to the viewpoint predicted     on the R2R validation unseen split. The results are presented in
+by our method (indicated by superscript ♠). In the return setting,      Table 4. For comparison convenience, we also present the baseline
+the SPL is slightly decreased (-1%) due to the increase in trajectory       result in #0. In #1, we present the results when applying all three
+length caused by the return path. By contrast, in the crop setting,     modules onto the baseline. In the remaining rows, we report the
+our method can bring 2%„5% absolute SPL improvement. All these       results by removing each module one by one. It shows that, when
+results show the effectiveness of the proposed method.                applying all three modules, the best results are achieved and reduce
+Results on REVERIE. In Table 2, we present results on the REVERIE     the gap between SR and OSR from 7.96 to 4.56 (#0 v.s. #1). When
+dataset with comparisons to several state-of-the-art methods, in-     removing each module in turns, we notice that the elevator trans-
+cluding RCM [64], SMNA [42], FAST-Short [26], MATTN [48],     former leads to the most performance drop (#1 v.s. #2), then the
+
+=== PDF PAGE 8 ===
+MM ’23, October 29–November 3, 2023, Ottawa, ON, Canada.                                                        Chongyang Zhao, Yuankai Qi, and Qi Wu
+
+
+       Walk from telephone down hall and turn left    Walk past the counters and exit the kitchen.    Walk past the end table and turn right into
+      down hall just before vase. Walk through    Wait next to the landscape painting on the     the kitchen. Walk to the  left of the island
+       archway into bedroom. Stop between bed     wall.                                           past the oven into the next room and stop.
+       and chair.
+
+
+
+
+
+                                                                                                                                                                            Correct Viewpoint
+
+                                                                                                                                                                               False Viewpoint
+
+                                                                                                                                                                            Correct Target
+
+                                                                                                                                                                               False Target
+
+                                                                                                                                                                  Sucess Action
+
+                                                                                                                                                                                             Fail Action
+
+                                                                                                                                                                  Return Action
+                               (a) HOP+ Ours                                           (b) HAMT+ Ours                                            (c) DUET+ Ours
+
+
+Figure 3: Visualization of trajectories before and after applying our method on top of three method: HOP [50], HAMT [8], and
+DUET [10]. The yellow lines represent the successful part of the original path, while the red lines represent the incorrect part
+of navigation. The green lines show the return path from an original stop location to the new stop location predicted by our
+methods.
+
+
+target selection transformer (#1 v.s. #4), and last the spatial-temproal     4.5  Qualitative Results
+transformer (#1 v.s. #3).                                                In Figure 3, we visualize the predicted trajectories before and after
+The Effectiveness of Additional Training Data. In addition      applying our method on top of three methods: HOP [50], HAMT [8]
+to the original training data of each VLN task, we also use the     and DUET [10]. As shown in Figure 3(a), HOP initially passed the
+automatically generated data in [9] of 900 unlabelled raw HM3D       target location, which is a common problem in trajectory planning
+environments. To verify its effectiveness, we conduct three ablation       for VLN agents. Our method is able to find the correct viewpoints
+studies and the results are shown in Table 5. Specifically, using       in the original trajectory and thus can correct wrong navigations as
+additional data resulted in a 2.17% increase in Success Rate com-      indicated by the dashed lines in Figure 3. The similar phenomena
+pared to the original training data (#1 v.s. #3). We also evaluated     can also be observed on HAMT [8] (Figure 3(b)) and DUET [10]
+zero-shot performance of the model trained only on additional data       (Figure 3(c)). This shows the effectiveness of our method in correct-
+(#2), which achieves a Success Rate of 45.52% on the R2R valida-      ing trajectories that deviate from desired path and enabling agents
+tion unseen split. Although the results suggest that the additional       to reach their target locations with improved precision.
+data from HM3D-VLN provides relevant information for the visual
+navigation task (#2 v.s. #3), it is important to note that the model    5  CONCLUSION
+trained solely on the additional data achieves significantly lower
+                                                                      In this paper, we address the long-ignored problem in Vision-and-
+performance than the model trained on only the original data.
+                                                           Language Navigation of narrowing the gap between Success Rate
+Training Losses. To effectively train our model, we test three loss
+                                                                     (SR) and Oracle Success Rate (OSR) by formulating VLN as a tra-
+functions: binary cross-entropy (BCE) loss, Focal loss [38], and
+                                                                         jectory grounding task. We propose to discover the target location
+Dice loss [44]. Here we evaluate their own efficacy. The results are
+                                                           from a trajectory given by off-the-shelf VLN models, rather than
+shown in Table 6. As shown in the table, using focal loss with dice
+                                                                       predicting actions directly as existing methods do. To achieve this,
+loss results in the best success rate, then BCE+Dice, Focal, and the
+                                                   we design a novel multi-module transformer-based model to learn a
+BCE loss. Focal loss achieving better results than BCE loss indicates
+                                                             compact discriminative trajectory viewpoint representation, which
+some training samples are important than others. The introduction
+                                                                                           is then used to predict the confidence of being a target location. Our
+of Dice loss boosts the performance over BCE and Focal loss. This
+                                                             proposed approach is evaluated on four widely adopted datasets,
+indicates that considering multiple predictions together is better
+                                                                 R2R, REVERIE and NDH, with extensive evaluations demonstrating
+than handling them separately.
+                                                                                         its effectiveness. Our method shows a new direction to solve the
+Impact of Hyperparameters. We take another ablation study to
+                                              VLN tasks, which has been previously overlooked, and presents
+investigate the impact of training loss hyperparameters (HPs) for
+                                                                promising results for enhancing the performance of existing navi-
+our model. The ablation study involves varying the values of two
+                                                                    gation agents.
+HPs, 𝜆𝑓𝑜𝑐𝑎𝑙and 𝜆𝑑𝑖𝑐𝑒, for the training loss function. Specifically, we
+experiment with four different combinations of hyper-parameters
+as shown in Table 7, ranging from both HPs having equal weight
+to one HP being given more weight than the other. The results
+show that varying the hyper-parameters has a minor impact on the
+performance of our model.
+
+=== PDF PAGE 9 ===
+Mind the Gap: Improving Success Rate of Vision-and-Language Navigation by Revisiting Oracle Success Routes MM ’23, October 29–November 3, 2023, Ottawa, ON, Canada.
+
+REFERENCES                                                                    [25] Gabriel Ilharco, Vihan Jain, Alexander Ku, Eugene Ie, and Jason Baldridge. 2019.
+ [1] Dong An, Yuankai Qi, Yan Huang, Qi Wu, Liang Wang, and Tieniu Tan. 2021.            General Evaluation for Instruction Conditioned Navigation using Dynamic Time
+     Neighbor-view Enhanced Model for Vision and Language Navigation. In ACM            Warping. In Adv. Neural Inform. Process. Syst.
+       Int. Conf. Multimedia.                                                                  [26] Liyiming Ke, Xiujun Li, Yonatan Bisk, Ari Holtzman, Zhe Gan, Jingjing Liu,
+ [2] Dong An, Yuankai Qi, Yangguang Li, Yan Huang, Liang Wang, Tieniu Tan, and             Jianfeng Gao, Yejin Choi, and Siddhartha S. Srinivasa. 2019. Tactical Rewind:
+     Jing Shao. 2022. BEVBert: Topo-Metric Map Pre-training for Language-guided             Self-Correction via Backtracking in Vision-And-Language Navigation. In IEEE
+     Navigation. arXiv preprint arXiv:2212.04385 (2022).                                         Conf. Comput. Vis. Pattern Recog. 6741–6749.
+ [3] Peter Anderson, Qi Wu, Damien Teney, Jake Bruce, Mark Johnson, Niko Sünder-        [27] Jacob Krantz, Erik Wijmans, Arjun Majumdar, Dhruv Batra, and Stefan Lee.
+     hauf, Ian D. Reid, Stephen Gould, and Anton van den Hengel. 2018. Vision-and-             2020. Beyond the Nav-Graph: Vision-and-Language Navigation in Continuous
+    Language Navigation: Interpreting Visually-Grounded Navigation Instructions             Environments. In Eur. Conf. Comput. Vis., Andrea Vedaldi, Horst Bischof, Thomas
+     in Real Environments. In IEEE Conf. Comput. Vis. Pattern Recog. 3674–3683.                 Brox, and Jan-Michael Frahm (Eds.), Vol. 12373. 104–120.
+ [4] Nicolas Carion, Francisco Massa, Gabriel Synnaeve, Nicolas Usunier, Alexan-        [28] Ranjay Krishna, Kenji Hata, Frederic Ren, Li Fei-Fei, and Juan Carlos Niebles.
+     der Kirillov, and Sergey Zagoruyko. 2020. End-to-end object detection with              2017. Dense-captioning events in videos. In Int. Conf. Comput. Vis. 706–715.
+     transformers. In Eur. Conf. Comput. Vis. 213–229.                                      [29] Alexander Ku, Peter Anderson, Roma Patel, Eugene Ie, and Jason Baldridge. 2020.
+ [5] Angel X. Chang, Angela Dai, Thomas A. Funkhouser, Maciej Halber, Matthias           Room-Across-Room: Multilingual Vision-and-Language Navigation with Dense
+     Nießner, Manolis Savva, Shuran Song, Andy Zeng, and Yinda Zhang. 2017. Mat-            Spatiotemporal Grounding. In EMNLP. 4392–4412.
+     terport3D: Learning from RGB-D Data in Indoor Environments. In International        [30]  Jialu Li and Mohit Bansal. 2023. Improving Vision-and-Language Navigation
+     Conference on 3D Vision. 667–676.                                                by Generating Future-View Image Semantics. In IEEE Conf. Comput. Vis. Pattern
+ [6] Jingyuan Chen, Xinpeng Chen, Lin Ma, Zequn Jie, and Tat-Seng Chua. 2018.             Recog. 10803–10812.
+     Temporally grounding natural sentence in video. In EMNLP. 162–171.                  [31]  Jialu Li and Mohit Bansal. 2023. PanoGen: Text-Conditioned Panoramic En-
+ [7] Jinyu Chen, Chen Gao, Erli Meng, Qiong Zhang, and Si Liu. 2022. Reinforced            vironment Generation for Vision-and-Language Navigation.  arXiv preprint
+     Structured State-Evolution for Vision-Language Navigation. In IEEE Conf. Com-             arXiv:2305.19195 (2023).
+      put. Vis. Pattern Recog. 15450–15459.                                                   [32]  Jialu Li, Hao Tan, and Mohit Bansal. 2022. Envedit: Environment editing for
+ [8] Shizhe Chen, Pierre-Louis Guhur, Cordelia Schmid, and Ivan Laptev. 2021. History             vision-and-language navigation. In IEEE Conf. Comput. Vis. Pattern Recog. 15407–
+     aware multimodal transformer for vision-and-language navigation. Adv. Neural             15417.
+     Inform. Process. Syst. 34 (2021), 5834–5847.                                             [33] Xiujun Li, Chunyuan Li, Qiaolin Xia, Yonatan Bisk, Asli Çelikyilmaz, Jianfeng
+ [9] Shizhe Chen, Pierre-Louis Guhur, Makarand Tapaswi, Cordelia Schmid, and Ivan            Gao, Noah A. Smith, and Yejin Choi. 2019. Robust Navigation with Language
+     Laptev. 2022. Learning from unlabeled 3d environments for vision-and-language             Pretraining and Stochastic Sampling. In EMNLP. 1494–1499.
+     navigation. In Eur. Conf. Comput. Vis. 638–655.                                         [34] Xiwen Liang, Fengda Zhu, Lingling Li, Hang Xu, and Xiaodan Liang. 2022.
+[10] Shizhe Chen, Pierre-Louis Guhur, Makarand Tapaswi, Cordelia Schmid, and Ivan            Visual-Language Navigation Pretraining via Prompt-based Environmental Self-
+     Laptev. 2022. Think global, act local: Dual-scale graph transformer for vision-             exploration. In ACL. 4837–4851.
+     and-language navigation. In IEEE Conf. Comput. Vis. Pattern Recog. 16537–16547.         [35] Xiwen Liang, Fengda Zhu, Yi Zhu, Bingqian Lin, Bing Wang, and Xiaodan Liang.
+[11] Wenhao Cheng, Xingping Dong, Salman H. Khan, and Jianbing Shen. 2022. Learn-             2022. Contrastive instruction-trajectory learning for vision-language navigation.
+     ing Disentanglement with Decoupled Labels for Vision-Language Navigation. In             In AAAI. 1592–1600.
+      Eur. Conf. Comput. Vis. 309–329.                                                       [36] Bingqian Lin, Yi Zhu, Zicong Chen, Xiwen Liang, Jianzhuang Liu, and Xiaodan
+[12] Chaorui Deng, Qi Wu, Qingyao Wu, Fuyuan Hu, Fan Lyu, and Mingkui Tan. 2022.             Liang. 2022. ADAPT: Vision-Language Navigation with Modality-Aligned Action
+     Visual Grounding Via Accumulated Attention. IEEE Trans. Pattern Anal. Mach.            Prompts. In IEEE Conf. Comput. Vis. Pattern Recog. 15396–15406.
+       Intell. 44, 3 (2022), 1670–1684. https://doi.org/10.1109/TPAMI.2020.3023438            [37] Chuang Lin, Yi Jiang, Jianfei Cai, Lizhen Qu, Gholamreza Haffari, and Zehuan
+[13] Jiajun Deng, Zhengyuan Yang, Tianlang Chen, Wengang Zhou, and Houqiang            Yuan. 2022. Multimodal Transformer with Variable-Length Memory for Vision-
+       Li. 2021. Transvg: End-to-end visual grounding with transformers. In IEEE Conf.           and-Language Navigation. In Eur. Conf. Comput. Vis. 380–397.
+     Comput. Vis. Pattern Recog. 1769–1779.                                                 [38] Tsung-Yi Lin, Priya Goyal, Ross Girshick, Kaiming He, and Piotr Dollár. 2017.
+[14] Jacob Devlin, Ming-Wei Chang, Kenton Lee, and Kristina Toutanova. 2019. BERT:             Focal loss for dense object detection. In IEEE Conf. Comput. Vis. Pattern Recog.
+     Pre-training of Deep Bidirectional Transformers for Language Understanding. In             2980–2988.
+    NAACL-HLT. 4171–4186.                                                              [39] Chong Liu, Fengda Zhu, Xiaojun Chang, Xiaodan Liang, Zongyuan Ge, and
+[15] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov, Dirk Weissenborn, Xi-           Yi-Dong Shen. 2021. Vision-language navigation with random environmental
+    aohua Zhai, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg            mixup. In IEEE Conf. Comput. Vis. Pattern Recog. 1644–1654.
+     Heigold, Sylvain Gelly, Jakob Uszkoreit, and Neil Houlsby. 2021. An Image is        [40] Yinhan Liu, Myle Ott, Naman Goyal, Jingfei Du, Mandar Joshi, Danqi Chen, Omer
+    Worth 16x16 Words: Transformers for Image Recognition at Scale. In Int. Conf.             Levy, Mike Lewis, Luke Zettlemoyer, and Veselin Stoyanov. 2019. Roberta: A
+     Learn. Represent.                                                                        robustly optimized bert pretraining approach. arXiv preprint arXiv:1907.11692
+[16] Daniel Fried, Ronghang Hu, Volkan Cirik, Anna Rohrbach, Jacob Andreas, Louis-              (2019).
+     Philippe Morency, Taylor Berg-Kirkpatrick, Kate Saenko, Dan Klein, and Trevor        [41]  Ilya Loshchilov and Frank Hutter. 2019. Decoupled Weight Decay Regularization.
+      Darrell. 2018. Speaker-Follower Models for Vision-and-Language Navigation. In             In Int. Conf. Learn. Represent.
+     Adv. Neural Inform. Process. Syst. 3318–3329.                                           [42] Chih-Yao Ma, Jiasen Lu, Zuxuan Wu, Ghassan AlRegib, Zsolt Kira, Richard Socher,
+[17] Tsu-Jui Fu, Xin Eric Wang, Matthew F Peterson, Scott T Grafton, Miguel P           and Caiming Xiong. 2019.  Self-Monitoring Navigation Agent via Auxiliary
+     Eckstein, and William Yang Wang. 2020. Counterfactual Vision-and-Language             Progress Estimation. In Int. Conf. Learn. Represent.
+     Navigation via Adversarial Path Sampling. In Eur. Conf. Comput. Vis. 71–86.            [43] Chih-Yao Ma, Zuxuan Wu, Ghassan AlRegib, Caiming Xiong, and Zsolt Kira. 2019.
+[18] Chen Gao, Xingyu Peng, Mi Yan, He Wang, Lirong Yang, Haibing Ren, Hongsheng           The Regretful Agent: Heuristic-Aided Navigation Through Progress Estimation.
+      Li, and Si Liu. 2023.  Adaptive Zone-Aware Hierarchical Planner for Vision-             In IEEE Conf. Comput. Vis. Pattern Recog. 6732–6740.
+    Language Navigation. In IEEE Conf. Comput. Vis. Pattern Recog. 14911–14920.          [44] Fausto Milletari, Nassir Navab, and Seyed-Ahmad Ahmadi. 2016. V-net: Fully
+[19] Jiyang Gao, Chen Sun, Zhenheng Yang, and Ram Nevatia. 2017. Tall: Temporal             convolutional neural networks for volumetric medical image segmentation. In
+      activity localization via language query. In IEEE Conf. Comput. Vis. Pattern Recog.              International Conference on 3D Vision. 565–571.
+     5267–5275.                                                                            [45] Jonghwan Mun, Minsu Cho, and Bohyung Han. 2020. Local-global video-text
+[20] Pierre-Louis Guhur, Makarand Tapaswi, Shizhe Chen, Ivan Laptev, and Cordelia              interactions for temporal grounding. In IEEE Conf. Comput. Vis. Pattern Recog.
+     Schmid. 2021. Airbert: In-Domain Pretraining for Vision-and-Language Naviga-            10810–10819.
+      tion. In Int. Conf. Comput. Vis. 1634–1643.                                              [46] Yuankai Qi, Zizheng Pan, Yicong Hong, Ming-Hsuan Yang, Anton van den Hengel,
+[21] Meera Hahn, Asim Kadav, James M Rehg, and Hans Peter Graf. 2019.  Trip-           and Qi Wu. 2021. The Road to Know-Where: An Object-and-Room Informed
+     ping through time: Efficient localization of activities in videos. arXiv preprint             Sequential BERT for Indoor Vision-Language Navigation. In Int. Conf. Comput.
+     arXiv:1904.09936 (2019).                                                                              Vis. 1655–1664.
+[22] Weituo Hao, Chunyuan Li, Xiujun Li, Lawrence Carin, and Jianfeng Gao. 2020.        [47] Yuankai Qi, Zizheng Pan, Shengping Zhang, Anton van den Hengel, and Qi Wu.
+    Towards Learning a Generic Agent for Vision-and-Language Navigation via             2020. Object-and-Action Aware Model for Visual Language Navigation. In Eur.
+     Pre-Training. In IEEE Conf. Comput. Vis. Pattern Recog. 13134–13143.                        Conf. Comput. Vis. 303–317.
+[23] Yicong Hong, Cristian Rodriguez Opazo, Yuankai Qi, Qi Wu, and Stephen Gould.        [48] Yuankai Qi, Qi Wu, Peter Anderson, Xin Wang, William Yang Wang, Chunhua
+     2020. Language and Visual Entity Relationship Graph for Agent Navigation. In            Shen, and Anton van den Hengel. 2020. REVERIE: Remote Embodied Visual
+     Adv. Neural Inform. Process. Syst.                                                        Referring Expression in Real Indoor Environments. In IEEE Conf. Comput. Vis.
+[24] Yicong Hong, Qi Wu, Yuankai Qi, Cristian Rodriguez Opazo, and Stephen Gould.             Pattern Recog. 9979–9988.
+                                                                                            [49] Yanyuan Qiao, Chaorui Deng, and Qi Wu. 2021. Referring Expression Compre-     2021. VLNœBERT: A Recurrent Vision-and-Language BERT for Navigation. In
+                                                                                           hension: A Survey of Methods and Datasets. IEEE Trans. Multimedia 23 (2021),     IEEE Conf. Comput. Vis. Pattern Recog. 1643–1653.
+                                                                                         4426–4440. https://doi.org/10.1109/TMM.2020.3042066
+
+=== PDF PAGE 10 ===
+MM ’23, October 29–November 3, 2023, Ottawa, ON, Canada.                                                        Chongyang Zhao, Yuankai Qi, and Qi Wu
+
+
+
+[50] Yanyuan Qiao, Yuankai Qi, Yicong Hong, Zheng Yu, Peng Wang, and Qi Wu. 2022.              for vision-language navigation. In ACM Int. Conf. Multimedia. 4194–4203.
+    HOP: history-and-order aware pre-training for vision-and-language navigation.        [76] Gengze Zhou, Yicong Hong, and Qi Wu. 2023. NavGPT: Explicit Reasoning in
+     In IEEE Conf. Comput. Vis. Pattern Recog. 15418–15427.                                  Vision-and-Language Navigation with Large Language Models. arXiv preprint
+[51] Yanyuan Qiao, Yuankai Qi, Yicong Hong, Zheng Yu, Peng Wang, and Qi Wu. 2023.             arXiv:2305.16986 (2023).
+    HOP+: History-enhanced and Order-aware Pre-training for Vision-and-Language        [77] Luowei Zhou, Chenliang Xu, and Jason Corso. 2018. Towards automatic learning
+     Navigation. IEEE Trans. Pattern Anal. Mach. Intell. (2023).                                    of procedures from web instructional videos. In AAAI.
+[52] Cristian Rodriguez, Edison Marrese-Taylor, Fatemeh Sadat Saleh, Hongdong        [78] Fengda Zhu, Xiwen Liang, Yi Zhu, Qizhi Yu, Xiaojun Chang, and Xiaodan Liang.
+      Li, and Stephen Gould. 2020. Proposal-free temporal moment localization of a              2021. SOON: Scenario Oriented Object Navigation With Graph-Based Exploration.
+     natural-language query in video using guided attention. In WACV. 2464–2473.               In IEEE Conf. Comput. Vis. Pattern Recog. 12689–12699.
+[53] Olga Russakovsky, Jia Deng, Hao Su, Jonathan Krause, Sanjeev Satheesh, Sean
+    Ma, Zhiheng Huang, Andrej Karpathy, Aditya Khosla, Michael S. Bernstein,
+     Alexander C. Berg, and Li Fei-Fei. 2015. ImageNet Large Scale Visual Recognition   APPENDIX
+     Challenge. Int. J. Comput. Vis. 115, 3 (2015), 211–252.                     The appendix is organized as follows:[54] Rui Su, Qian Yu, and Dong Xu. 2021. Stvgbert: A visual-linguistic transformer
+     based framework for spatio-temporal video grounding. In IEEE Conf. Comput.        ‚ In Section A, we provide additional results of our method on
+      Vis. Pattern Recog. 1533–1542.                                      RxR validation splits.[55] Hao Tan, Licheng Yu, and Mohit Bansal. 2019. Learning to Navigate Unseen
+     Environments: Back Translation with Environmental Dropout. In NAACL-HLT.        ‚ In Section B. we present more ablation studies of our MG-
+     2610–2621.                                           VLN model.
+[56] Zongheng Tang, Yue Liao, Si Liu, Guanbin Li, Xiaojie Jin, Hongxu Jiang, Qian
+     Yu, and Dong Xu. 2021. Human-centric spatio-temporal video grounding with         ‚ In Section C, we present several examples of our constructed
+     visual transformers. IEEE Trans. Circuit Syst. Video Technol. (2021).                new trajectories.
+[57] Jesse Thomason, Michael Murray, Maya Cakmak, and Luke Zettlemoyer. 2019.
+     Vision-and-Dialog                       Navigation.                                          394–406.                                    In CoRL.
+[58]     Ashish Vaswani, Noam                             Shazeer,                                     Niki Parmar,                                                Jakob Uszkoreit, Llion Jones,   A  ADDITIONAL RESULTS
+    Aidan N. Gomez, Lukasz Kaiser, and Illia Polosukhin. 2017. Attention is All    RxR benchmark. The Room-Across-Room (RxR) [29] dataset is
+    you Need. In Adv. Neural Inform. Process. Syst. 5998–6008.
+[59] Hanqing Wang, Wei Liang, Luc V Gool, and Wenguan Wang. 2022. Towards      a large multilingual VLN dataset that comprises a vast collection
+      versatile embodied navigation. Adv. Neural Inform. Process. Syst. 35 (2022), 36858–      of elaborate instructions and trajectories, including instructions in
+     36874.                                                             three different languages: English, Hindi, and Telugu. The dataset[60] Hanqing Wang, Wei Liang, Jianbing Shen, Luc Van Gool, and Wenguan Wang.
+     2022. Counterfactual cycle-consistent learning for instruction following and      emphasizes the role of language in VLN by addressing biases in
+     generation in vision-language navigation. In IEEE Conf. Comput. Vis. Pattern      paths and describing more visible entities than R2R [3]. We con-
+     Recog. 15471–15481.
+[61] Hanqing Wang, Wenguan Wang, Wei Liang, Caiming Xiong, and Jianbing Shen.      struct 427,347 trajectories for RxR using the same method men-
+     2021. Structured scene memory for vision-language navigation. In Proceedings of      tioned in the main paper.
+     the IEEE/CVF conference on Computer Vision and Pattern Recognition. 8455–8464.
+[62] Hanqing Wang, Wenguan Wang, Tianmin Shu, Wei Liang, and Jianbing Shen.
+     2020. Active Visual Information Gathering for Vision-Language Navigation. In     Evaluation Metrics. For the RxR [29], Normalized Dynamic
+      Eur. Conf. Comput. Vis.                                  Time Warping (nDTW) [25] and Success Rate weighted by
+[63] Weining Wang, Yan Huang, and Liang Wang. 2019. Language-driven temporal    Dynamic Time Warping (sDTW) are introduced in addition to      activity localization: A semantic matching reinforcement learning model. In IEEE
+     Conf. Comput. Vis. Pattern Recog. 334–343.                                  the SR and SPL metrics mentioned in R2R [3], to assess path fidelity.
+[64] Xin Wang, Qiuyuan Huang, Asli Çelikyilmaz, Jianfeng Gao, Dinghan Shen, Yuan-
+    Fang Wang, William Yang Wang, and Lei Zhang. 2019. Reinforced Cross-Modal
+     Matching and Self-Supervised Imitation Learning for Vision-Language Naviga-     Results on RxR. The results are presented in Table 8. By applying
+      tion. In IEEE Conf. Comput. Vis. Pattern Recog. 6629–6638.                    our method to HAMT [8], we achieved 3.2% and improvements in
+[65] Xiaohan Wang, Wenguan Wang, Jiayi Shao, and Yi Yang. 2023.  LANA: A      success rate on the RxR validation unseen split, respectively. More
+     Language-Capable Navigator for Instruction Following and Generation. In IEEE
+     Conf. Comput. Vis. Pattern Recog. 19048–19058.                           improvements are observed on the validation seen split: 3.8%. This
+[66] Zun Wang, Jialu Li, Yicong Hong, Yi Wang, Qi Wu, Mohit Bansal, Stephen Gould,      demonstrates that our method can improve the navigation success
+    Hao Tan, and Yu Qiao. 2023. Scaling Data Generation in Vision-and-Language       capability of the VLN agent.     Navigation. arXiv preprint arXiv:2307.15644 (2023).
+[67] Huijuan Xu, Kun He, Bryan A Plummer, Leonid Sigal, Stan Sclaroff, and Kate
+     Saenko. 2019. Multilevel language and vision integration for text-to-clip retrieval.     Table 8: Comparison with the state-of-the-art methods on
+     In AAAI. 9062–9069.
+[68] Masataka Yamaguchi, Kuniaki Saito, Yoshitaka Ushiku, and Tatsuya Harada.     Room-Across-Room (RxR) validation seen and unseen splits.
+     2017. Spatio-temporal person retrieval via natural language queries. In Int. Conf.     Ò denotes the performance improvement after applying our
+     Comput. Vis.                                            method. ♠denotes that we crop the original path from the
+[69] Antoine Yang, Antoine Miech, Josef Sivic, Ivan Laptev, and Cordelia Schmid.
+     2022. TubeDETR: Spatio-Temporal Video Grounding With Transformers. In IEEE      starting location to the viewpoint predicted.
+     Conf. Comput. Vis. Pattern Recog. 16442–16453.
+[70] Licheng Yu, Zhe Lin, Xiaohui Shen, Jimei Yang, Xin Lu, Mohit Bansal, and
+    Tamara L. Berg. 2018.  MAttNet: Modular Attention Network for Referring          Methods        SR    OSRRxR ValSPLSeennDTW  SDTW     SR    OSRRxR ValSPLUnseennDTW  SDTW
+     Expression Comprehension. In IEEE Conf. Comput. Vis. Pattern Recog. 1307–1315.
+[71] Yitian Yuan, Lin Ma, Jingwen Wang, Wei Liu, and Wenwu Zhu. 2019. Semantic            Baseline [29]      25.2         -       -      42.2      20.7       22.8         -       -      38.9      18.2
+     conditioned dynamic modulation for temporal sentence grounding in videos.       HAMT [8]        59.4      66.5   58.9    65.3      50.9       56.6      64.4   56.0    63.1      48.3
+     Adv. Neural Inform. Process. Syst. 32 (2019).                              ` Ours         63.2(Ò3.8)   66.5   58.1    66.9      52.7    59.8(Ò3.2)   64.4   55.2    63.9      49.2                                                             ` Ours♠        63.2(Ò3.8)   66.1   60.2    67.2      53.0    59.8(Ò3.2)   63.5   56.7    64.4      49.6
+[72] Yitian Yuan, Tao Mei, and Wenwu Zhu. 2019. To find where you talk: Temporal
+     sentence localization in video with attention based location regression. In AAAI.
+     9159–9166.
+[73] Da Zhang, Xiyang Dai, Xin Wang, Yuan-Fang Wang, and Larry S Davis. 2019.
+    Man: Moment alignment network for natural language moment retrieval via   B  ADDITIONAL ABLATIONS
+      iterative graph adjustment. In IEEE Conf. Comput. Vis. Pattern Recog. 1247–1257.      Accuracy in identifying the correct destination. The results of[74] Zhu Zhang, Zhou Zhao, Yang Zhao, Qi Wang, Huasheng Liu, and Lianli Gao.
+     2020. Where Does It Exist: Spatio-Temporal Video Grounding for Multi-Form      the accuracy in identifying the correct destination of our model with
+     Sentences. In IEEE Conf. Comput. Vis. Pattern Recog.                  HOP [50] on R2R Val Unseen split are presented in Table 9. "Keeping
+[75] Yusheng Zhao, Jinyu Chen, Chen Gao, Wenguan Wang, Lirong Yang, Haibing
+     Ren, Huaxia Xia, and Si Liu. 2022. Target-driven structured transformer planner
+
+=== PDF PAGE 11 ===
+Mind the Gap: Improving Success Rate of Vision-and-Language Navigation by Revisiting Oracle Success Routes MM ’23, October 29–November 3, 2023, Ottawa, ON, Canada.
+
+
+  Table 9: The accuracy in identifying the correct destination of our model with HOP [50] on R2R validation unseen split.
+
+
+           R2R Val Unseen      HOP [50]     SIG_HAMT [30]    DUET [10]     SIG_DUET [30]
+
+             0  Keeping SR      98.12% (62.32)     98.56% (67.09)      98.75% (70.63)     98.35% (71.22)
+             1   Correcting Gap  67.08% (4.60)      58.52% (3.36)       51.67% (3.96)      62.15% (4.68)
+             2   Final SR          66.92 (62.32+4.6)   70.46 (67.09+3.36)   74.58(70.63+3.96)   75.9 (71.22+4.68)
+
+
+ Walk straight until you get to a dresser         Non-Target Viewpoint      our correction. "Correcting Gap" denotes the percentage of episodes
+  with a vase on top of it. Turn left and wait         Target Viewpoint           that are previously failed but become successful after our correction.
+  there.
+                                                            Table 10: Ablation study of the [CLS] token on the R2R vali-
+                                                             dation unseen split with different instruction inputs.
+
+
+                                                                                                 R2R Val Unseen
+                                                                             Methods       Input Text
+                                                                                                   SR   OSR  Gap
+
+                                                           HOP [50]                        63.52   71.43   7.96
+                              (a) Original Trajectory                                 + Ours (1)   Target Instruction   66.39   71.48   5.09
+                                                                      + Ours (2)  Whole Instruction   66.92   71.48   4.56
+
+
+                                                Can Text [CLS] Encode Destination Information? To investi-
+                                                                      gate whether the Text [CLS] token (Section 3.1 Text Encoder. in the
+                                                          main paper) can encode the destination of an instruction after fine-
+                                                                     tuning, we conducted an ablation study as presented in Table 10.
+                           (b) Extended Trajectory 1
+                                                                               Specifically, we compare the model performance between feeding
+                                                                   the full instruction and the sub-instruction that only contains in-
+                                                                 formation related to the target location. The results show that the
+                                                               performances are very close with a small gap of 0.6%. The results
+                                                                    suggest that the [CLS] token can learn the destination information
+                                                                        of an instruction.
+
+                            (c) Extended Trajectory 2             C CONSTRUCTED TRAJECTORIES
+                                            We provide examples of constructed new trajectories based on
+Figure 4: Examples of our constructed trajectories based on     ground truth trajectory. Figure 4 (a) illustrates an original ground
+the ground-truth trajectory.                                        truth trajectory, where the target viewpoint is represented by a
+                                                                 pentagram. Figure 4 (b) and (c) present examples of new trajectories
+SR" denotes the percentage of episodes that are still successful after       that are constructed based on the original trajectory.

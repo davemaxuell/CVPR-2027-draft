@@ -1,0 +1,334 @@
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+2026-10-23 18:04:24,394 Initializing dataset R2RVLN-v1
+2026-10-23 18:04:25,278 Initializing dataset RxRVLN-v1
+Traceback (most recent call last):
+  File "/home/bufsgpu/yes/envs/rolevln/lib/python3.9/site-packages/torch/cuda/__init__.py", line 423, in _lazy_init
+    queued_call()
+  File "/home/bufsgpu/yes/envs/rolevln/lib/python3.9/site-packages/torch/cuda/__init__.py", line 269, in _check_capability
+    capability = get_device_capability(d)
+  File "/home/bufsgpu/yes/envs/rolevln/lib/python3.9/site-packages/torch/cuda/__init__.py", line 600, in get_device_capability
+    prop = get_device_properties(device)
+  File "/home/bufsgpu/yes/envs/rolevln/lib/python3.9/site-packages/torch/cuda/__init__.py", line 620, in get_device_properties
+    return _get_device_properties(device)  # type: ignore[name-defined]
+RuntimeError: device >= 0 && device < num_gpus INTERNAL ASSERT FAILED at "/pytorch/aten/src/ATen/cuda/CUDAContext.cpp":52, please report a bug to PyTorch. device=1, num_gpus=1
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/tools/eval_policy.py", line 200, in <module>
+    main()
+  File "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/tools/eval_policy.py", line 117, in main
+    policy = SmolVLM2Policy(pcfg, adapter=args.checkpoint, device=f"cuda:{args.gpu}")
+  File "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/policy/smolvlm2.py", line 81, in __init__
+    self.model = PeftModel.from_pretrained(base, adapter)
+  File "/home/bufsgpu/yes/envs/rolevln/lib/python3.9/site-packages/peft/peft_model.py", line 555, in from_pretrained
+    load_result = model.load_adapter(
+  File "/home/bufsgpu/yes/envs/rolevln/lib/python3.9/site-packages/peft/peft_model.py", line 1320, in load_adapter
+    adapters_weights = load_peft_weights(
+  File "/home/bufsgpu/yes/envs/rolevln/lib/python3.9/site-packages/peft/utils/save_and_load.py", line 652, in load_peft_weights
+    adapters_weights = safe_load_file(filename, device=device)
+  File "/home/bufsgpu/yes/envs/rolevln/lib/python3.9/site-packages/safetensors/torch.py", line 338, in load_file
+    result[k] = f.get_tensor(k)
+  File "/home/bufsgpu/yes/envs/rolevln/lib/python3.9/site-packages/torch/cuda/__init__.py", line 429, in _lazy_init
+    raise DeferredCudaCallError(msg) from e
+torch.cuda.DeferredCudaCallError: CUDA call failed lazily at initialization with error: device >= 0 && device < num_gpus INTERNAL ASSERT FAILED at "/pytorch/aten/src/ATen/cuda/CUDAContext.cpp":52, please report a bug to PyTorch. device=1, num_gpus=1
+
+CUDA call was originally invoked at:
+
+  File "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/tools/eval_policy.py", line 25, in <module>
+    import habitat
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 986, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 680, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 850, in exec_module
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "/home/bufsgpu/yes/envs/rolevln/src/habitat-lab/habitat-lab/habitat/__init__.py", line 9, in <module>
+    from habitat.core.benchmark import Benchmark
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 986, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 680, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 850, in exec_module
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "/home/bufsgpu/yes/envs/rolevln/src/habitat-lab/habitat-lab/habitat/core/benchmark.py", line 20, in <module>
+    from habitat.core.env import Env
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 986, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 680, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 850, in exec_module
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "/home/bufsgpu/yes/envs/rolevln/src/habitat-lab/habitat-lab/habitat/core/env.py", line 30, in <module>
+    from habitat.datasets import make_dataset
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 986, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 680, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 850, in exec_module
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "/home/bufsgpu/yes/envs/rolevln/src/habitat-lab/habitat-lab/habitat/datasets/__init__.py", line 7, in <module>
+    from habitat.datasets.registration import make_dataset  # noqa: F401 .
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 986, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 680, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 850, in exec_module
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "/home/bufsgpu/yes/envs/rolevln/src/habitat-lab/habitat-lab/habitat/datasets/registration.py", line 25, in <module>
+    _try_register_objectnavdatasetv1()
+  File "/home/bufsgpu/yes/envs/rolevln/src/habitat-lab/habitat-lab/habitat/datasets/object_nav/__init__.py", line 20, in _try_register_objectnavdatasetv1
+    from habitat.datasets.object_nav.object_nav_dataset import (  # noqa: F401
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 986, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 680, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 850, in exec_module
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "/home/bufsgpu/yes/envs/rolevln/src/habitat-lab/habitat-lab/habitat/datasets/object_nav/object_nav_dataset.py", line 14, in <module>
+    from habitat.datasets.pointnav.pointnav_dataset import (
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 986, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 680, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 850, in exec_module
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "/home/bufsgpu/yes/envs/rolevln/src/habitat-lab/habitat-lab/habitat/datasets/pointnav/pointnav_dataset.py", line 15, in <module>
+    from habitat.tasks.nav.nav import (
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 986, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 680, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 850, in exec_module
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "/home/bufsgpu/yes/envs/rolevln/src/habitat-lab/habitat-lab/habitat/tasks/nav/nav.py", line 36, in <module>
+    from habitat.sims.habitat_simulator.actions import HabitatSimActions
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 972, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 972, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 986, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 680, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 850, in exec_module
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "/home/bufsgpu/yes/envs/rolevln/src/habitat-lab/habitat-lab/habitat/sims/__init__.py", line 7, in <module>
+    from habitat.sims.registration import make_sim  # noqa: F401
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 986, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 680, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 850, in exec_module
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "/home/bufsgpu/yes/envs/rolevln/src/habitat-lab/habitat-lab/habitat/sims/registration.py", line 22, in <module>
+    _try_register_habitat_sim()
+  File "/home/bufsgpu/yes/envs/rolevln/src/habitat-lab/habitat-lab/habitat/sims/habitat_simulator/__init__.py", line 15, in _try_register_habitat_sim
+    import habitat_sim  # noqa: F401
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 986, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 680, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 850, in exec_module
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "/home/bufsgpu/yes/envs/rolevln/lib/python3.9/site-packages/habitat_sim-0.2.4-py3.9-linux-x86_64.egg/habitat_sim/__init__.py", line 14, in <module>
+    from habitat_sim import (
+  File "<frozen importlib._bootstrap>", line 1058, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 986, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 680, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 850, in exec_module
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "/home/bufsgpu/yes/envs/rolevln/lib/python3.9/site-packages/habitat_sim-0.2.4-py3.9-linux-x86_64.egg/habitat_sim/agent/__init__.py", line 7, in <module>
+    from .agent import *  # noqa: F403
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 986, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 680, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 850, in exec_module
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "/home/bufsgpu/yes/envs/rolevln/lib/python3.9/site-packages/habitat_sim-0.2.4-py3.9-linux-x86_64.egg/habitat_sim/agent/agent.py", line 17, in <module>
+    from habitat_sim.sensors.sensor_suite import SensorSuite
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 972, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 986, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 680, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 850, in exec_module
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "/home/bufsgpu/yes/envs/rolevln/lib/python3.9/site-packages/habitat_sim-0.2.4-py3.9-linux-x86_64.egg/habitat_sim/sensors/__init__.py", line 7, in <module>
+    from habitat_sim.sensors import noise_models
+  File "<frozen importlib._bootstrap>", line 1058, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 986, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 680, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 850, in exec_module
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "/home/bufsgpu/yes/envs/rolevln/lib/python3.9/site-packages/habitat_sim-0.2.4-py3.9-linux-x86_64.egg/habitat_sim/sensors/noise_models/__init__.py", line 10, in <module>
+    from habitat_sim.sensors.noise_models.gaussian_noise_model import GaussianNoiseModel
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 986, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 680, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 850, in exec_module
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "/home/bufsgpu/yes/envs/rolevln/lib/python3.9/site-packages/habitat_sim-0.2.4-py3.9-linux-x86_64.egg/habitat_sim/sensors/noise_models/gaussian_noise_model.py", line 14, in <module>
+    from habitat_sim.sensors.noise_models.sensor_noise_model import SensorNoiseModel
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 986, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 680, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 850, in exec_module
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "/home/bufsgpu/yes/envs/rolevln/lib/python3.9/site-packages/habitat_sim-0.2.4-py3.9-linux-x86_64.egg/habitat_sim/sensors/noise_models/sensor_noise_model.py", line 14, in <module>
+    from torch import Tensor
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 986, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 680, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 850, in exec_module
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "/home/bufsgpu/yes/envs/rolevln/lib/python3.9/site-packages/torch/__init__.py", line 2088, in <module>
+    _C._initExtension(_manager_path())
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 986, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 680, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 850, in exec_module
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "/home/bufsgpu/yes/envs/rolevln/lib/python3.9/site-packages/torch/cuda/__init__.py", line 356, in <module>
+    _lazy_call(_check_capability)
+  File "/home/bufsgpu/yes/envs/rolevln/lib/python3.9/site-packages/torch/cuda/__init__.py", line 353, in _lazy_call
+    _queued_calls.append((callable, traceback.format_stack()))
+
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+2026-10-23 18:10:00,392 Initializing dataset R2RVLN-v1
+2026-10-23 18:10:01,298 Initializing dataset RxRVLN-v1
+2026-10-23 18:10:14,340 initializing sim Sim-v0
+2026-10-23 18:10:28,500 Initializing task VLN-v0
+{"dataset": "r2r", "episode_id": "7413", "step": 100, "elapsed_seconds": 22.48477292060852}
+{"dataset": "r2r", "episode_id": "7413", "step": 200, "elapsed_seconds": 44.10590052604675}
+{"dataset": "r2r", "episode_id": "7413", "step": 300, "elapsed_seconds": 65.54201912879944}
+{"dataset": "r2r", "episode_id": "7413", "step": 400, "elapsed_seconds": 87.06255912780762}
+{"dataset": "r2r", "episode_id": "7413", "step": 500, "elapsed_seconds": 108.60292911529541}
+{"dataset": "r2r", "episode_id": "7413", "success": 0.0, "spl": 0.0, "steps": 500, "seconds": 108.60303235054016}
+{"dataset": "r2r", "episode_id": "7561", "step": 100, "elapsed_seconds": 21.500154495239258}
+{"dataset": "r2r", "episode_id": "7561", "step": 200, "elapsed_seconds": 43.11432099342346}
+{"dataset": "r2r", "episode_id": "7561", "step": 300, "elapsed_seconds": 64.64871096611023}
+{"dataset": "r2r", "episode_id": "7561", "step": 400, "elapsed_seconds": 85.93708539009094}
+{"dataset": "r2r", "episode_id": "7561", "step": 500, "elapsed_seconds": 107.42317938804626}
+{"dataset": "r2r", "episode_id": "7561", "success": 0.0, "spl": 0.0, "steps": 500, "seconds": 107.4232931137085}
+{"dataset": "r2r", "episode_id": "7635", "step": 100, "elapsed_seconds": 21.50916624069214}
+{"dataset": "r2r", "episode_id": "7635", "step": 200, "elapsed_seconds": 42.79585242271423}
+{"dataset": "r2r", "episode_id": "7635", "step": 300, "elapsed_seconds": 64.50550198554993}
+{"dataset": "r2r", "episode_id": "7635", "step": 400, "elapsed_seconds": 86.03888440132141}
+{"dataset": "r2r", "episode_id": "7635", "step": 500, "elapsed_seconds": 107.55218410491943}
+{"dataset": "r2r", "episode_id": "7635", "success": 0.0, "spl": 0.0, "steps": 500, "seconds": 107.55232858657837}
+{"dataset": "r2r", "episode_id": "8390", "step": 100, "elapsed_seconds": 21.35560631752014}
+{"dataset": "r2r", "episode_id": "8390", "step": 200, "elapsed_seconds": 42.647589921951294}
+{"dataset": "r2r", "episode_id": "8390", "step": 300, "elapsed_seconds": 63.733794927597046}
+{"dataset": "r2r", "episode_id": "8390", "step": 400, "elapsed_seconds": 85.1582362651825}
+{"dataset": "r2r", "episode_id": "8390", "step": 500, "elapsed_seconds": 106.45750117301941}
+{"dataset": "r2r", "episode_id": "8390", "success": 0.0, "spl": 0.0, "steps": 500, "seconds": 106.45762228965759}
+{"dataset": "r2r", "episode_id": "4117", "step": 100, "elapsed_seconds": 21.662906646728516}
+{"dataset": "r2r", "episode_id": "4117", "step": 200, "elapsed_seconds": 43.47553896903992}
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+{"completed": 1, "macro_success": 0.0}
+{"completed": 3, "macro_success": 0.0}
+{"completed": 4, "macro_success": 0.0}
+{"completed": 5, "macro_success": 0.0}
+{"completed": 6, "macro_success": 0.0}
+{"completed": 8, "macro_success": 0.0}
+{"completed": 9, "macro_success": 0.0}
+{"completed": 11, "macro_success": 0.0}
+{"completed": 12, "macro_success": 0.0}
+{"completed": 13, "macro_success": 0.0}
+{"completed": 14, "macro_success": 0.0}
+{"completed": 16, "macro_success": 0.0}
+{"completed": 17, "macro_success": 0.0}
+{"completed": 19, "macro_success": 0.0}
+{"completed": 20, "macro_success": 0.0}
+{"completed": 21, "macro_success": 0.0}
+{"completed": 23, "macro_success": 0.0}
+{"completed": 24, "macro_success": 0.0}
+{"completed": 25, "macro_success": 0.0}
+{"completed": 27, "macro_success": 0.0}
+{"completed": 28, "macro_success": 0.0}
+{"completed": 29, "macro_success": 0.0}
+{"completed": 31, "macro_success": 0.0}
+{"completed": 32, "macro_success": 0.0}
+{"completed": 33, "macro_success": 0.0}
+{"completed": 34, "macro_success": 0.0}
+{"completed": 35, "macro_success": 0.0}
+{"completed": 36, "macro_success": 0.0}
+{"completed": 37, "macro_success": 0.0}
+{"completed": 38, "macro_success": 0.0}
+{"completed": 39, "macro_success": 0.0}
+{"completed": 40, "macro_success": 0.0}
+{"completed": 41, "macro_success": 0.0}
+{"completed": 42, "macro_success": 0.0}
+{"completed": 43, "macro_success": 0.0}
+{"completed": 44, "macro_success": 0.0}
+{"completed": 45, "macro_success": 0.0}
+{"completed": 46, "macro_success": 0.0}
+{"completed": 47, "macro_success": 0.0}
+{"completed": 48, "macro_success": 0.0}
+{"completed": 49, "macro_success": 0.0}
+{"completed": 50, "macro_success": 0.0}
+{"completed": 51, "macro_success": 0.0}
+{"completed": 52, "macro_success": 0.0}
+{"completed": 53, "macro_success": 0.0}
+{"completed": 54, "macro_success": 0.0}
+{"completed": 55, "macro_success": 0.0}
+{"completed": 56, "macro_success": 0.0}
+{"completed": 57, "macro_success": 0.0}
+{"completed": 58, "macro_success": 0.0}
+{"completed": 59, "macro_success": 0.0}
+{"completed": 60, "macro_success": 0.0}
+{"completed": 61, "macro_success": 0.0}
+{"completed": 62, "macro_success": 0.0}
+{"completed": 63, "macro_success": 0.0}
+{"completed": 64, "macro_success": 0.0}
+{
+  "status": "complete",
+  "completed_utc": "2026-10-23T10:02:03.856657+00:00",
+  "seconds_this_run": 2428.3379430770874,
+  "group": "C",
+  "development_only": true,
+  "selection": "scene-balanced seeded subset, unfiltered by expert success",
+  "rxr_protocol": "15-degree turns; differs from official 30-degree RxR-CE",
+  "workers": 4,
+  "decoding_batch_size": 1,
+  "overall": {
+    "episodes": 64,
+    "scenes": 8,
+    "success": 0.0,
+    "spl": 0.0,
+    "distance_to_goal": 9.956142656505108,
+    "oracle_success": 0.125,
+    "steps": 600.0,
+    "collisions": 570.234375,
+    "stopped": 0.0
+  },
+  "by_dataset": {
+    "r2r": {
+      "episodes": 32,
+      "scenes": 8,
+      "success": 0.0,
+      "spl": 0.0,
+      "distance_to_goal": 8.514544937759638,
+      "oracle_success": 0.1875,
+      "steps": 500.0,
+      "collisions": 475.59375,
+      "stopped": 0.0
+    },
+    "rxr": {
+      "episodes": 32,
+      "scenes": 8,
+      "success": 0.0,
+      "spl": 0.0,
+      "distance_to_goal": 11.397740375250578,
+      "oracle_success": 0.0625,
+      "steps": 700.0,
+      "collisions": 664.875,
+      "stopped": 0.0
+    }
+  },
+  "macro_success": 0.0,
+  "macro_spl": 0.0
+}

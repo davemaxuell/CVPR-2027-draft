@@ -1,0 +1,1951 @@
+===== PDF PAGE 1 =====
+arXiv:2506.08566v1  [cs.CV]  10 Jun 2025
+Generating Vision-Language Navigation Instructions Incorporated
+Fine-Grained Alignment Annotations
+Yibo Cuia,b, Liang Xiea,b, Yu Zhaob, Jiawei Sunb,c and Erwei Yina,b,∗
+aDefense Innovation Institute, Chinese Academy of Military Science, Beijing, 100071, China
+bTianjin Artificial Intelligence Innovation Center, Tianjin, 300450, China
+cSchool of Mechanical Engineering, Tianjin University, Tianjin, 300354, China
+A R T I C L E I N F O
+Keywords:
+Vision-Language Navigation
+Data Augmentation
+Fine-Grained Alignment
+Instruction Generation
+A B S T R A C T
+Vision-Language Navigation (VLN) enables intelligent agents to navigate environments by integrating
+visual perception and natural language instructions, yet faces significant challenges due to the
+scarcity of fine-grained cross-modal alignment annotations. Existing datasets primarily focus on
+global instruction-trajectory matching, neglecting sub-instruction-level and entity-level alignments
+critical for accurate navigation action decision-making. To address this limitation, we propose FCA-
+NIG, a generative framework that automatically constructs navigation instructions with dual-level
+fine-grained cross-modal annotations. In this framework, an augmented trajectory is first divided
+into sub-trajectories, which are then processed through GLIP-based landmark detection, crafted
+instruction construction, OFA-Speaker based R2R-like instruction generation, and CLIP-powered
+entity selection, generating sub-instruction-trajectory pairs with entity-landmark annotations. Finally,
+these sub-pairs are aggregated to form a complete instruction-trajectory pair. The framework generates
+the FCA-R2R dataset, the first large-scale augmentation dataset featuring precise sub-instruction-
+sub-trajectory and entity-landmark alignments. Extensive experiments demonstrate that training
+with FCA-R2R significantly improves the performance of multiple state-of-the-art VLN agents,
+including SF, EnvDrop, RecBERT, and HAMT. Incorporating sub-instruction-trajectory alignment
+enhances agents’ state awareness and decision accuracy, while entity-landmark alignment further
+boosts navigation performance and generalization. These results highlight the effectiveness of FCA-
+NIG in generating high-quality, scalable training data without manual annotation, advancing fine-
+grained cross-modal learning in complex navigation tasks.
+1. Introduction
+Vision-Language Navigation (VLN) represents a pivotal
+task within embodied artificial intelligence, encapsulating
+the integration of perceptual understanding from visual input
+and semantic interpretation derived from natural language
+instructions to enable intelligent agents to navigate physical
+or virtual environments [3, 52]. VLN has attracted bur-
+geoning research interest from communities of computer
+vision, natural language processing, and robotics due to its
+broad application prospects [19, 14, 16]. In VLN tasks,
+cross-modal alignment is one central challenge for decision-
+making since the agent requires dynamically ground the
+received instructions to the surrounding visual observations.
+For instance, given the instruction "Walk beside the outside
+doors and behind the chairs across the room. Turn right and
+walk up the stairs. Stop on the seventh step.", the agent
+needs to find "outside doors", "chairs", "stairs" etc. (entity
+level) in nearby environments to help make action decisions
+and disregard the initial sub-instructions "Walk beside the
+outside doors" (sub-instruction level) after moving several
+steps. However, due to the scarcity of VLN datasets with
+these fine-grained alignment signals, previous methods have
+focused on global matching between instructions and com-
+plete visual trajectories (instruction level), leaving cross-
+modal alignment a significant challenge.
+∗Corresponding author
+yb.cui@outlook.com (Y. Cui); yinerwei1985@gmail.com (E. Yin)
+Turn right and go pass the table and chairs on your
+right. Turn left and walk into the meshroom. Go straight
+towards the bathroom door pass the foot of the beds. Turn
+right slightly into the bathroom and wait by the toilet.
+Figure 1: An illustration of our speaker-follower framework.
+The follower (blue) navigates through a 3D photorealistic
+environment, while the speaker (green) generates grounded
+descriptions of navigation trajectories along with fine-grained
+alignment annotations.
+Several prior works have explored fine-grained cross-
+modal alignment in VLN. Self-Monitoring [40] located
+completed or ongoing sub-instructions through visual-textual
+co-grounding and a progress monitor module during naviga-
+tion. AuxRN [69] reported the percentage of completed pro-
+cedures at each step using an auxiliary reasoning objective
+: Preprint submitted to Elsevier
+Page 1 of 15
+
+
+===== PDF PAGE 2 =====
+for progress estimation. Qi et al. [48] designed an object-
+aware module to enable matching between object-centered
+instructions and their corresponding visual observations.
+EntityGraph [23] modeled visual-textual correlations at the
+entity level via a language and visual entity-relationship
+graph. ORIST [47] used object-level features instead of
+view-level features as input to a sequential BERT model.
+Moudgil et al. [43] developed a scene- and object-aware
+transformer model using attention masking and view aggre-
+gation to explicitly represent objects and scenes. However,
+these works rely on weak supervision from environment in-
+formation or coarse-grained data due to the absence of fine-
+grained alignment signals in visual and textual modalities.
+Subsequent efforts have aimed to address the data scarcity
+problem. Zhu et al. [70] and Hong et al. [24] first segmented
+long instructions into sub-instructions using template match-
+ing, then grounded them to visual sub-trajectories via dy-
+namic programming and human annotation, respectively.
+Wang et al. [64] recognized entity phrases in instructions
+using text parsers and identified matching environmen-
+tal landmarks through object detection and weak supervi-
+sion from pose traces. However, these fine-grained cross-
+modal alignment signals lack precision. To construct high-
+quality alignments, He et al. [22] manually annotated the
+matching relationships between sub-instructions and sub-
+trajectories. Additionally, Cui et al. [12] introduced the
+GEL-R2R dataset, enriched with grounded entity-landmark
+annotations. While these efforts improved data quality, their
+datasets are insufficient and difficult to expand due to the
+high cost of human annotation.
+To address the challenges outlined above, we intro-
+duce a Generative framework for Navigation Instruction
+annotated with Fine-grained Cross-modal Alignment (FCA-
+NIG). This framework is designed to generate trajectory
+descriptions and simultaneously annotate them with de-
+tailed cross-modal information. The FCA-NIG framework
+operates through six key sub-steps: trajectory chunking,
+landmark detection, crafted instruction construction, R2R-
+like instruction generation, entity selection, and sub-pair in-
+tegration. Broadly, the FCA-NIG framework first segments
+a randomly sampled augmented trajectory into multiple
+sub-trajectories. These sub-trajectories are then processed
+sequentially through the intermediate steps to generate cor-
+responding sub-instructions, forming several sub-instruction
+sub-trajectory pairs annotated with entity-landmark matches.
+Finally, these sub-pairs are concatenated to construct the
+complete instruction-trajectory pair.
+During the landmark detection phase, we employ the
+open-world object detection model GLIP [35] to identify
+salient objects or scenes in the panoramic observation
+images of the sub-trajectories, which serve as reference
+landmarks. In the crafted instruction construction phase,
+we first establish a template instruction library comprising
+three core components: horizontal turning, vertical move-
+ment adjustments, and spatial relationships with target ob-
+jects. Leveraging these templates, we construct crafted sub-
+instructions for each sub-trajectory based on the detected
+landmarks and associated action turning data. In the R2R-
+like instruction generation phase, we design a speaker model
+based on the multi-modal pre-trained language generation
+model OFA [63], named OFA-Speaker. This model includes
+a panorama encoder, a vision encoder, a text encoder, a
+cross-modal encoder, and a text decoder, and is fine-tuned
+on the R2R dataset. Specifically, the OFA-Speaker uses
+a Transformer-based panorama encoder to extract features
+from the panoramic images of the sub-trajectories. These
+features are then concatenated with prompt words and
+template instructions as input to the OFA model to generate
+navigation sub-instructions similar to those in the R2R
+dataset. In the entity selection phase, we first parse the
+generated sub-instructions using the NLTK [4] to extract the
+entities contained within them. We then employ the large-
+scale multi-modal pre-trained model CLIP [51] to evaluate
+the similarity between each extracted entity and the detected
+visual landmarks. This process identifies the most relevant
+entity, which is then paired with the corresponding visual
+landmark to form an entity-landmark match pair.
+Using the FCA-NIG framework, we generate an aug-
+mentation dataset with fine-grained cross-modal alignment
+annotations, named FCA-R2R. We conduct extensive ex-
+periments to evaluate the quality of instruction-trajectory
+pairs in the FCA-R2R dataset and the effects of two types
+of fine-grained alignment information: sub-instruction sub-
+trajectory matching and entity-landmark matching. The
+evaluation involves four classic VLN agent models (SF [17],
+EnvDrop [55], RecBERT [25], and HAMT [7]), showing
+that incorporating the FCA-R2R dataset significantly im-
+proves navigation performance across all agents. Further
+experiments using Babywalk [70] and AFAC [11] meth-
+ods demonstrate that adding more sub-instruction sub-
+trajectory matching supervision signals enhances agents’
+state-awareness and action decisions. Lastly, applying the
+GELA [12] method highlights that sufficient entity-landmark
+matching supervision can further improve navigation per-
+formance, achieving notable SR and SPL scores on unseen
+validation and test sets. Specifically, on the unseen validation
+set and unseen test set, the Success Rate (SR) scores reach
+71.1% and 68.3%, respectively, while the Success Rate
+weighted by Path Length (SPL) scores reach 65.5% and
+63.3%, respectively.
+To summarize, our contributions are three-fold:
+• We propose a novel generative framework, FCA-NIG,
+designed to produce high-quality navigation instruc-
+tions incorporating fine-grained cross-modal align-
+ment annotations.
+• We introduce FCA-R2R, the first large-scale dataset
+annotated with fine-grained cross-modal alignment in
+the VLN domain. This dataset systematically grounds
+navigation instructions to both sub-trajectory seg-
+ments and visual landmarks, enabling precise super-
+vision for cross-modal alignment during navigation.
+• We demonstrate the effectiveness of the FCA-NIG
+framework and the FCA-R2R dataset through ex-
+tensive experiments, showing that they significantly
+: Preprint submitted to Elsevier
+Page 2 of 15
+
+
+===== PDF PAGE 3 =====
+enhance the navigation performance of VLN agents by
+improving the quality of instruction-trajectory pairs
+and enabling more accurate action decisions.
+2. Related work
+2.1. Vision-Language Navigation
+The field of Vision-Language Navigation (VLN) has
+seen rapid advancements, driven by the integration of vi-
+sual perception and language understanding for embod-
+ied decision-making. Anderson et al. [3] pioneered early
+work by establishing the R2R dataset based on 90 houses
+from the Matterport3D (MP3D) simulator [5], enabling
+agents to navigate photo-realistic environments via textual
+instructions. Subsequent research expanded VLN to diverse
+domains: outdoor navigation (e.g., TOUCHDOWN [6],
+AVDN [15]), continuous exploration (R2R-CE [31], LN-
+VLN [53]), dynamic environments (ARRAMON [28]), and
+interactive tasks (ALFRED [52]). Instruction formats have
+evolved from descriptive (R2R [3], RxR [32]) to object-
+centric (REVERIE [49]) and conversational (CVDN [56],
+TEACh [45]) paradigms. Methodologically, VLN models
+have transitioned from LSTM-based architectures [40, 60])
+to transformer-based frameworks [42, 20] for enhanced mul-
+timodal representation. Reinforcement learning (RCM [65],
+EnvDrop [55]) and imitation learning approaches have been
+employed to refine decision-making. Pretraining-finetuning
+pipelines (Prevalent [21], HAMT [7]) improved general-
+ization across downstream tasks. Knowledge-augmented
+reasoning (CKR [18], KERM [36]) and backtracking poli-
+cies [41, 9] further enhanced robustness. While these ad-
+vancements addressed high-level navigation, challenges per-
+sist in leveraging fine-grained cross-modal alignment signals
+for precise decision-making. This paper focuses on data
+augmentation strategies to enrich such signals.
+2.2. VLN Data Augmentation
+Due to the limited availability of expensive human anno-
+tations, researchers have explored data augmentation meth-
+ods to generate additional trajectory-instruction pairs. Con-
+temporary approaches have focused on data augmentation
+from three perspectives: image, trajectory, and environment.
+Image-based techniques aim to diversify visual observations
+to improve robustness to environmental variations. Early
+work introduced environment dropout [55], which randomly
+masked regions of panoramic images during training to
+simulate occlusions. Pathdreamer [30] leveraged generative
+hierarchical world models to synthesize complex indoor
+environments, though such approaches primarily enriched
+visual features without generating explicit trajectory annota-
+tions. Trajectory-based methods focus on synthesizing novel
+paths while maintaining instruction-trajectory compatibility.
+Fried et al. [17] pioneered this approach by sampling path
+viewpoints in seen environments and using a speaker model
+to generate instructions for sampled paths. Ossandon et
+al. [44] and Wang et al. [64] extended this by designing
+semantically rich instructions via human templates and mul-
+timodal transformers, respectively. Liu et al. [39] proposed
+a mixup strategy, interpolating sub-trajectories and sub-
+instructions from distinct pairs to create hybrid samples.
+Koh et al. [29] introduced spatial resampling, perturbing
+observation positions during agent training to encourage
+exploration of alternative paths. To address limited cov-
+erage of environments, recent efforts scale VLN training
+to out-of-domain spaces. Chen et al. [8] and Kamath et
+al. [27] utilized large-scale simulators (HM3D, Gibson)
+to construct navigation graphs and automatically generate
+instructions via speaker models. Li et al. [34] proposed
+a text-to-panorama framework, enabling synthetic environ-
+ment generation through textual descriptions. Lin et al. [38]
+exploited household video data from YouTube to extract
+trajectory-instruction pairs, mimicking real-world scenar-
+ios. Despite these innovations, most datasets remain limited
+to coarse-grained instruction-trajectory matching, neglect-
+ing critical sub-instruction and entity-level alignments. This
+paper addresses this gap by introducing a framework for
+scalable instruction-trajectory pairs with fine-grained cross-
+modal alignment signals.
+2.3. Cross-Modal Alignment in VLN
+In VLN, cross-modal alignment is fundamental to an
+agent’s ability to accurately interpret textual instructions
+and navigate visual environments. This alignment can be
+categorized into three hierarchical levels based on the gran-
+ularity of linguistic input: instruction-level, sub-instruction-
+level, and entity-level alignment. At the highest abstrac-
+tion, instruction-level alignment focuses on the global cor-
+respondence between full trajectories and complete naviga-
+tion instructions. Wang et al. [65] pioneered the integra-
+tion of cross-modal matching metrics into reinforcement
+learning frameworks, using the compatibility score between
+an agent’s trajectory and speaker-generated instructions as
+an intrinsic reward. Similarly, Huang et al. [26] formal-
+ized this concept in an auxiliary task called Cross-Modal
+Alignment (CMA), which evaluates the semantic compat-
+ibility of instruction-trajectory pairs during training. Chen
+et al. [7] and Qiao et al. [50] extended CMA to pretraining
+stages, leveraging large-scale in-domain and out-of-domain
+datasets to initialize unimodal and multimodal representa-
+tions for transformer-based models. Sub-instruction level in-
+vestigates the localized mapping between sub-paths and sub-
+instructions. Hong et al. [24] and Zhu et al. [70] introduced
+greedy segmentation algorithms to decompose long instruc-
+tions into sequential sub-instructions, enabling agents to
+execute modular tasks incrementally. He et al. [22] manually
+annotated sub-instruction-sub-path alignments and incorpo-
+rated focal-oriented rewards to guide local decision-making.
+AFAC [11] further advanced this domain by explicitly su-
+pervising local alignment through attention mechanisms and
+representation learning. Despite progress, such methods re-
+main limited by reliance on human annotations or heuristic
+decomposition strategies, which hinder scalability. Entity-
+level alignment targets the correspondence between explicit
+landmark references in instructions and their visual counter-
+parts. Cui et al. [12] addressed this challenge by curating the
+: Preprint submitted to Elsevier
+Page 3 of 15
+
+
+===== PDF PAGE 4 =====
+GEL-R2R dataset, which features human-annotated entity-
+landmark pairs in R2R dataset. Their GELA framework
+demonstrated improved fine-grained alignment capabilities
+by conditioning models on entity-specific visual features.
+While these studies have made progress in improving cross-
+modal alignment, they are ineffective in addressing fine-
+grained cross-modal alignment due to the data scarcity prob-
+lem. In this paper, we automate the creation of large-scale,
+high-quality datasets with fine-grained alignment annota-
+tions by leveraging a series of advanced foundation models.
+2.4. Multimodal Text Generation
+Multimodal text generation focuses on combining vi-
+sual and textual data to create coherent natural language
+descriptions. It spans tasks like image/video captioning and
+Visual Question Answering (VQA), requiring models to
+align modality-specific features and cross-modal relation-
+ships. Early breakthroughs, such as Show and Tell [58],
+demonstrated end-to-end vision-language alignment using
+CNNs for visual feature extraction and RNNs for text gen-
+eration. Xu et al. [67] later improved captions via attention
+mechanisms, dynamically weighting relevant image regions
+during decoding. Video captioning introduced temporal co-
+herence challenges, prompting architectures like 3D CNNs
+and temporal attention modules to model sequential dynam-
+ics [1]. Concurrently, VQA tasks emphasized joint reasoning
+over visual scenes and queries. Anderson et al. [2] pioneered
+region-based attention, enabling fine-grained interaction be-
+tween image segments and language tokens. A major shift
+came with cross-modal pretraining, allowing models to learn
+universal representations across modalities without task-
+specific supervision. Frameworks like Unicoder-VL [33] and
+VLP [68] combined masked language modeling and con-
+trastive learning to train vision-language encoders, achiev-
+ing state-of-the-art results on benchmark tasks. Recent stud-
+ies further unified diverse vision-and-language tasks under
+shared paradigms. VL-T5 and VL-BART [10] adapted trans-
+former architectures to integrate visual features and framed
+several tasks as a single-text generation problem. GIT sim-
+plified prior models by decoupling a ViT image encoder
+and GPT-style decoder, with GIT2 scaling up datasets and
+model size for better performance [61]. Wang et al. [63]
+introduced OFA, a unified framework for cross-modal and
+unimodal tasks (e.g., image captioning, VQA). Using an
+order-to-order learning approach and prompt-based task rep-
+resentation, OFA seamlessly integrates diverse objectives.
+However, while existing tasks focus on simple images, nav-
+igation instruction generation makes complex sequential
+environment panoramas as input and requires precise spa-
+tial understanding absent in standard benchmarks. In this
+paper, we adapt OFA for accurate instruction generation
+by incorporating a panoramic encoder designed to pro-
+cess high-resolution and context-rich scenes. By integrat-
+ing this encoder into the OFA-Speaker architecture, our
+approach bridges the gap between general-purpose vision-
+language models and navigation-specific requirements, im-
+proving both scene comprehension and instruction fidelity.
+3. Preliminaries
+The previous research [17] on creating synthetic VLN in-
+structions utilized the Speaker-Follower framework. In this
+framework, the speaker produces a grounded description of
+navigation trajectories as their navigation instruction. These
+generating instructions could then be used to enhance the
+training dataset for the follower. The follower, in turn, makes
+action decisions based on human instructions and visual
+observations to navigate toward the target position. In this
+work, we first construct a speaker-based data augmentation
+pipeline to generate novel trajectory-instruction pairs with
+fine-grained cross-modal alignments. Then we obtain the
+augmented dataset to train the follower and enhance the
+agents’ navigation performance.
+3.1. The VLN Speaker
+The goal of the VLN speaker is to generate a matching
+navigation instruction for a given trajectory selected from
+the environments. The speaker model typically comprises
+a trajectory encoder 𝐸and a language decoder 𝐷. As the
+input of the encoder, the trajectory consists of a sequence of
+panoramic visual observations = {𝑂0, … , 𝑂𝑇−1
+} along
+with the corresponding action 𝐴= {𝑎0, … , 𝑎𝑇−1
+} at each
+step 𝑡. Then the language decoder outputs an instruction
+consisting of a sequence of L words, denoted as 
+=
+{𝑤0, … , 𝑤𝐿−1
+}. Specifically, the objective is to learn a
+model with parameter 𝜃by maximizing the likelihood of
+the target instruction 𝐼conditioned on the input 𝑉and 𝐴:
+𝜽∗= arg min𝜽log 𝑝(𝑰∣𝑽, 𝑨; 𝜽).
+3.2. The VLN follower
+The goal of the VLN follower is to arrive at the target
+position from a starting pose inside a 3D environment by
+following the navigation instruction 𝐼. Formally, at each step
+𝑡, the follower acquires a new panoramic visual observation
+𝑂𝑡= {𝑜𝑡,𝑖
+}36
+𝑖=1 from surrounding environment, where 𝑜𝑡,𝑖=
+[𝑣𝑡,𝑖; 𝑎𝑡,𝑖
+] consists RGB image 𝑣𝑡,𝑖and panoramic action ori-
+entation 𝑎𝑡,𝑖of 𝑖-th view. The follower needs to pick the next
+step from the action space 𝑎𝑡= {𝑎𝑐𝑡𝑡,1, … , 𝑎𝑐𝑡𝑡,𝑛, [𝑆𝑇𝑂𝑃]}
+that consists of the relative angles of 𝑛navigable viewpoints
+to the current viewpoint and the stop action. The follower
+selects an action to move to a navigable viewpoint in a
+connectivity graph 𝐺or stop at the current location. Once
+the follower stops, the navigation episode is completed.
+4. Methods
+Overview. In this study, we present the FCA-NIG frame-
+work for generating novel trajectory-instruction pairs that in-
+corporate fine-grained cross-modal alignment annotations.
+As illustrated in the figure 2, the framework comprises six
+steps: (A) trajectory chunking, (B) landmark detection, (C)
+crafted instruction construction, (D) R2R-like instruction
+generation, (E) entity selection, and (F) sub-pair integration.
+Initially, we randomly sample a navigation trajectory from
+the environment and divide it into multiple sub-trajectories
+: Preprint submitted to Elsevier
+Page 4 of 15
+
+
+===== PDF PAGE 5 =====
+
+ 
+bathroom door
+Pano 4: [0.4421, 0.2169, 0.7385, 0.8341]
+(A) Trajectory Chunking
+N sub-trajectories
+Trajectory
+(B) Landmark Detection
+(C) Crafted Instruction Construction
+(D) R2R-like Instruction Generation
+(E) Entity-Landmark Matching
+Generated Instructions Incorporated Fine-Grained Alignment Annotations
+(F) Sub-Pair Integration
+GLIP
+Landmark Class: 
+bed. chairs. pool.
+bedroom. bathroom...
+OFA-
+Speaker
+chairs
+Template
+Instruction
+Library
+rel_heading: 1.76
+rel_with_obj: left
+Make a hard
+rightward
+turn towards the left
+of the chairs.
+NLTK
+Parser
+Image
+Encoder
+Text
+Encoder
+Similarity
+Ranking
+chairs
+<1,3> Turn right and go pass the table and chairs on your right. <3,4> Turn left and walk into the meshroom. <4,6> Go straight
+towards the bathroom door pass the foot of the beds. <6,7> Turn right slightly into the bathroom and wait by the toilet.
+chairs
+Pano 1: [0.1453, 0.2765, 0.6382, 0.4391]
+meshroom
+Pano 3: [0.3413, 0.2561, 0.7362, 0.5392]
+toilet
+Pano 6: [0.2433, 0.3725, 0.5312, 0.4794]
+Entity-
+Landmark
+Alignment
+Sub-Pair
+Alignment
+Crafted Instruction
+Make a hard
+rightward
+turn towards the left
+of the chairs.
+R2R-like Instruction
+turn right and go
+pass the table and
+chairs.
+turn right
+and go pass
+the table
+and chairs.
+(B) Landmark Detection
+Figure 2: Overview of the FCA-NIG framework. Initially, a randomly sampled augmented trajectory is segmented into multiple sub-
+trajectories via trajectory chunking (A). Each sub-trajectory undergoes sequential processing through intermediate steps: landmark
+detection (B), crafted instruction construction (C), R2R-like instruction generation (D), and entity selection (E), producing
+corresponding sub-instructions with entity-landmark matches. These sub-instruction sub-trajectory pairs are then integrated (F)
+to form the complete instruction-trajectory pair. Through this pipeline, our FCA-NIG framework generates detailed navigation
+instructions incorporated dual-level fine-grained alignment annotations.
+using step A. Then these sub-trajectories sequentially un-
+dergo steps B, C, D, and E to obtain their correspond-
+ing natural language navigation instruction, thus produc-
+ing n sub-pairs. Simultaneously, the landmarks along these
+sub-trajectories and the corresponding entities in the sub-
+instructions are labeled. Finally, these sub-pairs are con-
+nected to obtain a trajectory-instruction pair with alignment
+annotations of sub-pairs and entity-landmark pairs.
+4.1. Trajectory Chunking
+To acquire sub-pair alignment signals, we partition a
+complete trajectory into 𝑁sub-trajectories based on the
+agent’s movement directions, denoted as {𝑆𝑇0, … , 𝑆𝑇𝑁−1
+}.
+For each sub-trajectory, we generate corresponding path
+descriptions, referred to as sub-instructions, resulting in
+the set {𝑆0, … , 𝑆𝑛−1
+}. The process begins by ran-
+domly sampling a trajectory within the MP3D environments,
+similar to R2R trajectories, typically consisting of 5 to 7
+steps [3]. During this sampling, we record the turning angles
+associated with each navigation action. We denote 𝜓as the
+: Preprint submitted to Elsevier
+Page 5 of 15
+
+
+===== PDF PAGE 6 =====
+Table 1
+Overview of template instructions categorized into 12 horizontal action types and 3 vertical action types, along with 3 landmark
+relationship categories.
+Elements
+Range
+Template
+Horizontal Direction
+−15◦< Δ𝜓< 15◦
+go straight
+15◦< Δ𝜓< 45◦
+turn slightly right
+45◦< Δ𝜓< 75◦
+turn moderately right
+75◦< Δ𝜓< 105◦
+turn hardly right
+105◦< Δ𝜓< 135◦
+turn slightly to the right rear
+135◦< Δ𝜓< 165◦
+turns sharply to the right rear
+165◦< Δ𝜓or Δ𝜓< −165◦
+turn backwards
+−45◦< Δ𝜓< −15◦
+turn slightly left
+−75◦< Δ𝜓< −45◦
+turn moderately left
+−105◦< Δ𝜓< −75◦
+turn hardly left
+−135◦< Δ𝜓< −105◦
+turn slightly to the left rear
+−165◦< Δ𝜓< −135◦
+turns sharply to the left rear
+Vertical Direction
+−0.2𝑚< Δ𝜁< 0.2𝑚
+towards
+Δ𝜁< −0.2𝑚
+downwards
+Δ𝜁> 0.2𝑚
+upwards
+Position Relationship with Landmark Bounding Boxes
+𝜒𝑚𝑖𝑛< 𝜓< 𝜒𝑚𝑎𝑥
+towards
+𝜓< 𝜒𝑚𝑖𝑛
+towards the left of
+𝜓> 𝜒𝑚𝑎𝑥
+towards the right of
+heading angle of the agent, and Δ𝜓as the change in heading
+angle, or turning angle, for each action. The sampled steps
+are categorized into four groups based on the magnitude of
+Δ𝜓: straight (−15◦< Δ𝜓< 15◦), right (15◦< Δ𝜓<
+165◦), left (−165◦< Δ𝜓< −15◦), and backward (165◦<
+Δ𝜓< 180◦or −180◦< Δ𝜓< −165◦). Subsequently,
+successive straight actions are grouped into the same sub-
+trajectory, while turning actions are treated as separate sub-
+trajectories. This approach ensures that each sub-trajectory
+represents a coherent segment of the agent’s movement,
+either moving forward or executing a significant change in
+direction. Through this method, an augmented trajectory is
+divided into 𝑁sub-trajectories, each characterized by its
+own movement pattern and associated sub-instruction.
+4.2. Landmark Detection
+To establish a robust connection between visual land-
+marks and textual entities, our approach integrates object
+detection with natural language processing. Specifically, for
+each sub-trajectory, we identify a prominent landmark using
+an advanced object detector, GLIP [35], and then match this
+visual feature to the corresponding entity phrase derived
+from the generated instructions in step E. As depicted in Step
+B of Figure 2, GLIP, a state-of-the-art pre-trained model,
+excels at detecting objects and grounding phrases within
+images. By merging object detection and phrase grounding
+tasks, GLIP can learn object-level, language-aware, and se-
+mantically rich visual representations, which enable it to per-
+form exceptionally well in zero-shot scenarios in open-world
+environments. Given an image along with continuous text or
+discrete object categories as input, GLIP accurately outputs
+the bounding box coordinates and semantic labels of the
+detected objects. To optimize GLIP’s performance within
+our framework, we preprocess both textual and visual inputs.
+For the textual component, we construct a specialized library
+of landmark categories tailored to each MP3D environment,
+drawing on the GEL-R2R dataset [12]. This category library
+serves as the reference for identifying landmarks through
+GLIP. On the visual side, we constrain the detection area to a
+180-degree sector aligned with the agent’s intended direction
+of movement, effectively halving the panorama and enhanc-
+ing the precision of landmark identification. Our MP3D
+panoramas are captured at a resolution of 2048 x 1024, but
+we resize them to 1024 x 1024 to improve computational ef-
+ficiency without sacrificing critical detail. At each waypoint
+of a sub-trajectory, we apply GLIP to detect objects within
+the panoramic images, selecting the object or scene with
+the highest confidence score as the representative landmark.
+This systematic process results in a sequence of landmarks
+denoted as {𝑙0, … , 𝑙𝑁−1
+}, where each 𝑙𝑖corresponds to a
+significant point along the trajectory.
+4.3. Crafted Instruction Construction
+The generation of navigation instructions entails craft-
+ing a natural language description for a specified visual
+trajectory. Unlike image and video captioning tasks, which
+typically focus on static or sequential visual content, nav-
+igation instruction generation requires understanding the
+spatial relationships within a series of panoramic images.
+Existing multimodal generation models are yet to exhibit ro-
+bust spatial reasoning capabilities, prompting our approach
+to begin with manually constructing detailed navigation
+instructions for each sub-trajectory based on the agent’s ver-
+tical changes, horizontal turning angles, and the relationship
+between the next step’s orientation and landmarks. These
+manually crafted instructions are subsequently refined by
+a natural language generation (NLG) model into R2R-like
+navigation instructions, ensuring they are both precise and
+: Preprint submitted to Elsevier
+Page 6 of 15
+
+
+===== PDF PAGE 7 =====
+ViT
+Panorama Encoder
+Vision Encoder
+Text Encoder
+Cross-modal Encoder
+Text Decoder
+...
+...
+R2R-like Instruction：Turn right
+and go pass the table and chairs.
+Spatial
+Layer
+Temporal Layer
+ViT
+ViT
+ViT
+...
+...
+...
+ViT
+Spatial
+Layer
+Spatial
+Layer
+...
+Average
+Pooling
+...
+...
+Average
+Pooling
+Average
+Pooling
+...
+...
+...
+...
+Crafted Instruction
+Turn hard
+right towards
+the left of the
+chairs.
+Prompt
+Rewrite the crafted
+instruction of this
+trajectory by R2R
+style: 
+Figure 3: Architecture of the OFA-Speaker model. The OFA-Speaker introduces a panorama encoder into the standard OFA
+model, which includes a text encoder, a vision encoder, a cross-modal encoder, and a text decoder. Specifically, the panorama
+encoder features spatial and temporal layers to process context-rich panoramas. The OFA-Speaker integrates prompts, crafted
+instructions, and a sequence of panoramas as inputs, generating R2R-like navigation instructions.
+user-friendly. As illustrated in the table 1, we refine the
+classification of right and left turns in step A, with each
+category corresponding to a 30-degree angular segment.
+This finer granularity allows for more accurate descriptions
+of the agent’s movements. In conjunction with the actions
+of going straight and turning back, we classify the agent’s
+horizontal movements into 12 distinct categories. Let 𝜁
+denote the vertical coordinates of the agent, while 𝜒𝑚𝑖𝑛and
+𝜒𝑚𝑎𝑥represent the heading angles of the agent aligned with
+the left and right boundaries of the landmark’s boundary
+box, respectively. Vertical movements are categorized into
+three types: horizontal, upward, and downward. Movements
+with −0.2𝑚< Δ𝜁< 0.2𝑚are deemed horizontal, those
+with Δ𝜁> 0.2𝑚are classified as upward, and those with
+Δ𝜁< −0.2𝑚as downward. The orientation of the next
+step relative to landmarks is categorized into three types:
+"towards" (𝜒𝑚𝑖𝑛< 𝜓< 𝜒𝑚𝑎𝑥), "towards the left of" (𝜓<
+𝜒𝑚𝑖𝑛), and "towards the right of" (𝜓> 𝜒𝑚𝑎𝑥). As shown in
+Table 1, based on the 12 horizontal action categories and
+3 vertical action categories, combined with the 3 landmark
+relationship categories, we construct a template instruction
+library consisting of 108 unique template instructions. For
+each sub-trajectory, we select the most appropriate template
+from this library and combine it with the detected landmarks
+to form a crafted navigation instruction. As depicted in
+step C of the Figure 2, the red dot represents the current
+orientation of the agent, while the green dot indicates the
+next step’s orientation. Based on these inputs, we generate
+a crafted instruction such as: "Turn slightly to the left and
+walk towards the left side of the chair."
+4.4. R2R-like Instruction Generation
+Recent progress in multimodal pretraining models has
+significantly advanced language generation capabilities within
+the vision-language domain. However, the Speaker models
+have historically struggled due to their insufficient ability
+to align vision and language modalities effectively [17,
+62, 64]. To address this limitation, we develop a VLN
+Speaker model based on the large-scale multimodal pre-
+training model OFA [63], which we designate as OFA-
+Speaker. By adopting an order-to-order learning framework
+and a prompt-based task representation, OFA seamlessly
+integrates various unimodal and multimodal tasks, such
+as image classification, text filling, image captioning, and
+VQA. Despite these advancements, directly applying the
+OFA model to navigation instruction generation poses chal-
+lenges. The existing tasks primarily involve simple natural
+images, which are far less complex than the sequential
+environment panoramas required for navigation. To enhance
+the model’s understanding of complex scenes, we introduce
+a panoramic image encoder into the OFA-Speaker model,
+as shown in figure 3. Additionally, we design a specific
+prompt—"Manual instructions to rewrite this path in the
+style of R2R instructions"—to expand OFA’s application to
+the new downstream task of R2R-like instruction generation.
+Model Architecture. The classical speaker models [17,
+62] typically process a sequence of view images as input
+but struggles to effectively utilize scene information due
+to its limited capacity for understanding spatial relation-
+ships. In contrast, the MARKY-mT5 speaker model [64]
+modifies the input to include prompt words and carefully
+crafted navigation instructions, with visual inputs restricted
+to landmarks. Although this approach enables the model to
+focus on essential navigation elements, it sacrifices some
+environmental context crucial for generating detailed in-
+structions. Our proposed OFA-Speaker integrates prompts,
+crafted instructions, and a sequence of panoramic images
+as inputs. For each viewpoint observation 𝑂𝑡, we embed
+its constituent view images using the pre-trained CLIP-
+ViT model [51], denoted as 𝑉𝑡= {𝑣𝑡
+0, 𝑣𝑡
+1, … , 𝑣𝑡
+35}. These
+embeddings are then fed into a panorama encoder, which
+consists of two Transformer layers: a spatial layer that learns
+: Preprint submitted to Elsevier
+Page 7 of 15
+
+
+===== PDF PAGE 8 =====
+intra-panorama spatial relationships, and a temporal layer
+that captures inter-panorama temporal dynamics. An average
+pooling operation is applied between these layers to derive
+panorama embeddings, which are subsequently combined
+with oriented view image features via residual connections.
+This process yields a panorama representation defined as
+{𝑃0, 𝑃1, …}. Following visual processing, the panorama
+feature sequence is concatenated with prompt and template
+instructions before being input into the OFA encoder. The
+decoder then generates R2R-style navigation instructions,
+represented as ′ = {𝑤′
+0, 𝑤′
+1, …}.
+Training and Inference. We train the OFA-Speaker
+model in two phases. In the first phase, we freeze the weights
+of the pre-trained OFA model and train the remaining pa-
+rameters. In the second phase, we fine-tune the entire OFA-
+Speaker model. The training data are sourced from the R2R
+training set. We construct crafted instructions for the R2R
+training set paths using entity-landmark pairs from human-
+annotated GEL-R2R, pairing them with ground-truth in-
+structions to form training data. During inference, the entity
+classes and landmarks used in constructing these crafted
+instructions are detected using GLIP. To address the issue
+of textual repetition in generated instructions, we adapt the
+SimCTG approach [54], which consists of two components:
+contrastive training algorithms during training and con-
+trastive search decoding methods during inference. Repet-
+itive text generation arises from the anisotropic nature of
+the token representations produced by the model, where the
+vector representations of different tokens within a sentence
+are overly similar, leading to repeated token generation. Con-
+trastive training aims to adjust the model’s representation
+space to maximize the distinctiveness of different tokens
+within the same sentence. This is achieved by integrating
+a contrastive loss function with the traditional maximum
+likelihood estimation (MLE) loss function:
+MLE = −1
+|𝑥|
+|𝑥|
+∑
+𝑖=1
+log 𝑝𝜃(𝑥𝑖|𝑥<𝑖),
+(1)
+CL =
+1
+|𝑥|(|𝑥| −1)
+|𝑥|
+∑
+𝑖=1
+|𝑥|
+∑
+𝑗=1,𝑗≠𝑖
+max{0, 𝜌−𝑐(𝑟𝑥𝑖, 𝑟𝑥𝑖) + 𝑐(𝑟𝑥𝑖, 𝑟𝑥𝑗)},
+(2)
+SimCTG = MLE + CL,
+(3)
+where 𝑟is the representation of the model-generated token
+𝑥, 𝑐calculates the cosine similarity between token represen-
+tations, and 𝜌∈[−1, 1] is a predefined range. In contrastive
+search, the aim is to enhance the diversity of generated text
+while preserving semantic consistency with preceding text:
+𝑥𝑡=arg max
+𝑢∈𝑈(𝑘) {(1 −𝛼) × 𝑝𝜃
+(𝑢∣𝑥<𝑡
+)
+⏟⏞⏞⏞⏞⏟⏞⏞⏞⏞⏟
+model confidence
+−
+𝛼×
+(
+max
+{
+𝑐
+(
+𝑟𝑢, 𝑟𝑥𝑗
+)
+∶1 ≤𝑗≤𝑡−1
+})
+⏟⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏟⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏞⏟
+degeneration penalty
+}, (4)
+where 𝑈(𝑘) denotes the most likely candidate set of the top 𝐾
+predicted by the model, 𝑝𝜃
+(𝑢∣𝑥<𝑡
+) is the probability of the
+candidate 𝑢given the previous context 𝑥, and 𝑎𝑙𝑝ℎ𝑎is a hy-
+perparameter balancing model confidence and degeneration
+penalties. This decoding strategy prefers tokens with low
+similarity to prior representations, thereby avoiding model
+degradation and ensuring textual coherence.
+4.5. Entity Selection
+Given that the visual input consists of panoramic ob-
+servations containing numerous objects, the navigation in-
+structions generated by OFA-Speaker may include mul-
+tiple entity phrases, denoted as {𝑒𝑖,0, 𝑒𝑖,1, …}. To obtain
+entity-level cross-modal matching annotations for each sub-
+pair in Step B, we need to select the most relevant entity
+corresponding to the landmark on the sub-trajectory. We
+begin by using the NLTK text parser [4] to extract entities
+from the generated sub-instructions. These extracted entities
+serve as candidate landmark entities for each sub-instruction.
+This step ensures that we have a comprehensive list of
+potential landmarks mentioned in the text. To select the
+most appropriate entity, we employ a multimodal pretraining
+model, CLIP [51], which uses a dual-encoder structure to
+map both text and image data into a shared semantic space.
+CLIP is pretrained using large-scale contrastive learning,
+enabling it to exhibit strong zero-shot learning capabilities,
+generalization, and transferability. This robust foundation
+makes CLIP particularly well-suited for cross-modal under-
+standing and generation tasks. Specifically, in this step, the
+environment landmark 𝑙𝑖is fed into the image encoder of
+the CLIP model to extract image features. The candidate
+entities are input into the text encoder of the CLIP model to
+obtain text features. The cosine similarity between the text
+features and image features is then calculated and ranked.
+The entity with the highest cosine similarity score is selected
+as the corresponding entity 𝑒𝑖for the reference landmark
+𝑙𝑖. By leveraging the powerful capabilities of CLIP, we
+can effectively bridge the gap between visual and textual
+information, thereby enhancing the accuracy and reliability
+of the entity-level cross-modal matching annotations.
+4.6. Sub-Pair Integration
+Through the above steps, we derive sub-instructions
+for each sub-trajectory and extract entity-landmark align-
+ment. These sub-instructions are then connected to form a
+complete instruction. During this process, the positions of
+marker entities within the sub-instructions are adjusted to
+correspond to their positions within the full instruction. As a
+result, the system generates a complete instruction-trajectory
+pair with fine-grained cross-modal matching, enabling pre-
+cise alignment between visual and textual modalities.
+: Preprint submitted to Elsevier
+Page 8 of 15
+
+
+===== PDF PAGE 9 =====
+Table 2
+Comparative Statistics of VLN Datasets with Fine-Grained Cross-Modal Matching Annotations.
+Datasets
+Sub-instruction level
+Entity level
+Trajectory
+Instruction
+Fine-grained pairs
+FG-R2R [24]
+✓
+5,798
+17,409
+63,633
+Landmark-RxR [22]
+✓
+11,321
+26,464
+166,740
+GEL-R2R [12]
+✓
+5,798
+17,409
+150,183
+Marky [59]
+✓
+33,889
+101,669
+970,762
+FCA-R2R(ours)
+✓
+178,270
+534,810
+2,519,919
+✓
+178,270
+534,810
+5,240,981
+5. Experiments and results
+5.1. Experimental Setup
+5.1.1. Dataset
+We train the OFA-Speaker using training pairs con-
+structed from the R2R dataset [3] and evaluate the effec-
+tiveness of the augmentation dataset generated by the OFA-
+Speaker for the follower agent. The R2R dataset, based on
+90 photo-realistic indoor environments within the Matter-
+port3D simulator, comprises 7,189 shortest-path trajectories
+derived from navigation graphs. Each trajectory includes
+between 5 to 7 steps, with an average physical path length
+of 10 meters, and is annotated with three human-generated
+instructions, resulting in a total of 21,500 instructions. On
+average, each instruction contains approximately 29 words.
+The dataset is divided into four subsets: training (61 envi-
+ronments), validation seen (61 environments), validation un-
+seen (11 environments), and test unseen (18 environments).
+Notably, the validation seen split comprises environments
+identical to those in the training set, while the validation
+unseen and test splits contain distinct environments. The
+inclusion of these unseen trajectories is crucial for assessing
+the model’s adaptability and performance in novel settings.
+5.1.2. Evaluation Metrics
+We evaluate the quality of our generated instructions
+using automatic language metrics, reporting results based on
+BLEU [46], METEOR [13], ROUGE [37], and CIDEr [57],
+consistent with previous studies [17, 64, 66]. Additionally, to
+assess the efficacy of our augmentation dataset in enhancing
+the follower agents’ performance, we employ four standard
+navigation performance metrics: 1) Trajectory Length (TL):
+Measures the total distance traveled along the navigation
+path. 2) Navigation Error (NE): Defines the shortest distance
+between the agent’s final position and the target viewpoint.
+3)Success Rate (SR): Indicates the proportion of trials where
+the agent reaches within a 3-meter radius of the target
+viewpoint. 4) Success Rate weighted by Path Length (SPL):
+Balances the success rate against the efficiency of the route
+taken, providing a comprehensive evaluation metric. Partic-
+ularly, SPL is endorsed as the principal metric due to its
+balanced consideration of both accuracy and efficiency of
+navigation. This dual approach ensures a thorough evalua-
+tion of both linguistic quality and navigational effectiveness,
+offering a holistic view of the system’s capabilities.
+5.1.3. Implementation Details
+During the navigation instruction generation phase, we
+utilize the OFA-base pre-trained model [63] as our backbone
+model, adhering to its associated hyperparameters. Specifi-
+cally, fine-tuning is performed over 200k iterations on four
+NVIDIA Tesla A100 GPUs, employing AdamW optimizer
+with a learning rate of 2 × 10−5 and a batch size of 64 per
+GPU. For the pre-training of the follower agent model, two
+NVIDIA RTX 3090 GPUs are used for 200k iterations, using
+AdamW optimizer with a learning rate of 5 × 10−5 and a
+batch size of 64 per GPU. In the subsequent fine-tuning for
+downstream tasks, we conduct iterative training on a single
+NVIDIA RTX 3090 GPU using a learning rate of 10−5 and
+a reduced batch size of 16.
+5.2. Dataset Statistics and Comparative Analysis
+Table 2 presents the data statistics for trajectories, in-
+structions, and fine-grained pairs in various VLN datasets
+featuring fine-grained cross-modal matching annotations.
+The datasets analyzed include FG-R2R [24], Landmark
+RxR [22], Marky [59], GEL-R2R [12], and the newly pro-
+posed FCA-R2R. FG-R2R and Landmark RxR datasets con-
+tain only sub-pairs, whereas GEL-R2R and Marky datasets
+consist exclusively of entity-landmark pairs. In contrast, the
+FCA-R2R dataset uniquely offers both sub-pairs and entity-
+landmark pairs. FG-R2R and GEL-R2R are constructed
+using the R2R training set, seen validation set, and unseen
+validation set, resulting in consistent trajectory and instruc-
+tion counts of 5,798 and 17,409, respectively. Landmark
+RxR is derived from the English portion of the RxR dataset,
+with 11,321 trajectories and 26,464 instructions. Marky,
+based on the RxR training and validation sets, comprises
+33,889 trajectories and 101,669 instructions. The FCA-R2R
+dataset samples all 5-7 step trajectories within the Matter-
+port3D environment, generating six instructions per trajec-
+tory, totaling 178,270 trajectories and 534,810 instructions.
+This significantly surpasses other datasets in terms of both
+trajectory and instruction volume, highlighting its substan-
+tial advantage in data scale. Regarding fine-grained match-
+ing at the sub-instruction level, FG-R2R and Landmark
+RxR contain 63,633 and 166,740 sub-pairs, respectively,
+while FCA-R2R includes 2,519,919 sub-pairs. For entity-
+level fine-grained matching, GEL-R2R, Marky, and FCA-
+R2R have 150,183, 970,762, and 5,240,981 entity-landmark
+: Preprint submitted to Elsevier
+Page 9 of 15
+
+
+===== PDF PAGE 10 =====
+Table 3
+Navigation performance improvements with FCA-R2R dataset.
+Methods
+Validation Seen
+Validation Unseen
+TL
+NE ↓
+SR ↑
+SPL ↑
+TL
+NE ↓
+SR ↑
+SPL ↑
+SF [3]
+–
+3.36
+66.0
+–
+–
+6.62
+35.0
+–
+SF [3]+FCA-R2R
+–
+3.72
+64.3
+–
+–
+5.51
+45.0
+–
+EnvDrop [55]
+11.00
+3.99
+62.1
+59.0
+10.70
+5.22
+52.2
+48.0
+EnvDrop [55]+FCA-R2R
+13.42
+3.51
+68.6
+63.0
+16.67
+4.83
+55.8
+49.6
+RecBERT [25]
+10.79
+3.11
+71.1
+67.2
+11.86
+4.29
+58.7
+53.4
+RecBERT [25] +FCA-R2R
+10.98
+2.76
+74.3
+70.0
+11.67
+4.06
+61.6
+56.0
+HAMT [7]
+11.15
+2.51
+75.0
+71.7
+11.46
+3.62
+65.7
+60.9
+HAMT [7]+FCA-R2R
+10.80
+2.30
+77.8
+74.5
+11.68
+3.50
+67.2
+61.5
+pairs, respectively. These figures demonstrate that FCA-
+R2R’s sub-pairs and entity-landmark pairs reach into the
+millions, an order of magnitude larger than other datasets,
+underscoring its significant scale advantage. In conclusion,
+the FCA-R2R dataset, with its extensive coverage of sub-
+instruction and entity-level fine-grained information and
+large-scale data, provides rich and valuable resources for
+advancing research in the VLN domain.
+5.3. Effectiveness of Instruction-Trajectory Pair
+This section evaluates the quality of instruction-trajectory
+pairs in the FCA-R2R dataset using four representative
+VLN models: SF [3], EnvDrop [55], RecBERT [25], and
+HAMT [7]. SF and EnvDrop are based on LSTM archi-
+tectures, while RecBERT and HAMT utilize Transformer
+architectures. All four models were pretrained or fine-tuned
+using enhanced datasets: SF with SF-R2R, EnvDrop with
+EnvDrop-R2R, and RecBERT and HAMT with Prevalent-
+R2R. In our experiments, the original augmented datasets
+were replaced with the FCA-R2R dataset. The experimental
+results, presented in Table 3, demonstrate improvements
+across most navigation metrics for all four models after
+training with the FCA-R2R dataset. Specifically, the SF
+model exhibits a significant improvement in SR by 10% on
+the unseen validation set. EnvDrop shows SPL increases of
+4% and 1.6% on the unseen validation set. RecBERT im-
+proves SPL by 2.8% and 2.4%, while HAMT achieves SPL
+improvements of 2.8% and 0.6% on the unseen validation
+set. These findings suggest that the instruction-path pairs in
+the FCA-R2R dataset are of higher quality. Moreover, the
+performance gains for RecBERT and HAMT are notably
+lower than those for SF and EnvDrop. This discrepancy may
+stem from the fact that SF and EnvDrop were not pretrained
+and thus performed less effectively in multimodal feature
+representation compared to the pretrained RecBERT and
+HAMT models. Consequently, lower-quality datasets may
+hinder effective information extraction and limit navigation
+performance improvements for these models. In contrast,
+high-quality data like FCA-R2R enables more effective
+feature learning, leading to significant enhancements in
+navigation capabilities.
+5.4. Effectiveness of Sub-Pair Alignment
+This section evaluates the sub-pair alignment annota-
+tions in the FAC-R2R dataset using two distinct methods.
+The first method, Babywalk [70], initially constructs sub-
+instructions and sub-trajectory matches using heuristic al-
+gorithms on the R2R and SF-R2R datasets. It then trains
+agents under imitation learning and curriculum reinforce-
+ment learning frameworks, allowing progressive learning
+from shorter to longer paths, thereby enhancing final naviga-
+tion performance. The second method, AFAC [11], improves
+agent decision-making by incorporating auxiliary sub-pair
+alignment constraints. We applied the sub-pair matching
+information from the FCA-R2R dataset to train agents using
+both methods. The experimental results are summarized in
+Table 4. The results indicate that both methods improved all
+navigation evaluation metrics after training with the FCA-
+R2R dataset. Specifically, the Babywalk method achieves SR
+and SPL increases of 2.3% and 3.3%, respectively, on the un-
+seen validation set. Meanwhile, the AFAC method improves
+SR and SPL by 0.7% and 0.6%, respectively, on the seen
+validation set, and by 1.0% for both metrics on the unseen
+validation set. These findings indicate that incorporating ad-
+ditional sub-pair matching supervision into the training data
+facilitates more effective state-aware learning for agents,
+enabling them to make more accurate navigational decisions.
+This enhanced supervision significantly benefits agent per-
+formance, particularly in complex or unseen environments.
+5.5. Effectiveness of Entity-Landmark Alignment
+This section evaluates the entity-landmark alignment an-
+notations in the FAC-R2R dataset using the GELA method [12],
+which introduces a grounded entity-landmark adaptive pre-
+training framework to improve fine-grained semantic rep-
+resentation alignment based on human-annotated entity-
+landmark pairs. We utilized entity-landmark pairs from
+the GEL-R2R and FCA-R2R datasets for adaptive pre-
+training, followed by fine-tuning on the R2R dataset. The
+experimental results are presented in Table 5. The results
+indicate that the GELA method improves most navigation
+evaluation metrics after training with the FCA-R2R dataset.
+Specifically, on the seen validation set, SR and SPL improve
+: Preprint submitted to Elsevier
+Page 10 of 15
+
+
+===== PDF PAGE 11 =====
+Table 4
+Navigation performance improvements with sub-instruction sub-trajectory alignment in FCA-R2R dataset.
+Methods
+Validation Seen
+Validation Unseen
+TL
+NE ↓
+SR ↑
+SPL ↑
+TL
+NE ↓
+SR ↑
+SPL ↑
+Babywalk [70]
+–
+–
+–
+–
+10.2
+5.9
+43.8
+39.6
+Babywalk [70]+FCA-R2R
+10.16
+4.75
+0.55
+52.6
+9.46
+5.68
+46.1
+42.9
+AFAC [11]
+10.92
+2.40
+77.3
+73.9
+11.8
+3.56
+67.0
+61.7
+AFAC [11]+FCA-R2R
+11.01
+2.48
+78.0
+74.5
+12.0
+3.35
+68.0
+62.7
+Table 5
+Navigation performance improvements with entity-landmark
+alignment in FCA-R2R dataset.
+Methods
+Datasets
+TL
+NE↓
+SR↑
+SPL↑
+GELA [12]
+val seen
+11.19
+2.39
+76.4
+72.9
+val unseen
+11.73
+3.11
+71.1
+65.0
+val test
+12.99
+3.58
+67.4
+62.1
+GELA [12]+FCA-R2R
+val seen
+11.00
+2.31
+76.5
+73.5
+val unseen
+11.46
+3.09
+71.1
+65.5
+val test
+12.65
+3.57
+68.3
+63.3
+by 0.1% and 0.6%, respectively. On the unseen validation
+set, SR remains consistent, while SPL improved by 0.5%.
+On the unseen test set, SR and SPL increase by 0.9% and
+1.2%, respectively. These findings suggest that incorporating
+additional entity-landmark matching information during
+the adaptive pre-training stage enables the agent to learn
+more effective cross-modal representations. This enhanced
+representation learning promotes better understanding of
+instructions and the environment, thereby improving overall
+navigation performance.
+5.6. Ablation Study
+This section performs an ablation study on the quality of
+instructions in the FCA-R2R augmented dataset, focusing on
+three aspects of the OFA-Speaker model: input data, fine-
+tuning modules, and decoding methods. By systematically
+analyzing these components, we aim to identify how each
+aspect contributes to the overall performance of navigation
+instructions generated by the OFA-Speaker model. Specifi-
+cally, we examine the impact of different types of input data
+on instruction quality, evaluate various fine-tuning strategies
+for optimizing model parameters, and compare different
+decoding approaches to enhance the clarity and accuracy of
+generated instructions.
+5.6.1. Input Data
+We begin by examining the impact of input information
+on the OFA-Speaker model’s performance. Table 6 presents
+results on both seen and unseen validation sets. Our approach
+contrasts with Wang et al. [64], who utilize the mT5 model to
+generate the Marky dataset. Their method involves detecting
+landmarks using an object detection model, constructing
+template instructions based on actions and landmarks, and
+generating natural language navigation instructions via the
+mT5 model. However, the Marky dataset lacks simultaneous
+sub-pair and entity-landmark alignment information, and the
+mT5 model primarily focuses on natural language process-
+ing tasks with limited multimodal capabilities. The input to
+the Marky-mT5 model consists of manual instructions and
+prompt words. In contrast, our Model 0 uses only manual
+instructions as input, while Model 1 incorporates both man-
+ual instructions and prompt words. Both models significantly
+improve BLEU-4 scores compared to the Marky dataset,
+achieving increases of 4.69 and 5.38 points on the seen vali-
+dation set and 3.78 and 5.17 points on the unseen validation
+set. However, CIDEr scores generally decrease. To address
+the lack of visual information in the OFA-Speaker model,
+we incorporate panoramic image inputs into Models 0 and
+1, resulting in Models 2 and 3. The results indicate that the
+CIDEr score increased by 2.97 and 4.13 points for Model 2,
+and by 5.24 and 5.95 points for Model 3, surpassing those of
+the Marky dataset. Prompt words are also found to improve
+language scores. To better represent spatial features between
+different perspectives, we design a panorama encoder based
+on Transformer layers and integrated it into Model 3, form-
+ing Model 4. Compared to Model 3, Model 4 achieved
+improvements in BLEU-4 (1.13 and 0.68 points), CIDEr
+(1.95 and 1.28 points), Meteor(0.8 and 0.65 points), and
+Rouge(0.98 and 0.64 points). These findings highlight the
+effectiveness of the panorama encoder in enhancing visual
+feature representation and instruction quality.
+5.6.2. Fine-Tuning Module
+Next, we evaluate the fine-tuning modules of the OFA-
+Speaker model. The experimental results are shown in Ta-
+ble 7. Model 5 utilizes the pre-trained parameters of the OFA
+model without fine-tuning the encoder or decoder. The low
+language metrics of this model indicate a significant gap be-
+tween VLN instruction generation tasks and general visual-
+language generation tasks, highlighting the poor perfor-
+mance of the OFA pre-trained model when directly applied
+to VLN tasks. To address this, we conducted fine-tuning
+experiments on the encoder and decoder separately. Model
+6 fine-tuned only the encoder, while Model 7 fine-tuned
+only the decoder, retaining the OFA pre-trained parameters
+for the encoder. The results in Table 7 show that Model 7
+outperforms Model 6 in language metrics, demonstrating
+that fine-tuning the decoder alone is more effective than fine-
+tuning the encoder alone. This suggests that the decoder,
+being closer to the language generation output, plays a more
+: Preprint submitted to Elsevier
+Page 11 of 15
+
+
+===== PDF PAGE 12 =====
+Table 6
+Ablation study results of the OFA-Speaker model input data.
+Model
+input data
+val seen
+val seen
+crafted
+instruction
+prompt
+pano
+pano
+encoder
+Bleu4 ↑
+Meteor ↑
+Rouge ↑
+CIDEr ↑
+Bleu4 ↑
+Meteor ↑
+Rouge ↑
+CIDEr ↑
+Marky [64]
+✓
+✓
+6.2
+–
+–
+8.4
+5.8
+-
+-
+7.5
+0
+✓
+10.89
+15.8
+31.98
+6.23
+9.62
+15.38
+31.56
+4.77
+1
+✓
+✓
+11.58
+16.74
+33.32
+5.78
+10.97
+15.97
+32.39
+4.56
+2
+✓
+✓
+11.9
+16.47
+33.59
+9.2
+10.83
+15.62
+33.34
+8.9
+3
+✓
+✓
+✓
+12.42
+16.71
+34.62
+11.02
+12.31
+16.47
+34.79
+10.51
+4
+✓
+✓
+✓
+✓
+13.55
+17.51
+35.6
+12.97
+12.99
+17.12
+35.43
+11.79
+Table 7
+Ablation study results of the OFA-Speaker model fine-tuning module.
+model
+encoder
+decoder
+val seen
+val unseen
+Bleu4 ↑
+Meteor ↑
+Rouge ↑
+CIDEr ↑
+Bleu4 ↑
+Meteor ↑
+Rouge ↑
+CIDEr ↑
+5
+✗
+✗
+6
+14.89
+30.5
+1.02
+5.5
+14.5
+30.04
+0.77
+6
+✓
+✗
+7.95
+14.85
+29.58
+3.46
+6.75
+14.44
+29.24
+3.25
+7
+✗
+✓
+11.2
+17.62
+33.37
+6.21
+10.67
+17.53
+33
+6.2
+4
+✓
+✓
+13.55
+17.51
+35.6
+12.97
+12.99
+17.12
+35.43
+11.79
+critical role in improving performance. Specifically, com-
+pared to Model 5, Model 7 achieves increases of 5.2 and 5.17
+in Bleu4 scores, and 5.19 and 5.42 in CIDEr scores on the
+seen and unseen validation sets, respectively. Additionally,
+Model 4, which incorporates both fine-tuning of the decoder
+and other enhancements, further improves the Bleu4 scores
+by 5.6 and 5.24, and the CIDEr scores by 9.51 and 8.54,
+compared to Model 6.
+5.6.3. Decoding Method
+Finally, we investigate the decoding method used by
+the OFA-Speaker model, with results shown in Table 8.
+During experiments, word repetition issues were observed
+in generated navigation instructions, a common problem in
+language generation models using greedy algorithms. To
+mitigate this, we adopted the SimCTG decoding method,
+which integrates SimCTG loss into the greedy algorithm
+to reduce word repetition. This adjustment led to notable
+improvements in language metrics. Specifically, compared
+to Model 8 using the greedy algorithm, Model 4 achieves
+increases of 0.85 and 1.27 points in BLEU scores and 1.14
+and 1.91 points in CIDEr scores on the seen and unseen
+validation sets, respectively. Improvements are also noted in
+Meteor and Rouge scores.
+6. Conclusion
+This paper introduces the Generative framework for
+Navigation Instruction annotated with Fine-grained Cross-
+modal Alignment (FCA-NIG), a novel approach designed to
+tackle the critical challenge of data scarcity in high-quality
+fine-grained cross-modal alignment for VLN. By leveraging
+advanced foundation models such as GLIP, OFA, and CLIP,
+FCA-NIG automates the creation of large-scale, high-quality
+datasets with dual-level alignment annotations—sub-instruction
+sub-trajectory matching and entity-landmark correspon-
+dence. The proposed framework introduces a six-step pipeline:
+trajectory segmentation, landmark detection, crafted instruc-
+tion construction, R2R-like instruction generation, entity
+selection, and sub-pair integration. These steps synergisti-
+cally generate sub-instruction-sub-trajectory pairs enriched
+with entity-landmark annotations, which are aggregated
+into complete instruction-trajectory pairs. The resulting
+FCA-R2R dataset demonstrates significant improvements
+in navigation performance when integrated with state-of-
+the-art VLN models (SF, EnvDrop, RecBERT, HAMT).
+Specifically, the FCA-R2R dataset enhances state-awareness
+and action decision-making through sub-pair and entity-
+landmark alignment supervision (e.g., via Babywalk, AFAC,
+Table 8
+Ablation study results of the OFA-Speaker model decode method.
+model
+decode methods
+split
+Bleu4 ↑
+Meteor ↑
+Rouge ↑
+CIDEr ↑
+8
+Greedy
+val seen
+12.7
+17.6
+35.06
+11.83
+val unseen
+11.72
+17.01
+34.46
+9.88
+4
+SimCTG
+val seen
+13.55
+17.51
+35.6
+12.97
+val unseen
+12.99
+17.12
+35.43
+11.79
+: Preprint submitted to Elsevier
+Page 12 of 15
+
+
+===== PDF PAGE 13 =====
+and GELA methods), achieving SR scores of 71.1% and
+68.3% and SPL scores of 65.5% and 63.3% on unseen
+validation and test sets, respectively. By systematically
+addressing data scarcity and alignment precision, FCA-NIG
+advances the field of VLN toward more interpretable and
+scalable solutions. Future work could explore extending
+this framework to dynamic environments or integrating
+multi-turn dialog systems to further bridge the gap between
+simulated training and real-world deployment.
+7. Acknowledgments
+This work was supported in part by the grants from the
+National Natural Science Foundation of China under Grant
+62332019, the National Key Research and Development
+Program of China (2023YFF1203900, 2023YFF1203903),
+sponsored by Beijing Nova Program (20240484513).
+References
+[1] Aafaq, N., Akhtar, N., Liu, W., Gilani, S.Z., Mian, A., 2019. Spatio-
+temporal dynamics and semantic attribute enriched visual encoding
+for video captioning, in: CVPR, pp. 12487–12496. doi:10.1109/CVPR.
+2019.01277.
+[2] Anderson, P., He, X., Buehler, C., Teney, D., Johnson, M., Gould,
+S., Zhang, L., 2018a. Bottom-up and top-down attention for image
+captioning and visual question answering, in: CVPR, pp. 6077–6086.
+doi:10.1109/CVPR.2018.00636.
+[3] Anderson, P., Wu, Q., Teney, D., Bruce, J., Johnson, M., Sünderhauf,
+N., Reid, I.D., Gould, S., van den Hengel, A., 2018b.
+Vision-
+and-language navigation: Interpreting visually-grounded navigation
+instructions in real environments, in: CVPR, pp. 3674–3683. doi:10.
+1109/CVPR.2018.00387.
+[4] Bird, S., 2006. NLTK: the natural language toolkit, in: Calzolari, N.,
+Cardie, C., Isabelle, P. (Eds.), ACL. doi:10.3115/1225403.1225421.
+[5] Chang, A.X., Dai, A., Funkhouser, T.A., Halber, M., Nießner, M.,
+Savva, M., Song, S., Zeng, A., Zhang, Y., 2017.
+Matterport3d:
+Learning from RGB-D data in indoor environments, in: 3DV, pp. 667–
+676. doi:10.1109/3DV.2017.00081.
+[6] Chen, H., Suhr, A., Misra, D., Snavely, N., Artzi, Y., 2019. TOUCH-
+DOWN: natural language navigation and spatial reasoning in visual
+street environments, in: CVPR, pp. 12538–12547. doi:10.1109/CVPR.
+2019.01282.
+[7] Chen, S., Guhur, P., Schmid, C., Laptev, I., 2021. History aware mul-
+timodal transformer for vision-and-language navigation, in: NeurIPS,
+pp. 5834–5847. URL: https://proceedings.neurips.cc/paper/2021/
+hash/2e5c2cb8d13e8fba78d95211440ba326-Abstract.html.
+[8] Chen, S., Guhur, P., Tapaswi, M., Schmid, C., Laptev, I., 2022a.
+Learning from unlabeled 3d environments for vision-and-language
+navigation, in: ECCV, pp. 638–655. doi:10.1007/978-3-031-19842-7\
+_37.
+[9] Chen, S., Guhur, P., Tapaswi, M., Schmid, C., Laptev, I., 2022b.
+Think global, act local: Dual-scale graph transformer for vision-
+and-language navigation, in: CVPR, pp. 16516–16526. doi:10.1109/
+CVPR52688.2022.01604.
+[10] Cho, J., Lei, J., Tan, H., Bansal, M., 2021.
+Unifying vision-and-
+language tasks via text generation, in: ICML, pp. 1931–1942. URL:
+http://proceedings.mlr.press/v139/cho21a.html.
+[11] Cui, Y., Huang, R., Zhang, Y., Cen, Y., Xie, L., Yan, Y., Yin, E., 2023a.
+Auxiliary fine-grained alignment constraints for vision-and-language
+navigation, in: ICME, pp. 2621–2626. doi:10.1109/ICME55011.2023.
+00446.
+[12] Cui, Y., Xie, L., Zhang, Y., Zhang, M., Yan, Y., Yin, E., 2023b.
+Grounded entity-landmark adaptive pre-training for vision-and-
+language navigation, in: ICCV, pp. 12009–12019.
+doi:10.1109/
+ICCV51070.2023.01106.
+[13] Denkowski, M.J., Lavie, A., 2014.
+Meteor universal: Language
+specific translation evaluation for any target language, in: Proceedings
+of the Ninth Workshop on Statistical Machine Translation, pp. 376–
+380. doi:10.3115/V1/W14-3348.
+[14] DeSouza, G.N., Kak, A.C., 2002. Vision for mobile robot navigation:
+A survey.
+IEEE Trans. Pattern Anal. Mach. Intell. 24, 237–267.
+doi:10.1109/34.982903.
+[15] Fan, Y., Chen, W., Jiang, T., Zhou, C., Zhang, Y., Wang, X., 2023.
+Aerial vision-and-dialog navigation, in: Findings of the Association
+for Computational Linguistics, pp. 3043–3061. doi:10.18653/V1/2023.
+FINDINGS-ACL.190.
+[16] Francis, J., Kitamura, N., Labelle, F., Lu, X., Navarro, I., Oh, J.,
+2022. Core challenges in embodied vision-language planning. J. Artif.
+Intell. Res. 74, 459–515. doi:10.1613/jair.1.13646.
+[17] Fried, D., Hu, R., Cirik, V., Rohrbach, A., Andreas, J., Morency,
+L., Berg-Kirkpatrick, T., Saenko, K., Klein, D., Darrell, T., 2018.
+Speaker-follower models for vision-and-language navigation, in:
+NeurIPS, pp. 3318–3329.
+URL: https://proceedings.neurips.cc/
+paper/2018/hash/6a81681a7af700c6385d36577ebec359-Abstract.html.
+[18] Gao, C., Chen, J., Liu, S., Wang, L., Zhang, Q., Wu, Q., 2021. Room-
+and-object aware knowledge reasoning for remote embodied referring
+expression, in: CVPR, pp. 3064–3073. doi:10.1109/CVPR46437.2021.
+00308.
+[19] Gu, J., Stefani, E., Wu, Q., Thomason, J., Wang, X., 2022. Vision-
+and-language navigation: A survey of tasks, methods, and future
+directions, in: ACL, pp. 7606–7623. doi:10.18653/v1/2022.acl-long.
+524.
+[20] Guhur, P., Tapaswi, M., Chen, S., Laptev, I., Schmid, C., 2021.
+Airbert: In-domain pretraining for vision-and-language navigation,
+in: ICCV, pp. 1614–1623. doi:10.1109/ICCV48922.2021.00166.
+[21] Hao, W., Li, C., Li, X., Carin, L., Gao, J., 2020. Towards learning a
+generic agent for vision-and-language navigation via pre-training, in:
+CVPR, pp. 13134–13143. doi:10.1109/CVPR42600.2020.01315.
+[22] He, K., Huang, Y., Wu, Q., Yang, J., An, D., Sima, S., Wang,
+L., 2021.
+Landmark-rxr: Solving vision-and-language naviga-
+tion with fine-grained alignment supervision, in: NeurIPS, pp.
+652–663.
+URL: https://proceedings.neurips.cc/paper/2021/hash/
+0602940f23884f782058efac46f64b0f-Abstract.html.
+[23] Hong, Y., Opazo, C.R., Qi, Y., Wu, Q., Gould, S., 2020a.
+Lan-
+guage and visual entity relationship graph for agent navigation, in:
+NeurIPS.
+URL: https://proceedings.neurips.cc/paper/2020/hash/
+56dc0997d871e9177069bb472574eb29-Abstract.html.
+[24] Hong, Y., Opazo, C.R., Wu, Q., Gould, S., 2020b. Sub-instruction
+aware vision-and-language navigation, in: EMNLP, pp. 3360–3376.
+doi:10.18653/v1/2020.emnlp-main.271.
+[25] Hong, Y., Wu, Q., Qi, Y., Opazo, C.R., Gould, S., 2021. VLN BERT:
+A recurrent vision-and-language BERT for navigation, in: CVPR, pp.
+1643–1653. doi:10.1109/CVPR46437.2021.00169.
+[26] Huang, H., Jain, V., Mehta, H., Ku, A., Magalhães, G., Baldridge,
+J., Ie, E., 2019. Transferable representation learning in vision-and-
+language navigation, in: ICCV, pp. 7403–7412.
+doi:10.1109/ICCV.
+2019.00750.
+[27] Kamath, A., Anderson, P., Wang, S., Koh, J.Y., Ku, A., Waters, A.,
+Yang, Y., Baldridge, J., Parekh, Z., 2023. A new path: Scaling vision-
+and-language navigation with synthetic instructions and imitation
+learning, in: CVPR, pp. 10813–10823. doi:10.1109/CVPR52729.2023.
+01041.
+[28] Kim, H., Zala, A., Burri, G., Tan, H., Bansal, M., 2020. Arramon: A
+joint navigation-assembly instruction interpretation task in dynamic
+environments, in: Proceedings of the Annual Meeting of the Associa-
+tion for Computational Linguistics, pp. 3910–3927. doi:10.18653/V1/
+2020.FINDINGS-EMNLP.348.
+[29] Koh, J.Y., Agrawal, H., Batra, D., Tucker, R., Waters, A., Lee, H.,
+Yang, Y., Baldridge, J., Anderson, P., 2023.
+Simple and effective
+synthesis of indoor 3d scenes, in: AAAI, pp. 1169–1178. doi:10.1609/
+AAAI.V37I1.25199.
+: Preprint submitted to Elsevier
+Page 13 of 15
+
+
+===== PDF PAGE 14 =====
+[30] Koh, J.Y., Lee, H., Yang, Y., Baldridge, J., Anderson, P., 2021.
+Pathdreamer: A world model for indoor navigation, in: ICCV, pp.
+14718–14728. doi:10.1109/ICCV48922.2021.01447.
+[31] Krantz, J., Gokaslan, A., Batra, D., Lee, S., Maksymets, O., 2021.
+Waypoint models for instruction-guided navigation in continuous
+environments, in: ICCV, pp. 15162–15171. doi:10.1109/ICCV48922.
+2021.01488.
+[32] Ku, A., Anderson, P., Patel, R., Ie, E., Baldridge, J., 2020. Room-
+across-room: Multilingual vision-and-language navigation with dense
+spatiotemporal grounding, in: EMNLP, pp. 4392–4412. doi:10.18653/
+v1/2020.emnlp-main.356.
+[33] Li, G., Duan, N., Fang, Y., Gong, M., Jiang, D., 2020. Unicoder-
+vl: A universal encoder for vision and language by cross-modal pre-
+training, in: AAAI, pp. 11336–11344. doi:10.1609/AAAI.V34I07.6795.
+[34] Li, J., Bansal, M., 2023. Panogen: Text-conditioned panoramic envi-
+ronment generation for vision-and-language navigation, in: NeurIPS.
+[35] Li, L.H., Zhang, P., Zhang, H., Yang, J., Li, C., Zhong, Y., Wang, L.,
+Yuan, L., Zhang, L., Hwang, J., Chang, K., Gao, J., 2022. Grounded
+language-image pre-training, in: CVPR, pp. 10955–10965. doi:10.
+1109/CVPR52688.2022.01069.
+[36] Li, X., Wang, Z., Yang, J., Wang, Y., Jiang, S., 2023.
+KERM:
+knowledge enhanced reasoning for vision-and-language navigation,
+in: CVPR, pp. 2583–2592. doi:10.1109/CVPR52729.2023.00254.
+[37] Lin, C.Y., 2004.
+ROUGE: A package for automatic evaluation of
+summaries, in: Text Summarization Branches Out, Barcelona, Spain.
+pp. 74–81. URL: https://aclanthology.org/W04-1013/.
+[38] Lin, K., Chen, P., Huang, D., Li, T.H., Tan, M., Gan, C., 2023.
+Learning vision-and-language navigation from youtube videos, in:
+CVPR, pp. 8283–8292. doi:10.1109/ICCV51070.2023.00764.
+[39] Liu, C., Zhu, F., Chang, X., Liang, X., Ge, Z., Shen, Y., 2021. Vision-
+language navigation with random environmental mixup, in: ICCV, pp.
+1624–1634. doi:10.1109/ICCV48922.2021.00167.
+[40] Ma, C., Lu, J., Wu, Z., AlRegib, G., Kira, Z., Socher, R., Xiong,
+C., 2019a. Self-monitoring navigation agent via auxiliary progress
+estimation, in: ICLR.
+URL: https://openreview.net/forum?id=
+r1GAsjC5Fm.
+[41] Ma, C., Wu, Z., AlRegib, G., Xiong, C., Kira, Z., 2019b. The regretful
+agent: Heuristic-aided navigation through progress estimation, in:
+CVPR, pp. 6732–6740. doi:10.1109/CVPR.2019.00689.
+[42] Majumdar, A., Shrivastava, A., Lee, S., Anderson, P., Parikh, D.,
+Batra, D., 2020.
+Improving vision-and-language navigation with
+image-text pairs from the web, in: ECCV, pp. 259–274. doi:10.1007/
+978-3-030-58539-6\_16.
+[43] Moudgil,
+A.,
+Majumdar,
+A.,
+Agrawal,
+H.,
+Lee,
+S.,
+Batra,
+D., 2021.
+SOAT: A scene- and object-aware transformer
+for
+vision-and-language
+navigation,
+in:
+NeurIPS,
+pp.
+7357–
+7367.
+URL:
+https://proceedings.neurips.cc/paper/2021/hash/
+3c8a49145944fed2bbcaade178a426c4-Abstract.html.
+[44] Ossandón, J., Earle, B., Soto, Á., 2022. Bridging the visual semantic
+gap in VLN via semantically richer instructions, in: ECCV, pp. 54–69.
+doi:10.1007/978-3-031-19836-6\_4.
+[45] Padmakumar, A., Thomason, J., Shrivastava, A., Lange, P., Narayan-
+Chen, A., Gella, S., Piramuthu, R., Tür, G., Hakkani-Tür, D., 2022.
+Teach: Task-driven embodied agents that chat, in: AAAI, pp. 2017–
+2025. doi:10.1609/AAAI.V36I2.20097.
+[46] Papineni, K., Roukos, S., Ward, T., Zhu, W., 2002. Bleu: a method
+for automatic evaluation of machine translation, in: Proceedings of
+the 40th Annual Meeting of the Association for Computational Lin-
+guistics, pp. 311–318. doi:10.3115/1073083.1073135.
+[47] Qi, Y., Pan, Z., Hong, Y., Yang, M., van den Hengel, A., Wu, Q., 2021.
+The road to know-where: An object-and-room informed sequential
+BERT for indoor vision-language navigation, in: ICCV, pp. 1635–
+1644. doi:10.1109/ICCV48922.2021.00168.
+[48] Qi, Y., Pan, Z., Zhang, S., van den Hengel, A., Wu, Q., 2020a. Object-
+and-action aware model for visual language navigation, in: ECCV, pp.
+303–317. doi:10.1007/978-3-030-58607-2\_18.
+[49] Qi, Y., Wu, Q., Anderson, P., Wang, X., Wang, W.Y., Shen, C., van den
+Hengel, A., 2020b.
+REVERIE: remote embodied visual referring
+expression in real indoor environments, in: CVPR, pp. 9979–9988.
+doi:10.1109/CVPR42600.2020.01000.
+[50] Qiao, Y., Qi, Y., Hong, Y., Yu, Z., Wang, P., Wu, Q., 2023.
+HOP+: history-enhanced and order-aware pre-training for vision-
+and-language navigation.
+IEEE Trans. Pattern Anal. Mach. Intell.
+45, 8524–8537. URL: https://doi.org/10.1109/TPAMI.2023.3234243,
+doi:10.1109/TPAMI.2023.3234243.
+[51] Radford, A., Kim, J.W., Hallacy, C., Ramesh, A., Goh, G., Agar-
+wal, S., Sastry, G., Askell, A., Mishkin, P., Clark, J., Krueger, G.,
+Sutskever, I., 2021. Learning transferable visual models from natural
+language supervision, in: ICML, pp. 8748–8763.
+URL: http://
+proceedings.mlr.press/v139/radford21a.html.
+[52] Shridhar, M., Thomason, J., Gordon, D., Bisk, Y., Han, W., Mottaghi,
+R., Zettlemoyer, L., Fox, D., 2020.
+ALFRED: A benchmark for
+interpreting grounded instructions for everyday tasks, in: CVPR, pp.
+10737–10746. doi:10.1109/CVPR42600.2020.01075.
+[53] Song, X., Chen, W., Liu, Y., Chen, W., Li, G., Lin, L., 2025. Towards
+long-horizon vision-language navigation: Platform, benchmark and
+method, in: CVPR.
+URL: https://cvpr.thecvf.com/virtual/2025/
+poster/33993.
+[54] Su, Y., Collier, N., 2023. Contrastive search is what you need for
+neural text generation. Transactions on Machine Learning Research .
+[55] Tan, H., Yu, L., Bansal, M., 2019. Learning to navigate unseen envi-
+ronments: Back translation with environmental dropout, in: NAACL-
+HLT, pp. 2610–2621. doi:10.18653/v1/n19-1268.
+[56] Thomason, J., Murray, M., Cakmak, M., Zettlemoyer, L., 2019.
+Vision-and-dialog navigation, in: CoRL, pp. 394–406. URL: http:
+//proceedings.mlr.press/v100/thomason20a.html.
+[57] Vedantam, R., Zitnick, C.L., Parikh, D., 2015.
+Cider: Consensus-
+based image description evaluation, in: CVPR, pp. 4566–4575.
+doi:10.1109/CVPR.2015.7299087.
+[58] Vinyals, O., Toshev, A., Bengio, S., Erhan, D., 2015.
+Show and
+tell: A neural image caption generator, in: CVPR, pp. 3156–3164.
+doi:10.1109/CVPR.2015.7298935.
+[59] Wang, H., Liang, W., Shen, J., Gool, L.V., Wang, W., 2022a. Coun-
+terfactual cycle-consistent learning for instruction following and gen-
+eration in vision-language navigation, in: CVPR, pp. 15450–15460.
+doi:10.1109/CVPR52688.2022.01503.
+[60] Wang, H., Wu, Q., Shen, C., 2020. Soft expert reward learning for
+vision-and-language navigation, in: ECCV, pp. 126–141.
+doi:10.
+1007/978-3-030-58545-7\_8.
+[61] Wang, J., Yang, Z., Hu, X., Li, L., Lin, K., Gan, Z., Liu, Z., Liu, C.,
+Wang, L., 2022b. GIT: A generative image-to-text transformer for
+vision and language. Transactions on Machine Learning Research
+2022. URL: https://openreview.net/forum?id=b4tMhpN0JC.
+[62] Wang, L., Liu, C., He, Z., Li, S., Yan, Q., Chen, H., Chen, Q.,
+2024. PASTS: progress-aware spatio-temporal transformer speaker
+for vision-and-language navigation.
+Eng. Appl. Artif. Intell. 128,
+107487. doi:10.1016/J.ENGAPPAI.2023.107487.
+[63] Wang, P., Yang, A., Men, R., Lin, J., Bai, S., Li, Z., Ma, J., Zhou, C.,
+Zhou, J., Yang, H., 2022c. OFA: unifying architectures, tasks, and
+modalities through a simple sequence-to-sequence learning frame-
+work, in: ICML, pp. 23318–23340. URL: https://proceedings.mlr.
+press/v162/wang22al.html.
+[64] Wang, S., Montgomery, C., Orbay, J., Birodkar, V., Faust, A., Gur, I.,
+Jaques, N., Waters, A., Baldridge, J., Anderson, P., 2022d. Less is
+more: Generating grounded navigation instructions from landmarks,
+in: CVPR, pp. 15407–15417. doi:10.1109/CVPR52688.2022.01499.
+[65] Wang, X., Huang, Q., Celikyilmaz, A., Gao, J., Shen, D., Wang, Y.,
+Wang, W.Y., Zhang, L., 2019. Reinforced cross-modal matching and
+self-supervised imitation learning for vision-language navigation, in:
+CVPR, pp. 6629–6638. doi:10.1109/CVPR.2019.00679.
+[66] Wang, X., Wang, W., Shao, J., Yang, Y., 2023. LANA: A language-
+capable navigator for instruction following and generation, in: CVPR,
+IEEE. pp. 19048–19058. URL: https://doi.org/10.1109/CVPR52729.
+2023.01826, doi:10.1109/CVPR52729.2023.01826.
+[67] Xu, K., Ba, J., Kiros, R., Cho, K., Courville, A.C., Salakhutdinov, R.,
+Zemel, R.S., Bengio, Y., 2015. Show, attend and tell: Neural image
+: Preprint submitted to Elsevier
+Page 14 of 15
+
+
+===== PDF PAGE 15 =====
+caption generation with visual attention, in: ICML, pp. 2048–2057.
+URL: http://proceedings.mlr.press/v37/xuc15.html.
+[68] Zhou, L., Palangi, H., Zhang, L., Hu, H., Corso, J.J., Gao, J., 2020.
+Unified vision-language pre-training for image captioning and VQA,
+in: AAAI, pp. 13041–13049. doi:10.1609/AAAI.V34I07.7005.
+[69] Zhu, F., Zhu, Y., Chang, X., Liang, X., 2020a.
+Vision-language
+navigation with self-supervised auxiliary reasoning tasks, in: CVPR,
+pp. 10009–10019. doi:10.1109/CVPR42600.2020.01003.
+[70] Zhu, W., Hu, H., Chen, J., Deng, Z., Jain, V., Ie, E., Sha, F., 2020b.
+Babywalk: Going farther in vision-and-language navigation by taking
+baby steps, in: ACL, pp. 2539–2556. doi:10.18653/v1/2020.acl-main.
+229.
+: Preprint submitted to Elsevier
+Page 15 of 15

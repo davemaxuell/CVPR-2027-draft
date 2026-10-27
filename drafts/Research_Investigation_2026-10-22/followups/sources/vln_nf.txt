@@ -1,0 +1,955 @@
+=== PDF PAGE 1 ===
+     VLN-NF: Feasibility-Aware Vision-and-Language Navigation with
+                         False-Premise Instructions
+
+    Hung-Ting Su1*†‡   Ting-Jun Wang1‡   Jia-Fong Yeh1  Min Sun2   Winston H. Hsu1
+
+                  1National Taiwan University   2National Tsing Hua University
+                            https://vln-nf.github.io/
+
+
+                   Abstract                       often make mistakes when instructing robots. For
+                                                   example, a user may say “pick up the plate on the
+        Conventional Vision-and-Language Navigation                                                           table in the kitchen" when the plate is actually else-
+      (VLN) benchmarks assume instructions are                                               where (e.g., in the lounge or even in the car). A         feasible and the referenced target exists, leav-
+                                                        cognitive science study (Wang et al., 2002) found        ing agents ill-equipped to handle false-premise
+         goals.  We introduce VLN-NF, a bench-        that humans mislocate an item roughly once in ev-
+       mark with false-premise instructions where       ery seven object-location recall trials. Such instruc-
+         the target is absent from the specified room        tions are semantically well-formed but factually
+       and agents must navigate, gather evidence        incorrect, and they can cause agents to hallucinate
+        through in-room exploration, and explicitly                                                            similar objects or search indefinitely. Therefore, an
+        output NOT-FOUND. VLN-NF is constructed                                                      agent must be able to explore and explicitly report
+         via a scalable pipeline that rewrites VLN in-
+                                            when the target cannot be found, rather than simply         structions using an LLM and verifies target ab-
+                                                 assuming success and exploiting task priors.        sence with a VLM, producing plausible yet
+         factually incorrect goals. We further propose         Related efforts study instruction unreliability
+      REV-SPL to jointly evaluate room reaching,       across embodied settings, including feasibility
+         exploration coverage, and decision correctness.       in 2D interfaces (Burns et al., 2022), stepwise
+       To address this challenge, we present ROAM,    VLN  instruction  errors  (Taioli  et  al.,  2024),
+        a two-stage hybrid that combines supervised                                                      obstruction-induced    instruction–environment
+        room-level navigation with LLM/VLM-driven                                               mismatch  (Hong  et   al.,  2024),  and  false-        in-room exploration guided by a free-space
+                                                        premise/abstention/hallucination  in  embodied         clearance prior. ROAM achieves the best REV-
+      SPL among compared methods, while base-    QA or VLA (Wu  et  al., 2024, 2025; Hsieh
+          lines often under-explore and terminate prema-        et  al., 2025; Chakraborty  et  al., 2025).   Yet
+         turely under unreliable instructions.               evidence-grounded NOT-FOUND for 3D partially
+                                                      observable VLN—where absence must be justified
+   1  Introduction                               through autonomous exploration—is still largely
+                                                     unaddressed. To this end, we introduce VLN-Not   Language provides a flexible interface for specify-
+                                           Found (VLN-NF), a new VLN task that evaluates    ing goals to situated agents in the physical world.
+                                                         agents’ ability to handle false-premise instructions    Vision-and-Language Navigation (VLN) is a cru-
+                                                           referring to non-existent targets. We focus on     cial robotic task studying language grounding and
+                                                               this setting as a controlled but practical form of    path planning under partial observability. Existing
+                                                          goal-level false premise, where absence must  VLN datasets (Anderson et al., 2018b; Ku et al.,
+                                                be established through exploration under partial    2020; Qi et al., 2020; Thomason et al., 2020) and
+                                                         observability rather than inferred from a single    supervised agents (Pashevich et al., 2021; Chen
+                                                        observation. In VLN-NF, the agent must predict     et al., 2021, 2022) or agents based on LLM built on
+                                               NOT-FOUND when the target object is absent from   them (Zhou et al., 2024b,a; Chen et al., 2024; Lin
+                                                        the region specified by the instruction, indicating     et al., 2025) typically assume that every instruction
+                                                             that the instruction  is  infeasible.   To enable     is feasible. In real deployments, however, humans
+                                                     low-cost construction, we develop a scalable
+        *This work was conducted at National Taiwan University.   pipeline that converts feasible VLN instances    The author is currently affiliated with DRIC.
+         †Project lead.                                        into  infeasible ones  via  instruction  rewriting
+        ‡Equal technical contribution.                      and automatic verification.  An LLM replaces
+                                           25134
+Proceedings of the 64th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers), pages 25134–25150
+                                  July 2-7, 2026 ©2026 Association for Computational Linguistics
+=== PDF PAGE 2 ===
+                                                                                                   cup: NOT FOUND
+  viewpoint                                        cup: FOUND                                         plate: NOT FOUND                                                  cup: FOUND
+                                                          plate: ?                                                                                                                          plate: NOT FOUND
+
+
+
+
+  viewpoint
+  (cup visible)
+
+
+
+   trajectory
+
+               DUET + VLN              DUET + VLN-NF (Ours)     ROAM (Ours) + VLN-NF (Ours)
+
+Figure 1: A toy illustration of failure modes under unreliable instructions. For compactness, we visualize two
+separate single-target queries in the same scene (cup: feasible; plate: infeasible/absent in the kitchen). Left: Stan-
+dard VLN (DUET+VLN) lacks an explicit NOT-FOUND output (hence “?” for plate). Middle: Adding NOT-FOUND
+to action space (DUET+VLN-NF) can lead to premature abstention. Right: Our proposed ROAM+VLN-NF
+performs evidence-gathering exploration and outputs the correct decisions.
+
+
+the original target with a plausible but absent    ing on reference exploration trajectories can in
+alternative to simulate false-premise instructions,    turn encourage premature abstention (Fig. 1, mid-
+and a VLM verifies the target’s absence.  This    dle). This arises because exploration is underdeter-
+yields  linguistically  natural  instructions  with   mined—many trajectories can be reasonable and
+factually incorrect target descriptions.  Human    there is no explicit “search finished” signal—so
+evaluation on a subset confirms high quality, with    imitation-learned VLN agents can suffer covariate
+<2% errors.                                               shift (Kamath et al., 2023; Seo et al., 2024) and
+  Unlike conventional VLN, where success is de-   compounding errors (Zhang et al., 2024a), which
+fined by reaching a single goal and efficiency is    often manifest as unreliable stopping behavior (Xi-
+measured against a shortest path, VLN-NF re-   ang et al., 2020). In VLN-NF, this can surface as
+quires evidence-gathering exploration under par-   premature NOT-FOUND predictions that are not sup-
+tial observability: the absence of a target cannot    ported by sufficient evidence (Chakraborty et al.,
+be confirmed from a single viewpoint.  Naively   2025; Wu et al., 2025). Moreover, purely super-
+reusing standard VLN metrics encourages degen-   vised approaches typically require costly trajectory-
+erate behaviors (e.g., stopping early or predicting    level annotations (especially for exploration), while
+NOT-FOUND without sufficient search). To enable   LLM-based agents often struggle with room-to-
+principled comparison, we refine SPL and propose   room navigation under partial observability with-
+Reach–Explore–Verify SPL (REV-SPL). REV-   out stepwise guidance. To tackle this challenge,
+SPL (1) defines a reference exploration protocol   we propose a two-stage hybrid framework, Room-
+that specifies where an agent should reasonably   Object Aware Movement (ROAM; Fig. 1, right),
+search given the instruction (e.g., local exploration   which combines supervised room localization with
+when landmark cues exist and a broader room   LLM/VLM-driven in-room exploration and ver-
+sweep otherwise), and uses the resulting reference    ification. ROAM first localizes the target room
+length to normalize exploration efficiency; (2) eval-   using a weakly supervised model, then evidence-
+uates decision quality on mixed feasible/infeasible    gathering explores the room and decides whether
+episodes, capturing the trade-off between abstain-   the target object is present or should be reported as
+ing when appropriate and avoiding false alarms;   NOT-FOUND.
+and (3) discourages premature termination by re-
+warding coverage of the target room and penaliz-
+ing unsupported NOT-FOUND. Together, this design      Experimental results show that existing VLN
+extends SPL from shortest-path goal reaching to    agents struggle on VLN-NF: a supervised baseline
+evidence-grounded verification under partial ob-   (Chen et al., 2022) achieves 4.2 REV-SPL, while
+servability.                                LLM-based agents (Zhou et al., 2024b; Georgiev
+   Standard VLN benchmarks and agents typically    et al., 2024) reach only 1.0 and 1.5 REV-SPL. In
+assume feasibility and do not expose an explicit    contrast, ROAM attains 6.1 REV-SPL, improving
+NOT-FOUND decision (Fig. 1, left). Naively adding    over the supervised baseline by 45% while requir-
+a NOT-FOUND action and training via imitation learn-   ing only room-level annotations.
+                                        25135
+=== PDF PAGE 3 ===
+Contributions.   1. Task, dataset, and construc-   2023a), or enabling controllable instruction gener-
+tion.  We introduce VLN-Not Found (VLN-   ation (Kong et al., 2024). These methods largely
+NF), a VLN benchmark of false-premise instruc-   assume that a valid goal exists and use rewriting
+tions requiring evidence-gathering exploration and    to make instructions easier to follow. In contrast,
+NOT-FOUND, built via an LLM rewrite + VLM ab-   our pipeline rewrites feasible instances into false-
+sence verification pipeline with <2% human-judged    premise (infeasible) ones and automatically verifies
+errors. 2. Evaluation. We propose REV-SPL, a    target absence, enabling systematic evaluation of
+variant of SPL that uses a reference exploration   NOT-FOUND decision-making.
+protocol and decision-quality metrics to discourage
+                                                   Instruction unreliability in VLN. Prior workpremature stopping and unsupported NOT-FOUND.
+                                                has examined how corrupted or imperfect instruc-
+3. Method. We present ROAM, a two-stage hy-                                                         tions affect VLN agents. Hahn et al. (2023) perturb
+brid that localizes the target room with supervi-
+                                                      instruction tokens (e.g., directions, nouns, num-
+sion and then performs VLM/LLM-driven in-room
+                                                       bers) to analyze sensitivity, highlighting the impor-
+exploration and verification. 4. Results. ROAM                                                    tance of object nouns. Mind the Error (Taioli et al.,
+achieves 6.1 REV-SPL, outperforming a supervised                                               2024) modifies VLN-CE instructions (Krantz et al.,
+baseline by 45% while requiring only room-level                                              2020) and studies detection/correction of stepwise
+annotations.
+                                                      instruction errors, where the high-level goal re-
+                                            mains valid but intermediate guidance is flawed.
+2  Related Work                                         Our setting differs in that the instruction can be
+                                                  semantically well-formed yet factually incorrectVision-and-Language Navigation. VLN studies
+                                                           at the goal level (false premise), so the correct be-how an embodied agent follows natural-language
+                                                    havior is to gather evidence and output NOT-FOUNDinstructions to navigate in partially observed 3D en-
+                                        when appropriate.vironments. Benchmarks such as R2R (Anderson
+et al., 2018b), RxR (Ku et al., 2020), REVERIE (Qi       Infeasibility, mismatch, and abstention across
+et al., 2020), and CVDN (Thomason et al., 2020)   embodied tasks. MoTIF (Burns et al., 2022) intro-
+(built on Matterport3D (Chang et al., 2017)) have   duces unknown command feasibility with follow-
+driven rapid progress, but they typically assume   up questions, but operates in a mobile-app set-
+that the instruction is feasible and do not require    ting where the agent has a fully observable 2D
+agents to explicitly report failure. A related chal-   screen and access to a complete human explo-
+lenge is reliable exploration and termination under    ration trace. R2R-UNO (Hong et al., 2024) creates
+partial observability: exploration is often under-   instruction–environment mismatch via unexpected
+determined and stopping decisions can be brittle,    obstructions, focusing on navigability changes
+especially under imitation learning due to covariate    rather than semantic goal absence. CARe (Ko
+shift and compounding errors (Kamath et al., 2023;    et al., 2024) revises object-navigation decisions
+Seo et al., 2024; Zhang et al., 2024a; Xiang et al.,   when pre-explored semantic maps are inaccurate
+2020). VLN-NF targets this reliability axis by re-   using uncertainty estimation and multi-view consis-
+quiring evidence-grounded NOT-FOUND in addition    tency. Concurrent with our work, ADAPT (Chen
+to navigation.                                            et al., 2026) also studies infeasibility during nav-
+ VLN agents and instruction augmentation.    igation, but focuses more on resource-level affor-
+VLN approaches span memory-centric models (Pa-   dance failures (e.g., unavailable ovens) than on
+shevich et  al., 2021; Chen et  al., 2021), map-   evidence-grounded absence verification. Beyond
+based/topological methods (Chen et  al., 2022;    navigation, recent work studies false-premise han-
+Wang et al., 2023b; Georgakis et al., 2022), and    dling in VLA manipulation (Hsieh et al., 2025)
+LLM-based planners or copilots (Zhou et  al.,   and abstention or hallucinations under instruction–
+2024b,a; Pan  et  al., 2023; Qiao  et  al., 2024;    visual inconsistencies in embodied QA and em-
+Long et al., 2024; Chen et al., 2024; Lin et al.,   bodied agents (Wu et al., 2024, 2025; Chakraborty
+2025). Several works further improve navigation    et al., 2025). VLN-NF complements these lines
+by rewriting or generating auxiliary guidance, e.g.,   by instantiating goal-level false premises in 3D
+disambiguating landmarks (Zhang et al., 2024b;    partially observable VLN, where absence must
+Zhang and Kordjamshidi, 2023), jointly learning   be justified through autonomous exploration
+instruction following and generation (Wang et al.,   and explicit NOT-FOUND.
+                                       25136
+=== PDF PAGE 4 ===
+  Split        #Scans   #Pairs   #Instr.  #FOUND   #NF     are shown in Table 1.
+  Train           55   2,362   4,724    2,362  2,362
+  Val-seen        38    234    468     234    234
+  Val-unseen      10    718   1,436     718    718     3.1  Task Definition
+                                 VLN-NF extends REVERIE-style VLN (Qi et al.,
+Table 1: VLN-NF statistics. We use scan to de-
+                                             2020) with a NOT-FOUND option. An agent fol-note a Matterport3D building (scan ID). Each pair
+consists of one original REVERIE instruction (FOUND,   lows an instruction X = ⟨w1, . . . , wL⟩to navi-
+feasible) and one generated VLN-NF instruction (NF,   gate a Matterport3D scan represented as a graph
+NOT-FOUND/infeasible), sharing the same scan, start   G = (V, E), where each node v ∈V is a navigableviewpoint, and target room. Val-seen scans are a subset    viewpoint with a panoramic RGB observation (dis-
+of the training scans.                                   cretized into n view images). At step t, the agent
+                                                         selects (i) a neighboring viewpoint to move to, (ii)
+                                 STOP and output a grounded target object as in3  The VLN-NF Dataset
+                                       REVERIE, or (iii) NOT-FOUND to abstain when the
+VLN-NF  builds on  the  Matterport3D  envi-    instruction is infeasible (i.e., the referenced target
+ronment  (Chang  et  al.,  2017)  and  extends   does not exist in the specified room). Thus, each
+REVERIE (Qi et al., 2020) with infeasible goal    episode requires both navigation to the target room
+descriptions. We adopt REVERIE as our base   and a final decision of FOUND vs. NOT-FOUND.
+benchmark because it emphasizes goal-driven nav-
+                                                    3.2  Dataset Constructionigation and remote object grounding: instructions
+typically specify the target (and its surrounding con-   Annotating exploration behavior is inherently chal-
+text) rather than prescribing a step-by-step route    lenging: exploration trajectories are typically long
+as in R2R (Anderson et al., 2018b) and related   (making dense annotation costly) and underdeter-
+datasets.  Importantly, our construction pipeline   mined—many distinct paths can be valid—unlike
+is modular and can be transferred to other VLN    traditional VLN exploitation, where shortest paths
+datasets in future work.                            provide a clear reference. To address this, we pro-
+                                               pose a scalable pipeline to augment existing VLN
+Dataset statistics and pairing.  Table 1 sum-    datasets by (1) rewriting each instruction to create
+marizes VLN-NF. We inherit REVERIE’s en-   a linguistically natural but infeasible counterpart,
+vironment, viewpoint graph, and official train/-   (2) constructing an exploration protocol that can
+val_seen/val_unseen splits (Qi et al., 2020) (Matter-   supervise imitation learning and serve as reference
+port3D scans (Chang et al., 2017)); we use scan to    labels for evaluation.
+denote a building and room to denote a segmented                                        As shown in Fig. 2, we generate an infeasi-
+region within a scan. Starting from REVERIE, we                                                    ble counterpart for each REVERIE instance via
+filter out instruction instances that are incompatible                                                a rewrite-and-verify loop1. Given                                                                                           instruction X                                                                                               2with VLN-NF, including:  (i) instructions with-                                                  with target object o, the Rewriter  proposes a plau-
+out a well-defined target room/object for reliable                                                        sible replacement o′ that is not in the target-room
+navigation and verification, (ii) cases where our
+                                                      object list A, and rewrites X into X ′ by substituting                                                      while enforcing commonsense plausibility.rewriting+verification pipeline cannot confidently   o→o′produce an absent-but-plausible replacement tar-                                         The Verifier then runs open-vocabulary detection
+get after resampling (e.g., the verifier repeatedly                                                 over all panoramas in the target room; if any view
+detects the substituted object), and (iii) episodes                                                      detects o′, we blacklist it and resample, otherwise
+where the target-room connectivity/visibility is in-
+                                    we accept X ′ as an NF instruction. A manual au-sufficient for our reference exploration protocol to                                                             dit on 5% of pairs yields < 2% errors3, indicating
+achieve the minimum object-coverage requirement                                                          that our rewriter-verifier pipeline reliably produces
+(used for filtering and evaluation). For each remain-                                                         truly infeasible (NF) targets in the specified room.
+ing REVERIE instruction instance, we construct
+a one-to-one VLN-NF counterpart by rewriting   Generating Reference Exploration Paths.  To
+the target object to a plausible but absent object    decide FOUND vs. NOT-FOUND, an agent must ex-
+and verifying its absence, yielding paired FOUND    plore the target room; however, exploration tra-
+(feasible)/NF (NOT-FOUND, infeasible) instructions                                                     1An example is provided in the Appendix.
+with identical navigation context (same scan, start       2Prompts are provided in the Appendix.
+viewpoint, and target room). The detailed statistics        3Details are provided in the Appendix.
+                                       25137
+=== PDF PAGE 5 ===
+  instruction: X with a target object o
+                                          LLM Rewriter         NF proposal: X’ with a target
+                                                                    Rewrite X to X’ with o' ∉ A         object o’
+ known in-room objects: A
+
+                        Update known in-room objects: A ← A ∪ {o'} and retry
+                                                                         yes (present)
+
+ Accept X’ as a new NF instruction                VLM Verifier
+                                        no (absent)    Check if o' in room views
+                                                                       room views
+
+Figure 2: We design a scalable pipeline to rewrite VLN instructions and generate NF (NOT-FOUND, infeasible) ones.
+An LLM-based rewriter uses commonsense priors to generate physically plausible instructions (e.g., water the plant
+underneath the window→clean the couch underneath the window), while a VLM-based verifier checks that the
+referenced target entity is absent from the scene, ensuring NF correctness (Sec. 3).
+
+Algorithm 1 Extract Reach Path                 Algorithm 3 Reference Exploration Path (Cover-
+ 1: original_final_vp                               age / No-Landmark)                 ←gt_path[−1]
+ 2: room_vps ←VPSINSAMEROOM(original_final_vp)         1:  vstart = endpoint of the reach path (room entry viewpoint)
+ 3: reach_path ←[ ]                                               2:     = all viewpoints in the target room                                                                     Vroom 4: for each vp in gt_path do                                      3:                                                    = set of all objects in the target room                                  O 5:     reach_path.append(vp)                                      =                                                                     4:                                                                      Oseen                                                             ∅                                                                 explore_path                                          = [vstart] 6:       if vp ∈room_vps then                                     5: 7:       break                                                  6: visited =                                                                                              {vstart} 8: return reach_path                                             7: while True                                                              do
+                                                                     8:      vcurr = explore_path[−1]
+                                                                     9:  N = unvisited neighbors of vcurr
+Algorithm 2 Reference Exploration Path (Local-    10:       if N = ∅then                                                              11:       breakized / Landmark-Cued)                                                              12:      vnext = arg max
+ 1: o: original target object (from REVERIE annotations)                                                              v∈N |OBJECTSVISIBLE(v) \ Oseen|
+                                                              13:     explore_path.append(vnext)
+ 2: Vvis(o): viewpoints in the target room that can see o         14:     visited.add(vnext) 3:  vstart: endpoint of the reach path (room entry viewpoint)
+                                                              15:     Oseen ←Oseen ∪OBJECTSVISIBLE(vnext)                                                              16:       if                then 4: cand_vps                                                            |Oseen|/|O| ≥1.0           ←Vvis(o)                                       17:       break
+ 5: explore_path ←BRUTEFORCETSP(vstart, cand_vps)        18:  if      < 0.85 then 6: return explore_path                                              |Oseen|/|O|                                                              19:    discard the instruction-path pair
+                                                              20: else
+                                                              21:    return explore_path
+jectories are long and underdetermined, making
+dense human annotation costly. We therefore de-
+fine a reference exploration protocol (used for   served or no unvisited neighbors remain (Alg. 3).
+training/evaluation only; not exposed to the agent)    If the final object coverage is below 85%, we dis-
+with two cases. (1) Localized / landmark-cued    card the instance. Across retained subsets induced
+search. When the instruction provides strong spa-   by stricter minimum reference-coverage thresh-
+tial cues (e.g., “beside the chair”), the plausible    olds (0.85/0.90/0.95), method ranking remains un-
+search region is localized. Since our NF instruc-   changed; we report the full sensitivity analysis in
+tion is created by replacing the target object while    the appendix.
+keeping the surrounding description unchanged,
+we approximate this region by the viewpoints in                                                    3.3  Evaluation Metrics
+the target room that can see the original target
+object o.  The candidate set is small (typically   Exploration under partial observability is under-
+N ≤15), so we compute a shortest visit order   determined and long-horizon, so metrics muststarting from the room entry viewpoint using an   avoid rewarding premature “I’m done” decisions.
+exhaustive TSP solver (Alg. 2).  (2) Coverage /    In VLN-NF, an agent must (i) reach the target
+no-landmark search. Without such cues, we use a   room and (ii) make a final decision of FOUND vs.
+greedy explorer that repeatedly moves to the neigh-   NOT-FOUND. We report a primary composite metric
+boring viewpoint that reveals the most new room   (REV-SPL) together with a small set of decom-
+objects , stopping when all room objects are ob-   posed diagnostics for interpretability.
+                                       25138
+=== PDF PAGE 6 ===
+Success Rates.  Reach SR is the fraction of    inter-room navigation but often under-explore once
+episodes where the agent visits at least one view-   inside the target room, since exploration is under-
+point inside the target room. Reach&Decision SR   determined and lacks an explicit “search finished”
+counts episodes where the agent both reaches the    signal.  In contrast, LLM-based policies (Zhou
+correct room and makes the correct final decision.    et al., 2024b) can leverage commonsense priors
+                                                        to guide in-room search given context, but they of-
+Path-length Efficiency.  Following SPL (Ander-                                                    ten struggle with floorplan-level navigation under
+son et al., 2018a), Reach SPL evaluates efficiency                                                          partial observability.  Motivated by these obser-
+of reaching the target room using the reference                                                      vations, we propose Room-Object Aware Move-
+reach path length lreach,i:                                           ment (ROAM, Fig. 3), a hybrid framework with a
+            N                          Room-Level Navigator (Sec. 4.1) for robust room     X            1                            lreach,iReach SPL =                                        localization and an In-room Explorer (Sec. 4.2)       N      Sreach,i· max(preach,i, lreach,i).                 i=1                                 for evidence-gathering search. To compensate for
+                                                 (1)   LLMs’ weak geometric intuition, we further add a
+                                                   plug-and-play Free-space Raycasting EstimationREV-SPL (Reach–Explore–Verify SPL).  Our
+                                          Engine (FREE) that provides a free-space clear-primary metric REV-SPL extends SPL to cap-
+                                              ance signal (Sec. 4.3) to steer exploration towardture  (i) reaching the target room,  (ii) correct
+                                                        larger unsearched regions with semantic context.FOUND/NOT-FOUND decision, and (iii) sufficient in-
+room exploration. Let Sri ∈{0, 1} indicate whether    4.1  Room-Level Navigator
+the agent reaches the target room, and let Sdi ∈
+{0, 1} indicate whether it makes the correct final  We model each environment as a navigation graph
+decision. We define object coverage Ci       1]  G =  (V, E), where each node v          is a       S                                  ∈[0,                                     ∈V                  OBJECTSVISIBLE(v)                                                                                    v)                                             panoramic viewpoint and each edge (u,             v∈Pias Ci =                                   , where Pi is the                     ∈E
+                        |Oi|                            denotes a traversable transition. Let r(v) be theagent’s in-room trajectory and Oi is the set of an-                                         room label associated with viewpoint v, and let r⋆
+notated object instances in the target room. Let ℓi                                              be the target room parsed from the instruction. We
+and pi denote the reference and actual exploration                                                    define the target-room subgraph as R =lengths, respectively.                                                            {v ∈V  |
+                                                 r(v) =  We compute                                             r⋆}.
+                                              Given an episode starting at vstart, we define an
+      X               1                      ℓi             entry viewpoint
+ REV−SPL = N    Sri Sdi Ci max(pi, ℓi)
+                                  i                         (2)                                                               vroom = arg min dG(vstart, v),        (3)                               pi               min  1,        .                                 v∈R                             ·           ℓi
+                                           where dG(·, ·) is the shortest-path distance on G.  We additionally report Coverage and average                                                This reduces the original reach-and-explore task
+path lengths as diagnostics.                                                      to a room-reaching problem: navigate from vstart
+                                                      to vroom. In our experiments, we obtain the room-4 ROAM Framework                                                   entry target viewpoint from reach-to-room path
+VLN-NF evaluates evidence-grounded NOT-FOUND    prefixes (ending at room entry); more generally,
+under partial observability: the agent must reach    since this stage only requires room identity, it can
+the referenced room, search for the target, and out-   be trained from weak supervision that labels view-
+put FOUND or NOT-FOUND. This requires reliable    points with room IDs and synthesizes reach-to-
+room localization and coverage-aware in-room ex-   room paths (e.g., shortest paths to any viewpoint in
+ploration, declaring NOT-FOUND only after suffi-   the target room), without trajectory-level in-room
+cient search yields no evidence of the target. Note    exploration annotation. We adopt DUET (Chen
+that our goal here is not to formalize absence as a    et al., 2022) as the backbone, though any VLN pol-
+complete belief-theoretic inference problem, but to    icy capable of room-level navigation can be used.
+provide a tractable and reproducible operationaliza-   At inference, the navigator runs until the agent en-
+tion that can be benchmarked under realistic VLN    ters the target room (i.e., r(vt) = r⋆) or a step
+constraints. We observe that supervised VLN poli-   budget is reached, after which we hand off to the
+cies such as DUET (Chen et al., 2022) are strong at   in-room exploration stage.
+                                       25139
+=== PDF PAGE 7 ===
+ Instruction: Go to the study room and pick up the cup on the table      visited     candidate    unvisited
+             Room-Level Navigator                                 In-room Explorer
+
+                                                                      A studyroom corner with a table and chair.
+
+
+
+
+                                                                               2.5m
+                                                                                     A table beside a bookshelf
+                                                        FOUND
+
+                                                                                        1.7m
+                                                       NOT FOUND
+
+
+                                                                                     2.6m        A living-area view with a
+                                                                                                                                fireplace and mantel
+
+Figure 3: Overview of our two-stage framework, ROAM (Sec. 4). Left (Sec. 4.1): a room-level navigator trained
+with room labels only guides the agent to enter the target room. Right (Sec. 4.2): an LLM-based in-room explorer
+selects the next viewpoint using VLM captions as semantic context and a geometric coverage prior from FREE
+(Sec. 4.3) to favor headings that lead to larger unsearched regions.
+
+4.2  In-room Explorer                            4.3 FREE
+After entering the target room R, the In-room Ex-  When exploring, an agent benefits from both com-
+plorer4 searches for the target object o′ and decides   monsense priors (e.g., cups are likely on tables)
+whether to output FOUND or NOT-FOUND. At time   and geometric coverage cues (e.g., moving toward
+t, the agent is at viewpoint vt ∈R with a history   a large unsearched area is often informative). PriorHt (visited viewpoints and accumulated evidence),   work suggests that LLMs encode commonsense
+and has a set of reachable neighbors N(vt).        knowledge but can be unreliable at geometric/s-  We use a VLM stack to convert observations    patial reasoning (Comsa and Narayanan, 2023;
+into semantic context (scene captions and detected   Yan et al., 2023; Cheng et al., 2024; Yang et al.,
+objects), and an LLM to select actions in a closed    2024). To bridge this gap, we introduce a plug-and-
+loop. The action space is                           play Free-space Raycasting Estimation Engine
+                                          (FREE), which provides a free-space clearance
+                                                      signal to guide exploration.
+At = {move(v) | v ∈N(vt)}∪{FOUND, NOT-FOUND}.                                                 (4)     Given the current observation at vt, FREE es-
+Let D(v, o′)      1] denote the confidence from an    timates, for each candidate heading θk, a clear-          ∈[0,open-vocabulary detector for object o′ at viewpoint   ance distance dfree(θk) indicating how far the
+v (Grounding-DINO (Liu et al., 2024) in our imple-   agent can move before encountering an obstacle
+mentation). In addition, for each candidate move    (Fig. 4).  Concretely, we segment navigable re-
+v ∈N(vt), we compute a free-space clearance cue    gions (Grounded-SAM (Ren et al., 2024) in ourdfree(vt      using FREE (Sec. 4.3).                experiments) and back-project the mask into 3D to     →v)                                              perform raycasting. We then map each candidate  The  explorer  terminates  with  FOUND   if
+                                       move v           to its heading θ(v) and attachD(vt, o′)      at any step; otherwise, it continues        ∈N(vt)     ≥τexploring         and may output NOT-FOUND only when    dfree(θ(v)) to the planner prompt as a geometric
+                                                           prior, encouraging actions that lead to larger un-an evidence-backed stopping criterion is satisfied
+                                                 searched regions.or a hard constraint is met (e.g., frontier exhaustion
+or a fixed exploration budget). We implement the
+                                       5  Experimentsexplorer by augmenting NavGPT (Zhou et  al.,
+2024b) with the FREE clearance cue, where    5.1  Baseline Methods
+NavGPT tokenizes observations via captioning
+                                 We adapt several representative VLN baselines toand open-vocabulary detection and uses an LLM
+                                                  our dataset VLN-NF. DUET (Chen et al., 2022) isto reason over accumulated evidence and decide
+                                                 extended by adding an additional NOT-FOUND classwhether to continue or terminate.
+                                                      in its decision head to support abstention on in-
+   4Prompts are provided in the Appendix.                  feasible episodes. NavGPT (Zhou et al., 2024b)
+                                       25140
+=== PDF PAGE 8 ===
+ Setting       Method                Coverage  Len (reach)  Len (explore)  Reach SR  Reach&Decision SR  Reach SPL  REV-SPL
+ supervised   DUET                  69.5%         13.1             7.8   53.8%         33.8%         37.0%      4.2%
+ unsupervised  NavGPT                59.1%         10.6             2.7    8.2%          5.4%          7.0%      1.0%
+ unsupervised  MapGPT                63.3%         13.3             3.5   30.0%         14.0%         18.2%      3.2%
+ unsupervised  SoM-Gemini-2.0-Flash     80.9%         10.0           14.2   39.4%         22.0%         28.9%      1.5%
+ hybrid     ROAM (Ours)-GPT-3.5    82.1%         11.2             9.9   58.6%         37.6%         44.1%     6.1%
+ hybrid     ROAM (Ours)-GPT-4o     82.8%         12.8           22.0   62.6%         41.4%         45.4%      5.6%
+
+Table 2: Comparison with baselines on VLN-NF val_unseen. We report our primary metric REV-SPL (Eq. 2),
+together with decomposed diagnostics, Reach SR, Reach&Decision SR, and Reach SPL. (Sec. 5.2)
+
+
+                                                          target: the cup on the table            dicating that reaching the target room does not
+                                                view                                                                1: d_free:                                                        2.5m
+                                       A studyroom                                                               corner                                                                    with a table and       guarantee evidence-gathering verification.   (2)
+                                                               chair.             LLM/VLM baselines are unreliable under par-
+                       view 2
+                     1.7m                        view 2: d_free: 1.7m                                       A table beside a bookshelf              tial observability. NavGPT rarely reaches the tar-
+
+         view            1                   view                                   3              view                                                                3: d_free:                                                        2.6m                                                    get room (Reach SR 8.2%) and yields 1.0 REV-        2.5m                               2.6m                                       A living-area                                                           view                                                                  with a fireplace and
+                                               mantel                  SPL; while SoM explores more (Coverage 80.9%,
+                                                 Len(explore) 14.2),  it  still falls short on joint
+Figure 4: FREE (Sec. 4.3) segments navigable floor                                                   reach+decision (Reach&Decision SR 22.0%, REV-regions from the current view using an open-vocabulary
+                                     SPL 1.5), showing that commonsense alone is in-visual model and uses depth-based raycasting to es-
+                                                         sufficient for robust long-horizon navigation andtimate a free-space clearance dfree for each candidate
+direction. The resulting clearance cues are appended to    stopping. MapGPT improves over other LLM-
+the LLM prompt to encourage coverage-oriented explo-   based baselines (REV-SPL 3.2 vs. 1.0 for NavGPT
+ration.                                       and 1.5 for SoM), indicating that stronger global
+                                                planning helps under false-premise instructions.
+                                            However, it still remains below DUET (4.2) andis modified to include an explicit NOT-FOUND ac-
+                                                  both ROAM variants (6.1/5.6), suggesting that map-tion in its action space/prompt, allowing the agent
+                                               guided planning alone is insufficient for evidence-to terminate with NOT-FOUND when appropriate.
+                                             grounded FOUND/NOT-FOUND decisions under par-MapGPT (Chen et al., 2024) is a map-guided
+                                                                  tial observability.  (3) ROAM closes both gaps.GPT-based VLN agent that constructs an online
+                                     By combining weakly supervised navigation withlinguistic topological map and performs adaptive
+                                        LLM/VLM-driven in-room search, ROAM sub-multi-step path planning. SoM-Gemini-2.0-Flash
+                                                          stantially improves both reaching and decisionfollows the Set-of-Marks prompting strategy (Yang
+                                                     quality (Reach SR 58.6/62.6%, Reach&Decisionet al., 2023) and uses Gemini-2.0-Flash as the multi-
+                                   SR 37.6/41.4%) and achieves the best REV-SPLmodal backbone, providing a captioning-free alter-
+                                                         (6.1/5.6), outperforming DUET by 45% while us-native to NavGPT’s captioning-then-LLM pipeline.
+                                                  ing only room-level supervision.  (4) REV-SPLConcretely, we overlay candidate viewpoints in
+                                               captures the efficiency–thoroughness trade-off.Matterport3D with red markers and numeric labels,
+                                    ROAM-GPT-4o attains higher Reach&Decisionand query Gemini to select the next action (nav-
+                                   SR than ROAM-GPT-3.5 (41.4% vs. 37.6%) butigate, stop/FOUND, or NOT-FOUND). We include it
+                                                  explores much longer (22.0 vs. 9.9), leading toas a planner/map-augmented baseline and adapt
+                                                        slightly lower REV-SPL (5.6 vs. 6.1), consistentit to VLN-NF by evaluating it under the same
+                                                with REV-SPL penalizing inefficient wanderingFOUND/NOT-FOUND decision protocol and evalua-
+                                                     despite correct decisions.tion pipeline as the other methods.
+
+5.2  Results                                  Ablation Study.  Table 3 demonstrates the ef-
+                                                    fectiveness of our two-stage hybrid frameworkAs shown in Table 2, ROAM achieves the best per-
+                                       and the FREE design.  Comparing (1) andformance among all compared baselines on VLN-
+                                                            (2), adding a room-level navigator trained withNF under our primary metric REV-SPL.
+                                         room labels only dramatically improves perfor-
+Findings.   (1) Room reaching vs. in-room veri-   mance (e.g., Reach SR 7.8%→59.4% and REV-
+fication. DUET achieves strong room-reaching   SPL 0.8%→5.6%), indicating that an LLM-only(Reach SR 53.8%, Reach SPL 37.0%) but at-    controller struggles with long-horizon room reach-
+tains only 69.5% coverage and 4.2 REV-SPL, in-   ing under partial observability.  Comparing (2)
+                                       25141
+=== PDF PAGE 9 ===
+ #      2        Stage  FREE                      Coverage                               Reach                              SR                            R&D SR  Reach                                                 SPL  REV-SPL
+   %       %  (1)                    75.7%                              7.8%                                       4.4%                                                6.7%                                                           0.8%               Error source                  Share
+   !       %  (2)                    79.2%                                        37.2%                                                           5.6%                            59.4%                                              44.2%                                                               Room-reaching failure           55.7%   !       !  (3)                              58.6%                                                 44.1%                    82.1%                                     37.6%                                                       6.1%
+                                                                     Perception/grounding uncertainty  31.0%
+                                                                        Exploration-control failure       13.3%
+Table 3: Ablation study of our ROAM framework using
+GPT-3.5 on the val_unseen split of VLN-NF.
+                                                     Table 5: Error-source decomposition of decision-level
+                                                                false NOT-FOUND predictions made by ROAM (GPT-3.5) #    2 Stage  FREE  Reach SR  Reach SPL  SR    SPL
+                                               on feasible (FOUND) episodes in VLN-NF val_unseen.  (1) %   %     8.1%      6.6%       9.2%   6.8%
+  (2) !   %     62.0%     48.1%      42.0%  23.7%
+  (3) !   !     64.0%     48.4%      45.2%  25.1%
+                                                      rewritten-and-verified infeasible counterparts, and
+ Table 4: ROAM (GPT-3.5) on REVERIE val_unseen.    propose REV-SPL to evaluate reaching, decision
+                                                        correctness, and evidence-gathering exploration ef-
+                                                         ficiency. We further present ROAM, a two-stageand (3), FREE further increases evidence cov-
+                                                 hybrid that combines room-level supervision for
+erage (79.2%→82.1%) and improves REV-SPL    robust room localization with VLM/LLM-driven in-
+(5.6%→6.1%), validating that geometric clearance   room exploration and verification, augmented by acues complement caption-based commonsense by
+                                                      free-space clearance cue (FREE). Across baselines,steering exploration toward larger unsearched re-
+                              ROAM achieves the best performance on VLN-NFgions, while leaving reaching performance essen-
+                                                        (6.1 REV-SPL), improving over a strong supervisedtially unchanged.
+                                                  agent by 45% while requiring only room-level an-
+Transfer to standard feasible VLN.  (Table 4)    notations. We view ROAM as a structured first step
+shows that ROAM also enhances VLN perfor-   toward evidence-grounded abstention in 3D VLN
+mance on REVERIE val_unseen. Removing   under partial observability, while more principled
+the room-level navigator again leads to very poor   absence reasoning and broader recovery behaviors
+navigation (Reach SR 8.1%, SPL 6.8%), while   remain important future directions.
+the two-stage design substantially improves both
+reaching and task success (Reach SR 62.0%, SPL   Limitations
+23.7%). Importantly, FREE remains beneficial                                         Our study has several limitations that point to di-
+even in the feasible-only setting, improving SR                                                       rections for future work.
+(42.0%→45.2%) and SPL (23.7%→25.1%), sug-
+gesting that FREE-style coverage cues help the   Data coverage and filtering.  The experiments in
+LLM planner choose more informative viewpoints    this paper are based on REVERIE, which we adapt
+without hurting conventional VLN performance.      to the VLN-NF setting. To ensure reliable verifi-
+                                                     cation and stable reference-exploration generation,
+False NOT-FOUND on  feasible  episodes.  As                                      we apply strict filtering and currently retain 45% of
+shown in Table 5, on VLN-NF val_unseen, we                                    REVERIE episodes. This trades raw coverage for
+further audit decision-level false NOT-FOUND pre-                                                    higher confidence in NF correctness and evaluation
+dictions made by ROAM (GPT-3.5) on FOUND                                                              stability. Importantly, this filtering is intended as
+episodes.  Most such errors are classic room-                                                a quality-control gate for evaluability rather than
+reaching failures (55.7%), while the remainder                                                a mechanism to skew the benchmark distribution.
+are dominated by perception/grounding uncertainty                                        As shown in Appendix, the filtering-only subset in-
+(31.0%) and a smaller exploration-control compo-                                                duces only very small language/object distribution
+nent (13.3%), suggesting that enabling NOT-FOUND                                                              shift relative to full REVERIE, while the additional
+mainly amplifies calibration and verification chal-                                                              shift in final VLN-NF is modest and expected from
+lenges rather than introducing a fundamentally new                                                        substituting absent-but-plausible targets.
+failure mode.
+                                                Evaluation of path quality.  While we con-
+                                                  ducted human evaluation on a sampled subset of the6  Conclusion
+                                 VLN-NF dataset to confirm that the automatically
+We study evidence-grounded NOT-FOUND for 3D    labeled NOT-FOUND targets are accurate—achieving
+VLN under unreliable (false-premise) instructions.   approximately 98% correctness—we did not per-
+We introduce VLN-NF, constructed by pairing   form a formal assessment of the quality or natu-
+feasible REVERIE episodes with automatically    ralness of the generated paths themselves. This
+                                       25142
+=== PDF PAGE 10 ===
+omission may leave potential gaps in evaluating      Jana Kosecka, Jitendra Malik, Roozbeh Mottaghi,
+whether the paths are contextually and semantically      Manolis Savva, and 1 others. 2018a. On evalua-
+                                                               tion of embodied navigation agents. arXiv preprintappropriate.                                                        arXiv:1807.06757.
+  Grounding-confidence threshold sensitivity in
+ROAM. The performance of the ROAM frame-    Peter Anderson, Qi Wu, Damien Teney, Jake Bruce,
+                                              Mark Johnson, Niko Sünderhauf, Ian Reid, Stephenwork is sensitive to the object grounding model’s
+                                                     Gould, and Anton Van Den Hengel. 2018b. Vision-
+(e.g., Grounding-DINO) confidence  threshold.                                                      and-language  navigation:   Interpreting  visually-
+Since the NOT-FOUND signal in our system is trig-     grounded navigation instructions in real environ-
+gered based on whether any object surpasses the      ments. In Proceedings of the IEEE conference on
+detection threshold, this fixed threshold may lead      computer vision and pattern recognition, pages 3674–
+                                                       3683.
+to performance degradation when applied to envi-
+ronments that differ significantly from the original   Andrea Burns, Deniz Arsan, Sanjna Agrawal, Ranjitha
+training domain.                                   Kumar, Kate Saenko, and Bryan A. Plummer. 2022.
+                                  A dataset for interactive vision-language navigation
+Scope of false-premise types.  VLN-NF cur-      with unknown command feasibility. In Computer
+                                                             Vision – ECCV 2022 - 17th European Conference, Telrently instantiates a focused form of goal-level                                                                  Aviv, Israel, October 23–27, 2022, Proceedings, Part
+false premise: the referenced target object is ab-                                                                 VIII, volume 13668 of Lecture Notes in Computer
+sent from the room specified by the instruction. We       Science, pages 312–328. Springer.
+choose this setting as a controlled but practical start-
+                                                      Trishna Chakraborty, Udita Ghosh, Xiaopan Zhang,
+ing point, since mis-specified object locations are                                                  Fahim Faisal Niloy, Yue Dong, Jiachen Li, Amit Roy-
+common in human instructions and, under partial      Chowdhury, and Chengyu Song. 2025. HEAL: An
+observability, absence cannot be verified from a sin-      empirical study on hallucinations in embodied agents
+gle viewpoint. Importantly, several broader false-      driven by large language models. In Findings of the
+                                                           Association for Computational Linguistics: EMNLPpremise variants reduce to the same core decision                                                       2025, pages 21226–21243, Suzhou, China. Associa-
+problem once conditioned on a described region;       tion for Computational Linguistics.
+for example, a target located in the wrong room
+                                                  Angel Chang, Angela Dai, Thomas Funkhouser, Maciejcorresponds to “absent in the specified room,” and                                                          Halber, Matthias Niessner, Manolis Savva, Shuran
+wrong attribute/object descriptions correspond to      Song, Andy Zeng, and Yinda Zhang. 2017. Matter-
+“absence of the described entity.” However, cases       port3d: Learning from rgb-d data in indoor environ-
+with multiple plausible referents or under-specified      ments. arXiv preprint arXiv:1709.06158.
+instructions may require clarification or interactive                                                                Jiaqi Chen, Bingqian Lin, Ran Xu, Zhenhua Chai, Xiao-
+recovery rather than pure absence verification. Ex-     dan Liang, and Kwan-Yee K. Wong. 2024. Mapgpt:
+tending VLN-NF to cover these broader variants      Map-guided prompting with adaptive path planning
+                                                                for vision-and-language navigation. In Proceedingsand richer recovery behaviors is an important di-
+                                                               of the 62nd Annual Meeting of the Association for
+rection for future work.                                                      Computational Linguistics.
+  Future Work: Recovery Policy.  Once the
+system identifies an instruction as leading to a    Pei-An Chen, Yong-Ching Liang, Jia-Fong Yeh, Hung-
+                                                     Ting Su, Yi-Ting Chen, Min Sun, and Winston Hsu.NOT-FOUND target, it currently terminates naviga-                                                        2026. Adapt: Benchmarking commonsense planning
+tion. However, in real-world scenarios, users may      under unspecified affordance constraints. Preprint,
+expect recovery behaviors, such as rephrasing the      arXiv:2604.14902.
+instruction, exploring alternative paths, or asking                                                   Shizhe Chen, Pierre-Louis Guhur, Cordelia Schmid,
+for clarification. Designing and integrating such                                                   and Ivan Laptev. 2021. History aware multimodal
+recovery strategies remains an open area for future       transformer for vision-and-language navigation. Ad-
+research.                                             vances in neural information processing systems,
+                                                      34:5834–5847.
+Acknowledgment  This work was supported in
+                                                    Shizhe Chen, Pierre-Louis Guhur, Makarand Tapaswi,part by National Science and Technology Council,                                                         Cordelia Schmid, and Ivan Laptev. 2022.  Think
+Taiwan, under Grant NSTC 113-2634-F-002-007.       global, act local: Dual-scale graph transformer for
+                                                         vision-and-language navigation. In Proceedings of
+                                                            the IEEE/CVF Conference on Computer Vision and
+References                                              Pattern Recognition, pages 16537–16547.
+Peter Anderson, Angel Chang, Devendra Singh Chaplot,   An-Chieh Cheng, Hongxu Yin, Yang Fu, Qiushan Guo,
+   Alexey Dosovitskiy, Saurabh Gupta, Vladlen Koltun,     Ruihan Yang, Jan Kautz, Xiaolong Wang, and Sifei
+                                        25143
+=== PDF PAGE 11 ===
+   Liu. 2024. Spatialrgpt: Grounded spatial reasoning    Jacob Krantz, Erik Wijmans, Arjun Majundar, Dhruv
+   in vision-language models. In Advances in Neural       Batra, and Stefan Lee. 2020. Beyond the nav-graph:
+  Information Processing Systems.                        Vision and language navigation in continuous envi-
+                                                       ronments.  In European Conference on Computer
+Iulia Comsa and Srini Narayanan. 2023. A benchmark       Vision (ECCV).
+   for reasoning with spatial prepositions. In Proceed-
+   ings of the 2023 Conference on Empirical Methods in    Alexander Ku, Peter Anderson, Roma Patel, Eugene
+  Natural Language Processing, pages 16328–16335,        Ie, and Jason Baldridge. 2020. Room-across-room:
+  Singapore. Association for Computational Linguis-      Multilingual vision-and-language navigation with
+   tics.                                               dense spatiotemporal grounding.  arXiv preprint
+                                                        arXiv:2010.07954.
+Georgios Georgakis, Karl Schmeckpeper, Karan Wan-
+  choo, Soham Dan, Eleni Miltsakaki, Dan Roth, and    Liunian Harold Li, Pengchuan Zhang, Haotian Zhang,
+  Kostas Daniilidis. 2022. Cross-modal map learning      Jianwei Yang, Chunyuan Li, Yiwu Zhong, Lijuan
+   for vision and language navigation. In Proceedings     Wang, Lu Yuan, Lei Zhang, Jenq-Neng Hwang, and 1
+   of the IEEE/CVF conference on computer vision and       others. 2022. Grounded language-image pre-training.
+   pattern recognition, pages 15460–15470.                 In Proceedings of the IEEE/CVF conference on com-
+                                                         puter vision and pattern recognition, pages 10965–
+Petko Georgiev, Ving Ian Lei, Ryan Burnell, Libin      10975.
+   Bai, Anmol Gulati, Garrett Tanzer, Damien Vincent,
+  Zhufeng Pan, Shibo Wang, Soroosh Mariooryad, and    Bingqian Lin, Yunshuang Nie, Ziming Wei, Jiaqi Chen,
+  1 others. 2024. Gemini 1.5: Unlocking multimodal      Shikui Ma, Jianhua Han, Hang Xu, Xiaojun Chang,
+  understanding across millions of tokens of context.     and Xiaodan Liang. 2025. Navcot: Boosting llm-
+  arXiv preprint arXiv:2403.05530.                      based vision-and-language navigation via learning
+                                                          disentangled reasoning. IEEE Transactions on Pat-
+Meera Hahn, Amit Raj, and James M. Rehg. 2023.       tern Analysis and Machine Intelligence.
+  Which way is ‘right’?: Uncovering limitations of
+  vision-and-language navigation models. In Proceed-    Shilong Liu, Zhaoyang Zeng, Tianhe Ren, Feng Li, Hao
+   ings of the International Conference on Autonomous      Zhang, Jie Yang, Qing Jiang, Chunyuan Li, Jianwei
+  Agents and Multiagent Systems (AAMAS), pages      Yang, Hang Su, and 1 others. 2024. Grounding dino:
+  2415–2417, Richland, SC.                           Marrying dino with grounded pre-training for open-
+                                                                 set object detection.  In European Conference on
+Haodong Hong, Sen Wang, Zi Huang, Qi Wu, and Jiajun                                                 Computer Vision, pages 38–55. Springer.
+   Liu. 2024. Navigating beyond instructions: Vision-
+  and-language navigation in obstructed environments.   Yuxing Long, Xiaoqi Li, Wenzhe Cai, and Hao Dong.
+   arXiv preprint arXiv:2407.21452. Accepted to ACM      2024. Discuss before moving: Visual language navi-
+  Multimedia (MM) 2024.                                 gation via multi-expert discussions. In Proceedings
+                                                              of the IEEE International Conference on Robotics
+Wen-Han Hsieh, Elvis Hsieh, Dantong Niu, Trevor Dar-                                                 and Automation (ICRA). IEEE.
+   rell, Roei Herzig, and David M. Chan. 2025. Do
+  what? teaching vision-language-action models to re-   OpenAI. 2023. Gpt-4 technical report. Accessed: 2025-
+   ject the impossible. In Findings of the Association       05-18.
+   for Computational Linguistics: EMNLP 2025, pages
+  11861–11869, Suzhou, China. Association for Com-   Bowen Pan, Rameswar Panda, SouYoung Jin, Rogerio
+   putational Linguistics.                                        Feris, Aude Oliva, Phillip Isola, and Yoon Kim. 2023.
+                                                    Langnav: Language as a perceptual representation
+Aishwarya Kamath, Peter Anderson, Su Wang, Jing Yu       for navigation. arXiv preprint arXiv:2310.07889.
+  Koh, Alexander Ku, Austin Waters, Yinfei Yang, Ja-
+  son Baldridge, and Zarana Parekh. 2023. A new    Alexander Pashevich, Cordelia Schmid, and Chen Sun.
+   path: Scaling vision-and-language navigation with      2021. Episodic transformer for vision-and-language
+   synthetic instructions and imitation learning. In Pro-       navigation. In Proceedings of the IEEE/CVF Interna-
+   ceedings of the IEEE/CVF Conference on Computer       tional Conference on Computer Vision, pages 15942–
+   Vision and Pattern Recognition (CVPR), pages 10813–     15952.
+  10823.
+                                                 Yuankai Qi, Qi Wu,  Peter Anderson, Xin Wang,
+Po-Chen Ko, Hung-Ting Su, CY Chen, Jia-Fong Yeh,      William Yang Wang, Chunhua Shen, and Anton
+  Min Sun, and Winston H. Hsu. 2024. Context-aware      van den Hengel. 2020. Reverie: Remote embodied
+   replanning with pre-explored semantic map for ob-      visual referring expression in real indoor environ-
+   ject navigation. In 8th Annual Conference on Robot      ments. In Proceedings of the IEEE/CVF Conference
+  Learning.                                       on Computer Vision and Pattern Recognition, pages
+                                                    9982–9991.
+Xianghao Kong, Jinyu Chen, Wenguan Wang, Hang
+  Su, Xiaolin Hu, Yi Yang, and Si Liu. 2024. Con-   Yanyuan Qiao, Qianyi Liu, Jiajun Liu, Jing Liu, and
+   trollable navigation instruction generation with chain     Qi Wu. 2024. Llm as copilot for coarse-grained
+   of thought prompting. In European Conference on       vision-and-language navigation. In European Confer-
+  Computer Vision, pages 37–54. Springer.                ence on Computer Vision, pages 459–476. Springer.
+                                       25144
+=== PDF PAGE 12 ===
+Tianhe Ren, Shilong Liu, Ailing Zeng, Jing Lin, Kun-    Jianwei Yang, Hao Zhang, Feng Li, Xueyan Zou, Chun-
+  chang Li, He Cao, Jiayu Chen, Xinyu Huang, Yukang      yuan Li, and Jianfeng Gao. 2023.  Set-of-mark
+  Chen, Feng Yan, and 1 others. 2024. Grounded sam:      prompting unleashes extraordinary visual grounding
+  Assembling open-world models for diverse visual       in gpt-4v. arXiv preprint arXiv:2310.11441.
+   tasks. arXiv preprint arXiv:2401.14159.
+                                                       Jihan Yang, Shusheng Yang, Anjali W. Gupta, Rilyn
+Seokin Seo, Byung-Jun Lee, Jongmin Lee, HyeongJoo      Han, Li Fei-Fei, and Saining Xie. 2024.  Think-
+  Hwang, Hongseok Yang, and Kee-Eung Kim. 2024.      ing in space: How multimodal large language mod-
+   Mitigating covariate shift in behavioral cloning via       els see, remember, and recall spaces.   Preprint,
+   robust stationary distribution correction.   In Ad-      arXiv:2412.14171.
+  vances in Neural Information Processing Systems,
+  volume 37.                                    Xiaoyu Zhang, Matthew Chang, Pranav Kumar, and
+                                                    Saurabh Gupta. 2024a.  Diffusion meets DAgger:
+Francesco Taioli, Stefano Rosa, Alberto Castellini,      Supercharging eye-in-hand imitation learning.  In
+  Lorenzo  Natale,  Alessio Del Bue,  Alessandro       Robotics: Science and Systems (RSS).
+   Farinelli, Marco Cristani, and Yiming Wang. 2024.
+  Mind the error!  detection and localization of in-   Yue Zhang, Quan Guo, and Parisa Kordjamshidi. 2024b.
+   struction errors in vision-and-language navigation.      Navhint: Vision and language navigation agent with
+   In 2024 IEEE/RSJ International Conference on In-      a hint generator. Association for Computational Lin-
+   telligent Robots and Systems (IROS), pages 12993–       guistics.
+  13000.
+                                             Yue Zhang and Parisa Kordjamshidi. 2023. Vln-trans:
+Jesse Thomason, Michael Murray, Maya Cakmak, and                                                           Translator for the vision and language navigation
+  Luke Zettlemoyer. 2020.  Vision-and-dialog navi-                                                             agent. arXiv preprint arXiv:2302.09230.
+   gation.  In Conference on Robot Learning, pages
+  394–406. PMLR.                               Gengze Zhou, Yicong Hong, Zun Wang, Xin Eric Wang,
+                                                  and Qi Wu. 2024a. Navgpt-2: Unleashing naviga-
+Hongbin Wang, Todd R Johnson, Jiajie Zhang, and Yue                                                                 tional reasoning capability for large vision-language
+  Wang. 2002. A study of object-location memory. In                                                      models. In European Conference on Computer Vi-
+  Proceedings of the Annual Meeting of the Cognitive                                                                sion, pages 260–278. Springer.
+  Science Society, volume 24.
+                                             Gengze Zhou, Yicong Hong, and Qi Wu. 2024b.Xiaohan Wang, Wenguan Wang,  Jiayi Shao, and                                                     Navgpt: Explicit reasoning in vision-and-language  Yi Yang. 2023a. Lana: A language-capable navigator                                                          navigation with large language models. In Proceed-   for instruction following and generation. In Proceed-                                                             ings of the AAAI Conference on Artificial Intelligence,   ings of the IEEE/CVF conference on computer vision                                                  volume 38, pages 7641–7649.  and pattern recognition, pages 19048–19058.
+Zihan Wang, Xiangyang Li, Jiahao Yang, Yeqi Liu, and  A  Appendix
+  Shuqiang Jiang. 2023b. Gridmm: Grid memory map
+   for vision-and-language navigation. In Proceedings   A.1  Implementation Details
+   of the IEEE/CVF International conference on com-
+                                              Dataset Generation Pipeline. We use Gemini   puter vision, pages 15625–15636.
+                                           1.5  Flash (Georgiev et al., 2024) as the land-
+Tao Wu, Chuhao Zhou, Yen Heng Wong, Lin Gu, and   mark extractor to classify instructions into two
+   Jianfei Yang. 2024. Noisyeqa: Benchmarking em-                                                      categories:  with landmark and without land-  bodied question answering against noisy queries.
+  arXiv preprint arXiv:2412.10726.                 mark. This classification allows us to apply dif-
+                                                      ferent exploration strategies accordingly. We use
+Tao Wu, Chuhao Zhou, Guangyu Zhao, Haozhi Cao,                                            gpt-3.5-turbo(OpenAI, 2023) as the Rewriter to  Yewen Pu, and Jianfei Yang. 2025. When robots
+                                                        revise REVERIE instructions by replacing the orig-  should say “i don’t know”: Benchmarking absten-
+   tion in embodied question answering. arXiv preprint    inal target object with a new object that does not
+  arXiv:2512.04597.                                    exist in the corresponding room. To ensure that
+                                                      the selected object is truly absent, we employ GLIPJiannan Xiang, Xin Wang, and William Yang Wang.
+  2020. Learning to stop: A simple yet effective ap-   SWIN-Large(Li et al., 2022) as the Verifier, using
+  proach to urban vision-language navigation. In Find-   a confidence threshold of 0.7.
+   ings of the Association for Computational Linguistics:    We provide below the prompt used for the
+  EMNLP 2020, pages 699–707, Online. Association                                                       rewriter(gpt-3.5-turbo):   for Computational Linguistics.
+He Yan, Xinyao Hu, Xiangpeng Wan, Chengyu Huang,              Listing 1: Prompt for the Rewriter
+  Kai Zou, and Shiqi Xu. 2023. Inherent limitations    You should find a new target object to
+   of gpt=4 regarding spatial information.  Preprint,       replace the old target_object and
+  arXiv:2312.03042.                                 return me a new instruction.
+                                       25145
+=== PDF PAGE 13 ===
+Notice: the new target object must doesn    ROAM Framework. In the Room-Object Ex-
+    ’t look like any objects(should be         tractor, we use Gemini 1.5 Flash (Georgiev et al.,
+    different type) in avoid_objects
+    list.                                         2024). We first fine-tune DUET(Chen et al., 2022)
+Sometimes , you should review your answer     (the REVERIE version with object bounding box
+     and change the verb to which is         information) on VLN-NF using only the reach    suitable for the new target objects.
+Important: you can only replace the           paths to obtain a Room Navigator. Notably, instead
+    target object and the verb about it.     of using SPL to select the best model, we use Reach
+                                                Success Rate (Reach SR) as the selection criterion.Example:
+inputs:                                          All other hyperparameters follow the default set-
+{                                                       tings of DUET. At inference, we first run the Room
+    ’instruction                  ’:                     ’Go to                           bedroom                                      at                                         the    Navigator from the start viewpoint. The Room Ex-         back left                    side                           of                             the house                                        and
+         turn on the lamp nearest the         plorer is invoked only after the navigator enters
+        bedroom door ’,                          the target room (i.e., r(vt) = r⋆); otherwise, the
+    ’target_object ’: ’lamp ’,
+    ’avoid_objects ’: [’window ’, ’lamp ’,      episode terminates when the navigation step budget
+        ’picture ’, ’bed ’],                           is exhausted. No ground-truth room entry or oracle
+}                                                hand-off is used at test time. We then use GPT-4o
+outputs:
+{                                                  or GPT-3.5-turbo(OpenAI, 2023) as the Room
+    ’new_target_object ’: ’the mirror ’,       Explorer. This Room Explorer is adapted from
+    ’new_instruction ’: ’Go to bedroom at   NavGPT(Zhou et al., 2024b), with prompts mod-          the back left side of the house
+          and take the mirror nearest the      ified to suit the VLN-NF task. Additionally, we
+         bedroom door ’,                         incorporate distance information estimated by our
+}                                  FREE module. For the grounding component, we
+explanation:                                   use the grounding-dino-base(Liu et al., 2024)
+First , Choose ’the mirror ’ as the new       with a threshold of 0.75 to detect objects in each
+    target object because it isn ’t in
+    the ’avoid_objects ’ list , and ’take ’     observation step taken by the Room Explorer.
+     is a good verb for ’the mirror ’.         Below is the prompt used for GPT-3.5-Turbo and
+So the new instructions is ’Go to          GPT-4o in our experiments:    bedroom at the back left side of the
+     house and take the mirror nearest
+    the bedroom door.’                                   Listing 3: Prompt for the In-Room Explorer
+                                                 As an intelligent embodied agent , you
+Now it is your turn:                                                   will navigate in an indoor
+inputs:                                                 environment to reach a target
+    ___inputs___                                                 viewpoint based on a given
+outputs:                                                 instruction , performing the Vision
+                                                    and Language Navigation (VLN) task.
+  Below is an example from our dataset generated
+using our generation pipeline:                     The instruction will let you find all
+                                                    the target objects in a building.
+          Listing 2: Example for Our Dataset
+                                                But if you cannot find the target object
+{                                                        , don ’t stop , keep exploring the
+    ’original_instruction ’: ’Go to the          whole room to find other objects ,
+        laundryroom off of the garage            but you still should have a good
+         and turn off the exhaust fan ’,          strategy , don ’t waste time and
+    ’original_target_object ’: ’exhaust          energy to move.
+         fan ’,
+    ’avoid_objects ’: [’cabinet ’, ’fan ’,     You will move among static positions
+        ’counter ’, ’trash can ’, ’floor ’,        within a pre -defined graph , aiming
+         ’vent ’, ’washing machine ’, ’            for the nearest position to the
+        excercise equipment ’, ’faucet ’,         object if the object is present.
+        ’dryer ’, ’rug ’, ’sink ’, ’roof ’,
+        ’ceiling inset for fan ’, ’plant      You will receive a trajectory
+         ’]                                       instruction at the start and will
+                                                   have access to step history (your
+    ’new_target_object ’: ’the stool ’,           Thought , Action , Action Input and
+    ’new_instruction ’: ’Go to the               Observation after the Begin! sign)
+        laundryroom off of the garage            and current viewpoint observation (
+         and sit on the stool ’                    including scene descriptions ,
+}                                                 objects , and navigable directions/
+                                                 distances within 3 meters) during
+                                       25146
+=== PDF PAGE 14 ===
+    navigation. Orientations range from
+    -180 to 180 degrees , with 0 being
+    forward , right 90 rightward , right/
+    left 180 backward , and left 90
+    leftward.
+
+And we will calculate how many meters
+    extend in the direction of each
+    viewpoint before hitting a wall. We
+    hope this distance information can
+    help you understand the spatial
+    layout of the room. Please plan an
+    effective exploration strategy based
+     on this distance information.
+
+For example , if I have 2 viewpoints to
+    choose (A: 1m, B: 5m) but I cannot
+    find the target object so I better        Figure 5: Most occurred objects for NOT-FOUND instruc-
+    choose viewpoint B because I may            tions.
+    have more exploration space to find
+    the target.
+
+- Notice: You should have a good            Observation: the result of the action
+    strategy to check whether the target     ... (this Thought/Action/Action Input/
+     object exists in the target room ,          Observation can repeat N times)
+    and stop when you exploring all          Thought: I found my target object , but I
+    viewpoint in the target room.                 should check whether any other
+                                                  objects may be hidden.
+Explore the environment while avoiding
+    revisiting viewpoints by comparing       or
+    current and previously visited IDs
+                                             Thought: I checked that no objects are
+If you think you are moving in circles ,         hidden , I can stop.
+    please stop and think whether any        Final Answer: Not found!
+    other objects may be hidden. If no ,
+    please output ’Final Answer: Not         ----
+    found ’.
+                                             Begin!
+Continue by considering your location       Instruction: {action_plan}
+    and the next viewpoint based on the      Initial Observation: {init_observation}
+    instruction , using the action_maker     Thought: I should start navigation
+    tool.                                        according to the instruction , {
+And if you explored all the target room(        agent_scratchpad }"""
+    no other viewpoint to move to), stop
+     and output ’Final Answer: Not found
+    !’.                        ROAM Framework  - Free-space Raycast-
+Show your reasoning in the Thought           ing Estimation Engine (FREE)  . We first uti-
+    section.                                           lize Grounded  SAM (GroundingDINO_SwinT +
+Follow the given format and use provided    sam_vit_h_4b8939 version)(Ren et al., 2024) with
+     tools.                                       the prompt "the floor, the ground, the carpet" to
+{tool_descriptions}                               identify areas where the agent can move. WeDo not fabricate nonexistent viewpoint
+    IDs.                                               set the box_threshold and text_threshold pa-
+                                                 rameters to 0.25 and 0.3, respectively.  Addi-
+----
+Starting below , you should follow this        tionally, our FREE module is designed to esti-
+    format , do not use other format:        mate the explorable distance within a single room.
+                                         To avoid rays passing through doors and enter-
+Instruction: the instruction describing
+    the whole trajectory                       ing other rooms—potentially affecting decision-
+Initial Observation: the initial          making—we further use the prompt "the door
+    observation of the environment           frame" with box_threshold set to 0.3. During
+Thought: you should always think about
+    what to do next and why                     raycasting, any intersection with a detected door
+Action: the action to take , must be one     frame is treated as a termination point for the ray.
+    of the tools [{ tool_names }]            (Show in Figure 6)Action Input: "Viewpoint ID", you should
+     not choose object name or others ,         After completing all segmentation, we perform
+    please only output "Viewpoint ID"        Free-space Raycasting to estimate distances. First,
+                                       25147
+=== PDF PAGE 15 ===
+                                                  ing uncertainty estimation, confidence calibration
+                                            and fallback interaction (e.g., asking for clarifica-
+                                                             tion).
+                                                     Fairness concerns such as overexposure to cer-
+                                                         tain environments or instruction styles are also
+                                               worth noting. As our dataset is built on REVERIE
+                                            and Matterport3D Simulator, it primarily reflects
+Figure 6: On the left, Grounding DINO detects the door   a limited range of indoor environments. Addition-
+frame. On the right, during raycasting, the process stops     ally, all instructions are currently in English, which
+when encountering the door frame’s bounding box to   may disadvantage models trained for multilingual
+avoid estimating incorrect distances (Note the red line                                                    or non-English scenarios.
+indicating a distance of 2.8 meters).                                                       Overall, our work does not involve large-scale
+                                          model training (e.g., LLM pretraining), does not
+we compute the vectors from the agent’s current   pose privacy risks. We believe this benchmark
+viewpoint to each candidate viewpoint in the world   promotes safer, more cautious navigation behavior
+coordinate system, then normalize these vectors to   by encouraging systems to recognize failure modes.
+unit vectors with a length of 10 cm.
+                                            A.3  License and Usage of REVERIE  Next, we extend these unit vectors in the world
+coordinate system towards the candidate view-   The REVERIE dataset used in this work is based
+points. The points along these rays are projected   on the Matterport3D environment and is distributed
+into the camera coordinate system of the observa-   under a non-commercial research license. We
+tion photos using the intrinsic and extrinsic camera    follow all usage terms specified in the original
+parameters from Matterport3D. If the ray encoun-  REVERIE paper (Qi et al., 2020) and the Matter-
+ters an unwalkable area or a door frame bounding   port3D dataset (Chang et al., 2017). Our extensions
+box, the extension stops.                                   (e.g., instruction augmentation and path generation)
+                                                    are built upon these publicly released annotations  Since each step corresponds to 10 cm, we esti-
+                                             and simulation environments.mate the maximum distance the agent can move in
+                                   We confirm that our use of REVERIE compliesthat direction by counting the number of valid steps.
+                                                 with the dataset’s license, and all modifications areThis process enriches the information available to
+                                                 intended for non-commercial academic research.the LLM for better environment understanding.
+                                         The newly generated data will be released under
+Human Evaluation.  We randomly sampled 5%    similar terms to support future research in the com-
+of the data. Annotators were shown: (1) the newly    munity.
+generated target object, and (2) all panoramas of the      Furthermore, the datasets used do not contain
+corresponding target room. They verified whether   any personally identifiable information or offen-
+the new object truly did not exist in that room.        sive content. We conducted manual sampling to
+                                                      verify this and ensure data quality. We have en-
+A.2  Potential Risks                                                 sured that our use and extension of these artifacts
+We do not foresee direct risks related to malicious    respect the original creators’ rights and adhere to
+misuse, as our dataset VLN-NF does not include    ethical standards.
+sensitive information, human identities, or unau-
+                                            A.4  Sensitivity to Minimumthorized photos of private residences.
+                                                  Reference-Coverage Threshold  However, we acknowledge potential risks spe-
+cific to our work.  Since our dataset VLN-NF   Our reference exploration protocol uses a minimum
+and framework ROAM are designed to detect and    reference-coverage threshold to  filter episodes
+respond to potentially incorrect instructions, im-   whose target-room visibility graph is too sparse
+proper handling of uncertainty may lead to prema-    for stable evaluation. In the main paper, we retain
+ture task termination or refusal to act when the in-   episodes with minimum reference coverage ≥0.85.struction is merely ambiguous rather than incorrect.   To verify that our conclusions are not sensitive to
+Over-reliance on NOT-FOUND predictions could re-    this choice, we evaluate stricter retained subsets in-
+duce system reliability in real-world deployment.   duced by thresholds 0.90 and 0.95, while keeping
+To mitigate these risks, we recommend incorporat-   agent trajectories unchanged.
+                                       25148
+=== PDF PAGE 16 ===
+       th    ROAM    MapGPT   Retained         ing language/object distribution inherited from
+       R&D / REV R&D / REV  episodes       REVERIE. To separate the effect of filtering from
+     85%    37.6 / 6.1     14.0 / 3.2    100.0%          the effect of NF construction itself, we compare:
+     90%    37.6 / 6.1     15.4 / 3.7    83.8%                                                                   (i) REVERIE vs. retained REVERIE (filtering     95%    37.8 / 6.5     14.2 / 3.3    76.1%
+                                                        only), and (ii) REVERIE vs. final VLN-NF (post
+Table 6: Sensitivity to the minimum reference-coverage    rewrite/verify).
+threshold.  Each cell reports Reach&Decision SR  /
+REV-SPL (both in %). This analysis varies only the    Interpretation.  The filtering-only comparison
+retained evaluation subset (i.e., stricter evaluability fil-   shows extremely small distribution shift: word/ob-
+tering), while keeping agent trajectories unchanged. The    ject rank agreement remains very high and normal-
+retained-episodes column is reported relative to the 0.85    ized object proportions remain nearly unchanged.
+retained set.                                                  This supports the view that strict filtering primarily
+                                                  enforces evaluability and label reliability, rather
+Interpretation.  The results are stable across    than introducing a substantial bias in language or
+stricter retained subsets. ROAM (GPT-3.5) main-   object domain.  The additional shift from final
+tains nearly identical Reach&Decision SR (37.6–  VLN-NF is modest and expected, since NF con-
+37.8%) and similar REV-SPL (6.1–6.5%) across    struction intentionally replaces the original target
+thresholds, while MapGPT also shows only limited   with an absent but plausible alternative. Impor-
+variation (R&D SR 14.0–15.4%, REV-SPL 3.2–    tantly, this shift does not collapse the benchmark
+3.7%). Crucially, the method ranking is unchanged    into a degenerate object distribution; rather, it re-
+under all thresholds (ROAM > MAPGPT), indi-    flects the intended transformation needed to create
+cating that our conclusions are not sensitive to the    false-premise instructions.
+specific 0.85 choice and that the threshold does
+                                                      Scalability.  Although  strict QC reduces  thenot create method-dependent advantages. Increas-
+                                                    current benchmark size, the rewrite-and-verifying the threshold simply filters out additional low-
+                                                     pipeline is naturally scalable. On the negativevisibility cases, reducing the number of retained
+                                                         side, a single feasible episode can yield multipleepisodes, while leaving the qualitative conclusions
+                                 NF variants by resampling alternative absent tar-unchanged.
+                                                     gets with blacklisting, and the difficulty of gener-
+A.5  Use of AI Assistants                         ated negatives can be controlled through prompt-
+                                                  ing or sampling priors (e.g., same-category vs.We used AI assistants during the research and writ-
+                                                     distant-category substitutes, or landmark-cued vs.ing process to improve writing clarity and presenta-
+                                              no-landmark settings). On the positive side, feasi-tion. Specifically, ChatGPT was used for language
+                                                      ble instances can be expanded through lightweightpolishing (e.g., grammar, rephrasing, and clarity ed-
+                                                        heuristics such as instruction paraphrases or start-its), and for suggesting code improvements. It was
+                                            node variations that preserve target-room reacha-also used to draft or edit non-empirical schematic
+                                                                 bility, and then paired with the same rewrite-and-figures (e.g., pipeline diagrams/icons) for illustra-
+                                                      verify pipeline to generate additional NF counter-tion purposes only. We also used ChatGPT and
+                                                          parts. These properties make VLN-NF a high-NotebookLLM to help organize and summarize lit-
+                                                 confidence benchmark in its current form whileerature during the early stages of the related work
+                                                    leaving a clear path for future scaling.review. No AI-generated images, captions, or
+other synthetic content were used as experimen-                                            A.7  Model Size And Budget
+tal inputs or as evidence for the reported re-
+sults. All AI-assisted outputs were reviewed and   Baseline - DUET The number of parameters is
+edited by the authors, and all critical decisions    nearly identical to that of DUET. Training on an
+regarding modeling, implementation, and anal-  RTX 4090 took approximately 48 hours
+ysis were made by the authors.                     Baseline - NavGPT Using GPT-4 to run infer-
+                                              ence on the val_unseen split costs approximately
+A.6   Filtering, Distribution Shift, and              less than $8 USD.
+      Scalability                                                  Baseline - MapGPT Using GPT-4 to run infer-
+We further analyze whether the strict filtering used   ence on the val_unseen split costs approximately $
+in VLN-NF substantially changes the underly-   215 USD.
+                                       25149
+=== PDF PAGE 17 ===
+Metric                     Filtering only  Final VLN-NF
+Words: Jaccard@50 ↑          0.887           0.852
+Words: Spearman ρ@50 ↑      0.942           0.863
+Words: JS ↓                  0.0106         0.0148
+Objects: Spearman ρ ↑         0.985           0.859
+Objects: Cosine sim. ↑         0.998           0.958
+Objects: JS ↓                 0.0017         0.0414
+Objects: TV ↓                0.0330         0.1627
+
+Table 7: Distribution-shift analysis for strict filtering
+and final NF construction. “Filtering only” compares
+full REVERIE against the retained REVERIE subset
+after QC filtering.  “Final VLN-NF” compares full
+REVERIE against the final post rewrite/verify bench-
+mark. Higher is better for Jaccard, Spearman, and co-
+sine similarity; lower is better for JS and TV.
+
+  Baseline - SoM Using Gemini-2.0 Flash to run
+inference on the val_unseen split costs approxi-
+mately $ 180 USD.
+  Baseline - ROAM We trained DUET as a Room
+Navigator. Training on an RTX 4090 took approx-
+imately 48 hours. During the Fine-grained stage,
+we used GPT-3.5 for inference on the val_unseen
+split, which incurred a cost of approximately less
+than $3 USD.
+
+
+
+
+
+                                       25150

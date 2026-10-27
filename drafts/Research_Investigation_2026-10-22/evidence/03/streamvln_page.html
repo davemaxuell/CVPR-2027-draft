@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="description"
+        content="StreamVLN: Streaming Vision-and-Language Navigation via SlowFast Context Modeling">
+  <meta name="keywords" content="Vision-Lanuguage Navigation, MLLM, Video-LLM">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StreamVLN: Streaming Vision-and-Language Navigation via SlowFast Context Modeling</title>
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-D06WYF3KRB"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-D06WYF3KRB');
+  </script>
+
+    <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro"
+          rel="stylesheet">
+
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-carousel.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-slider.min.css">
+  <link rel="stylesheet" href="./static/css/fontawesome.all.min.css">
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="./static/css/index.css">
+  <link rel="icon" href="./static/images/favicon.ico">
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script defer src="./static/js/fontawesome.all.min.js"></script>
+  <script src="./static/js/bulma-carousel.min.js"></script>
+  <script src="./static/js/bulma-slider.min.js"></script>
+  <script src="./static/js/index.js"></script>
+</head>
+<body>
+
+<section class="hero">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1 publication-title">StreamVLN: Streaming Vision-and-Language Navigation via SlowFast Context Modeling</h1>
+          <div class="is-size-5 publication-authors">
+            <span class="author-block"><a target="_blank" href="https://scholar.google.com.hk/citations?user=Wx8ChLcAAAAJ&hl=en">Meng Wei</a><sup>*, 1, 2</sup>,</span>
+            <span class="author-block"><a target="_blank" href="https://bryce-wan.github.io/">Chenyang Wan</a><sup>*, 1, 3</sup>,</span>
+            <span class="author-block"><a target="_blank" href="https://scholar.google.com/citations?user=CKWKIscAAAAJ&hl=en">Xiqian Yu</a><sup>*, 1</sup>,</span>
+            <span class="author-block"><a target="_blank" href="https://tai-wang.github.io/">Tai Wang</a><sup>*&dagger;, 1 </sup>,</span>
+            <span class="author-block"><a target="_blank" href="https://yuqiang-yang.github.io/">Yuqiang Yang</a><sup>1</sup>,</span>
+            <span class="author-block"><a target="_blank" href="https://scholar.google.com/citations?user=-zT1NKwAAAAJ&hl=en">Xiaohan Mao</a><sup>1, 4</sup>,</span>
+            <span class="author-block"><a target="_blank" href="https://zcmax.github.io/">Chenming Zhu</a><sup>1, 2</sup>,</span>
+            <span class="author-block"><a target="_blank" href="https://wzcai99.github.io/">Wenzhe Cai</a><sup>1</sup>,</span>
+            <span class="author-block"><a target="_blank" href="https://hanqingwangai.github.io/">Hanqing Wang</a><sup>1</sup>,</span>
+            <span class="author-block"><a target="_blank" href="https://yilunchen.com/about/">Yilun Chen</a><sup>1</sup>,</span>
+            <span class="author-block"><a target="_blank" href="https://xh-liu.github.io/">Xihui Liu</a><sup>2, &#x2709;</sup>,</span>
+            <span class="author-block"><a target="_blank" href="https://oceanpang.github.io/">Jiangmiao Pang</a><sup>1, &#x2709;</sup>,</span>
+          </div>
+
+          <div class="is-size-5 publication-authors">
+            <span class="author-block"><sup>1</sup>Shanghai AI Laboratory,</span>
+            <span class="author-block"><sup>2</sup>The University of Hong Kong,</span>
+            <span class="author-block"><sup>3</sup>Zhejiang University,</span>
+            <span class="author-block"><sup>4</sup>Shanghai Jiao Tong University,</span>
+            <span class="eql-cntrb"><small><br/><sup>&dagger;</sup>Project Lead, </small></span>
+            <span class="author-block"><small><sup>*</sup>Equal Contribution, </small></span>
+            <span class="author-block"><small><sup>&#x2709;</sup>Corresponding Author</small></span>
+          </div>
+
+          <div class="column has-text-centered">
+            <div class="publication-links">
+              <!-- PDF Link. -->
+              <!-- <span class="link-block">
+                <a href="https://streamvln.github.io/"
+                   class="external-link button is-normal is-rounded is-light">
+                  <span class="icon">
+                      <i class="fas fa-file-pdf"></i>
+                  </span>
+                  <span>Paper</span>
+                </a>
+              </span> -->
+              <span class="link-block">
+                <a href="https://arxiv.org/abs/2507.05240"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="ai ai-arxiv"></i>
+                  </span>
+                  <span>arXiv</span>
+                </a>
+              </span>
+              <!-- Video Link. -->
+              <span class="link-block">
+                <a href="https://www.youtube.com/watch?v=gG3mpefOBjc"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="fab fa-youtube"></i>
+                  </span>
+                  <span>Video</span>
+                </a>
+              </span>
+              <!-- Code Link. -->
+              <span class="link-block">
+                <a href="https://github.com/OpenRobotLab/StreamVLN"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="fab fa-github"></i>
+                  </span>
+                  <span>Code</span>
+                  </a>
+              </span>
+              <!-- Dataset Link. -->
+              <span class="link-block">
+                <a href="https://huggingface.co/datasets/cywan/StreamVLN-Trajectory-Data"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="fa fa-database"></i>
+                  </span>
+                  <span>Data</span>
+                  </a>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- <section class="hero teaser">
+  <div class="container is-max-desktop">
+    <div class="hero-body">
+      <div class="columns is-centered">
+        <video id="teaser" controls muted loop playsinline autoplay style="width: 100%;">
+          <source src="./static/videos/demo.mp4"
+                  type="video/mp4">
+        </video>
+      </div>
+
+      <h2 class="subtitle has-text-centered">
+    </div>
+  </div>
+</section> -->
+
+<!-- video -->
+<section class="section" style="padding-top: 0rem; padding-bottom: 0rem;">
+  <div class="columns is-centered has-text-centered" style="max-width: 1000px; margin: 0 auto;">
+    <div class="column is-full-width">
+      <!-- <h2 class="title is-2">Video</h2> -->
+      <div class="publication-video">
+        <iframe src="https://www.youtube.com/embed/gG3mpefOBjc?si=x5wzffyv3vqmWXXZ"
+                frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+      </div>
+      <br/>
+      <h2 class="title is-5">TL; DR</h2>
+      <h2 class="subtitle has-text-centered" style="line-height: 1.6;">
+        StreamVLN is a streaming VLN framework that employs a hybrid slow-fast context modeling strategy to support multi-modal reasoning over interleaved vision, language and action inputs.
+      </h2>
+    </div>
+  </div>
+</section>
+
+<!-- abstract -->
+<!-- <section class="section hero is-light">
+  <div class="container is-max-desktop">
+    <div class="rows is-centered has-text-centered ">
+      <div class="row is-four-fifths">
+        <h2 class="title is-3 has-text-centered is-size-5-mobile title-with-lines">Abstract</h2>
+          <div class="content has-text-justified" style="font-size: 17px;margin: 0 auto;margin-bottom: 1em;">
+            <p>
+              Vision-and-Language Navigation (VLN) in real-world settings requires agents to process continuous visual streams and generate actions with low latency grounded in language instructions. 
+              While Video-based Large Language Models (Video-LLMs) have driven recent progress, current VLN methods based on VideoLLM often face trade-offs among fine-grained visual understanding, long-term context modeling and computational efficiency. 
+            </p>
+            <p>
+              We introduce <b>StreamVLN</b>, a streaming VLN framework that employs a hybrid slow-fast context modeling strategy to support multi-modal reasoning over interleaved vision, language and action inputs. 
+              The fast-streaming dialogue context facilitates responsive action generation through a sliding-window of active dialogues, while the slow-updating memory context compresses historical visual states using a 3D-aware token pruning strategy. 
+            </p>
+            <p>
+              With this slow-fast design, <b>StreamVLN</b> achieves coherent multi-turn dialogue through efficient KV cache reuse across the whole process, supporting long video streams with bounded context size and inference cost. 
+              Experiments on VLN-CE benchmarks demonstrate state-of-the-art performance with stable low latency, ensuring robustness and efficiency in real-world deployment.
+            </p>
+          </div>
+      </div>
+    </div>
+  </div>
+</section> -->
+
+<!-- Highlight -->
+<!-- <section class="section">
+  <div class="container is-max-desktop">
+    <div class="rows is-centered has-text-centered ">
+      <div class="row is-full-width">
+        <h2 class="title is-3 has-text-centered is-size-5-mobile title-with-lines">Highlight</h2>
+          <br/>
+          <br/>
+          <div class="content has-text-justified" style="font-size: 17px;margin: 0 auto;margin-bottom: 1em;">
+            <p>
+              TODO
+            </p>
+
+          </div>
+      </div>
+    </div>
+  </div>
+</section> -->
+
+<!-- method -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="rows is-centered has-text-centered ">
+      <div class="row is-full-width">
+        <h2 class="title is-3 has-text-centered is-size-5-mobile title-with-lines">Approach</h2>
+        
+        <h3 class="title is-4 has-text-centered is-size-5-mobile">SlowFast Context Modeling</h3>
+        <!-- <img src="./static/images/overview.png" alt="method" style="width: 75%;"></img> -->
+        <img alt="overview" src="./static/images/overview.gif" onmouseover="src='./static/images/overview.png'" onmouseout="src='./static/images/overview.gif'" style="border: 2px dashed #cccccc;"/>
+        <text style="font-size: 12px; color: #666;">Overview of the StreamVLN framework. <b>Hover over the image to see a static illustration.</b></text>
+        <br/>
+        <br/>
+        <div class="content has-text-justified" style="font-size: 17px;margin: 0 auto;margin-bottom: 1em;">
+          <p>
+            <b>StreamVLN</b> generates action outputs from continuous video input in an online, multi-turn dialogue manner. Built on <b>LLaVA-Video</b> as the foundational Video-LLM, we extend it for interleaved vision, language, and action modeling.
+            For both effective context modeling of long sequence and efficient computation for real-time interaction, StreamVLN has: (1) a <b>fast-streaming</b> dialogue context with a sliding-window KV cache; and (2) a <b>slow-updating</b> memory via token pruning.
+          </p>
+        </div>
+        <br/>
+        <br/>
+
+        <h3 class="title is-4 has-text-centered is-size-5-mobile">Data Collection</h3>
+        <div class="columns is-vcentered" style="margin-top: 1.5rem;">
+          <div class="column is-8">
+            <div class="content has-text-justified" style="font-size: 17px; margin-bottom: 1em;">
+              <p>
+                We incorporates both <b>navigation-specific data</b> samples and <b>general multi-modal data</b> samples in our training data.
+              </p>
+              <p>  
+                For <b>navigation-specific data</b>, we collect 450K video clips from R2R, R2R-EnvDrop, RxR and ScaleVLN as expert training data, and 240K DAgger data samples as augmentation.
+              </p>  
+                For <b>general multi-modal data</b>, we incorporate 248K video-based VQA samples from LLaVA-Video-178K and ScanQA, and 230K interleaved image-text samples from MMC4.
+              </p>
+              <p>
+                The table below shows details of our data compositiion.
+              </p>
+
+            </div>
+          </div>
+          <div class="column is-4">
+            <img src="./static/images/data_recipe.png" alt="data" style="width:100%; max-width: 800px; display: block; margin-left: auto;">
+            <text style="font-size: 12px; color: #666;">Our data recipe.</text>
+          </div>
+        </div>
+
+        <div class="table-container" style="margin: 2rem 0;">
+          <table class="table is-bordered" style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+            <thead>
+              <tr>
+                <th style="border-top: 4px solid #333; border-bottom: 2px solid #333; padding: 0.75rem; text-align: center;">Data Type</th>
+                <th style="border-top: 4px solid #333; border-bottom: 2px solid #333; padding: 0.75rem; text-align: center;">Source</th>
+                <th style="border-top: 4px solid #333; border-bottom: 2px solid #333; padding: 0.75rem; text-align: center;">Samples</th>
+                <th style="border-top: 4px solid #333; border-bottom: 2px solid #333; padding: 0.75rem; text-align: center;">Purpose</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="border-bottom: 1px solid #ddd; padding: 0.75rem; text-align: left; vertical-align: middle;">Navigation (Oracle)</td>
+                <td style="border-bottom: 1px solid #ddd; padding: 0.5rem; text-align: center; vertical-align: middle;">
+                  <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center;">
+                    <div style="background: #dfdfdf; border-radius: 8px; padding: 0.5rem 0.5rem; box-shadow: 0 3px 9px rgba(0,0,0,0.1);">R2R</div>
+                    <div style="background: #dfdfdf; border-radius: 8px; padding: 0.5rem 0.5rem; box-shadow: 0 3px 9px rgba(0,0,0,0.1);">R2R-EnvDrop</div>
+                    <div style="background: #dfdfdf; border-radius: 8px; padding: 0.5rem 0.5rem; box-shadow: 0 3px 9px rgba(0,0,0,0.1);">RxR</div>
+                    <div style="background: #dfdfdf; border-radius: 8px; padding: 0.5rem 0.5rem; box-shadow: 0 3px 9px rgba(0,0,0,0.1);">ScaleVLN (subset)</div>
+                  </div>
+                </td>
+                <td style="border-bottom: 1px solid #ddd; padding: 0.75rem; text-align: center; vertical-align: middle;">450K</td>
+                <td style="border-bottom: 1px solid #ddd; padding: 0.75rem; text-align: center; vertical-align: middle;">General navigation skills</td>
+              </tr>
+              <tr>
+                <td style="border-bottom: 1px solid #ddd; padding: 0.75rem; text-align: left; vertical-align: middle;">Navigation (DAgger)</td>
+                <td style="border-bottom: 1px solid #ddd; padding: 0.75rem; text-align: center; vertical-align: middle;">-</td>
+                <td style="border-bottom: 1px solid #ddd; padding: 0.75rem; text-align: center; vertical-align: middle;">240K</td>
+                <td style="border-bottom: 1px solid #ddd; padding: 0.75rem; text-align: center; vertical-align: middle;">Error correction</td>
+              </tr>
+              <tr>
+                <td style="border-bottom: 1px solid #ddd; padding: 0.75rem; text-align: left; vertical-align: middle;">Video QA</td>
+                <td style="border-bottom: 1px solid #ddd; padding: 0.5rem; text-align: center; vertical-align: middle;">
+                  <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center;">
+                    <div style="background: #dfdfdf; border-radius: 8px; padding: 0.5rem 0.5rem; box-shadow: 0 3px 9px rgba(0,0,0,0.1);">LLaVA-Video-178K</div>
+                    <div style="background: #dfdfdf; border-radius: 8px; padding: 0.5rem 0.5rem; box-shadow: 0 3px 9px rgba(0,0,0,0.1);">ScanQA</div>
+                  </div>
+                </td>
+                <td style="border-bottom: 1px solid #ddd; padding: 0.75rem; text-align: center; vertical-align: middle;">248K</td>
+                <td style="border-bottom: 1px solid #ddd; padding: 0.75rem; text-align: center; vertical-align: middle;">Spatiotemporal reasoning</td>
+              </tr>
+              <tr>
+                <td style="border-bottom: 4px solid #333; padding: 0.75rem; text-align: left; vertical-align: middle;">Interleaved Image-Text</td>
+                <td style="border-bottom: 4px solid #333; padding: 0.5rem; text-align: center; vertical-align: middle;">
+                  <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center;">
+                    <div style="background: #dfdfdf; border-radius: 8px; padding: 0.5rem 0.5rem; box-shadow: 0 3px 9px rgba(0,0,0,0.1);">MMC4</div>
+                  </div>
+                </td>
+                <td style="border-bottom: 4px solid #333; padding: 0.75rem; text-align: center; vertical-align: middle;">230K</td>
+                <td style="border-bottom: 4px solid #333; padding: 0.75rem; text-align: center; vertical-align: middle;">Multi-turn dialog</td>
+              </tr>
+            </tbody>
+            <!-- <tfoot>
+              <tr>
+                <td colspan="2" style="padding-top: 0.5rem; text-align: left; font-weight: bold;">Total</td>
+                <td style="padding-top: 0.5rem; text-align: center; font-weight: bold;">1.168M</td>
+                <td style="padding-top: 0.5rem; text-align: left;"></td>
+              </tr>
+            </tfoot> -->
+          </table>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- simulation experiments -->
+
+<!-- method -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="rows is-centered has-text-centered ">
+      <div class="row is-full-width has-text-centered">
+        <h2 class="title is-3 is-size-5-mobile title-with-lines">Evaluation in Simulation</h2>
+        
+        <h3 class="title is-4 has-text-centered is-size-5-mobile">Quantitative Results</h3>
+        <div>
+          <img src="./static/images/exp_sim.png" alt="method" style="width: 80%;"></img>
+        </div>
+        <text style="font-size: 12px; color: #666;">Evaluation results on R2R-CE and RxR-CE benchmarks.</text>
+
+        <!-- <iframe src="static\images\image.pdf" width="800px" height="2400px"></iframe> -->
+       
+        <br/>
+        <br/>
+
+
+        <div class="content has-text-justified" style="font-size: 17px;margin: 0 auto;margin-bottom: 1em;">
+          <p>
+            We evaluate our method on two public VLN-CE benchmarks collected from Matterport3D scenes using the Habitat simulator: <b>R2R-CE</b> and <b>RxR-CE</b>. 
+            Our <b>StreamVLN</b> model achieves state-of-the-art performance among RGB-only methods both without and with extra navigation datasets, reaching <b>56.9%</b> SR and <b>51.9%</b> SPL on R2R (Val-Unseen), and <b>52.9%</b> SR and <b>46.0%</b> SPL on RxR (Val-Unseen).
+          </p>
+        </div>
+
+        <br/>
+
+        <h3 class="title is-4 has-text-centered is-size-5-mobile">Vision-Language Navigation in Habitat Simulator</h3>
+
+          <div class="container is-full-width">
+      
+            <div id="results-carousel" class="carousel results-carousel">
+              <div class="item item-box">
+                <video poster="" id="box" autoplay controls muted loop playsinline height="100%">
+                  <source src="./static/videos/sim_0.mp4"
+                          type="video/mp4">
+                </video>
+              </div>
+              <div class="item item-drawer">
+                <video poster="" id="drawer" autoplay controls muted loop playsinline height="100%">
+                  <source src="./static/videos/sim_1.mp4"
+                          type="video/mp4">
+                </video>
+              </div>
+              <div class="item item-dustpan">
+                <video poster="" id="dustpan" autoplay controls muted loop playsinline height="100%">
+                  <source src="./static/videos/sim_2.mp4"
+                          type="video/mp4">
+                </video>
+              </div>
+              <div class="item item-fridge">
+                <video poster="" id="fridge" autoplay controls muted loop playsinline height="100%">
+                  <source src="./static/videos/sim_3.mp4"
+                          type="video/mp4">
+                </video>
+              </div>
+              <div class="item item-handover_easy">
+                <video poster="" id="handover_easy" autoplay controls muted loop playsinline height="100%">
+                  <source src="./static/videos/sim_4.mp4"
+                          type="video/mp4">
+                </video>
+              </div>
+              <div class="item item-handover">
+                <video poster="" id="handover" autoplay controls muted loop playsinline height="100%">
+                  <source src="./static/videos/sim_5.mp4"
+                          type="video/mp4">
+                </video>
+              </div>
+            </div>
+      
+          </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- realworld experiments -->
+<section class="section is-small">
+  <div class="container is-max-desktop">
+    
+    <h2 class="title is-3 has-text-centered is-size-5-mobile title-with-lines">Real-World Experiments</h2>
+
+    <h3 class="title is-4 has-text-centered is-size-5-mobile">Accurate Instruction Following</h3>
+    <div class="columns is-multiline">
+
+      <div class="column is-half">
+        <div class="card">
+          <div class="card-image">
+            <video controls muted loop playsinline autoplay>
+              <source src="./static/videos/home_0.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="card-content has-text-centered">
+            <p class="title is-5">Living Room</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="column is-half">
+        <div class="card">
+          <div class="card-image">
+            <video controls muted loop playsinline autoplay>
+              <source src="./static/videos/home_1.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="card-content has-text-centered">
+            <p class="title is-5">Bedroom</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <br/>
+
+
+    <h3 class="title is-4 has-text-centered is-size-5-mobile">Extreme Long-Horizon VLN Tasks</h3>
+    <div class="columns is-multiline">
+      <div class="column is-half">
+        <div class="card">
+          <div class="card-image">
+            <video controls muted loop playsinline autoplay>
+              <source src="./static/videos/workspace_0.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="card-content has-text-centered">
+            <p class="title is-5">Office Lobby and Work Zones</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="column is-half">
+        <div class="card">
+          <div class="card-image">
+            <video controls muted loop playsinline autoplay>
+              <source src="./static/videos/workspace_1.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="card-content has-text-centered">
+            <p class="title is-5">Workspace</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <br/>
+
+    <h3 class="title is-4 has-text-centered is-size-5-mobile">Generalization across Diverse Scenes</h3>
+    <div class="columns is-multiline">
+      <div class="column is-half">
+        <div class="card">
+          <div class="card-image">
+            <video controls muted loop playsinline autoplay>
+              <source src="./static/videos/mall.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="card-content has-text-centered">
+            <p class="title is-5">Mall</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="column is-half">
+        <div class="card">
+          <div class="card-image">
+            <video controls muted loop playsinline autoplay>
+              <source src="./static/videos/outdoor_0.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="card-content has-text-centered">
+            <p class="title is-5">Outdoor Sidewalk</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="column is-half">
+        <div class="card">
+          <div class="card-image">
+            <video controls muted loop playsinline autoplay>
+              <source src="./static/videos/outdoor_1.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="card-content has-text-centered">
+            <p class="title is-5">Outdoor Walkways</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="column is-half">
+        <div class="card">
+          <div class="card-image">
+            <video controls muted loop playsinline autoplay>
+              <source src="./static/videos/outdoor_2.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="card-content has-text-centered">
+            <p class="title is-5">Outdoor Lawn and Sidewalk</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <br/>
+
+    <h3 class="title is-4 has-text-centered is-size-5-mobile">Visual Question Answering and Navigation</h3>
+    <!-- <div class="columns is-multiline is-centered" style="display: flex; flex-wrap: wrap;">
+      <div class="column is-half" style="flex: 1 0 50%; display: flex; align-items: stretch;">
+        <div class="card" style="flex: 1; display: flex; flex-direction: column;">
+          <div class="card-image" style="
+            flex-shrink: 0; /* 防止图片容器收缩 */
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            height: 300px; /* 固定高度，或根据内容自适应 */
+          ">
+            <img src="./static/images/qa.png" alt="method" style="max-width: 125%; max-height: 115%; object-fit: contain;">
+            <div class="card-content has-text-centered flex-grow">
+              <p class="title is-5">Distinguish between Mona Lisa and Einstein</p>
+            </div>
+          </div>
+        </div>
+      </div> -->
+    
+      <div class="columns is-flex is-flex-wrap-nowrap is-align-items-stretch" style="width: 100%; margin: 0;">
+        <!-- 左卡片 -->
+        <div class="column is-half" style="flex: 1; min-width: 0; padding: 0.75rem; display: flex;">
+          <div class="card" style="flex: 1; display: flex; flex-direction: column;">
+            <div class="card-image" style="flex-shrink: 0; display: flex; justify-content: center; align-items: center; height: 225px;">
+              <img src="./static/images/vqa.png" alt="method" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+            </div>
+            <div class="card-content has-text-centered" style="flex: 1;">
+              <p class="title is-6">Q: "Describe the picture on the right.</p>
+              <p class="title is-6" style="color: red;">A: "Picture of the Mona Lisa."</p>
+            </div>
+          </div>
+        </div>
+      
+        <!-- 右卡片 -->
+        <div class="column is-half" style="flex: 1; min-width: 0; padding: 0.75rem; display: flex;">
+          <div class="card" style="flex: 1; display: flex; flex-direction: column;">
+            <div class="card-image">
+              <video controls muted loop playsinline autoplay style="width: 100%; height: 225px; object-fit: cover;">
+                <source src="./static/videos/visual_reasoning.mp4" type="video/mp4">
+              </video>
+            </div>
+            <div class="card-content has-text-centered" style="flex: 1;">
+              <p class="title is-5">Distinguish between Mona Lisa and Einstein</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <br/>
+
+  </div>
+</section> 
+
+<!-- citation -->
+<section class="section" id="BibTeX">
+  <div class="container is-max-desktop content">
+    <h2 class="title">Citation</h2>     
+    <pre><code>@article{wei2025streamvln,
+    title={StreamVLN: Streaming Vision-and-Language Navigation via SlowFast Context Modeling},
+    author={Wei, Meng and Wan, Chenyang and Yu, Xiqian and Wang, Tai and Yang, Yuqiang and Mao, Xiaohan and Zhu, Chenming and Cai, Wenzhe and Wang, Hanqing and Chen, Yilun and others},
+    journal={arXiv preprint arXiv:2507.05240},
+    year={2025}
+  }
+</code></pre>
+  </div>
+</section> 
+
+<!-- footer -->
+<footer class="footer">
+  <div class="container">
+    <!-- <div class="content has-text-centered">
+      <a class="icon-link" href="./static/pdfs/nerfies_paper.pdf">
+        <i class="fas fa-file-pdf"></i>
+      </a>
+      <a class="icon-link" href="https://github.com/keunhong" class="external-link" disabled>
+        <i class="fab fa-github"></i>
+      </a>
+    </div> -->
+    <div class="columns is-centered">
+      <div class="column is-8">
+        <div class="content">
+          <p>
+            This website is licensed under a <a rel="license"
+                                                href="http://creativecommons.org/licenses/by-sa/4.0/">Creative
+            Commons Attribution-ShareAlike 4.0 International License</a>.
+          </p>
+          <p>
+            Website template modified from <a href="https://github.com/nerfies/nerfies.github.io">Nerfies</a>.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

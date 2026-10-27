@@ -1,0 +1,940 @@
+=== PDF PAGE 1 ===
+         On the Evaluation of Vision-and-Language Navigation Instructions
+
+
+                      Ming Zhao   Peter Anderson  Vihan Jain  Su Wang
+                              Alexander Ku   Jason Baldridge  Eugene Ie
+                                          Google Research
+           {astroming, pjand, vihan, wangsu, alexku, jridge, eugeneie}
+                                   @google.com
+
+
+
+
+                           Abstract                                                                           Trajectory
+                                                                                                                         Representation
+                 Vision-and-Language Navigation wayﬁnding                                       Visual             hv
+                                                                                                 Encoder
+                  agents can be enhanced by exploiting automat-
+                     ically generated navigation instructions. How-                                                                                                             j
+                     ever, existing instruction generators have not                                          Dot                i
+                 been comprehensively evaluated, and the au-                                          Product2021                  tomatic evaluation metrics used to develop
+
+                 wayﬁnders, we show that these generators per-           Walkenter upthestairsfirst roomand                                   Matrix S(i, j)Jan          them have not been validated. Using human                                                               Compatibility
+                form on par with or only slightly better than           on the left. Walk            Instruction
+                  a template-based generator and far worse than             the bedroom and          Encoder26                                                                                     towards the end of                           hw
+              human instructors. Furthermore, we discover             stop inside the                                Instruction
+                                                                                             bathroom.                               Representation
+                     that BLEU, ROUGE, METEOR and CIDEr
+                   are ineffective for evaluating grounded naviga-
+                                                                    Figure 1: Proposed dual encoder instruction-trajectory                    tion instructions. To improve instruction eval-
+                                                                        compatibility model. Navigation instructions and tra-                    uation, we propose an instruction-trajectory
+                                                                               jectories (sequences of panoramic images and view an-[cs.AI]             compatibility model that operates without ref-
+                                                                             gles) are projected into a shared latent space. The in-                  erence instructions. Our model shows the high-
+                                                               dependence between the encoders facilitates learning                     est correlation with human wayﬁnding out-
+                                                                     using both contrastive and classiﬁcation losses.               comes when scoring individual instructions.
+                 For ranking instruction generation systems, if
+                   reference instructions are available we recom-
+              mend using SPICE.                             performing agents (Wang et al., 2019; Huang et al.,
+                                                            2019; Li et al., 2019).
+          1  Introduction                                                     To make further advances in the generation of
+             Generating route instructions is a long studied prob-   visually-grounded navigation instructions, accurate
+           lem with clear practical applications (Richter and    evaluation of the generated text is essential. How-
+              Klippel, 2005). Whereas earlier work sought to    ever, the performance of existing instruction gen-
+              create instructions for human wayﬁnders, recent    erators has not yet been evaluated using human
+           work has focused on using instruction-generation   wayﬁnders, and the efﬁcacy of the automated eval-arXiv:2101.10504v1
+            models to improve the performance of agents that    uation metrics used to develop them has not been
+             follow instructions given by people. In the con-    established. This paper addresses both gaps.
+               text of Vision-and-Language Navigation (VLN)     To establish benchmarks for navigation instruc-
+              datasets such as Room-to-Room (R2R) (Anderson    tion generation, we evaluate existing English mod-
+               et al., 2018b), models for generating navigation    els (Fried et al., 2018; Tan et al., 2019) using human
+               instructions have improved agents’ wayﬁnding per-   wayﬁnders. These models are effective for data
+            formance in at least two ways: (1) by synthesizing    augmentation, but in human trials they perform on
+          new instructions for data augmentation (Fried et al.,   par with or only slightly better than a template-
+             2018; Tan et al., 2019), and (2) by fulﬁlling the role   based system, and they are far worse than human
+              of a probabilistic speaker in a pragmatic reasoning    instructors. This leaves much headroom for better
+               setting (Fried et al., 2018). Such data augmentation    instruction generation, which may in turn improve
+                 is so effective that it is nearly ubiquitous in the best    agents’ wayﬁnding abilities.
+
+=== PDF PAGE 2 ===
+  Next, we consider the evaluation of naviga-     Recent work has focused on instruction gen-
+tion instructions without human wayﬁnders, a    eration to improve the performance of wayﬁnd-
+necessary step for future improvements in both    ing agents. Two instruction generators, Speaker-
+grounded instruction generation (itself a challeng-   Follower (Fried et al., 2018) and EnvDrop (Tan
+ing and important language generation problem)    et  al., 2019), have been widely used for R2R
+and agent wayﬁnding. We propose a model-based    data augmentation.  They provide ∼170k new
+approach (Fig. 1) to measure the compatibility of    instruction-trajectory pairs sampled from training
+an instruction-trajectory pair without needing ref-   environments. Both are seq-to-seq models with
+erence instructions for evaluation. In training this    attention. They take as input a sequence of panora-
+model, we ﬁnd that adding contrastive losses in   mas grounded in a 3D trajectory, and output a tex-
+addition to pairwise classiﬁcation losses improves    tual instruction intended to describe it.
+AUC by 9–10%, round-trip back-translation im-
+                                             Vision-and-Language  Navigation  For VLN,proves performance when used to paraphrase posi-
+                                            embodied agents in 3D environments must followtive examples, and that both trajectory and instruc-
+                                                     natural language instructions to reach prescribedtion perturbations are useful as hard negatives.
+                                                      goals. Most recent efforts (e.g., Fu et al., 2019;
+   Finally, we compare our compatibility model to
+                                        Huang et al., 2019; Jain et al., 2019; Wang et al.,
+common textual evaluation metrics to assess which
+                                               2019, etc.) have used the Room-to-Room (R2R)
+metric best correlates with the outcomes of human
+                                                     dataset (Anderson et al., 2018b), which contains
+wayﬁnding attempts. We discover that BLEU (Pap-
+                                           4675 unique paths in the train split, 340 in the val-
+ineni et al., 2002), ROUGE (Lin, 2004), METEOR
+                                                seen split (same environments, new paths), and
+(Denkowski and Lavie, 2014) and CIDEr (Vedan-
+                                             an additional 783 paths in the val-unseen split
+tam et al., 2015) are ineffective for evaluating
+                                             (new environments, new paths). However, our ﬁnd-
+grounded navigation instructions. For system-level
+                                                   ings are also relevant for similar datasets such as
+evaluations with reference instructions, we recom-
+                                          Touchdown (Chen et al., 2019; Mehta et al., 2020),
+mend SPICE (Anderson et al., 2016). When aver-
+                              CVDN (Thomason et al., 2019), REVERIE (Qi
+aged over many instructions, SPICE correlates with
+                                                           et al., 2020), and the multilingual Room-across-
+both human wayﬁnding performance and subjec-
+                                   Room (RxR) dataset (Ku et al., 2020).
+tive human judgments of instruction quality. When
+scoring individual instructions, our compatibility   Text Generation Metrics  There are many auto-
+model most closely reﬂects human wayﬁnding per-   mated metrics that assess textual similarity; we fo-
+formance, outperforming BERTScore (Zhang et al.,   cus on ﬁve that are extensively used in the context
+2019) and VLN agent-based scores. Our results are    of image captioning: BLEU (Papineni et al., 2002),
+a timely reminder that textual evaluation metrics  METEOR (Denkowski and Lavie, 2014), ROUGE
+should always be validated against human judg-   (Lin, 2004), CIDEr (Vedantam et al., 2015) and
+ments when applied to new domains. We plan to   SPICE (Anderson et al., 2016). More recently,
+release our trained compatibility model and the in-   model- and semi-model-based metrics have been
+structions and human evaluation data we collected.   proposed. BERTScore (Zhang et al., 2019) takes a
+                                                semi-model-based approach to compute token-wise
+2  Related Work                                  similarity using contextual embeddings learned
+                                                  with BERT (Devlin et al., 2019). BLEURT (Sellam
+Navigation Instruction Generation  Until re-                                                            et al., 2020) is a fully model-based approach com-
+cently, most methods for generating navigation                                                    bining large-scale synthetic pretraining and domain
+instructions were focused on settings in which a                                                 speciﬁc ﬁnetuning. However, all of the aforemen-
+system has access to a map representation of the                                                   tioned metrics are reference-based, and none is
+environment, including the locations of objects and                                                   speciﬁcally designed for assessing navigation in-
+named items (e.g. of streets and buildings) (Richter                                                      structions associated with 3D trajectories for an
+and Klippel, 2005). Some generate route instruc-                                             embodied agent, which requires not only language-
+tions interactively given the current position and                                                       to-vision grounding but also correct sequencing.
+goal location (Dr¨ager and Koller, 2012), while oth-
+ers provide in-advance instructions that must be    Instruction-Trajectory Compatibility Models
+more robust to possible misinterpretation (Roth and   Our model builds on that of Huang et al. (2019),
+Frank, 2010; Mast and Wolter, 2013).               but differs in loss (using focal and contrastive
+
+=== PDF PAGE 3 ===
+losses), input features (adding action and geom-   modes on instruction following performance, we
+etry representation), and negative mining strate-   include three adversarial perturbations of human
+gies (adding instruction perturbations in addition    instructions capturing incorrect direction words,
+to trajectory perturbations). Compared to the tra-   hallucinated objects/landmarks, and repeated or
+jectory re-ranking compatibility model proposed    skipped steps. We use Google Cloud NLP2 to iden-
+by Majumdar et al. (2020), we use a dual encoder     tify named entities and parse dependency trees and
+architecture rather than dense cross-attention. This    then generate perturbations as follows:
+facilitates the efﬁcient computation of contrastive
+losses, which are calculated over all pairs in a mini-       • Direction  Swap:   Random  swapping
+batch, and improve AUC by 10% in our model. We        of  directional  phrases  with  alternatives
+also avoid training on the outputs of the instruction       from the same  set, with sets as follows:
+generators (to prevent overﬁtting to the models we         around/left/right,        bottom/middle/top,
+evaluate). We are yet to explore transfer learning        up/down, front/back, above/under, enter/exit,
+(which is the focus of Majumdar et al. (2020)).           backward/forward,   away   from/towards,
+                                                             into/out of, inside/outside.
+3  Human Wayﬁnding Evaluations
+                                                  Example: “Take a right (left) and wait by the
+To benchmark the current state-of-the-art for navi-       couch outside (inside) the bedroom. ”
+gation instruction generation, we evaluate the out-
+puts of the Speaker-Follower and EnvDrop models        • Entity Swap: Random swapping of enti-
+by asking people to follow them. We use instruc-          ties in an instruction. All noun phrases ex-
+tions for the 340 and 783 trajectories in the R2R        cluding a stop list containing any, ﬁrst, end,
+val-seen and val-unseen splits, respectively. Both          front,  etc.   are considered to be  entities.
+models are trained on the R2R train split and the          If two entities have the same lemma (e.g.,
+generated instructions were provided by the respec-         stairs/staircase/stairway) they are considered
+tive authors. To contextualize the results, we addi-         to be synonyms and are not swapped.
+tionally evaluate instructions from a template-based                                                Example:  “Exit the bedroom (bathroom),
+generator (using ground-truth object annotations),                                                        turn right, then enter the bathroom (bed-
+a new set of instructions written by human annota-                                                    room).”
+tors, and three adversarial perturbations of these hu-
+man instructions. New navigation instructions and                                                                 • Phrase Swap: A random operation on the
+wayﬁnding evaluations are collected using a lightly                                                 dependency tree:  either remove one sub-
+modiﬁed version of PanGEA1, an open-source an-                                                        sentence tree, duplicate one sub-sentence tree,
+notation toolkit for panoramic graph environments.                                                          or shufﬂe the order of all sentences except the
+                                                                        last.Crafty  Crafty is a template-based navigation in-
+struction generator. It observes the trajectory’s ge-       Example: “Exit the room using the door on
+ometry and nearby ground-truth object annotations,        the left.  Turn slightly left and go past the
+identiﬁes salient objects, and creates English in-       round table an chairs. Wait there.” – where
+structions using templates describing movement         the ﬁrst and second sentences are swapped.
+with respect to the trajectory and objects.  See
+the Appendix for details. Note that Crafty has an   Wayﬁnding Task  Using the PanGEA Follower
+advantage over the learned models which rely on    task, annotators are presented with a textual navi-
+panoramic images to identify visual references and    gation instruction and the ﬁrst-person camera view
+do not exploit object annotations.                 from the starting pose. They are instructed to at-
+                                              tempt to follow the instruction to reach the goal
+Human Instructions We collect 340 new En-
+                                                       location. Camera controls allow for continuous
+glish instructions for the trajectories in the R2R
+                                               heading and elevation changes as well as move-
+val-seen split using the PanGEA Guide task.
+                                            ment between Matterport3D panoramas based on a
+Instruction Perturbations  To quantify the im-   navigation graph. Each instruction is evaluated by
+pact of common  instruction generator  failure    three different human wayﬁnders.
+
+    1https://github.com/google-research/pangea                      2https://cloud.google.com/natural-language/
+
+=== PDF PAGE 4 ===
+                                                                                          Visual Search
+
+ Instructions       Num. Evals Wordcount NE ↓SR ↑SPL ↑SDTW ↑Quality ↑Start ↓Other ↓Time ↓
+
+ Val-unseen
+ Speaker-Follower      783×3        24.6      6.55   35.8   30.3     28.1       3.50      43.5     24.8     43.2
+ EnvDrop            783×3        21.3      5.89   42.3   36.1     33.5       3.70      42.1     24.8     39.5
+
+ Val-seen
+ Speaker-Follower      340×3        24.7      6.23   42.3   35.7     33.2       3.64      43.0     24.5     42.6
+ EnvDrop            340×3        22.3      5.99   47.7   40.0     36.9       3.83      39.9     25.0     42.1
+ Crafty              340×3        71.2      6.01   43.6   34.7     33.3       3.48      42.0     25.9     69.6
+ Direction Swap       340×3        54.8      4.74   58.9   47.9     45.9       3.67      40.6     25.4     61.0
+ Entity Swap          340×3        55.1      4.71   51.3   42.5     40.6       3.33      40.1     25.8     62.7
+ Phrase Swap         340×3        52.0      4.07   62.6   51.6     49.9       3.85      38.7     24.7     58.0
+ Human             340×3        54.1      2.56   75.1   64.7     63.1       4.25      35.8     23.8     53.9
+
+Table 1: Human wayﬁnding performance following instructions from the Speaker-Follower (Fried et al., 2018)
+and EnvDrop (Tan et al., 2019) models, compared to Crafty (template-based) instructions, Human instructions,
+and three adversarial perturbations of Human instructions (Direction, Entity and Phrase Swap).
+
+
+Evaluation Metrics We use the following stan-    in human wayﬁnding evaluations on all path eval-
+dard metrics to evaluate the trajectories generated    uation metrics and on subjective assessments of
+by our annotators (and hence, the quality of the    instruction quality, and they also incur the lowest
+provided instructions): Navigation Error (NE ↓)    visual search costs. The only metric not dominated
+Success Rate (SR ↑), Success weighted by inverse   by human instructions is the time taken – which cor-
+Path Length (SPL ↑), Success weighted by normal-    relates with instruction length, and may be affected
+ized Dynamic Time Warping (SDTW ↑). Arrows   by wayﬁnders giving up when faced with poor qual-
+indicate improving performance. See Anderson    ity instructions. Overall, the Speaker-Follower and
+et al. (2018a) and Ilharco et al. (2019) for details.    EnvDrop models are surprisingly weak and notice-
+  People are resourceful and may succeed in fol-   ably worse than even adversarially perturbed hu-
+lowing poor quality instructions by expending ad-  man instructions. Compared to the template-based
+ditional effort. Therefore, we report additional met-   approach (Crafty), the Speaker-Follower model per-
+rics to capture these costs.  Quality ↑is a self-   forms on par and EnvDrop is only slightly better.
+reported measure of instruction quality based on a   As a ﬁrst step to improving existing navigation in-
+1–5 Likert scale. At the end of each task annota-    struction generators, we focus on developing and
+tors respond to the prompt: Do you think there are    evaluating automated metrics that can approximate
+mistakes in the instruction? Responses range from    these human wayﬁnding evaluations.
+Way too many mistakes to follow (1) to No mis-
+                                        4  Compatibility Modeltakes, very very easy to follow’ (5). Visual Search
+cost ↓measures the percentage of the available   As an alternative to human evaluations, we train
+panoramic visual ﬁeld that the annotator observes   an instruction-trajectory compatibility model to as-
+at each viewpoint, based on the pose traces pro-    sess both the grounding between textual and visual
+vided by PanGEA and ﬁrst proposed in the RxR    inputs and the alignment of the two sequences.
+dataset (Ku et al., 2020). Higher values indicate
+greater effort spent looking for the correct path. We    4.1  Model Structure
+report this separately for the start viewpoint and   Our model is a dual encoder that encodes in-
+other viewpoints since wayﬁnders typically look    structions and trajectories into a shared latent
+around to orient themselves at the start. Time ↓   space (Figure 1).  The instruction representa-
+represents the average time taken in seconds.         tion hw is the concatenation of the ﬁnal output
+                                                         states of a bi-directional LSTM (Schuster and
+Results  Table 1 summarizes the results of 11,886    Paliwal, 1997) encoding the instruction tokens
+wayﬁnding attempts using 37 English-speaking an- W = {w1, w2, ..., wn}. We use contextualized
+notators. The performance of annotators stays con-   token embeddings from BERT (Devlin et al., 2019)
+sistent over time and does not show any sign of    as input to the LSTM.
+adaptation. See Appendix for detailed analysis.       The visual encoder is a two-layer LSTM that pro-
+  As expected, human instructions perform best    cesses visual features extracted from a sequence
+
+=== PDF PAGE 5 ===
+of viewpoints V = {(I1, p1), (I2, p2)..., (It, pt)}   Trajectory Perturbations  To perturb trajecto-
+comprised of panoramic images It captured at po-    ries we use the navigation graphs deﬁning con-
+sitions pt along a 3D trajectory. The vector hvt    nected viewpoints in R2R. Inspired by Huang et al.
+representing the viewpoint at step t is given by:      (2019), we consider Random Walk, Path Reversal,
+                                             and Viewpoint Swap perturbations:
+           at = Attention(hvt−1, epano,t)        (1)
+              vt = f([eprev,t, enext,t, at])        (2)        • Random Walk: The ﬁrst or last two view-
+              hvt = LSTM(vt, hvt−1)        (3)         points are ﬁxed and the remainder of the
+                                                            trajectory is re-sampled using random edge
+where epano,t is a set of 36 visual features repre-                                                               traversals subject to the path length remaining
+senting the panoramic image It (discretized into                                                      within ±1 step of the original. To make the
+36 viewing angles by elevation θ and heading φ),                                                         task harder, we avoid revisiting a viewpoint
+eprev,t and enext,t are the visual features in the direc-                                                 and require the re-sampled trajectory to have
+tions of the previous and next viewpoints (vt−1−vt                                                                at least two overlapping viewpoints with the
+and vt+1 −vt respectively), and f is a projection                                                               original.
+layer. Each visual feature is a concatenation of a
+pre-trained CNN image feature (Juan et al., 2020)        • Path Reversal: The entire trajectory is re-
+with orientation vectors encoding both sine and co-        versed while keeping the same viewpoints.
+sine functions of the absolute and relative angles
+{θabs, φabs, θrel, φrel}. We use standard dot-product        • Viewpoint Swap: A new method we intro-
+attention (Luong et al., 2014) and deﬁne hv = hvT ,       duce that randomly samples and swaps a view-
+the ﬁnal viewpoint embedding in the trajectory.        point in a trajectory with a new viewpoint
+The output of the model is the compatibility score       sampled from the neighbors of the adjacent
+S between an instruction and a trajectory deﬁned        viewpoints in the original trajectory.
+as the cosine similarity between hv and hw.
+                                             Paraphrases  To expand the 14k positive exam-
+4.2  Hard Negative Mining                         ples from the R2R train set and balance the positive-
+To avoid overﬁtting, our compatibility model is    to-negative ratio, we paraphrase instructions via
+not trained on the outputs of any of the instruc-   round-trip back-translation. We use the following
+tion generators that we evaluate. Instead, we use    ten intermediate languages and Google Translate3:
+only the relatively small set of positive instruction-    ar, es, de, fr, hi, it, pt, ru, tr, and zh. To exclude low
+trajectory examples from R2R. We use round-trip    quality or nearly duplicate instructions, we ﬁlter
+back-translation to expand the set of positive exam-   paraphrased instructions outside the BLEU score
+ples. Unmatched instruction-trajectory pairs from    range of [0.25, 0.7] compared to the original. Over-
+R2R are considered to be negative examples and we     all we have a total of 110,601 positive instruction-
+also construct hard negative examples from positive    trajectory pairs in the training set, which contains
+examples by adversarially perturbing both trajecto-   4675 unique trajectories.
+ries and instructions.
+                                                    4.3  Loss Functions
+Instruction Perturbations We use the same in-
+                                               During training, each minibatch is constructed with
+struction perturbations described in Section 3: Di-
+                           N matching instruction-trajectory pairs, which may
+rection Swap, Entity Swap, and Phrase Swap.                                             be perturbed. We deﬁne M ∈{0, 1}N as the vec-
+These perturbations are inspired by typical failure
+                                                         tor indicating unperturbed pairs. A compatibility
+modes in instruction generators and are designed to                                                 matrix S ∈RN×N is deﬁned such that Si,j is the
+be hard to recognize without grounding on images
+                                                  cosine similarity score between instruction i and
+and actions along the trajectory. Previous work
+                                                        trajectory j determined by our model.
+by Huang et al. (2019) considered only trajectory
+                                   We use both binary classiﬁcation loss functions,
+perturbations. While this encourages the model to
+                                           deﬁned on diagonal elements of S, and a con-
+recognize incorrect trajectories for a given ground
+                                                          trastive loss deﬁned on S’s rows and columns.
+truth instruction, it may not encourage the model
+                                                     Contrastive losses are commonly used for retrieval
+to identify a trajectory matched with a poor qual-
+                                              and representation learning (e.g., Yang et al., 2019;
+ity instruction. Our results suggest that instruction
+perturbations are equally important.                          3https://cloud.google.com/translate/
+
+=== PDF PAGE 6 ===
+                                                                                                  Instruction Validation       Path Validation
+
+    Model                                          Perturbations     Validation     Test    Direction Entity Phrase Viewpoint Random   Path
+                                                                                   (val unseen) (val seen)  Swap   Swap  Swap   Swap    Walk   Reversal
+
+ 1  Huang et al. (2019)                               Path + Instruction       53.4        52.3      80.3    89.4   80.9     78.0      72.9     75.9
+
+    This Work
+ 2  + CE Loss                                      Path + Instruction       57.9        57.6      89.5    88.4   83.4     95.0      94.1     87.8
+ 3  + Focal Loss                                    Path + Instruction       59.2        59.2      89.8    90.5   84.2     95.6      95.0     90.3
+ 4  + Contrastive Loss                               Path + Instruction       67.2        68.7      75.1    70.1   73.7     73.6      88.7     93.1
+ 5  + Contrastive + CE                               Path + Instruction       66.5        67.5      82.0    77.4   76.9     84.7      91.3     91.7
+ 6  + Contrastive + Focal                            Path + Instruction       68.5        68.3      83.9    81.5   79.8     88.5      93.7     93.3
+ 7  + Contrastive + Focal + Paraphrase                Path + Instruction       71.3        72.2      83.1    81.9   80.4     90.4      95.2     94.0
+ 8  + Contrastive + Focal + Paraphrase + Bert Embed.   Path + Instruction       73.5        73.7      84.6    86.7   82.2     89.1      94.3     93.3
+
+     Perturbation Ablations
+ 9  + Contrastive + Focal + Paraphrase + Bert Embed.       Instruction          70.5        70.4      85.1    88.6   82.5     64.9      84.3     90.7
+ 10 + Contrastive + Focal + Paraphrase + Bert Embed.  Direction Swap Only     70.1        68.9      89.0    72.0   70.7     65.9      85.0     91.0
+ 11 + Contrastive + Focal + Paraphrase + Bert Embed.   Entity Swap Only       69.1        68.5      70.3    92.7   71.3     65.2      84.4     90.9
+ 12 + Contrastive + Focal + Paraphrase + Bert Embed.   Phrase Swap Only       70.3        70.5      70.1    72.5   85.5     65.5      83.3     90.1
+ 13 + Contrastive + Focal + Paraphrase + Bert Embed.         Path             69.7        69.4      71.7    71.4   69.8     92.4      94.8     92.2
+ 14 + Contrastive + Focal + Paraphrase + Bert Embed. Viewpoint Swap Only     70.7        72.1      70.7    71.1   71.2     94.6      94.6     91.9
+ 15 + Contrastive + Focal + Paraphrase + Bert Embed.  Random Walk Only      70.5        70.9      70.5    71.5   71.0     81.7      95.1     91.6
+ 16 + Contrastive + Focal + Paraphrase + Bert Embed.   Path Reversal Only      69.4        69.7      71.0    70.7   71.2     65.3      86.3     91.9
+ 17 + Contrastive + Focal + Paraphrase + Bert Embed.   No Perturbation        69.1        69.7      71.1    71.0   70.8     65.3      84.9     90.2
+
+Table 2: Ablation of different models based on classiﬁcation AUC. Models are trained with the original R2R-train
+data and paraphrased positive instructions, plus path and/or instruction perturbed hard negatives (second column).
+The best models are selected based on the validation set (column 3), and we report the ﬁnal test performance in
+column 4. To understand the performance of individual perturbation method, we also report the best AUCs for
+each of the six perturbations in columns 5 - 10.
+
+
+Chen et al., 2020) and in our case exploits all ran-   Sampling hyperparameters We sample posi-
+dom instruction-trajectory pairs in a minibatch.       tive and negative examples equally with a mix ratio
+  Each loss requires a separate normalization. For    of 2:1:1 for ground truth, instruction perturbations,
+the classiﬁcation loss we compute the probability of   and trajectory perturbations, respectively. For each
+a match pi,j, such that pi,j = σ(aSi,j + b) where a    perturbation type, we sample the three methods
+and b are learned scalars and σ is the sigmoid func-   with equal probability.
+tion. For the classiﬁcation loss Lcls we consider
+both binary cross entropy loss LCE, and focal loss   5  Experiments
+(Lin et al., 2017) given by LFL = (1 −pi,j)γLCE
+                                We evaluate our compatibility model against al-
+where we set γ = 2.
+                                                       ternative model-based evaluations and standard
+  For the contrastive loss we compute logits by
+                                                       textual similarity metrics. We report instruction
+scaling S with a learned scalar temperature τ. The
+                                                      classiﬁcation results in Section 5.1, improved data
+contrastive loss LC(S) calculated over the rows
+                                               augmentation for VLN agents in Section 5.2, and
+and colums of S is given by:
+                                                        correlation with human wayﬁnder outcomes in 5.3.
+              N
+             1
+                                                    5.1  Instruction Classiﬁcation  LC(S) =  X  Lr(Si) + Lr(S⊺i )    (4)
+     Pi Mi i=1                                              Evaluation  In this setting we use the instruction-
+where Lr(Si) = 0 if Mi = 0, i.e., the diagonal    trajectory compatibility model to classify high and
+element is a perturbed pair and not considered to   low quality instructions for trajectories from the
+be a match. Otherwise:                    R2R val-unseen and val-seen sets. The instruction
+                                                 pool includes 3 high-quality instructions per trajec-
+                                   eSi,i/τ
+         Lr(Si) = −log                     (5)    tory from R2R, plus 2 instructions per trajectory
+             PNj  eSi,j/τ            from the Speaker-Follower and EnvDrop models.
+                                              These are considered to be high quality if 2 out of 3
+The ﬁnal loss is the combination:
+                                        human wayﬁnders reached the goal (see Section 3),
+                  N                    and low quality otherwise. We assess model perfor-                  β
+     L = LC(S) + X Lcls(Si,i)      (6)            N                     mance using Area Under the ROC Curve (AUC).
+                          i=1
+                                  We use the val-unseen split (3915 instructions, 75%
+where Lcls is the classiﬁcation loss, either LCE or    high quality) for model validation and the val-seen
+LFL, and we set β = 1.                                   split (1700 instructions, 78% high quality) as test.
+
+=== PDF PAGE 7 ===
+                                                  45                                                  37.5
+      8.0
+                                                                                                              35.0
+                                                  40
+      7.5                         ) 32.5
+
+)              )
+                           ( 30.0(              (                                                  35      7.0
+ NE                        SR                                                    27.5                                                                                                           SDTW
+      6.5                                           30                                                  25.0
+                                                                               top_x
+                                                                     random_x                        22.5
+      6.0                                           25                  top_x augmented only
+                                                                     random_x augmented only         20.0
+
+         0     20     40     60     80    100          0     20     40     60     80    100            0     20    40    60    80    100
+                  Percentage                             Percentage                              Percentage
+
+Figure 2: Navigation performance of a VLN agent trained with different fractions of Speaker-Follower augmented
+paths, starting from 1%. For NE, lower is better; for SR and SDTW, higher is better. The dashed-lines (green and
+red) use only augmented paths in training, while the dotted lines (blue and orange) use both augmented and R2R-
+train paths. Filled circles indicate fractions ranked by our compatibility model in descending order, while triangles
+indicate random fractions. Each point is the mean of 3 runs and the error bars represent the standard deviation of
+the mean. The model-ranked fractions show consistent improvement over random samples of the same percentage.
+Agents trained with only augmented paths (dashed-lines) show greater difference between model-ranked fractions
+and random fractions.
+
+
+Benchmark We compare to the compatibility   using only instruction perturbations (row 9), only
+model proposed by Huang et al. (2019), which    path perturbations (13), or no perturbations at all
+computes elementwise similarities between instruc-   (row 17) perform considerably worse than our best
+tion words and trajectory panoramas before pool-   model (row 8). We also show that no individual
+ing, and does not include action embeddings (eprev,t    perturbation approach is effective on its own. In
+and enext,t) or position encodings pt. In contrast,   addition to scores for the validation and test sets,
+our model calculates the similarity between instruc-  we report AUC for each perturbation method on the
+tions and trajectories after pooling each sequence    val-seen set to investigate their individual perfor-
+and includes both action and position encodings.    mance. Overall, trajectory perturbations get higher
+                                                     scores than instruction perturbations, showing they
+Results  Table 2 reports classiﬁcation AUC in-                                                    are easier tasks. Phrase Swap proves the hardest
+cluding comprehensive ablations of loss functions,                                                          task, while Random Walk is the easiest.
+approaches to hard negative mining, and model-
+ing choices. With regard to the loss function, we
+                                                    5.2  Data Augmentation for VLN
+ﬁnd that the combination of contrastive and fo-
+cal loss (row 6) performs best overall, and that   Data augmentation using instructions from the
+adding contrastive loss provides a very signiﬁcant   Speaker-Follower and EnvDrop models is perva-
+9 - 10% increase in AUC compared to using just    sive in the training of VLN agents (Wang et al.,
+cross-entropy (CE) or focal loss (rows 2 and 3) due   2019; Huang et al., 2019; Li et al., 2019).  In
+to the effective use of in-batch negatives. Adding    this section we evaluate whether our compatibil-
+paraphrased positive instructions and pretrained    ity model can be used to ﬁlter out low quality in-
+BERT token embeddings also leads to signiﬁcant    structions from the augmented training set to im-
+performance gains (rows 7 and 8 vs. row 6). The   prove VLN performance. We score all of 170k
+best performing model on both the validation and   augmented instruction-trajectory pairs from the
+test sets uses Contrastive + Focal loss with para-   Speaker-Follower model and rank them in descend-
+phrased instructions and BERT embeddings, as    ing order. We then use different fractions of the
+well as trajectory and instruction perturbations (row   ranked data to train VLN agents, and compare with
+8). This model consistently outperforms the bench-   agents trained using random samples of the same
+mark from prior work (row 1) by a large margin    size. We use a VLN agent model based on Wang
+and achieves a test set AUC of 73.7%.                  et al. (2019) and implemented in VALAN (Lansing
+   In rows 9–17 we ablate the six perturbation meth-    et al., 2019), which achieves a success rate (SR) of
+ods that we use for hard negative mining. Ablations  45% on the R2R val-unseen split when trained on
+
+=== PDF PAGE 8 ===
+the R2R train split and all of the Speaker-Follower                                    All Instructions (N=3.9k, M=9)
+augmented instructions.                                          Score     Ref   NE ↓      SR ↑      SPL ↑      Quality ↑
+                                                             BLEU-4  ✓( 0.00, 0.33) (-0.22, 0.39) (-0.22, 0.00)  ( 0.11, 0.39)
+  Figure 2 indicates that instruction-trajectory       CIDEr   ✓( 0.06, 0.39) (-0.22, 0.39) (-0.22, 0.00)  ( 0.17, 0.39)
+pairs selected by our compatibility model consis-     METEOR ✓( 0.11, 0.44) (-0.39, 0.28) (-0.39, -0.06)  ( 0.00, 0.28)                                                    ROUGE  ✓( 0.06, 0.39) (-0.28, 0.39) (-0.33, 0.00)  ( 0.06, 0.39)
+tently outperform random training pairs in terms       SPICE     ✓(-0.67, -0.28) (-0.06, 0.61)  ( 0.44, 0.78)  ( 0.56, 0.83)
+                                                                  BERTScore ✓( 0.06, 0.39) (-0.22, 0.39) (-0.22, 0.00)  ( 0.17, 0.39)of the performance of the trained VLN agent.                           System-Level SPL1-agent       (-0.50, -0.06) (-0.22, 0.44)  ( 0.11, 0.56)  ( 0.00, 0.44)
+                                                                                                              (-0.22,                                                                                                            0.17)                                                                                                                             (-0.33,                                                                                                                           0.39)                                                                                                                                                                 (                                                                                                                                        0.00,                                                                                                                                         0.33)                                                                                                                                                                                   (                                                                                                                                                       0.33,                                                                                                                                                       0.61)This demonstrates the efﬁcacy of our compatibility          SPL3-agents                                                                                                              (-0.44,                                                                                                            0.00)                                                                                                                             (-0.22,                                                                                                                           0.44)                                                                                                                                                                 (                                                                                                                                        0.11,                                                                                                                                         0.50)                                                                                                                                                                                   (                                                                                                                                                       0.00,                                                                                                                                                       0.44)                                                                              SDTW1-agent
+model for improving VLN data augmentation by        SDTW3-agents    (-0.22, 0.17) (-0.28, 0.33)  ( 0.00, 0.33)  ( 0.33, 0.61)
+                                                                                  Compatibility   (-0.17, 0.17) (-0.17, 0.50)  ( 0.00, 0.28)  ( 0.44, 0.72)
+identifying high quality instructions.
+                                                                                                              All Instructions (N=3.9k, M=9)
+
+5.3  Correlation with Human Wayﬁnders               Score     Ref   NE ↓      SR ↑      SPL ↑      Quality ↑
+                                                             BLEU-4  ✓( 0.05, 0.09) (-0.04, 0.00) (-0.09, -0.05) (-0.01, 0.03)
+In this section we evaluate the correlation between       CIDEr   ✓( 0.06, 0.09) (-0.04, -0.00) (-0.11, -0.07) (-0.02, 0.01)
+                                                   METEOR ✓( 0.00, 0.04) (-0.05, -0.02) (-0.04, 0.00) (-0.01, 0.02)
+the scores given by our instruction-trajectory com-     ROUGE  ✓( 0.05, 0.08) (-0.05, -0.01) (-0.10, -0.06) (-0.02, 0.02)
+patability model and the outcomes from the human       SPICE     ✓(-0.05, -0.02) (-0.00, 0.04)  ( 0.03, 0.06)  ( 0.03, 0.07)
+                                                                  BERTScore ✓(-0.04, -0.00)  ( 0.07, 0.12) (-0.01, 0.03)  ( 0.07, 0.11)wayﬁnding attempts described in Section 3. Using                                   Instance-Level SPL1-agent       (-0.18, -0.14)  ( 0.15, 0.19)  ( 0.14, 0.18)  ( 0.07, 0.11)
+Kendall’s τ to assess rank correlation, we report          SPL3-agentsSDTW1-agent    (-0.22,(-0.18, -0.18)-0.14)  (( 0.15,0.20, 0.24)0.19)  (( 0.14,0.18, 0.18)0.22)  (( 0.08,0.10, 0.12)0.14)
+both system-level and instance-level correlation.        SDTW3-agents    (-0.22, -0.19)  ( 0.20, 0.24)  ( 0.18, 0.22)  ( 0.11, 0.15)
+                                                                                  Compatibility   (-0.20, -0.17)  ( 0.13, 0.17)  ( 0.17, 0.20)  ( 0.19, 0.23)
+The instance-level evaluations assess whether the
+                                                                                       Model-Generated Instructions (N=2.2k, M=4)
+metric can identify the best instruction from two                                                                          Score     Ref   NE ↓      SR ↑      SPL ↑      Quality ↑
+candidates, while the system-level evaluations as-                                                             BLEU-4   ✓(-0.02, 0.03) (-0.03, 0.02) (-0.02, 0.03) (-0.02, 0.03)
+sess whether a metric can identify the best model       CIDEr     ✓(-0.02, 0.03) (-0.03, 0.02) (-0.02, 0.03) (-0.02, 0.03)
+                                                   METEOR  ✓(-0.02, 0.03) (-0.03, 0.02) (-0.02, 0.03) (-0.02, 0.03)
+from two candidates (after averaging over many     ROUGE   ✓(-0.02, 0.03) (-0.05, 0.00) (-0.04, 0.01) (-0.03, 0.02)
+instruction scores for each model). The results in       SPICEBERTScore ✓(-0.05,✓(-0.22, -0.00)-0.18)  (( 0.00,0.19, 0.05)0.24)  (( 0.00,0.18, 0.05)0.23)  (( 0.01,0.16, 0.06)0.20)Table 3 are reported separately over all 3.9k in-                               Instance-Level SPL1-agent       (-0.21, -0.16)  ( 0.17, 0.23)  ( 0.16, 0.22)  ( 0.07, 0.12)
+                                                                                             SPL3-agents       (-0.26, -0.21)  ( 0.21, 0.27)  ( 0.21, 0.26)  ( 0.09, 0.14)
+structions (9 systems comprising the rows of Table        SDTW1-agent    (-0.22, -0.16)  ( 0.17, 0.23)  ( 0.16, 0.22)  ( 0.07, 0.13)
+1), and over model-generated instructions only (4         SDTW3-agentsCompatibility   (-0.25,(-0.26, -0.21)-0.20)  (( 0.22,0.22, 0.27)0.27)  (( 0.21,0.21, 0.26)0.25)  (( 0.10,0.18, 0.15)0.23)
+systems comprising the 2.2k instructions generated
+                                                      Table 3: Kendall’s τ correlation between automated in-by the Speaker-Follower and EnvDrop models on
+                                                             struction evaluation metrics and human wayﬁnder eval-R2R val-seen and val-unseen).
+                                                            uations.  Ranges are 90% conﬁdence intervals based
+Automatic Metrics  For comparison we include   on bootstrap resampling. N refers to the number of
+                                                             instructions and M refers to the number of systems.standard textual evaluation metrics (BLEU, CIDEr,
+                                                                       If checked, Ref indicates that the metric requires ref-METEOR, ROUGE and SPICE) and two model-
+                                                      erence instructions for comparison.  SPLk-agent(s) and
+based metrics: BERTScore (Zhang et al., 2019),
+                                                          SDTWk-agent(s) refers to wayﬁnding scores averaged
+and scores based on the performance of a trained                                                      over k VLN agents trained from random initialization.
+VLN agent attempting to follow the candidate in-
+struction (Agarwal et al., 2019). Note that only
+the compatibility model and the VLN agent-based  We then employ the trained agents for the wayﬁnd-
+scores use the candidate trajectory – the other met-   ing task and report performance as either the SPL
+rics are calculated by comparing each candidate    or SDTW similarity between the path taken by the
+instruction to the three reference instructions from    agent and the reference path – using either a single
+R2R (and are thus reliant on reference instructions).   agent or the average score from three agents.
+  To calculate the standard metrics we use the ofﬁ-                                                 Results  Table 3 compares  system-level and
+cial evaluation code provided with the COCO cap-                                                        instance-level correlations for all metrics, both stan-
+tions dataset (Chen et al., 2015). For BERTScore,                                                dard and model-based. At the system-level, we
+we use a publicly available uncased BERT4 model                                                  see no correlation between standard text metrics
+with 12 layers and hidden dimension 768, and com-
+                                                such as BLEU, ROUGE, METEOR and CIDEr and
+pute the mean F1-score over the three references.                                       human wayﬁnder performance. The exception is
+For the VLN agent score, we train three VLN                                           SPICE, which shows the desired negative corre-
+agents based on Wang et al. (2019) from differ-                                                        lation with NE, and positive correlation with SR,
+ent random initializations using the R2R train set.                                     SPL (see Figure 3) and Quality. At the system-
+    4tfhub.dev/google/bert uncased L-12 H-768 A-12/1         level, the model-based approaches (BERTScore,
+
+=== PDF PAGE 9 ===
+                                              been hindered by a lack of suitable automatic eval-
+                                                   uation metrics. With the exception of SPICE, all
+                                                    the standard textual evaluation metrics we evalu-
+                                                   ated (BLEU, CIDEr, METEOR and ROUGE) are
+                                                          ineffective, and – perhaps as a result – existing in-
+                                                        struction generators have substantial headroom for
+                                               improvement.
+                                           To  address  this  problem, we  develop an
+                                                         instruction-trajectory compatibility model that out-
+                                                performs all existing automatic evaluation metrics
+                                          on instance-level evaluation without needing any
+                                                    reference instructions – making it suitable for use
+                                                     as a reward function in a reinforcement learning set-
+                                                             ting, as a discriminator in a Generative Adversarial
+                                           Network (GAN) (Dai et al., 2017), or for ﬁltering
+                                                        instructions in a data augmentation setting.
+                                                    Progress in natural language generation (NLG)
+Figure 3:  Standard evaluation metrics vs.  human
+                                                                  is increasing the demand for evaluation metrics that
+wayﬁnding outcomes (SPL) for 9 navigation instruc-
+                                              can accurately evaluate generated text in a varietytion generation systems.  SPICE is most consistent
+with human wayﬁnding outcomes, although no metrics    of domains. Our ﬁndings are a timely reminder that
+score the Crafty template-based instructions highly.       textual evaluation metrics should not be trusted in
+                                       new domains unless they have been comprehen-
+                                                      sively validated against human judgments. In the
+agent SPL/SDTW and Compatability) also lack
+                                                   case of grounded navigation instructions, for model
+the desired correlation and exhibit wide conﬁdence
+                                                      selection in the presence of reference instructions
+intervals. Here, it is important to point out that
+                                      we recommend using the SPICE metric. In all other
+the 9 systems under evaluation include a variety of
+                                                     scenarios (e.g., selecting individual instructions, or
+styles (e.g., Crafty’s template-based instructions,
+                                            model selection without reference instructions) we
+different annotator pools, adversarial perturbations)
+                                        recommend using a learned instruction-trajectory
+which are dissimilar to the R2R data used to train
+                                                     compatibility model.
+the VLN agents and the compatibility model. Ac-
+cordingly, the model-based approaches are unable   Acknowledgements
+to reliably rank these out-of-domain systems.
+                                We thank the Google Data Compute team, in par-  At the instance-level (when scoring individ-
+                                                          ticular Ashwin Kakarla and Priyanka Rachapally,ual instructions) we observe different outcomes.
+                                                      for their tooling and annotation support for thisSPICE scores for individual instructions have high
+                                                         project.variance, and so SPICE does not correlate with
+wayﬁnder performance at the instruction level. In
+contrast, the model-based approaches exhibit the                                          References
+desired correlation, particularly when restricted to
+                                            Sanyam Agarwal, Devi Parikh, Dhruv Batra, Peter An-
+the model-generated instructions (Table 3 bottom                                                           derson, and Stefan Lee. 2019.   Visual landmark
+panel). Our compatibility score shows the strongest       selection for generating grounded and interpretable
+correlation among all metrics, performing similarly       navigation instructions. In CVPR workshop on Deep
+to an ensemble of three VLN agents.                   Learning for Semantic Visual Navigation.
+
+                                                          Peter Anderson, Angel X. Chang, Devendra Singh
+6  Conclusion                                                          Chaplot,  Alexey  Dosovitskiy,  Saurabh  Gupta,
+                                                       Vladlen  Koltun,  Jana  Kosecka,   Jitendra  Ma-
+Generating grounded navigation instructions is one                                                                            lik,  Roozbeh  Mottaghi,  Manolis  Savva,  and
+of the most promising directions for improving the     Amir Roshan Zamir. 2018a. On evaluation of em-
+performance of VLN wayﬁnding agents, and a chal-      bodied navigation agents. CoRR, abs/1807.06757.
+lenging and important language generation task in                                                          Peter Anderson, Basura Fernando, Mark Johnson, and
+its own right. In this paper, we show that efforts      Stephen Gould. 2016.  SPICE: Semantic Proposi-
+to improve navigation instruction generators have       tional Image Caption Evaluation. In ECCV.
+
+=== PDF PAGE 10 ===
+Peter Anderson, Qi Wu, Damien Teney, Jake Bruce,    Gabriel Ilharco, Vihan Jain, Alexander Ku, Eugene
+  Mark Johnson, Niko S¨underhauf, Ian Reid, Stephen        Ie, and Jason Baldridge. 2019.  Effective and gen-
+  Gould, and Anton van den Hengel. 2018b. Vision-       eral evaluation for instruction conditioned naviga-
+  and-Language Navigation:   Interpreting  visually-       tion using dynamic time warping. NeurIPS Visually
+  grounded navigation instructions in real environ-     Grounded Interaction and Language Workshop.
+  ments. In CVPR.
+                                                  Vihan Jain, Gabriel Magalh˜aes, Alexander Ku, Ashish
+Howard Chen, Alane Suhr, Dipendra Misra, Noah      Vaswani, Eugene  Ie, and Jason Baldridge. 2019.
+   Snavely, and Yoav Artzi. 2019. Touchdown: Natural      Stay on the path: Instruction ﬁdelity in vision-and-
+  language navigation and spatial reasoning in visual      language navigation. In ACL.
+   street environments. In CVPR.
+                                              Da-Cheng Juan, Chun-Ta Lu, Zhen Li, Futang Peng,
+Ting Chen, Simon Kornblith, Mohammad Norouzi,      Aleksei Timofeev, Yi-Ting Chen, Yaxi Gao, Tom
+  and Geoffrey Hinton. 2020. A simple framework      Duerig, Andrew Tomkins, and Sujith Ravi. 2020.
+   for contrastive learning of visual representations. In       Ultra ﬁne-grained image semantic embedding.  In
+  ICML.                                               Proceedings of the 13th International Conference on
+                                            Web Search and Data Mining, page 277–285.
+Xinlei  Chen,  Tsung-Yi  Lin Hao  Fang,  Ramakr-
+   ishna Vedantam, Saurabh Gupta, Piotr Dollar, and    Alexander Ku, Peter Anderson, Roma Patel, Eugene
+  C. Lawrence Zitnick. 2015. Microsoft COCO Cap-        Ie, and Jason Baldridge. 2020. Room-across-room:
+   tions: Data Collection and Evaluation Server. arXiv       Multilingual vision-and-language navigation with
+   preprint arXiv:1504.00325.                            dense spatiotemporal grounding. In Proceedings of
+                                                             the 2020 Conference on Empirical Methods in Natu-
+Bo Dai, Sanja Fidler, Raquel Urtasun, and Dahua Lin.                                                                ral Language Processing (EMNLP).
+  2017.  Towards diverse and natural image descrip-
+   tions via a conditional gan.  In Proceedings of the    Larry Lansing, Vihan Jain, Harsh Mehta, Haoshuo
+  IEEE International Conference on Computer Vision      Huang, and Eugene Ie. 2019. VALAN: Vision and
+  (ICCV).                                             language agent navigation. arXiv:1912.03241.
+
+Michael Denkowski and Alon Lavie. 2014. Meteor uni-   Xiujun Li, Chunyuan Li, Qiaolin Xia, Yonatan Bisk,
+   versal: Language speciﬁc translation evaluation for       Asli Celikyilmaz, Jianfeng Gao, Noah Smith, and
+  any target language.  In Proceedings of the Ninth      Yejin Choi. 2019. Robust navigation with language
+  Workshop on Statistical Machine Translation, pages       pretraining and stochastic sampling. In CVPR.
+  376–380, Baltimore, Maryland, USA. Association
+   for Computational Linguistics.                    Chin-Yew Lin. 2004. ROUGE: A package for auto-
+                                                        matic evaluation of summaries. In Text Summariza-
+Jacob Devlin, Ming-Wei Chang, Kenton Lee, and       tion Branches Out, pages 74–81, Barcelona, Spain.
+   Kristina Toutanova. 2019.  BERT: Pre-training of      Association for Computational Linguistics.
+  deep bidirectional transformers for language under-
+   standing. In NAACL.                              Tsung-Yi Lin, Priya Goyal, Ross Girshick, Kaiming
+                                                    He, and Piotr Doll´ar. 2017. Focal loss for dense ob-
+Markus Dr¨ager and Alexander Koller. 2012.  Genera-       ject detection. In CVPR.
+   tion of landmark-based navigation instructions from
+  open-source data. In Proceedings of the 13th Con-   Minh-Thang Luong, Hieu Pham, and Christopher D
+   ference of the European Chapter of the Association      Manning. 2014.  Effective approaches to attention-
+   for Computational Linguistics, pages 757–766, Avi-      based neural machine translation. In EMNLP.
+  gnon, France. Association for Computational Lin-
+   guistics.                                         Arjun Majumdar, Ayush Shrivastava, Stefan Lee, Peter
+                                                      Anderson, Devi Parikh, and Dhruv Batra. 2020. Im-
+Daniel  Fried, Ronghang Hu,  Volkan  Cirik, Anna      proving vision-and-language navigation with image-
+  Rohrbach, Jacob Andreas, Louis-Philippe Morency,       text pairs from the web. In CVPR.
+  Taylor Berg-Kirkpatrick, Kate Saenko, Dan Klein,
+  and Trevor Darrell. 2018. Speaker-follower models    Vivien Mast and Diedrich Wolter. 2013. A probabilis-
+   for vision-and-language navigation. In NeurIPS.             tic framework for object descriptions in indoor route
+                                                                 instructions.  In Spatial Information Theory, pages
+Tsu-Jui Fu, Xin Eric Wang, Matthew Peterson, Scott      185–204, Cham. Springer International Publishing.
+   Grafton, Miguel Eckstein, and William Yang Wang.
+  2019.  Counterfactual vision-and-language naviga-   Harsh Mehta, Yoav Artzi, Jason Baldridge, Eugene
+   tion via adversarial path sampling.                             Ie,  and  Piotr Mirowski. 2020.   Retouchdown:
+                                                 Adding touchdown to streetlearn as a shareable re-
+Haoshuo Huang, Vihan Jain, Harsh Mehta, Alexander      source for language grounding tasks in street view.
+  Ku, Gabriel Magalhaes, Jason Baldridge, and Eu-      arXiv:2001.03671.
+  gene Ie. 2019. Transferable representation learning
+   in vision-and-language navigation.  In Proceedings    Kishore Papineni, Salim Roukos, Todd Ward, and Wei-
+   of the IEEE/CVF International Conference on Com-      Jing Zhu. 2002. Bleu: a method for automatic eval-
+   puter Vision (ICCV).                                     uation of machine translation. In ACL.
+
+=== PDF PAGE 11 ===
+Yuankai Qi, Qi Wu,  Peter Anderson, Xin Wang,
+  William Yang Wang, Chunhua Shen, and Anton
+  van den Hengel. 2020. REVERIE: Remote embod-
+   ied visual referring expression in real indoor environ-
+  ments. In CVPR.
+
+Kai-Florian Richter and Alexander Klippel. 2005. A
+  model for context-speciﬁc route directions. In Spa-
+   tial Cognition IV. Reasoning, Action, Interaction,
+  pages 58–78, Berlin, Heidelberg. Springer Berlin
+   Heidelberg.
+
+Michael Roth and Anette Frank. 2010. Computing EM-
+  based alignments of routes and route directions as a
+   basis for natural language generation.  In Proceed-
+   ings of the 23rd International Conference on Compu-
+   tational Linguistics (Coling 2010), pages 958–966,
+   Beijing, China. Coling 2010 Organizing Committee.
+
+Mike Schuster and Kuldip K. Paliwal. 1997.  Bidirec-
+   tional recurrent neural networks. IEEE Trans. Sig-
+   nal Processing, 45:2673–2681.
+
+Thibault Sellam, Dipanjan Das, and Ankur Parikh.
+  2020. BLEURT: Learning robust metrics for text
+   generation. In Proceedings of the 58th Annual Meet-
+   ing of the Association for Computational Linguistics,
+  pages 7881–7892, Online. Association for Computa-
+   tional Linguistics.
+
+Hao Tan, Licheng Yu, and Mohit Bansal. 2019. Learn-
+   ing to navigate unseen environments: Back transla-
+   tion with environmental dropout. In NAACL.
+
+Jesse Thomason, Michael Murray, Maya Cakmak, and
+  Luke Zettlemoyer. 2019. Vision-and-dialog naviga-
+   tion. In CoRL.
+
+Ramakrishna Vedantam, C. Lawrence Zitnick, and
+  Devi Parikh. 2015. Cider: Consensus-based image
+   description evaluation. In CVPR.
+
+Xin Wang, Qiuyuan Huang, Asli Celikyilmaz, Jian-
+  feng  Gao,  Dinghan  Shen,  Yuan-Fang  Wang,
+  William Yang Wang, and Lei Zhang. 2019.  Re-
+   inforced cross-modal matching and self-supervised
+   imitation learning for vision-language navigation.
+   In CVPR.
+
+Yinfei Yang, Gustavo Hern´andez ´Abrego, Steve Yuan,
+  Mandy Guo, Qinlan Shen, Daniel Cer, Yun-Hsuan
+  Sung, Brian Strope, and Ray Kurzweil. 2019. Im-
+  proving multilingual sentence embedding using bi-
+   directional dual encoder with additive margin soft-
+  max. In IJCAI.
+
+Tianyi Zhang, Varsha Kishore, Felix Wu, Kilian Q.
+  Weinberger, and Yoav Artzi. 2019. Bertscore: Eval-
+   uating text generation with BERT. In ICLR.
+
+=== PDF PAGE 12 ===
+A  Automated metric scores for all           For each object, we obtain properties such as their
+    instructions                                 category and center, which allows the distance and
+                                                heading from the panorama center to be computed.
+We provide more details about automated metric
+                                       From these, the Walker creates a sequence of mo-
+scores for all instructions in this section. Table 4
+                                                      tion tuples, each of which captures the context of
+gives automated metrics for each model we con-
+                                                      the source panorama and the goal panorama, along
+sider. Generated instructions from EnvDrop and
+                                                 with the heading to move from source to goal.
+Speaker-Follower are scored the highest, whereas
+human instructions are scored poorly and on par   B.3  Observer
+with perturbed instructions, and Crafty is the low-                                          The Observer selects an object sequence by gener-
+est. These results diverge signiﬁcantly from human                                                     ating objects from an HMM that is specially con-
+wayﬁnding performance in Section 3, and high-                                                       structed for each environment, characterized by:
+lights the inefﬁcacy of these automated text met-
+rics.                                                            • Emissions: how panoramas relate to objects.
+             BertScore BLEU-4 CIDEr ROUGE METEOR SPICE         This is a probability distribution over panora-
+ Val-unseen                                     mas for each object, based on the distance
+ Speaker Fol.    78.9      22.3     36.3     45.6       23.1      17.0         between the object and the panoramas.
+ EnvDrop        79.3      23.7     42.2     45.8       22.5      18.1
+
+ Val-seen
+ Speaker Fol.    79.0      23.3     40.1     46.3       23.5      18.7          • Transitions: how looking at one object might
+ EnvDrop        79.5      24.5     49.3     46.7       22.8      20.2            shift to another one, based on their relative lo-
+ Crafty          71.5       4.1      0.4     23.3       17.5      12.0
+ Dir. Swap       74.7       8.2      5.7     31.4       20.7      19.4            cation, the motion at play, and the Appraiser’s
+ Entity      Swap                 74.0                             8.4                                      4.6                                             31.4                                                       20.6                                                                 17.8
+ Phrase      Swap                 74.8                             9.8                                      7.4                                             31.4                                                       21.0                                                                 20.1          assessment of their prominence.
+ Human         74.9       9.9      6.7     33.3       21.9      21.0
+                                          The intuition for using an HMM is that we tend to
+Table 4: Automated metric scores for all instructions.
+                                                ﬁxate on a given salient object over several steps
+The BLEU, CIDEr and ROUGE metrics score human
+                                                   as we move (high self-transitions); these tend toinstructions poorly compared to the neural net models.
+                                             be nearby (high emission probability for objects
+                                                   near a panorama’s center) and connected to the next
+B  Crafty Details                                    salient object (biased object-object transitions). To
+                                                   explain a particular observed panorama sequence
+We use the data in Matterport3D to build Crafty,    (path), we can then infer the optimal object se-
+a template-based navigation instruction generator   quence using the Viterbi algorithm.
+that uses a Hidden Markov Model (HMM) to se-
+lect objects as reference landmarks for wayﬁnding.   B.4  Talker
+Crafty’s four main components (Appraiser, Walker,   Given a motions sequence from the Walker and cor-
+Observer and Talker) are described below.          responding object observations from the Observer,
+                                                    the Talker uses a small set of templates to create
+B.1  Appraiser
+                                                 English instructions for each step. We decompose
+The Appraiser scores the interestingness of objects    this into low-level and high-level templates.
+based on the Matterport3D scans in the training
+                                                  B.4.1  Low-level templatesset. It treats each panorama as a document and the
+categories corresponding to objects visible from   For single step actions, there are three main things
+the panorama as words, and then computes a per-    to mention: movement, the ﬁxated object and its
+category inverse document frequency (IDF) score.    relationship to the agent’s position.
+                                  MOVE. For movement, we simply generate a
+B.2  Walker                                                         set of possible commands for each direction type,
+The Walker converts a panorama sequence into a   where the direction types are deﬁned as in the orien-
+motion sequence. Given a path (sequence of con-    tation wheel shown in Fig. 4. There are additional
+nected panoramas) and an initial heading, it cal-   direction types for UP and DOWN based on rela-
+culates the entry heading into each panorama and    tive pitch (e.g. when the goal panorama is higher
+the exit heading required to transition to the next    or lower than the source).
+panorama. For each panorama, all annotated ob-     Given one of these heading types, we generate
+jects that are visible from the location are retrieved.   a set of matching phrases appropriate to each. E.g.
+
+=== PDF PAGE 13 ===
+                                                           tions: start of a path, heading change in a panorama
+                                                            (intra) and moving between panoramas (inter).
+
+                                                                 • Start of path: There are several templates that
+                                                   simply help a wayﬁnder verify their current
+                                                             position. Ex: you are near a OBJ, ORIENT.
+
+                                                                 • Intra: These templates include the movement
+                                         command followed by a veriﬁcation of the
+                                                            orientation to an object having completed the
+                                                movement. Ex: MOVE. a OBJ is ORIENT.
+
+                                                                 • Inter : These templates capture walking from
+                                                one panorama to another and provide addi-
+                                                             tional object veriﬁcation. Ex: MOVE, going
+                                                    along to the OBJ ORIENT.
+Figure 4: Orientation wheel with directions types. The
+demarcations are π8 (22.5◦), 3π8  (67.5◦), etc.               Multi-step actions. We attempt to reduce ver-
+                                                    bosity by collapsing actions that involve ﬁxation
+                                           on the same object.
+for LEFT and RIGHT, the verbs face, go, head,
+make a, pivot, turn, and walk are combined left and        • Combining actions:  Repeated actions are
+right, respectively. For moving STRAIGHT, the         collapsed; e.g. [STRAIGHT, STRAIGHT,
+verbs continue, go, head, proceed, walk, and travel       RIGHT, STRAIGHT] becomes [STRAIGHT,
+are combined with straight and ahead. To select an       RIGHT, STRAIGHT]). These produce a com-
+instruction for a given heading, we randomly sam-        posite move command, e.g. proceed forward
+ple from the list of available phrases. To generate a       and make a right and go straight.
+MOVE command for LEFT, we randomly sample
+from [face left, go left, . . . walk left].                       • Describing the object: To orient with respect
+                                                           to the ﬁxated-upon object, we switch on the  OBJ. An object’s description is its category (e.g.
+                                                           direction type between the agent and the ob-couch, tv, window).
+                                                                   ject at the last action. Ex: for STRAIGHT, we  ORIENT. We use the same direction types
+                                                      use heading toward the OBJ and for SLIGHTshown  in  Figure  4.   When  an  object  is
+                                           LEFT/RIGHT, we use approaching the OBJSTRAIGHT and BEHIND, we use the phrases
+                                           ORIENT.ahead  of  you  or  in  front  of  you  and  be-
+hind  you  or  in  back  of  you,  respectively.
+                                            The ﬁnal output is the concatenation of the com-
+For objects to the LEFT or RIGHT, we use
+                                                bined move command and the object orientation
+two templates DIRECTION PRE DIRECTION
+                                                     phrase.
+and DIRECTION DIRECTION POST,  where
+                                                End-of-path instruction templates. The ﬁnal
+DIRECTION PRE is selected from [to your, to
+                                                    action is a special situation in that it needs to de-
+the, on your, on the] and DIRECTION POST is
+                                                     scribing stopping near a salient object. For this,
+the phrase of you. This produces to your left, on the
+                                    we extract MOVE and OBJ phrases from the last
+right, right of you, and so on. For SLIGHT LEFT
+                                                      action and use templates such as MOVE and stop by
+and SLIGHT RIGHT, one of [a bit, slightly, a little,
+                                                     the OBJ.
+just] is added in front (e.g. a bit to your left).
+                                                    Full example. Putting it all together, Crafty cre-
+B.4.2  High level templates                         ates full path instructions such as the following,
+                                                with relevant high-level templates indicated:
+Crafty pieces these low-level textual building
+blocks together to describe actions. In what fol-                                                                 • (START) there is a lamp when you look a bit
+lows, MOVE, OBJ, and ORIENT indicate the move                                                             to the left. pivot right, so it is in back of you.
+command, object phrase and orientation phrase, re-
+spectively, discussed above.                                 • (INTER) walk forward, going along to the cur-
+  Single action. We use templates for three situa-         tain in front of you.
+
+=== PDF PAGE 14 ===
+    • (INTRA) curve left. you should see a tv ahead
+     of you.
+
+    • (MULTI-ACTION) go forward and go slightly
+      left and walk straight, passing the curtain to
+     your right.
+
+    • (END-OF-PATH) continue forward and stop
+    by the couch.
+
+   Crafty’s instructions are more verbose than hu-
+man instructions, but are often easy to follow—
+provided there are good, visually salient landmarks
+in the environment to use for orientation.
+
+C  Human Rater Performance Over Time
+
+Human raters are excellent at learning and adapt-
+ing to new problems over time. To understand
+whether our 37 human raters learn to self-correct
+the perturbed instructions over time and whether
+that affects the quality of our human wayﬁnding
+results, we investigate rater performance as a func-
+tion of time using the sequence of examples they
+evaluate.
+  Figure 5 shows the average human rater perfor-
+mance for all of the 9 datasets included in Table
+1 of Section 3. Due to the binary nature of SR,
+we use a 50-point bin to average each rater’s per-
+formance, and then average the results across all
+raters for each bin. Figure 5 shows that the average
+rater performance stays ﬂat within the uncertain-
+ties and does not show systematic drift over time,
+indicating no overall self-correction that affects the
+wayﬁnding results. For a more granular scrutiny
+of individual perturbation methods, in particular
+the perturbed instructions, we plot in Figure 6 the
+average human rater performance over time for the
+three methods: Direction Swap, Entity Swap, and
+Phrase Swap. Despite greater uncertainties due
+to much fewer data points used for averaging, the
+overall human performance for each method still
+does not drift signiﬁcantly in a systematic manner.
+These results indicate that our human wayﬁnding
+performance results are reliable and robust over
+time, which can be attributed to shufﬂing of the ex-
+amples and that the perturbation methods are blind
+to human raters.
+
+=== PDF PAGE 15 ===
+             1.2                                                                            2.00
+
+                                                                                           1.75
+             1.0
+                                                                                           1.50
+             0.8
+                                                                                           1.25
+                               Normalized 0.6                                                                                                                                                                                                                                              Normalized 1.00
+            SDTW 0.4                                                                                               SDTW 0.75
+                                                                                           0.50
+             0.2
+                                                                                           0.25
+
+             0.0                                                                            0.00
+                 0      100     200     300     400     500     600                      100     200     300     400     500     600     700
+                                         Time Step                                                               Time Step
+
+
+Figure 5: Average human rater performance for all datasets as a function of time using the sequence of examples
+each rater has evaluated. Each rated example indicates a time step. We normalize the scores of each rater by their
+mean value over time to remove performance bias of each rater in order to better pick up the trend over time. We
+average 50 examples to get the mean SDTW for each rater due to the discrete nature of success. Left: The mean
+performance of all rater for each bin. Error bars represent the standard deviation of the mean. Right: Individual
+rater performance over time. Each line represents a single rater. Despite a few outliers, the overall human rater
+performance is ﬂat and consistent over time, indicating no self-correction or adaptation to the datasets by human
+raters.
+
+
+
+
+
+                                Direction Swap                                                             Entity Swap                                                      Phrase Swap
+     1.4                                                                                1.4                                                                                1.4
+
+     1.2                                                                                1.2                                                                                1.2
+
+     1.0                                                                                1.0                                                                                1.0
+
+     0.8                                                                                0.8                                                                                0.8      Normalized                                                                                                                                                                                                                                                         Normalized                                                                                                                                                                                                                                                         Normalized
+  SDTW 0.6                                                                                                SDTW 0.6                                                                                                SDTW 0.6
+     0.4                                                                                0.4                                                                                0.4
+
+     0.2                                                                                0.2                                                                                0.2
+
+     0.0                                                                                0.0                                                                                0.0
+          0      10     20     30     40     50     60     70                  0      10     20     30     40     50     60     70                  0      10     20     30     40     50     60     70
+                                  Time Step                                                               Time Step                                                               Time Step
+
+Figure 6: Average human rater performance for the three instruction perturbation methods as a function of time
+(number of examples), computed in a similar way as in Figure 5. We use a 15-point bin to compute the average
+for each human rater, and aggregate over all raters to get the mean and its uncertainty. The overall human rater
+performance stays ﬂat and does not drift signiﬁcantly over time for instruction perturbations.

@@ -1,0 +1,38 @@
+[
+  {
+    "claim_id": "ROOT-C01",
+    "paper_id": "cross-paper",
+    "assignment": "coordinator",
+    "claim": "For finite logits and at least one allowed movement action, a categorical STOP/movement policy exactly factors into a STOP Bernoulli and conditional movement softmax. An isolated 1,000-vector numerical check had maximum absolute difference 2.78e-16. Factorization alone is therefore not a distinct probability model; changed supervision/features/decision rules could still matter.",
+    "evidence_type": "DEDUCTION and EXECUTED NUMERICAL CHECK; not benchmark evidence",
+    "source": "experiments/premise_checks.py; experiments/premise_checks_results.json",
+    "locator": "softmax_factorization; derivation in appendices/Previous_Idea_Claim_Audit.md"
+  },
+  {
+    "claim_id": "ROOT-C02",
+    "paper_id": "duet",
+    "assignment": "coordinator",
+    "claim": "The pinned DUET FloydGraph class returned a path through a visited junction to an unvisited frontier and a path back to the visited start in a four-node synthetic graph. This establishes routing capability, not learned-policy backtracking frequency or benchmark performance.",
+    "evidence_type": "EXECUTED ISOLATED SOURCE-FUNCTION CHECK",
+    "source": "experiments/duet_routing_check.py; experiments/duet_routing_check_results.json",
+    "locator": "DUET commit 93e8b233164bc079a6db48b8a0a78d123ec8de41, map_nav_src/models/graph_utils.py, FloydGraph"
+  },
+  {
+    "claim_id": "ROOT-C03",
+    "paper_id": "r2r",
+    "assignment": "coordinator",
+    "claim": "In the inspected local R2R annotations and pinned public connectivity graphs, 4,051/4,675 training reference paths and 712/783 validation-unseen reference paths have a proper prefix with graph endpoint distance below 3m and SPL exactly 1 under the reviewed DUET evaluator formula. No model selected these prefixes. This expected metric tolerance does not establish instruction violation or an SRDF data-error rate.",
+    "evidence_type": "EXECUTED STATIC DATASET GEOMETRY AND METRIC CHECK",
+    "source": "experiments/geometry_audit.py; experiments/geometry/results.json; experiments/geometry/path_results.csv",
+    "locator": "results.json summary; connectivity commit 589d091b111333f9e9f9d6cfd021b2eb68435925; DUET env.py lines314–338 and utils/data.py lines25–50"
+  },
+  {
+    "claim_id": "ROOT-C04",
+    "paper_id": "local-environment",
+    "assignment": "coordinator",
+    "claim": "The local machine exposes an RTX 4070 Laptop GPU with 8,188 MiB through nvidia-smi, but installed PyTorch 2.9.0+cpu reports CUDA unavailable. Habitat/Habitat-Sim/MatterSim are absent in this Python environment. Existing R2R annotation files were found; public connectivity was subsequently downloaded for a static geometry check. A usable navigator checkpoint, image features and licensed scene assets remain unestablished.",
+    "evidence_type": "EXECUTED ENVIRONMENT AND FILE INSPECTION",
+    "source": "experiments/environment.json; experiments/local_data_inventory.json; experiments/geometry/connectivity_manifest.json",
+    "locator": "nvidia_smi_hardware; installed_packages; annotation hashes and bounded-search scope"
+  }
+]

@@ -1,0 +1,778 @@
+                             This ICCV paper is the Open Access version, provided by the Computer Vision Foundation.
+                                           Except for this watermark, it is identical to the accepted version;
+                                     the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+D REAMWALKER: Mental Planning for Continuous Vision-Language Navigation
+
+                                                                     ∗
+                   Hanqing Wang1, 2                 Wei Liang1,4            Luc Van Gool2                   Wenguan Wang3*
+              1                                      2                                      3
+                  Beijing Institute of Technology        Computer Vision Lab, ETH Zurich        ReLER, CCAI, Zhejiang University
+                                 4
+                                     Yangtze Delta Region Academy of Beijing Institute of Technology, Jiaxing
+                                        https://github.com/hanqingwangai/Dreamwalker
+
+
+
+                             Abstract
+                                                                                                          maR@
+
+    VLN-CE is a recently released embodied task, where AI
+agents need to navigate a freely traversable environment to                        p@H]M
+reach a distant target location, given language instructions.                                                                                       vUmUpMK
+                                                                                                                                                   w@yiaU_p
+It poses great challenges due to the huge space of possible
+strategies. Driven by the belief that the ability to anticipate                      9al]K!aKM]
+                                                                                                                                                   U^@SU_MK
+the consequences of future actions is crucial for the emer-                                                                           U^@SU_S      w@yiaU_p
+
+gence of intelligent and interpretable planning behavior, we
+propose D REAMWALKER — a world model based VLN-CE
+agent. The world model is built to summarize the visual, to-                                                  sofa
+pological, and dynamic properties of the complicated conti-                                 table
+nuous environment into a discrete, structured, and compact
+representation. D REAMWALKER can simulate and evaluate
+possible plans entirely in such internal abstract world, be-
+fore executing costly actions. As opposed to existing model-
+free VLN-CE agents simply making greedy decisions in the
+                                                                                       continuous
+real world, which easily results in shortsighted behaviors,                           environment
+D REAMWALKER is able to make strategic planning through                              Instruction: Head out and turn left. Pass a fireplace and continue
+large amounts of “mental experiments.” Moreover, the ima-                            towards the sofa. Enter the room and stop when seeing a table.
+gined future scenarios reﬂect our agent’s intention, making                 Figure 1: In partially observable, continuous VLN environments,
+its decision-making process more transparent. Extensive ex-                 D REAMWALKER maps its surrounding into a discrete and structured
+periments and ablation studies on VLN-CE dataset conﬁrm                     abstraction. In this internal world, it is able to conduct mental plan-
+the effectiveness of the proposed approach and outline fruit-               ning (     ) by imagining future scenarios, before taking real action.
+ful directions for future work.
+                                                                            topology, perfect localization, and deterministic transition.
+                                                                               To better reﬂect the challenges of real world navigation,
+1. Introduction                                                             Krantz et al.[45] update the discrete VLN to a continuous ver-
+    For decades, the AI community has strived to develop in-                sion – VLN-CE (VLN in continuous environments), where
+telligent robots that can understand human instructions and                 the agent is free to traverse any unobstructed location with
+carry them out. As a small step towards this long-held goal,                low-level actions. VLN-CE proved much more challenging
+vision-language navigation (VLN) [6] — the task of entail-                  than its discrete counterpart: the performance gap between
+ing autonomous agents to navigate in never-before-seen 3D                   the state-of-the-arts in the two settings is more than 20%, in
+environments with language instructions — gained growing                    terms of episode success rate. The main challenge posed by
+attention. In the standard VLN setting, agent’s movement                    VLN-CE lies in the demand of strategic planning in conti-
+is constrained to a small set of pre-deﬁned sparse locations.               nuous environments with low-level actions.
+As pointed out by [45], such over-simpliﬁed, discrete task                     As a direct response, we developed a world model based
+setup involves many unrealistic assumptions such as known                   VLN-CE agent, called D REAMWALKER. Previous studies in
+                                                                            cognitive science [17, 34, 35] suggest that humans build a
+  * Corresponding authors.                                                  mental model of the local surrounding, based on our limited
+
+
+
+                                                                         10873
+senses. This internal world model summarizes our knowle-              the appealing ability of real-time behavioral interpretation.
+dge about the environment and serves as the basis for many            This work is expected to foster future research in developing
+high-level meta-skills, e.g., reasoning, planning, decision-          more strategic, robust, and interpretable VLN-CE agents.
+making, and interpretation. The world model theory is one
+source of the idea of model-based Reinforcement Learning              2. Related Work
+(RL) [73] and promotes many recent advances in robot con-
+                                                                      VLN in Discrete Environments. The release of R2R data-
+trol [69, 62, 58, 91]. Keeping this grand idea in head, we let
+                                                                      set [6] has stimulated the emergence of variousVLN systems
+D REAMWALKER explicitly abstract crucial characteristics of
+                                                                      and datasets. In particular, early VLN agents are built upon
+its continuous surrounding environment to a discrete, struc-
+                                                                      recurrent neural network based sequence-to-sequence mo-
+tured representation (Fig.1). This allows D REAMWALKER to
+                                                                      del [6, 18, 77, 88, 86, 31, 52, 93, 38, 53, 84, 82, 2], while the
+“imagine” a lot of future possible navigation plans and eva-
+                                                                      recent ones explore graph neural networks [15, 83] and non-
+luate the corresponding consequences entirely in the mind,
+                                                                      local transformer models [30, 60, 10] for long-term planning,
+before taking actual low-level actions in the real world. In
+                                                                      with the assist of environment map building [92, 11, 51],
+this way, D REAMWALKER takes the challenge of VLN-CE
+                                                                      cross-modal matching [81, 94, 87], and multi-modal pre-
+head-on: mental planning with discrete world model enables
+                                                                      training [54, 26, 64, 65, 3] techniques. Besides the advance
+efﬁcient navigation behavior in continuous environments.
+                                                                      in model design, several more challenging VLN datasets,
+    Technically, the world model is built upon agent’s past ex-       such as R4R [32], RxR [46], and REVERIE [63], are devel-
+periences and can make predictions about the future. It con-          oped to address long-term navigation [32, 46] and concise
+tains two parts: i) An environment graph (EG) is constructed          instruction guided navigation [63].
+as a composition of selected or predicted waypoints and their             These remarkable efforts follow the seminal work of R2R
+typological relations. EG collects agent’s temporary know-            to assume the agent can ‘perfectly’ teleport to and from a
+ledge about its surrounding. ii) A learnable scene synthesizer        ﬁxed small set of locations (pre-stored in a sparse naviga-
+(SS) predicts future observations from a waypoint with mul-           tion graph) in the Matterport3D [8] environment. Although
+tiple steps. SS embeds agent’s stable knowledge about envi-           facilitating the evolution and evaluation of VLN algorithms,
+ronments, such as general room layout rules and transition            such discrete task setup is too simpliﬁed to cover the prac-
+dynamics, into its network parameters. Based on the world             tical challenges that a robot would encounter while naviga-
+model, D REAMWALKER synthesizes various future naviga-                ting the real world, such as environment topology acquire-
+tion trajectories, and assesses their progress towards the ﬁnal       ment and localization error. In this work, we focus on per-
+target location. Then, the best mental plan is found by Monte         forming VLN in continuous environments, setup by [45].
+Carlo Tree Search [41] and executed in the continuous world           VLN in Continuous Environments (VLN-CE). Krantz et
+with low-level actions. With the navigation proceeds, EG is           al. [45] lift the discrete R2R VLN task setup to the conti-
+further updated for making a new round of mental planning.            nuous setting — VLN-CE, where the embodied agent is ini-
+    Notably, our D REAMWALKER signiﬁcantly distinguishes              tiated in freely traversable 3D environments and must exe-
+itself from prior VLN-CE solutions [67, 29, 43, 44] in the            cute low-level actions to follow natural language navigation
+following aspects: i) Recent advanced solutions are essen-            instructions. After throwing away the unrealistic assump-
+tially model-free methods. While in principle a representa-           tion of the navigation graph, the VLN task becomes more
+tion of the environment could be implicitly learned through           challenging and closer to the real-world. Later approaches
+model-free RL, the reinforcement signal may be too weak to            attempt to reproduce the success of the abstract VLN in
+quickly learn such a representation and how to make use of            the continuous counterpart, by building a high-level action
+it. In contrast, our agent plans its actions within an explicit,      space based on online prediction of waypoints [67, 29, 43,
+and abstract model of the continuous environment. ii) Ex-             80, 4]. More recently, [44] explores transferring pre-trained
+isting agents navigate by greedily and reactively choosing            VLN policies to continuous environments, demonstrating
+between a small set of nearby waypoints, based on their               advantages over training VLN-CE policies from scratch.
+hidden state which compresses past observations. They tend                Our agent is favored due to i) its model-based nature, and
+to be shortsighted, due to the absence of reliable strategies         ii) the ability of strategic and interpretable planning. First, our
+for capturing information for achieving the future [23]. Yet          agent learns and builds an explicit model of the world, free-
+D REAMWALKER can use the world model to anticipate the                ing navigation policy learning from environment modeling.
+impacts of possible actions and plan strategic behavior. iii)         Second, by visualizing possible futures, our agent is able to
+The future scenarios created by the world model explain the           develop advanced plan before moving and explain its beha-
+intention of D REAMWALKER in a way that human can un-                 viors. In contrast, current agents make only greedy decisions
+derstand, making its behaviors more interpretable [9, 79].            purely relying on their latent state. Their planning ability is
+    Extensive experiments on VLN-CE dataset [45] conﬁrm               rather weak and the decision mode is non-transparent.
+that our D REAMWALKER gains promising performance with                World Model. Equipping robot machines with the ability to
+
+
+
+                                                                   10874
+build world models is viewed as a key step towards the next-        to target positions, according to language instructions. The
+generation of AI [34, 50]. Capturing high-level aspects of the      environments are assumed to be continuous open space. At
+environment, world models help enable AI agents for rea-            each step, the agent must choose a low-level action from
+sonable decision-making through simulation (a.k.a., imagi-          {turn-left 15◦ , turn-right 15◦ , move-forward 0.25m, stop},
+nation) of possible futures. Towards this direction, a bunch        given the instruction X and 360◦ panoramic RGBD obser-
+of approaches have been recently developed to predict for-          vation Y . The navigation is successful only if the agent se-
+ward dynamics/representations [59, 37, 12, 20, 39, 49], per-        lects stop within 3m of the target location within 500 steps.
+form sampling-based planning [72, 61, 91], conduct self-            Waypoint Action Space. Recent VLN-CE solutions [67, 29,
+simulation based policy learning [89, 85, 22], and recon-           43, 44] adopt a high-level waypoint action space. During na-
+cile the advantages of model-based and model-free RL re-            vigation, the agent uses a Waypoint Predictor to get a heat-
+gimes [66, 56, 75, 47]. Some others leverage world models           map of 120 angles-by-12 distances, which highlights navi-
+to anticipate (short-term) targets for goal-conditioned po-         gable waypoints in its surrounding. Each angle is of 3 de-
+licy learning [58, 57], boost the learning of world models by       grees, and the distances range from 0.25 meters to 3.00 me-
+introducing belief of state uncertainty [13, 20, 19], informa-      ters with 0.25 meters separation, respectively corresponding
+tive state representation [48, 25, 76], and model regulariza-       to the turning angle and forward step size of the low-level
+tion [50, 14, 40]. Although world models ﬁnd successful ap-         action space (Fig. 2(f)). In this way, the problem of inferring
+plications in Atari [36, 24, 23, 25] and robot motion plan-         low-level controls is translated to the task of waypoint pre-
+ning [16, 69], many of them are restricted to relatively            diction and selection. Please refer to [29] for more details.
+simple tasks or low-dimensional environments, pointed out           Algorithmic Overview. Our D REAMWALKER agent solves
+by [23, 25, 58, 42]. To date, world models have been rarely         VLN-CE through i) building a world model (§3.1) that ex-
+investigated in visually-rich, embodied tasks. The few excep-       plicitly abstracts intrinsic properties of continuous environ-
+tions [49, 42] simply use a viewpoint synthesis network as          ments into a structured, discrete representation; ii) condu-
+the world model. They either pre-access the entire environ-         cting strategic planning in the discrete mental world before
+ment typology [42], or only treat the synthesized observa-          taking actual actions in the continuous environment (§3.2).
+tions as sub-goals without sampling-based planning [49].
+In [1], NeRF-based world model is adopted for drone navi-           3.1. World Model: Structured, Discrete, and Com-
+gation planning, which requires pre-exploration of the envi-              pact Abstraction of Continuous Environments
+ronment. For ours, in addition to the challenging task setup,
+our world model is organized as a structured summarization of           To efﬁciently plan and act in the highly complex world,
+environment layout and a compact representation of environ-         humans develop a mental model to represent our knowledge
+ment evolution, instead of [49, 42] encoding all the knowl-         about the surrounding, based on our past daily experiences
+edge about the environment into latent network parameters.          and current information perceived by limited sense [22]. In
+More importantly, our explicit and discrete abstraction of the      view of this, our world model is built as combination of two
+continuous environments offers a suitable testbed for men-          parts: i) An environment graph (EG) – a structured and disc-
+tal experiments. Through sampling and assessing numerous            rete representation of agent’s temporary knowledge about the
+possible solutions entirely in the mind, our agent can conduct      visual landmarks and typologies of the current partially ob-
+strategic and global navigation planning before moving.             served environment; and ii) A scene synthesizer (SS) that en-
+Monte Carlo Tree Search (MCTS). MCTS [41] is a heu-                 codes agent’s stable knowledge about some general rules of
+ristic search algorithm for approximating optimal choices in        environments such as transition dynamics and room layout,
+large search spaces. It has demonstrated great success in cre-      which are learned from training experiences and utilized to
+ating game-playing AI agents and solving sequential decision        predict the unobserved portions of the current environment.
+tasks, such as Atari games [21, 71] and Go [73, 74, 71].            Environment Graph (EG). EG is organized as an episodic
+    In this work, we adopt MCTS to search for possible na-          graph G = (V, E), where nodes v ∈ V denote previously vi-
+vigation plans based on the world model. MCTS has so far            sited waypoints and edges eu,v ∈ E store geometric relations
+been rarely explored in the ﬁeld of VLN-CE. In addition, in         between waypoints (Fig. 2(a)(g)). At the beginning of current
+many application scenarios of MCTS, all the aspects of the          navigation episode, G only contains one single node — the
+world states are fully observable. However, the continuous          starting location. Then, the agent predicts a set of accessi-
+VLN-CE environments are partially observable, and hence             ble waypoints, and selects one of them to navigate. After rea-
+we run MTCS in a discrete, synthesized world space.                 ching the selected waypoint, G will be updated by involving
+                                                                    this waypoint. Hence EG evolves with the navigation pro-
+3. Methodology                                                      ceeds. Concretely, for each node v ∈ V, its embedding is the
+                                                                    feature of the corresponding waypoint observation:
+Task Setup and Notations. In VLN-CE [45], AI agents are
+required to navigate in never-before-seen 3D environments                                     v = Ypv ,                        (1)
+
+
+
+
+                                                                 10875
+                                                                                                                                           Instruction: Head out and turn left. Pass a fireplace and continue
+    Instruction: Head out and turn left. Pass a fireplace and continue                       p@H]M                                         towards the sofa. Enter the room and stop when seeing a table.
+    towards the sofa. Enter the room and stop when seeing a table.
+                                                                           maR@
+                           maR@
+
+        p@H]M                                                                                                                                   p@H]M
+
+
+
+                                                                         9al]K!aKM]                                    9al]K
+                                                                                        9al]K!aKM]                     !aKM]
+    (a)                                                                  (b)           (c)                               (d)               (e)
+      9@yiaU_p           Ô
+
+
+
+
+    (f)                   ^               (g)                   (h)                            (i)                                 (j)
+Figure 2: (a) Top-down view of current navigation, where indicates previously visited waypoints and refers to detected but unvisited
+waypoints. (b) D REAMWALKER synthesizes future observations at unvisited waypoints           through SS. (c-d) With the synthesized obser-
+vations, D REAMWALKER further extends the synthesized trajectories and looks deeper into the future. (e) D REAMWALKER selects the best
+mental plan for execution. After reaching the selected waypoint, it starts next-round planning. (f) Top-down view of the waypoint action
+space. (g) EG G of (a). (h-j) D REAMWALKER images its future observation at the unvisited waypoint , based on its current observation.
+The synthesized and real observations at are given in (i) and (j), respectively. For clarity, only RGB observation is provided. Notably,
+the imagined scenarios explain agent’s inner decision mode in a way that human can understand, leading to improved interpretability.
+
+where pv refers to the location of waypoint v, and the co-                                                tical knowledge about some fundamental constraints in the
+ordinate of the start point is set as (0, 0); Ypv indicates the                                           world, such as the transition dynamics and general rules be-
+embedding of the panoramic observation Ypv at location pv .                                               hind room arrangement (e.g., ‘dishwasher is typically lo-
+   For each edge eu,v ∈ E, its embedding eu,v encodes topo-                                               cated in the kitchen’).
+logical relations between waypoints u and v:                                                              Working Mode of World Model. Integrating EG and SS
+                              eu,v = (cos θu,v , sin θu,v , pu,v ),                         (2)          together leads to a powerful world model. EG stores agent’s
+                                                                                                          understanding of the observed portions of the environment.
+where θu,v and pu,v = pu − pv refer to the angle and dis-                                                Based on working memory, SS makes use of statistical know-
+tance between u and v, respectively. Note that the connecti-                                              ledge to forecast the unexplored portion of the environment
+vity among waypoints is also captured by G. An edge, eu,v ,                                               (Fig. 2(a-e)). For instance, starting from a waypoint v in G,
+exists only if u and v are connected, that is, they are detected
+                                                                                                          the world model uses SS to imagine the future (i.e., Ŷpv ) if
+as valid in the waypoint prediction heatmap of each other.
+                                                                                                          the agent navigates to a previously unvisited waypoint v  of
+   As such, EG is built upon the information gathered during
+                                                                                                          v. With the synthesized observation V̂pv at waypoint v  , the
+current navigation episode. Hence it represents the agent’s
+                                                                                                          world model can make further future prediction. Notably,
+temporary knowledge about its observed surroundings, and
+                                                                                                          our world model, or more precisely, its parametric part – SS,
+organizes them in a concise, structured, and discrete manner.
+                                                                                                          is trained independently, which lifts the navigation policy
+Scene Synthesizer (SS). SS is a generative network that pre-
+                                                                                                          from learning inherent structures of environments.
+dicts future scenes based on agent’s past observations only,
+without having to navigate them (Fig. 2(h-j)). Given pano-                                                3.2. Mental Planning: Forecasting the Future in the
+ramic RGBD observation Yp perceived at position p, SS is                                                        World Model
+to render a plausible, full-resolution panoramic RGBD ob-
+servation Ŷp at an unvisited position p . The position p of                                               Powered by the world model, D REAMWALKER gains the
+interest is a waypoint of p, thus p and p are spatially close.                                           ability of anticipating the consequences of its actions, for an
+Like previous world structure-aware video synthesis meth-                                                 extended period into the future. This is because the world mo-
+ods [55, 42], we ﬁrst project Yp to a 3D point cloud using                                                del can simulate how the environment changes in response
+the depth information and re-project this point cloud into                                                to agent’s actions. D REAMWALKER can thus make advanced
+the observation space at position p , so as to obtain a sparse,                                          planning, through perform mental experiments in the simu-
+geometry-aligned RGBD panoramic image Yp→p . The SS                                                      lated world. Basically, at every navigation-decision making
+network takes as inputs both the observation Yp perceived at                                              step, D REAMWALKER ﬁrst uses the world model to syn-
+p and the reconstructed observation Yp→p , and synthesizes                                               thesize many future navigation trajectories, and then selects
+the observation Ŷp for the unvisited waypoint position p :                                             the best one for execution. Here we adopt Monte Carlo Tree
+                                                                                                          Search (MCTS) [41, 21], a powerful approach for decision
+                         Ŷp = Scene Synthesizer(Yp , Yp→p ).                              (3)          problems, to achieve world model based online planning.
+SS learns from experiences of ‘viewing’ numerousVLN-CE                                                    MCTS based Mental Planning. As a best-ﬁrst tree search
+training environments. Its parameters encode agent’s statis-                                              algorithm, MCTS represents the space of candidates into a
+
+
+
+                                                                                                       10876
+                                                                                        Selection               Extension              Rollout          Back-up
+  tree and ﬁnds an optimal solution in an iterative manner. In                                 s0
+  our case, each tree node s represents a possible world state:
+                                                                               UCT                  UCT
+  the root node s0 is the world state G at current navigation step,                      max
+
+  while other nodes indicate future world states, synthesized
+  by the world model. The edge from node s to s denotes the
+                                                                                                     N(s)=1                                                  N(s)=2
+                                                                           N(s)=2       UCT          UCT
+  action a taken in s to reach s , and is identiﬁed by pair (s, a).
+                                                                                              max
+
+                                                                                                                     .
+     The core idea of MCTS based planning is to gradually ex-                                                        s
+                                                                                                                           .
+                                                                               N(s)=1                                    N(s)=1
+  pand the search tree and evaluate rewards, i.e., create many                                                                                 D
+                                                                                                                                                                  R
+                                                                                          tree                                      rollout
+  plans and assess the outcomes in mind. This is achieved by                             policy                                     policy K steps
+  an iterative tree search process. Each search iteration starts
+  from the root state s0 , and sequentially samples states and            Figure 3: MCTS based Mental planning. Each node in the research
+  actions, based on the simulation of four phases (Fig. 3):               tree refers to a possible world state, corresponding to a future plan.
+
+                                                                          conducts a lot of mental experiments, and the best action is
+ i) Selection: Actions/edges are selected according to a tree
+                                                                          selected among the edges starting from the root node:
+    policy. A commonly used policy is to select greedily with
+    respect to Upper Conﬁdence bounds for Trees (UCT) [7]:                                                    a∗ = arg max Q(s0 , a).                              (7)
+                                                                                                                     a∈A(s0 )
+                                          
+                                              log N (s)                       Here a∗ corresponds to a certain waypoint observed at cur-
+               UCT(s, a) = Q(s, a) + C                  ,       (4)
+                                               N (s, a)                   rent world state s0 . According to EG G, the agent can
+    where Q(s, a) is the average accumulated reward of tak-               reach this waypoint by taking a sequence of low-level ac-
+    ing action a; N (s, a) and N (s) return the visiting times            tions. If a∗ is never visited before, EG is updated after its
+    of edge a and state s, respectively; C is a scalar explora-           ﬁrst visit, followed by new-round mental planning and next-
+    tion constant. Starting from the root node, the action is             step action. When a∗ is a visited waypoint, the agent will
+    selected as:                                                          move to this waypoint and choose stop to terminate navi-
+                                                                          gation. In this way, our agent predicts future in the discrete
+                       a∗ = argmax UCT(s, a),                   (5)       world model, and navigates in the continuous environment.
+                              a∈A(s)
+                                                                          Reward. The immediate reward R(s, a) is deﬁned accord-
+     where A(s) is the global action space at state s, which              ing to the change of distance to goal after taking action a.
+     enumerates all the possible waypoints. The selection is per-         Let Gs= (Vs , Es ) denote EG corresponding to state s, where
+     formed recursively until an unexpanded edge is selected.             Vs−V refers to those waypoints visited in dream world state
+ ii) Expansion: With the ﬁnally selected unexpanded edge, a               s, the distance to the target location in state s is deﬁned as:
+     new leaf node ṡ is further appended, i.e., N (ṡ) = 1.
+                                                                                                           D(s) = min Fd (v, Gs , X),                              (8)
+iii) Rollout: A quick rollout is performed to predict further                                                         v∈Vs
+
+     multiple steps into the future, according to a certain roll-         where Fd is a learnable distance function that predicts the
+     out policy. Based on a reward function R, the value of the           distance from waypoint v to the target location, conditioned
+     new leaf node ṡ, i.e., V (ṡ), is obtained.                         on EG Gs and instruction X. More speciﬁcally, D(s) is built
+iv) Back-up: The statistics of nodes and edges are updated                upon a graph attention (GAT) network [78]:
+     bottom-up through the tree from ṡ until reaching the root
+     node.                                                                       Fd (v, Gs , X) = MLP(ṽ),
+                                                                                                                                                                   (9)
+                                                                                     Ṽ = {ṽ}v = GAT({[v, X]}v , {[eu,v , u, X]}u,v ),
+             N (s, a) = N (s ),
+             Q(s, a) = R(s, a) + γV (s ),                                where v (u) is the initial embedding of node v (u), eu,v is
+                                                               (6)       the edge embedding of eu,v ∈ E. X denotes the textual em-
+              N (s) = 1 + a∈A(s) N (s, a),
+                                                                       bedding of the instruction X, and [·, ·] refers to concatena-
+              V (s) = N1(s) a∈A(s) N (s, a)Q(s, a) .
+                                                                          tion. After fusing node and edge embeddings with the tex-
+                                                                          tual context, GAT outputs the collection of improved node
+    Here R(s, a) gives the reward for taking action a at state
+                                                                          embeddings Ṽ . After that, a small multilayer perceptron
+    s; s = T (s, a), where T (s, a) is the deterministic transi-
+                                                                          (MLP) is applied per node for distance regression.
+    tion function. The design of our reward function R and
+    the rollout policy will be detailed later.                                Given the deterministic transition s = T (s, a), we have
+                                                                          a = Vs − Vs . If action a is a previously visited waypoint,
+  As such, in each iteration, D REAMWALKER creates and ex-                i.e., a ∈ V, the immediate reward R(s, a) is given as:
+  ecutes a plan in the world model by expanding the search                                                       
+  tree, and anticipates the consequence by estimating the re-                                                        +5,          Fd (v, Gs , X) ≤ 3,
+                                                                                                    R(s, a) =                                                     (10)
+  wards. After several times of iterative simulation, the agent                                                      −5,          Fd (v, Gs , X) > 3.
+
+
+
+
+                                                                       10877
+Here a ∈ V means the agent chooses stop at waypoint a.We               tively encoded by ImageNet [68] pre-trained ResNet-18 [27]
+estimate if its distance to the target is within the success cri-      and PointGoal [90] pre-trained ResNet-50.The language ins-
+teria, i.e., 3m, and assign a constant positive/negative reward        truction X is encoded through a bi-LSTM with GLoVE [33]
+(+5/-5) accordingly. If waypoint a is never visited before,            word embeddings. Scene Synthesizer is built as a two-stage
+we deﬁne:                                                              generator, following [42].Waypoint Predictor is the one used
+                   R(s, a) = D(s ) − D(s).                 (11)       in [29]. For the distance function Fd , GAT is implemented
+That is to say, the reward is deﬁned as the distance that a            as standard [78], and MLP has 1, 024 hidden neurons.
+can bring the agent closer to the target than before.                  Network Training. The training ofWaypoint Predictor and
+Rollout Policy. In the rollout phase, a rollout policy is ado-         Scene Synthesizer are scheduled as in [29] and [42] respec-
+pted to guide the fast playout starting from the new expanded          tively. For our distance function Fd , we progressively con-
+leaf state ṡ. This can be intuitively viewed as further imag-         struct EGs along the ground-truth trajectory of each training
+ining the future of state ṡ with several steps through fast sa-       episode. Fd is trained by minimizing the L2 loss between
+mpling. For the sake of Monte Carlo property and simplicity,           the predicted distance and ground-truth distance for each
+we treat the distance function D(·) (cf. Eq. 8) as the rollout         waypoint for each EG. More speciﬁcally, for robust distance
+policy. For example, at the ﬁrst rollout step, the action dis-         prediction, for a ground-truth trajectory with L waypoints,
+tribution p over possible waypoints A(ṡ) at state ṡ is given         we construct L EGs where the l-th EG is constructed by
+as:                                                                    adding the l-th waypoint of the trajectory as well as up to
+              p[a] = softmaxa∈A(ṡ) Fd (a, Gṡ , X).        (12)       5 random sampled, accessible waypoints into the (l − 1)-
+                                                                       th EG. In addition, we randomly replace ground-truth way-
+The rollout stops when a previously visited waypoint is se-
+                                                                       points with the ones created by Scene Synthesizer, making
+lected or a maximum rollout depth K is reached. The re-
+                                                                       Fd better adapted to the working mode of mental planning.
+wards {R1 , R2 , · · · , RK } along the rollout record are col-
+                                                                       Reproducibility. Our hyper-parameters are set as follows.
+lected to compute the accumulated discounted reward as the
+                                                                       The discount factor γ is 0.98 (Eq. 6 and 13). The horizon of
+value of ṡ:                 
+                    V (ṡ) =   K                                       mental planning, i.e., the maximum step of imagining the
+                               k=1 γ     Rk .
+                                     k−1
+                                                            (13)
+                                                                       future trajectory, is 4. The number of search iterations for each
+4. Experiments                                                         time of mental planning is 50. Our model is implemented
+    After stating our experimental setup (§4.1) and imple-             in PyTorch with Habitat [70] simulator, and trained on one
+mentation details (§4.2), we provide performance compari-              NVIDIA RTX 3090 GPU. Our code is released at https:
+son results with VLN-CE state-of-the-arts (§4.3). Then we              //github.com/hanqingwangai/Dreamwalker.
+identify there is still room for improvement in the aspects of         4.3. Comparison with VLN-CE State-of-the-Arts
+world model (§4.4) and distance estimation (§4.6), reveal-                 We compare our agent, D REAMWALKER, with ﬁve pre-
+ing possible future directions. We further verify the con-             viously published VLN-CE models [45, 43, 67, 29, 44]. As
+tribution of our world model based mental planning (§4.5).             illustrated in Table 1, our agent outperforms all the com-
+Finally, we evaluate the impacts of core hyper-parameters              petitors across all the splits, in terms of SR. In particular,
+(§4.7) and offer visual analyses (§4.8).                               D REAMWALKER surpasses BridgingGap [29], the current
+4.1. Experimental Setup                                                top-leading VLN-CE model, by 7%, 5%, and 7%, on val
+                                                                       seen, val unseen, and test splits, respectively. Since
+Dataset. We conduct experiments on VLN-CE dataset [45].
+                                                                       all the involved competitors are model-free approaches, our
+The dataset has 16, 844 trajectory-instruction pairs across 90
+                                                                       promising results demonstrate the superiority of our world
+Matterport3D [8] scenes, and is divided into four sets, i.e.,
+                                                                       model based algorithmic design, which relieves the burden
+train (10, 819 pairs, 61 scenes), val seen (778 pairs, 53
+                                                                       on the agent to learn the knowledge about the environments
+scenes), val unseen (1, 839 pairs, 11 scenes), and test
+                                                                       during navigation policy training. In addition, we can ﬁnd
+(3, 408 pairs, 18 scenes). As the scenes in val unseen and
+                                                                       that DREAMWALKER boosts SR score greatly without intro-
+test are not exposed in train, the performances on val
+                                                                       ducing much extra travel expense. This evidences that, com-
+unseen and test are more important than val seen.
+                                                                       pared to greedily following a sophisticated navigation pol-
+Evaluation Metric. Following [45, 43, 44], we use ﬁve me-
+                                                                       icy, planning ahead in the mental world enables advanced
+trics for evaluation, i.e., Navigation Error (NE), Trajectory
+                                                                       decision-making with little expense of physical execution.
+Length (TL), Success Rate (SR), Oracle success Rate (OR),
+and Success rate weighted by Path Length (SPL), where SR               4.4. How Far We Are From a Perfect World Model?
+is the priority. Please see [5, 6] for full details on metrics.
+                                                                          The world model allows our D REAMWALKER to employ
+4.2. Implementation Details                                            ‘mental imagery’ to perform mental experiments, so as to
+Network Architecture. As in [43, 44, 45, 29], the RGB and              plan ahead before taking action. The previous experiments
+depth channels of the panoramic observation Y are respec-              sted by our world model with the corresponding actual
+
+
+
+                                                                    10878
+                                                                                                                                                                                  Distance Estimation Error (m)
+                                  val seen           val unseen             test                                          100
+          Model                                                                                                                                                               3
+                             NE↓ TL SR↑ OR↑ SPL↑ NE↓ TL SR↑ OR↑ SPL↑ NE↓ TL SR ↑ OR↑ SPL↑                                         90
+
+
+
+
+                                                                                                               Success Rate (%)
+                                                                                                                                  80
+        CMA [45] [ECCV20]    7.21 9.06   34   44   32   7.60 8.27   29   36   27    7.91 8.85   28   36   25                                                                  2
+    Waypoint [43] [ICCV21]   5.48 8.54   46   53   43   6.31 7.62   36   40   34    6.65 8.02   32   37   30                      70
+                                                                                                                                                                              1
+        LAW [67] [EMNLP21]   6.35 9.34   40   49   37   6.83 8.89   35   44   31    7.69 9.67   28   38   25                      60
+ BridgingGap [29] [CVPR22]   5.02 12.5   50   59   44   5.74 12.2   44   53   39    5.89 13.3   42   51   36                      50                                          0
+    Sim2Sim [44] [ECCV22]    4.67 11.2   52   61   44   6.07 10.7   43   52   36    6.17 11.4   44   52   37                           0   20     40       60      80   100
+ D REAMWALKER (Ours)         4.09 11.6   59   66   48   5.53 11.3   49   59   44    5.48 11.8   49   57   44                                    Replacing Rate (%)
+                                                                                                               Figure 4: Curves of success rate and
+        Table 1: Impacts of core method components on VLN-CE dataset [45] (§4.4-§4.5).                         distance estimation error (§4.6).
+(cf. §4.3 and Table 1) primarily demonstrated the                                          val seen                 val unseen
+                                                                 Variant
+power of the world model in strategic navigation                                  NE ↓ TL SR ↑ OR ↑ SPL ↑ NE ↓ TL SR ↑ OR ↑ SPL ↑
+planning, through the comparison with existing D REAMWALKER (Ours) 4.09 11.6 59 66 48 5.53 11.3 49 59 44
+model-freeVLN-CE agents.To help highlight how              Perfect Imagination    3.75 10.8 64    69    60   4.88 11.1 54    63  49
+                                                             Copy Memory          7.10 13.5 35    44    31   7.76 13.8 27    35  24
+far we are from a perfect world model, we derive            Greedy Selection      5.22 10.5 47    56    43   5.93 10.9 42    53  36
+a variant – “perfect imagination” – from our algo-
+                                                       Table 2: Impacts of core method components on VLN-CE dataset [45] (§4.4-§4.5).
+rithm, by replacing the future scenarios forecas-
+ahead observations from the environment. For complete-                   D REAMWALKER assesses the outcome of mental plans by
+ness, we also provide a “lazy” world model – “copy mem-                  means of the distance function. We therefore conduct ex-
+ory” – which simply memorizes all past observations and                  periments to study the inﬂuence of the distance function.
+generates future predictions by simply copying the nearest               Speciﬁcally, we report the performance by randomly replac-
+memory. From Table 2 we can ﬁnd that, compared with                      ing the distance estimates with the ground-truth in differ-
+D REAMWALKER, “perfect imagination” yields solid per-                    ent probabilities. The performance are plotted in curves in
+formance boost. This is because the agent coupled with                   Fig. 4. We can observe that, when the distance estimation
+a perfect world model can make perfect prediction of the                 becomes more accurate, D REAMWALKER performs better.
+future. This also suggests the upperbound of our performance             With perfect distance estimation – the agent is allowed to
+w.r.t.world model, and is consistent with prior studies [84, 42]         access accurate distance between any waypoint and the tar-
+which ﬁnd that allowing agent to look ahead at actual obser-             get goal, 100% SR can be reached. We also ﬁnd that, even
+vations from environments can facilitate decision-making in              when the replacement probability is as low as 20%, the
+the abstract setting. At the other extreme, “copy memory”,               agent can achieve a rather high 70 SR. It demonstrates the
+not surprisingly, gives the worst results, since the agent does          central role of the distance function in our algorithm and,
+not make any imagination of the future. This veriﬁes again the           also, suggests a feasible direction for further improvement.
+beneﬁt of world model in navigation planning.
+                                                                                   4.7. Hyper-Parameter Study
+4.5. Advanced Planning or Greedy Selection?                                            In this section, we examine our hyper-parameter setup.
+    It is also interesting to quantify the contribution of our                     Search Iterations of MCTS. We ﬁrst investigate the inﬂu-
+world model based mental planning. To this end, in Table 2,                        ence of searching iterations in MCTS based mental plan-
+we report a baseline - “greedy selection”: at each decision-                       ning. Intuitively, with more searching rounds, the search
+making step, the agent greedily selects the waypoint in the                        tree has a higher probability to reach a good terminal state
+view of ﬁeld for navigation, according to the estimated dis-                       and can better estimate the outcome of possible actions, yet,
+tance to the target location. This decision-making strategy                        at the expense of larger simulation cost. Therefore, in addi-
+is adopted by all current VLN-CE agents, yet lacking ex-                           tion to estimating the navigation performance with different
+plicit planning. Our world model enables sampling-based                            searching rounds (i.e., 10, 30, 50, 70), we also report statis-
+planning — ﬁrst assessing the consequences of possible                             tics for the runtime. As shown in Table 3, the runtime grows
+navigation solutions in the mind then taking actual action.                        linearly as the number of searching rounds increases. How-
+From Table 2 we can ﬁnd that, mental planning exhibit sig-                         ever, when the number of searching rounds exceeds 50, the
+niﬁcantly better performance compared with the greedy ac-                          performance gain becomes marginal. Thus we ﬁnally set the
+tion selection strategy. This evidences our primary hypothe-                       number of searching rounds to 50 to save the unproductive
+sis that imagination of possible futures in the internal world                     computation cost. We also stress that our mental planning
+abstract is necessary for strategic navigation planning.                           is very fast which typically responds within 1.5s.
+                                                                                   Horizons of Mental Planning. We report the performance
+4.6. What Is the Impact of Distance Function?                                      with different planning horizons — imaging future trajecto-
+   During mental planning, D REAMWALKER makes use of                               ries with a maximum length of 0, 2, 4, or 6 forward steps.
+the distance function Fd (cf. Eq. 9) to calculate the immedi-                      From Table 4 we can ﬁnd that, both the performance and
+ate reward R (cf. Eq. 11) for a certain action. In other words,                    the runtime generally grows as the horizons increased from
+
+
+
+                                                                              10879
+      Searching         val seen               val unseen        Runtime                                                                       180
+  #
+       Iteration NE ↓ TL SR ↑ OR ↑ SPL ↑ NE ↓ TL SR ↑ OR ↑ SPL ↑ (s/step) ↓
+  1        10         4.43      12.1     55      63              45      5.76    12.5     44      55      38     0.43
+
+
+
+
+                                                                                                                           Fréchet Inception
+                                                                                                                                               160
+
+
+
+
+                                                                                                                            Distance (FID)
+  2        30         4.29      10.9     57      65              47      5.62    11.1     46      57      42     1.08
+  3        50         4.09      11.6     59      66              48      5.53    11.3     49      59      44     1.43
+  4        70         4.02      12.6     59      67              48      5.49    12.9     50      60      44     1.74                          140
+        Table 3: Impact of sampling iteration for navigation plan searching (§4.7).
+                                                                                                                                               120
+      Planning       val seen               val unseen        Runtime                                                                                                          seen
+ #
+      Horizon NE ↓ TL SR ↑ OR ↑ SPL ↑ NE ↓ TL SR ↑ OR ↑ SPL ↑ (s/step) ↓                                                                                                       unseen
+                                                                                                                                               100
+ 1        0          5.22      10.5     47      56            43         5.93    10.9     42      53      36     0.09
+ 2        2          4.21      11.8     56      64            45         5.66    12.2     47      57      41     1.15                                0   2      4         6       8
+ 3        4          4.09      11.6     59      66            48         5.53    11.3     49      59      44     1.43                                        Prediction Step
+ 4        6          4.18      12.5     57      65            44         5.59    12.9     48      58      41     2.05     Figure 5: FID curve of synthesized panoramic
+  Table 4: Impact of planning horizon (§4.7). The maximum searching round is 50.                                          view w.r.t. prediction step (§4.7).
+
+
+ Instruction: Walk out of the bedroom and go into the hallway. Turn the corner and walk into              case in Fig. 6. In this case, we visualize the navigation
+ the dining area. Pass the dining table and walk into the living room. Stop near the chair.
+                                                                                                          trajectory performed by a greedy policy (i.e., greedily se-
+                                                                                                          lecting the best waypoint predicted by the distance func-
+                                                                                                          tion) and our D REAMWALKER. As seen, given a compli-
+                       A
+                                                                   (b)                                    cated instruction “Walk out · · · to outside.”, the agent with
+                                                                                        Search Tree
+                                                                                                          the greedy policy soon gets lost after it enters the dining
+                            B          KU_U_S@lM@                       V=4.3                            room, while our D REAMWALKER manages to reach the tar-
+                                                                                                          get location. For an intuitive comprehension of the plan-
+                                                                   V=1.4         V=3.8                    ning procedure, here we visualize a part of the search tree.
+                      UvU_S                  visited waypoint
+                     laa^                     unvisited waypoint
+                                                                                                          The nodes and edges in the search tree are colored accord-
+                                 IT@Ul        DREAMWALKER                                                 ing to their corresponding V (s) and Q(s, a) values, i.e.,
+(a)                                           greedy policy        (c)     0                    4.6
+                                                                                                          red color indicates high value and blue color indicates low
+                                                                                                          value. We can clearly observe that the search tree is split
+                                                                                                          into two branches when the planning proceeds to “walk into
+(d)                                            (e)                                                        the dining area”, i.e., D REAMWALKER starts to imagine the
+                                                                                                          outcomes of two possible actions, and the branch of the cor-
+Figure 6: (a) Trajectories of an episode navigated by a greedy pol-                                       rect action ﬁnally wins with a large margin as the branch of
+icy (red) and D REAMWALKER (blue). (b) Current panoramic ob-                                              the wrong action receives rather low rewards (deep blue).
+servation. (c) The search tree rooted by the world state of (a). The                                      We visualize the imagined future waypoints of the correct
+nodes and edges are painted according to their V (s) and Q(s, a)                                          action and the wrong action respectively and ﬁnd that the
+respectively. (d) Imagined view at waypoint A. (e) Imagined view                                          correct action leads to a room which looks more like a “liv-
+at waypoint B. See §4.8 for more details.                                                                 ing room” mentioned in the instruction, while the wrong
+                                                                                                          action leads to a corridor. This study demonstrates that
+0 to 4 steps. Comparing #3 and #4 rows, we can ﬁnd that                                                   our D REAMWALKER can provide strong interpretability of
+the performance gain becomes marginal or even negative.                                                   decision making by conducting tractable planning and pre-
+This happens probably due to that the capacity of the world                                               senting intuitive visualization for imagined observations.
+model is overloaded. As in [42], we assess the ﬁdelity of our
+synthesized panoramic RGBD views by computing Fréchet
+Inception Distance (FID) [28] to the ground-truth scenes.                                                 5. Conclusion and Discussion
+As shown in Fig. 5, the error between simulated views and                                                    In this article, we devise D REAMWALKER, a world model
+corresponding actual observations from real environments                                                  based VLN-CE agent. Our world model is built as a discrete
+accumulates as the trajectory rolls out. Hence the scenar-                                                and structured abstraction of the continuous environment,
+ios forecasted over long horizons might be useless or even                                                allowing D REAMWALKER to synthesize, assess, and inter-
+detrimental to mental planning.                                                                           pret possible plans in the mind before taking actual actions.
+4.8. Qualitative Result                                                                                   We empirically conﬁrm the superiority of D REAMWALKER
+                                                                                                          over existing model-free agents, in terms of performance
+   To better understand the superior performance of our                                                   and interpretability. Building more expressive and versatile
+method and demonstrate the interpretability of the mental                                                 world models, and exploring world model based VLN-CE
+planning mechanism, we analyse a challenging qualitative                                                  policy learning will be the focus of our future work.
+
+
+
+                                                                                                       10880
+Acknowledgements                                                       [14] Antonia Creswell, Rishabh Kabra, Chris Burgess, and Mur-
+                                                                            ray Shanahan. Unsupervised object-based transition models
+This project is partially sponsored by the National Natural Sci-
+                                                                            for 3d partially observable environments. In NeurIPS, 2021.
+ence Foundation of China (NSFC) under Grant No.62172043, and
+                                                                            3
+CCF-Tencent Open Fund.
+                                                                       [15] Zhiwei Deng, Karthik Narasimhan, and Olga Russakovsky.
+                                                                            Evolving graphical planner: Contextual global planning for
+References                                                                  vision-and-language navigation. In NeurIPS, 2020. 2
+                                                                       [16] Chelsea Finn and Sergey Levine. Deep visual foresight for
+ [1] Michal Adamkiewicz, Timothy Chen, Adam Caccavale,                      planning robot motion. In ICRA, 2017. 3
+     Rachel Gardner, Preston Culbertson, Jeannette Bohg, and           [17] Jay W Forrester. Counterintuitive behavior of social systems.
+     Mac Schwager. Vision-only robot navigation in a neural ra-             Theory and Decision, 2(2):109–140, 1971. 1
+     diance world. IEEE Robotics and Automation Letters, 2022.         [18] Daniel Fried, Ronghang Hu, Volkan Cirik, Anna Rohrbach,
+     3                                                                      Jacob Andreas, Louis-Philippe Morency, Taylor Berg-
+ [2] Dong An, Yuankai Qi, Yan Huang, Qi Wu, Liang Wang, and                 Kirkpatrick, Kate Saenko, Dan Klein, and Trevor Darrell.
+     Tieniu Tan. Neighbor-view enhanced model for vision and                Speaker-follower models for vision-and-language naviga-
+     language navigation. In ACMMM, 2021. 2                                 tion. In NeurIPS, 2018. 2
+ [3] Dong An, Yuankai Qi, Yangguang Li, Yan Huang, Liang               [19] Karol Gregor, Danilo Jimenez Rezende, Frederic Besse, Yan
+     Wang, Tieniu Tan, and Jing Shao. Bevbert: Topo-metric map              Wu, Hamza Merzic, and Aaron van den Oord. Shaping be-
+     pre-training for language-guided navigation. arXiv preprint            lief states with generative environment models for rl. In
+     arXiv:2212.04385, 2022. 2                                              NeurIPS, 2019. 3
+ [4] Dong An, Hanqing Wang, Wenguan Wang, Zun Wang, Yan                [20] Karol Gregor, George Papamakarios, Frederic Besse, Lars
+     Huang, Keji He, and Liang Wang. Etpnav: Evolving topo-                 Buesing, and Theophane Weber. Temporal difference varia-
+     logical planning for vision-language navigation in continu-            tional auto-encoder. In ICLR, 2018. 3
+     ous environments. arXiv preprint arXiv:2304.03047, 2023.          [21] Xiaoxiao Guo, Satinder Singh, Honglak Lee, Richard L
+     2                                                                      Lewis, and Xiaoshi Wang. Deep learning for real-time atari
+ [5] Peter Anderson, Angel Chang, Devendra Singh Chaplot,                   game play using ofﬂine monte-carlo tree search planning. In
+     Alexey Dosovitskiy, Saurabh Gupta, Vladlen Koltun, Jana                NeurIPS, 2014. 3, 4
+     Kosecka, Jitendra Malik, Roozbeh Mottaghi, Manolis Savva,         [22] David Ha and Jürgen Schmidhuber. Recurrent world models
+     et al. On evaluation of embodied navigation agents. arXiv              facilitate policy evolution. In NeurIPS, 2018. 3
+     preprint arXiv:1807.06757, 2018. 6                                [23] Danijar Hafner, Timothy Lillicrap, Jimmy Ba, and Moham-
+ [6] Peter Anderson, Qi Wu, Damien Teney, Jake Bruce, Mark                  mad Norouzi. Dream to control: Learning behaviors by la-
+     Johnson, Niko Sünderhauf, Ian Reid, Stephen Gould, and                tent imagination. In ICLR, 2020. 2, 3
+     Anton van den Hengel. Vision-and-language navigation: In-         [24] Danijar Hafner, Timothy Lillicrap, Ian Fischer, Ruben Ville-
+     terpreting visually-grounded navigation instructions in real           gas, David Ha, Honglak Lee, and James Davidson. Learning
+     environments. In CVPR, 2018. 1, 2, 6                                   latent dynamics for planning from pixels. In ICML, 2019. 3
+ [7] Peter Auer, Nicolo Cesa-Bianchi, and Paul Fischer. Finite-        [25] Danijar Hafner, Timothy P Lillicrap, Mohammad Norouzi,
+     time analysis of the multiarmed bandit problem. Machine                and Jimmy Ba. Mastering atari with discrete world models.
+     Learning, 2002. 5                                                      In ICLR, 2020. 3
+ [8] Angel Chang, Angela Dai, Thomas Funkhouser, Maciej Hal-           [26] Weituo Hao, Chunyuan Li, Xiujun Li, Lawrence Carin, and
+     ber, Matthias Niessner, Manolis Savva, Shuran Song, Andy               Jianfeng Gao. Towards learning a generic agent for vision-
+     Zeng, and Yinda Zhang. Matterport3D: Learning from RGB-                and-language navigation via pre-training. In CVPR, 2020.
+     D data in indoor environments. In 3DV, 2017. 2, 6                      2
+ [9] Jianyu Chen, Shengbo Eben Li, and Masayoshi Tomizuka.             [27] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
+     Interpretable end-to-end urban autonomous driving with la-             Deep residual learning for image recognition. In CVPR,
+     tent deep reinforcement learning. IEEE Transactions on In-             2016. 6
+     telligent Transportation Systems, 2021. 2                         [28] Martin Heusel, Hubert Ramsauer, Thomas Unterthiner,
+[10] Shizhe Chen, Pierre-Louis Guhur, Cordelia Schmid, and                  Bernhard Nessler, and Sepp Hochreiter. Gans trained by a
+     Ivan Laptev. History aware multimodal transformer for                  two time-scale update rule converge to a local nash equilib-
+     vision-and-language navigation. In NeurIPS, 2021. 2                    rium. In NeurIPS, 2017. 8
+[11] Shizhe Chen, Pierre-Louis Guhur, Makarand Tapaswi,                [29] Yicong Hong, Zun Wang, Qi Wu, and Stephen Gould. Bridg-
+     Cordelia Schmid, and Ivan Laptev. Think global, act local:             ing the gap between learning in discrete and continuous en-
+     Dual-scale graph transformer for vision-and-language navi-             vironments for vision-and-language navigation. In CVPR,
+     gation. In CVPR, 2022. 2                                               2022. 2, 3, 6, 7
+[12] Silvia Chiappa, Sébastien Racaniere, Daan Wierstra, and          [30] Yicong Hong, Qi Wu, Yuankai Qi, Cristian Rodriguez-
+     Shakir Mohamed. Recurrent environment simulators. In                   Opazo, and Stephen Gould. A recurrent vision-and-language
+     ICLR, 2017. 3                                                          bert for navigation. In CVPR, 2021. 2
+[13] Kurtland Chua, Roberto Calandra, Rowan McAllister, and            [31] Haoshuo Huang, Vihan Jain, Harsh Mehta, Alexander Ku,
+     Sergey Levine. Deep reinforcement learning in a handful                Gabriel Magalhaes, Jason Baldridge, and Eugene Ie. Trans-
+     of trials using probabilistic dynamics models. In NeurIPS,             ferable representation learning in vision-and-language navi-
+     2018. 3
+
+
+
+
+                                                                    10881
+     gation. In ICCV, 2019. 2                                               tive information accelerates learning in rl. In NeurIPS, 2020.
+[32] Vihan Jain, Gabriel Magalhaes, Alexander Ku, Ashish                    3
+     Vaswani, Eugene Ie, and Jason Baldridge. Stay on the path:        [49] Juncheng Li, Siliang Tang, Fei Wu, and Yueting Zhuang.
+     Instruction ﬁdelity in vision-and-language navigation. In              Walking with mind: Mental imagery enhanced embodied qa.
+     ACL, 2019. 2                                                           In ACMMM, 2019. 3
+[33] RichardSocher JeffreyPennington and ChristopherD Man-             [50] Zhixuan Lin, Yi-Fu Wu, Skand Peri, Bofeng Fu, Jindong
+     ning. Glove: Global vectors for word representation. In                Jiang, and Sungjin Ahn. Improving generative imagination
+     EMNLP, 2014. 6                                                         in object-centric world models. In ICML, 2020. 3
+[34] Philip Nicholas Johnson-Laird. Mental models: Towards a           [51] Rui Liu, Xiaohan Wang, Wenguan Wang, and Yi Yang.
+     cognitive science of language, inference, and consciousness.           Bird’s-eye-view scene graph for vision-language navigation.
+     Harvard University Press, 1983. 1, 3                                   In ICCV, 2023. 2
+[35] Philip N Johnson-Laird. Mental models and human reason-           [52] Chih-Yao Ma, Jiasen Lu, Zuxuan Wu, Ghassan AlRegib,
+     ing. Proceedings of the National Academy of Sciences, 2010.            Zsolt Kira, Richard Socher, and Caiming Xiong. Self-
+     1                                                                      monitoring navigation agent via auxiliary progress estima-
+[36] Łukasz Kaiser, Mohammad Babaeizadeh, Piotr Miłos,                      tion. In ICLR, 2019. 2
+     Błażej Osiński, Roy H Campbell, Konrad Czechowski,              [53] Chih-Yao Ma, Zuxuan Wu, Ghassan AlRegib, Caiming
+     Dumitru Erhan, Chelsea Finn, Piotr Kozakowski, Sergey                  Xiong, and Zsolt Kira. The regretful agent: Heuristic-aided
+     Levine, et al. Model based reinforcement learning for atari.           navigation through progress estimation. In CVPR, 2019. 2
+     In ICLR, 2019. 3                                                  [54] Arjun Majumdar, Ayush Shrivastava, Stefan Lee, Peter An-
+[37] Maximilian Karl, Maximilian Soelch, Justin Bayer, and                  derson, Devi Parikh, and Dhruv Batra. Improving vision-
+     Patrick Van der Smagt. Deep variational bayes ﬁlters: Un-              and-language navigation with image-text pairs from the web.
+     supervised learning of state space models from raw data. In            In ECCV, 2020. 2
+     ICLR, 2017. 3                                                     [55] Arun Mallya, Ting-Chun Wang, Karan Sapra, and Ming-Yu
+[38] Liyiming Ke, Xiujun Li, Yonatan Bisk, Ari Holtzman, Zhe                Liu. World-consistent video-to-video synthesis. In ECCV,
+     Gan, Jingjing Liu, Jianfeng Gao, Yejin Choi, and Siddhartha            2020. 4
+     Srinivasa. Tactical rewind: Self-correction via backtracking      [56] Anusha Nagabandi, Gregory Kahn, Ronald S Fearing, and
+     in vision-and-language navigation. In CVPR, 2019. 2                    Sergey Levine. Neural network dynamics for model-based
+[39] Nan Rosemary Ke, Amanpreet Singh, Ahmed Touati,                        deep reinforcement learning with model-free ﬁne-tuning. In
+     Anirudh Goyal, Yoshua Bengio, Devi Parikh, and Dhruv Ba-               ICRA, 2018. 3
+     tra. Learning dynamics model in reinforcement learning by         [57] Ashvin V Nair, Vitchyr Pong, Murtaza Dalal, Shikhar Bahl,
+     incorporating the long term future. In ICLR, 2019. 3                   Steven Lin, and Sergey Levine. Visual reinforcement learn-
+[40] Kuno Kim, Megumi Sano, Julian De Freitas, Nick Haber,                  ing with imagined goals. In NeurIPS, 2018. 3
+     and Daniel Yamins. Active world model learning with               [58] Suraj Nair, Silvio Savarese, and Chelsea Finn. Goal-aware
+     progress curiosity. In ICML, 2020. 3                                   prediction: Learning to model what matters. In ICML, 2020.
+[41] Levente Kocsis and Csaba Szepesvári. Bandit based monte-              2, 3
+     carlo planning. In ECML, 2006. 2, 3, 4                            [59] Junhyuk Oh, Xiaoxiao Guo, Honglak Lee, Richard L Lewis,
+[42] Jing Yu Koh, Honglak Lee, Yinfei Yang, Jason Baldridge,                and Satinder Singh. Action-conditional video prediction us-
+     and Peter Anderson. Pathdreamer: A world model for indoor              ing deep networks in atari games. In NeurIPS, 2015. 3
+     navigation. In CVPR, 2021. 3, 4, 6, 7, 8                          [60] Alexander Pashevich, Cordelia Schmid, and Chen Sun.
+[43] Jacob Krantz, Aaron Gokaslan, Dhruv Batra, Stefan Lee, and             Episodic transformer for vision-and-language navigation. In
+     Oleksandr Maksymets. Waypoint models for instruction-                  ICCV, 2021. 2
+     guided navigation in continuous environments. In ICCV,            [61] Alexandre Piché, Valentin Thomas, Cyril Ibrahim, Yoshua
+     2021. 2, 3, 6, 7                                                       Bengio, and Chris Pal. Probabilistic planning with sequential
+[44] Jacob Krantz and Stefan Lee. Sim-2-sim transfer for vision-            monte carlo methods. In ICLR, 2018. 3
+     and-language navigation in continuous environments. In            [62] AJ Piergiovanni, Alan Wu, and Michael S Ryoo. Learning
+     ECCV, 2022. 2, 3, 6, 7                                                 real-world robot policies by dreaming. In IROS, 2019. 2
+[45] Jacob Krantz, Erik Wijmans, Arjun Majumdar, Dhruv Batra,          [63] Yuankai Qi, Qi Wu, Peter Anderson, Xin Wang,
+     and Stefan Lee. Beyond the nav-graph: Vision-and-language              William Yang Wang, Chunhua Shen, and Anton van den
+     navigation in continuous environments. In ECCV, 2020. 1,               Hengel. Reverie: Remote embodied visual referring expres-
+     2, 3, 6, 7                                                             sion in real indoor environments. In CVPR, 2020. 2
+[46] Alexander Ku, Peter Anderson, Roma Patel, Eugene Ie, and          [64] Yanyuan Qiao, Yuankai Qi, Yicong Hong, Zheng Yu, Peng
+     Jason Baldridge. Room-Across-Room: Multilingual vision-                Wang, and Qi Wu. Hop: history-and-order aware pre-
+     and-language navigation with dense spatiotemporal ground-              training for vision-and-language navigation. In CVPR, 2022.
+     ing. In EMNLP, 2020. 2                                                 2
+[47] Alex X Lee, Anusha Nagabandi, Pieter Abbeel, and Sergey           [65] Yanyuan Qiao, Yuankai Qi, Yicong Hong, Zheng Yu, Peng
+     Levine. Stochastic latent actor-critic: Deep reinforcement             Wang, and Qi Wu. Hop+: History-enhanced and order-
+     learning with a latent variable model. In NeurIPS, 2020. 3             aware pre-training for vision-and-language navigation. IEEE
+[48] Kuang-Huei Lee, Ian Fischer, Anthony Liu, Yijie Guo,                   Transactions on Pattern Analysis and Machine Intelligence,
+     Honglak Lee, John Canny, and Sergio Guadarrama. Predic-                2023. 2
+                                                                       [66] Sébastien Racanière, Théophane Weber, David Reichert,
+
+
+
+
+                                                                    10882
+     Lars Buesing, Arthur Guez, Danilo Jimenez Rezende, Adrià                 ing for instruction following and generation in vision-
+     Puigdomènech Badia, Oriol Vinyals, Nicolas Heess, Yujia                  language navigation. In CVPR, 2022. 2
+     Li, et al. Imagination-augmented agents for deep reinforce-          [82] Hanqing Wang, Wenguan Wang, Wei Liang, Steven CH Hoi,
+     ment learning. In NeurIPS, 2017. 3                                        Jianbing Shen, and Luc Van Gool. Active perception for
+[67] Sonia Raychaudhuri, Saim Wani, Shivansh Patel, Unnat Jain,                visual-language navigation. International Journal of Com-
+     and Angel Chang. Language-aligned waypoint (law) super-                   puter Vision, 2023. 2
+     vision for vision-and-language navigation in continuous en-          [83] Hanqing Wang, Wenguan Wang, Wei Liang, Caiming Xiong,
+     vironments. In EMNLP, 2021. 2, 3, 6, 7                                    and Jianbing Shen. Structured scene memory for vision-
+[68] Olga Russakovsky, Jia Deng, Hao Su, Jonathan Krause, San-                 language navigation. In CVPR, 2021. 2
+     jeev Satheesh, Sean Ma, Zhiheng Huang, Andrej Karpathy,              [84] Hanqing Wang, Wenguan Wang, Tianmin Shu, Wei Liang,
+     Aditya Khosla, Michael Bernstein, Alexander C. Berg, and                  and Jianbing Shen. Active visual information gathering for
+     Li Fei-Fei. ImageNet Large Scale Visual Recognition Chal-                 vision-language navigation. In ECCV, 2020. 2, 7
+     lenge. IJCV, 115(3):211–252, 2015. 6                                 [85] Tingwu Wang and Jimmy Ba. Exploring model-based plan-
+[69] Oleh Rybkin, Karl Pertsch, Konstantinos G Derpanis, Kostas                ning with policy networks. In ICLR, 2020. 3
+     Daniilidis, and Andrew Jaegle. Learning what you can do              [86] Xin Wang, Qiuyuan Huang, Asli Celikyilmaz, Jianfeng Gao,
+     before doing anything. In ICLR, 2018. 2, 3                                Dinghan Shen, Yuan-Fang Wang, William Yang Wang, and
+[70] M. Savva, A. Kadian, O. Maksymets, Y. Zhao, E. Wijmans,                   Lei Zhang. Reinforced cross-modal matching and self-
+     B. Jain, J. Straub, J. Liu, V. Koltun, and J. Malik. Habitat: A           supervised imitation learning for vision-language navigation.
+     platform for embodied ai research. In ICCV, 2019. 6                       In CVPR, 2019. 2
+[71] Julian Schrittwieser, Ioannis Antonoglou, Thomas Hubert,             [87] Xiaohan Wang, Wenguan Wang, Jiayi Shao, and Yi Yang.
+     Karen Simonyan, Laurent Sifre, Simon Schmitt, Arthur                      Lana: A language-capable navigator for instruction follow-
+     Guez, Edward Lockhart, Demis Hassabis, Thore Graepel,                     ing and generation. In CVPR, 2023. 2
+     et al. Mastering atari, go, chess and shogi by planning with         [88] Xin Wang, Wenhan Xiong, Hongmin Wang, and William
+     a learned model. Nature, 588(7839):604–609, 2020. 3                       Yang Wang. Look before you leap: Bridging model-free
+[72] Ramanan Sekar, Oleh Rybkin, Kostas Daniilidis, Pieter                     and model-based reinforcement learning for planned-ahead
+     Abbeel, Danijar Hafner, and Deepak Pathak. Planning to                    vision-and-language navigation. In ECCV, 2018. 2
+     explore via self-supervised world models. In ICML, 2020. 3           [89] Manuel Watter, Jost Springenberg, Joschka Boedecker, and
+[73] David Silver, Aja Huang, Chris J Maddison, Arthur Guez,                   Martin Riedmiller. Embed to control: A locally linear latent
+     Laurent Sifre, George Van Den Driessche, Julian Schrit-                   dynamics model for control from raw images. In NeurIPS,
+     twieser, Ioannis Antonoglou, Veda Panneershelvam, Marc                    2015. 3
+     Lanctot, et al. Mastering the game of go with deep neural            [90] Erik Wijmans, Abhishek Kadian, Ari Morcos, Stefan Lee,
+     networks and tree search. Nature, 2016. 2, 3                              Irfan Essa, Devi Parikh, Manolis Savva, and Dhruv Batra.
+[74] David Silver, Julian Schrittwieser, Karen Simonyan, Ioannis               Dd-ppo: Learning near-perfect pointgoal navigators from 2.5
+     Antonoglou, Aja Huang, Arthur Guez, Thomas Hubert, Lu-                    billion frames. In ICLR, 2019. 6
+     cas Baker, Matthew Lai, Adrian Bolton, et al. Mastering the          [91] Lin Yen-Chen, Maria Bauza, and Phillip Isola. Experience-
+     game of go without human knowledge. Nature, 2017. 3                       embedded visual foresight. In CoRL, 2020. 2, 3
+[75] Aravind Srinivas, Allan Jabri, Pieter Abbeel, Sergey Levine,         [92] Yusheng Zhao, Jinyu Chen, Chen Gao, Wenguan Wang,
+     and Chelsea Finn. Universal planning networks: Learn-                     Lirong Yang, Haibing Ren, Huaxia Xia, and Si Liu. Target-
+     ing generalizable representations for visuomotor control. In              driven structured transformer planner for vision-language
+     ICML, 2018. 3                                                             navigation. In ACMMM, 2022. 2
+[76] Adam Stooke, Kimin Lee, Pieter Abbeel, and Michael                   [93] Fengda Zhu, Yi Zhu, Xiaojun Chang, and Xiaodan Liang.
+     Laskin. Decoupling representation learning from reinforce-                Vision-language navigation with self-supervised auxiliary
+     ment learning. In ICML, 2021. 3                                           reasoning tasks. In CVPR, 2020. 2
+[77] Hao Tan, Licheng Yu, and Mohit Bansal. Learning to nav-              [94] Wanrong Zhu, Yuankai Qi, Pradyumna Narayana, Kazoo
+     igate unseen environments: Back translation with environ-                 Sone, Sugato Basu, Xin Eric Wang, Qi Wu, Miguel Eckstein,
+     mental dropout. In NAACL, 2019. 2                                         and William Yang Wang. Diagnosing vision-and-language
+[78] Petar Veličković, Guillem Cucurull, Arantxa Casanova,                   navigation: What really matters. In NAACL, 2022. 2
+     Adriana Romero, Pietro Lio, and Yoshua Bengio. Graph at-
+     tention networks. In ICLR, 2018. 5, 6
+[79] Huanjie Wang, Hongbo Gao, Shihua Yuan, Hongfei Zhao,
+     Kelong Wang, Xiulai Wang, Keqiang Li, and Deyi Li.
+     Interpretable decision-making for autonomous vehicles at
+     highway on-ramps with latent space reinforcement learning.
+     IEEE Transactions on Vehicular Technology, 2021. 2
+[80] Hanqing Wang, Wei Liang, Luc V Gool, and Wenguan
+     Wang. Towards versatile embodied navigation. In NeurIPS,
+     2022. 2
+[81] Hanqing Wang, Wei Liang, Jianbing Shen, Luc Van Gool,
+     and Wenguan Wang. Counterfactual cycle-consistent learn-
+
+
+
+
+                                                                       10883
+

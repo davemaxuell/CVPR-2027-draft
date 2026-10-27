@@ -1,0 +1,48 @@
+{
+  "test_kind": "Independent toy and algebra checks, not project execution or benchmark results",
+  "skillnav_batch_assignment": {
+    "setup": "Two distinct toy heads, same features; assignment order mirrors inspected lines647-664 then838.",
+    "single_item_outputs": [
+      10,
+      20
+    ],
+    "mixed_batch_outputs": [
+      20,
+      20
+    ],
+    "finding": "The inspected call pattern can violate per-item expert routing; actual trained heads and paper runs were not evaluated."
+  },
+  "mapnav_adjusted_metric": {
+    "setup": {
+      "terminal_distance_m": 3.1,
+      "optimal_length_m": 5,
+      "executed_length_m": 20
+    },
+    "standard_3m_success": 0,
+    "standard_3m_spl": 0,
+    "relaxed_3_2m_spl_with_path_weight": 0.25,
+    "released_helper_adjusted_spl": 1,
+    "finding": "Even under a relaxed success radius, setting adjusted SPL to1 discards path efficiency."
+  },
+  "susa_sigmoid_then_softmax": {
+    "assumption": "Four branch weights are softmax(sigmoid(z)), finite real logits z.",
+    "maximum_pairwise_ratio_supremum": 2.718281828459045,
+    "maximum_single_weight_supremum": 0.4753668864186717,
+    "minimum_single_weight_infimum": 0.10923177257303593,
+    "finding": "The gate cannot arbitrarily suppress a branch through these weights alone; branch-logit scale remains another degree of freedom."
+  },
+  "polarmem_weighted_conflict_example": {
+    "setup": "For a positive query, released mixed-modality score is HAS count minus2*NOT_HAS count.",
+    "compatible_candidate": {
+      "has": 2,
+      "not_has": 0,
+      "score": 2
+    },
+    "conflicting_candidate": {
+      "has": 5,
+      "not_has": 1,
+      "score": 3
+    },
+    "finding": "Weighted scoring can rank a conflicting candidate above a compatible candidate; unlike lexicographic conflict-first ordering."
+  }
+}

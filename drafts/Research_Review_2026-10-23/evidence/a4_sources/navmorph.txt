@@ -1,0 +1,2765 @@
+NavMrph: A Self-Evolving World Model for Vision-and-Language Navigation in Continuous Environments
+Report GitHub Issue
+×
+Title:
+Content selection saved. Describe the issue below:
+Description:
+Submit without GitHub
+Submit in GitHub
+arXiv is now an independent nonprofit!
+Learn more
+×
+Back to arXiv
+Why HTML?
+Report Issue
+Back to Abstract
+Download PDF
+Abstract
+1 Introduction
+2 Related Work
+3 Method
+3.1 World-Aware Navigator (Inference Network)
+3.2 Foresight Action Planner (Predictive Network)
+3.3 Pre-training Objective
+3.4 Working Modes
+4 Experiments
+4.1 Experimental Setup
+4.2 Comparison with State-of-the-art VLN Models
+4.3 Further Remarks
+5 Conclusion
+References
+6 Lower Bound Derivation
+7 Evaluation Metrics for VLN-CE agents
+8 Implementation Details
+9 Complementary Experiments
+9.1 Full Results
+9.2 Extended Results for Self-Evolution
+9.3 Other Ablation Studies
+9.4 Extensive Discussion
+10 Qualitative Analysis
+License: arXiv.org perpetual non-exclusive license
+arXiv:2506.23468v2 [cs.CV] 22 Jul 2025
+NavMrph: A Self-Evolving World Model for Vision-and-Language Navigation in Continuous Environments
+Xuan Yao
+Affiliation: State Key Laboratory of Multimodal Artificial Intelligence Systems (MAIS)Institute of Automation, Chinese Academy of Sciences (CASIA)
+Affiliation: School of Artificial Intelligence, University of Chinese Academy of Sciences (UCAS)
+Junyu Gao
+Affiliation: State Key Laboratory of Multimodal Artificial Intelligence Systems (MAIS)Institute of Automation, Chinese Academy of Sciences (CASIA)
+Affiliation: School of Artificial Intelligence, University of Chinese Academy of Sciences (UCAS)
+Changsheng Xu
+Affiliation: State Key Laboratory of Multimodal Artificial Intelligence Systems (MAIS)Institute of Automation, Chinese Academy of Sciences (CASIA)
+Affiliation: School of Artificial Intelligence, University of Chinese Academy of Sciences (UCAS)
+Affiliation: Peng Cheng Laboratory, ShenZhen, Chinayaoxuan2022@ia.ac.cn; {junyu.gao, csxu}@nlpr.ia.ac.cn
+Abstract
+Vision-and-Language Navigation in Continuous Environments (VLN-CE) requires agents to execute sequential navigation actions in complex environments guided by natural language instructions. Current approaches often struggle with generalizing to novel environments and adapting to ongoing changes during navigation.
+Inspired by human cognition, we present NavMorph, a self-evolving world model framework that enhances environmental understanding and decision-making in VLN-CE. NavMorph employs compact latent representations to model environmental dynamics, equipping agents with foresight for adaptive planning and policy refinement. By integrating a novel Contextual Evolution Memory, NavMorph leverages scene-contextual information to support effective navigation while maintaining online adaptability. Extensive experiments demonstrate that NavMorph achieves notable performance improvements on popular VLN-CE benchmarks. Our Code is available at https://github.com/Feliciaxyao/NavMorph.
+1 Introduction
+In recent years, Embodied AI [70, 53, 51, 79] has emerged as a pivotal research direction, attracting significant attention across computer vision, natural language processing, and robotics communities due to its interdisciplinary nature.
+Among its core challenges, Vision-and-Language Navigation (VLN) [5] has gained prominence for its broad applicability in many intriguing real-world applications, such as robotic assistance [7, 44], autonomous navigation [56, 38], and smart home systems [67, 66].
+VLN tasks require agents to interpret natural language instructions, process visual information in dynamic environments, and execute sequential actions to reach target locations. To navigate effectively, agents must dynamically build a structured understanding of scenes from current observations and instructions, enabling them to predict the outcomes of their actions and make reasonable inferences about subsequent steps in response to ongoing environmental changes.
+Inspired by remarkable human capacity to construct mental representations of environments, facilitating deliberate planning for complex tasks like motor control, imagery, inference, and decision-making [26], world models have emerged as promising frameworks that explicitly model environmental dynamics by simulating actions and their effects on world states.
+By maintaining a compact latent representation, world models encapsulate dynamic and structural characteristics through agent-environment interactions [45], enabling prediction of state transitions and potential future observations.
+Figure 1: Self-Evolving World Model for Online VLN-CE tasks.
+Despite a few pioneering efforts, such as Navigation World Models [9], DreamWalker [69] and PathDreamer [39], have demonstrated the potential of world models for navigation, their application in VLN remains underexplored.
+Specifically, these approaches either lack the capacity to learn underlying action-state transitions or rely on discrete state dynamics, limiting their ability to capture the continuous nature of spatial-temporal dynamics inherent in VLN tasks.
+The limitation becomes even evident during online deployment, where agents frequently encounter complex and varied environments with substantial distributional shifts from training data [57, 78].
+Such environmental disparities pose risks of performance degradation [19], while existing world model approaches [39, 69, 9] focus primarily on the pre-training stage and lack mechanisms for continuous updating, therefore limiting their ability for online adaptation to novel environments.
+To address the above issue, we propose NavMorph, a self-evolving world model framework tailored for VLN-CE tasks. As shown in Figure 1, NavMorph constructs a continuously evolving latent space that transforms vision-language inputs (observations) into effective navigation decisions (actions) through online interaction.
+We design a tailored Recurrent State-Space Model (RSSM) [23] for VLN, which can capture continuous navigational dynamics by explicitly modeling latent action-state transitions.
+Extending this foundation, NavMorph incorporates self-evolution by progressively enhancing its latent representations, enabling agents to accumulate contextual information.
+Specifically, the framework comprises two core networks: World-aware Navigator and Foresight Action Planner. The World-aware Navigator infers environmental dynamics from historical context and current observations, constructing robust latent state representations. The Foresight Action Planner then leverages these latent states to learn a navigation policy that outputs control signals, while decoding them into foresight visual embedding, thus providing enriched scene-aware visual information for navigation decisions.
+To further equip the model with evolving adaptability, we introduce Contextual Evolution Memory (CEM), a simple yet effective memory mechanism seamlessly integrated into two networks of our model. CEM serves as a central enhancement to the recurrent module within RSSM, bolstering foresight planning and plausible navigational inference.
+Moreover, CEM enables efficient and dynamic updates during learning and online testing, empowering NavMorph with self-evolving abilities.
+Our contributions can be summarized as follows:
+•
+Starting from the definition, a novel self-evolving world model is developed for VLN-CE tasks, which adaptively models latent representations of continuous environments, enabling effective foresight-driven decision-making and adaptability in online navigation.
+•
+We design World-aware Navigator to infer latent representations of environmental dynamics and Foresight Action Planner to optimize navigational policy via predictive modeling, integrating seamlessly with Contextual Evolution Memory to accumulate navigation insights for plausible and dynamic action planning in evolving environmental observations.
+•
+Extensive experiments on popular VLN-CE benchmarks demonstrate that NavMorph significantly enhances the performance of several leading models, validating its improved adaptability and generalization.
+Figure 2: Overall framework of the proposed NavMorph, a self-evolving world model for VLN-CE tasks. World-aware Navigator (Inference Network) infers latent representations by leveraging current observations 𝒐\boldsymbol{o} and historical context from Contextual Evolution Memory. Foresight Action Planner (Predictive Network) then uses these latent representations 𝒔^\boldsymbol{\hat{s}} to predict future visual embeddings 𝒙^\boldsymbol{\hat{x}}, enriching scene semantics for action sequence prediction 𝒂^\boldsymbol{\hat{a}}. This integrated framework enables robust navigation and effective policy learning.
+2 Related Work
+VLN in Continuous Environments.
+Recently, Vision-and-Language Navigation (VLN) tasks [5, 60, 8, 1, 61, 47, 28] have garnered considerable attention among embodied AI, requiring an agent to follow human language instructions to navigate in previously unseen environments using visual observations.
+To remove the unrealistic assumptions in discrete VLN settings, VLN in continuous environments (VLN-CE) [41] is proposed to extend navigation to continuous spaces.
+In VLN-CE, agents can freely explore any unobstructed location in 3D environments, using low-level actions (e.g., MOVE-FORWARD 0.25m, TURN-LEFT/RIGHT 15∘15^{\circ} and STOP) through the Habitat Simulator [64].
+Early VLN-CE methods employed end-to-end trained systems to directly predict low-level actions from nature language instructions and visual observations [41, 35]. To alleviate the reliance on costly, data-intensive pre-training, Krantz et al. [42] proposed to decouple the task into subgoal planning and low-level control by waypoint predictor.
+Building on this framework, recent studies have explored waypoint-based approaches by using more robust visual representations pre-trained on large datasets [37], incorporating graph-based models [1], or integrating auxiliary tasks [31] to improve performance.
+Currently, many of these models rely on panoramic RGB-D inputs [3, 29, 6, 40], but their high cost, bulkiness, and computational overhead hinder deployment on physical robots. Therefore, the monocular configuration—processing single RGB-D frames sequentially—has emerged as a practical alternative, positioning it as a favorable approach for real-world applications in state-of-the-art methods [75, 80].
+World Models.
+World models have emerged as a promising framework for data-efficient learning in simulated environments [32, 77, 52, 72, 59] and video games [25, 81]. These generative models embed observations into latent states, predict future states conditioned on actions, and decode latent predictions back into observation space [45].
+As an effective framework for latent dynamics learning, RSSM consists of an Inference Network for estimating latent states and a Predictive Network for forecasting future transitions. Ha et al. [22] introduced a prototypical two-part model combining RSSM with a variational autoencoder.
+Subsequent works like PlaNet [23] and the Dreamer series [24, 55, 25] refined this approach, optimizing policies over predicted latent states. World models enable agents to model environmental dynamics and predict future states without decoding observations, which is crucial for reasoning and planning in VLN tasks.
+However, their application in VLN remains underexplored. Pathdreamer [39] introduced a visual world model to generate future observations at discrete viewpoints based on prior seen views, using them as augmented data for training. In continuous settings, DREAMWALKER [69] adopted a heuristic search-based world model to generate panoramic images of navigable candidates.
+Recently, Navigation World Models [9] introduced a controllable video generation model that utilizes learned visual priors to imagine trajectories in unfamiliar environments.
+Despite notable gains, existing navigational world models encounter challenges in VLN tasks, as they (1) rely on discrete state dynamics, limiting their ability to model continuous action-state transitions, (2) use static pretrained models, restricting adaptability to novel and dynamic environments, and (3) employ pixel-level future prediction that may incur high computational costs.
+To address these limitations, our proposed world model that models continuous action-state transitions through latent representation learning, adapts dynamically via a self-evolving mechanism, and reconstructs visual embeddings and perform future prediction at feature level to enhance efficiency.
+3 Method
+In this section, we propose a self-evolving world model tailored for VLN-CE [41], a practical setting where the agent navigates a 3D mesh environment through low-level, parameterized actions.
+Our model aims to learn and adapt to the spatio-temporal dynamics of continuous environments within a structured latent space, facilitating effective reasoning and action planning during online testing.
+Task Definition.
+VLN-CE [41] utilizes the Habitat Simulator [64] to render observations of environments derived from the Matterport3D dataset [10], providing the agent with RGB-D sensory inputs.
+Each episode, referring to a complete navigation task, begins with the VLN agent receiving an instruction alongside an initial visual observation, and concludes when the agent either selects the ‘stop’ action or reaches the maximum step limit.
+At each timestep tt, the agent predicts waypoints [42, 29] from a predefined set of angles and distances, which are subsequently translated into low-level control actions. This navigation progress unfolds over time steps t∈ℕt\in\mathbb{N}, with high-dimensional RGB-D images 𝒐t∈ℝNo×h×w×c\boldsymbol{o}_{t}\in\mathbb{R}^{N_{o}\times h\times w\times c} serving as input observations to infer navigational actions 𝒂t=π(𝒂t|𝒐1:t,𝒂1:t−1)\boldsymbol{a}_{t}=\pi(\boldsymbol{a}_{t}|\boldsymbol{o}_{1:t},\boldsymbol{a}_{1:t-1}) under a learnable policy π\pi.
+The sequence 𝒐1:t\boldsymbol{o}_{1:t} denotes all observations up to tt, while 𝒂1:t−1\boldsymbol{a}_{1:t-1} denotes all navigation actions up to t−1t-1.
+Framework Overview.
+To enhance the agent’s ability to understand and interact with environments for VLN-CE tasks, as illustrated in Figure 2, our proposed world model consists of two primary components: (1) World-Aware Navigator (Inference Network), which continuously constructs environmental representations and infers state transitions in a latent space, and (2) Foresight Action Planner (Predictive Network), which predicts future states to facilitate effective policy learning for strategic navigation.
+Within the World-Aware Navigator (parameterized by ϕ\phi), we adopt a structured latent representation following RSSM [23], decomposed into two components: a deterministic history 𝒉t\boldsymbol{h}_{t} and a stochastic state 𝒔t\boldsymbol{s}_{t}, maintaining consistent navigation progress while incorporating new observations and their potential variations. A visual encoder eϕe_{\phi} processes observations and integrates them with these latent variables (𝒉t−1,𝒔t−1)(\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1}) to form a comprehensive state representation 𝒉t\boldsymbol{h}_{t} for navigation decision-making.
+The Predictive Network (parameterized by θ\theta) then leverages this latent representation to plan foresight actions sequentially. Specifically, it generates the predicted latent stochastic feature 𝒔^t\boldsymbol{\hat{s}}_{t}, which encapsulates potential environmental uncertainties in future time steps. Subsequently, a visual decoder dθd_{\theta} transforms this feature into a predicted visual embedding 𝒙^t\boldsymbol{\hat{x}}_{t}, providing a high-level semantic representation of the anticipated navigational scene to guide the prediction of the next action 𝒂^t+1\boldsymbol{\hat{a}}_{t+1}.
+Notably, a recurrent module fϕ/θf_{\phi/\theta} is utilized as the fundamental component of RSSM for modeling latent states, sharing parameter between both above components to ensure consistent temporal dynamics across state inference and future prediction. For notational clarity, we denote it as ff.
+An overview of detailed architecture is shown in Figure 3, with components of our self-evolving world model outlined below:
+•
+Inference Network
+Visual Representation:
+𝒙t=eϕ​(𝒐t)\displaystyle\,\boldsymbol{x}_{t}=e_{\phi}(\boldsymbol{o}_{t})
+Initial Latent Deterministic State:
+𝒉1∼δ⁡(𝟎)\displaystyle\,\boldsymbol{h}_{1}\sim\delta(\mathbf{0})
+Recurrent Model:
+𝒉t=f⁡(𝒉t−1,𝒔t−1)\displaystyle\,\boldsymbol{h}_{t}=f(\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1})
+Dynamic Transition Model:
+𝒔t∼qϕ(𝒔t|𝒐1:t,𝒂1:t−1)\displaystyle\,\boldsymbol{s}_{t}\sim q_{\phi}(\boldsymbol{s}_{t}|\boldsymbol{o}_{1:t},\boldsymbol{a}_{1:t-1})
+•
+Predictive Network
+Initial Latent Stochastic State:
+𝒔1∼𝒩⁡(𝟎,𝑰)\displaystyle\,\boldsymbol{s}_{1}\sim\mathcal{N}(\boldsymbol{0,I})
+Stochastic State Model:
+𝒔^t∼pθ​(𝒔^t|𝒉t,𝒔^t−1)\displaystyle\,\boldsymbol{\hat{s}}_{t}\sim p_{\theta}(\boldsymbol{\hat{s}}_{t}|\boldsymbol{h}_{t},\boldsymbol{\hat{s}}_{t-1})
+Visual Decoder:
+𝒙^t∼pθ​(𝒙^t|𝒉t,𝒔^t)\displaystyle\,\boldsymbol{\hat{x}}_{t}\sim p_{\theta}(\boldsymbol{\hat{x}}_{t}|\boldsymbol{h}_{t},\boldsymbol{\hat{s}}_{t})
+Action Decoder:
+𝒂^t∼pθ​(𝒂^t|𝒉t,𝒔^t)\displaystyle\,\boldsymbol{\hat{a}}_{t}\sim{p}_{\theta}(\boldsymbol{\hat{a}}_{t}|\boldsymbol{h}_{t},\boldsymbol{\hat{s}}_{t})
+Figure 3: Detailed architecture of our world model.
+3.1 World-Aware Navigator (Inference Network)
+The World-Aware Navigator is a policy-based agent designed to effectively map the cross-modal input onto a sequence of actions within the VLN framework.
+Actions are pivotal for the world model to anticipate and predict future states. In a typical VLN-CE setting [39, 3], the agent predicts actions by selecting a candidate sub-goal point on a constructed map, along with its corresponding coordinates. To ensure plausible predictions of NavMorph, we define the action at time step tt as Δ​p​o​s​i​t​i​o​nt\Delta position_{t}, which represents the movement of ego location between the previous time step t−1t-1 to current time step tt. For consistency with operations in the latent space of our world model, a linear transformation maps the action into a dad_{a}-dimensional embedding 𝒂t∈ℝda\boldsymbol{a}_{t}\in\mathbb{R}^{d_{a}}.
+After integrating the encoded action with the agent’s current state and observation, we sample from (𝒉t,𝒂t,𝒙t)\left(\boldsymbol{h}_{t},\boldsymbol{a}_{t},\boldsymbol{x}_{t}\right) to estimate the Gaussian posterior, yielding a probabilistic representation of the current state:
+q(𝒔t|𝒐1:t,𝒂1:t−1)∼𝒩(μϕ(\displaystyle q(\boldsymbol{s}_{t}|\boldsymbol{o}_{1:t},\boldsymbol{a}_{1:t-1})\sim\mathcal{N}(\mu_{\phi}(
+OPEN𝒉t,𝒂t−1,𝒙t),\displaystyle\boldsymbol{h}_{t},\boldsymbol{a}_{t-1},\boldsymbol{x}_{t}),
+OPENσϕ​(𝒉t,𝒂t−1,𝒙t)​𝑰),\displaystyle\sigma_{\phi}(\boldsymbol{h}_{t},\boldsymbol{a}_{t-1},\boldsymbol{x}_{t})\boldsymbol{I}),
+(1)
+where (μϕ,σϕ)(\mu_{\phi},\sigma_{\phi}) are multi-layer perceptions (MLPs) that parameterize the posterior state distribution.
+During training, 𝒂t\boldsymbol{a}_{t} corresponds to ground truth actions.
+In our model, the deterministic history should encode both temporal dynamics and accumulated information from past observations and language instructions. A common approach to achieve this is through conventional recurrent modules like RNNs, LSTMs, or transformer-based architectures, which can process current observations alongside previously obtained features to recursively integrate historical information 𝒉t−1\boldsymbol{h}_{t-1} and stochastic states 𝒔t−1\boldsymbol{s}_{t-1} into a full history representation 𝒉t\boldsymbol{h}_{t}.
+However, while effective in capturing short-term dynamics, these approaches struggle with adaptive updates during online testing due to their reliance on gradient descent and lack an explicit memory mechanism to store and utilize novel scene information.
+Therefore, we introduce a simple yet effective Contextual Evolution Memory (CEM), which enhances the agent’s capacity to retain and leverage historical navigation insights. CEM maintains NmN_{m} scene-contextual features {𝒗m}m=1Nm\left\{\boldsymbol{v}_{m}\right\}_{m=1}^{N_{m}}, where each 𝒗m∈ℝdv\boldsymbol{v}_{m}\in\mathbb{R}^{d_{v}} captures crucial visual insights from diverse scenarios encountered.
+To accommodate the dynamic nature of navigation environments, CEM continuously evolves by incorporating new scene features while selectively preserving valuable historical context.
+CEM is randomly initialized and progressively integrates informative scene-contextual features accumulated throughout learning and online testing.
+This adaptive mechanism ensures relevance to recent experiences while preserving critical visual-semantic information from past episodes.
+Specifically, this evolving CEM supports the enhanced deterministic history 𝒉~t\tilde{\boldsymbol{h}}_{t} by assimilating relevant contextual information from past navigational experiences. Our CEM-enhanced recurrent module retrieves the top-KK scene-contextual features from CEM, using them as historical semantic insights to enrich the deterministic state:
+{𝒗k}k=1K=arg​top​K⁡(𝒮​ℐ​ℳ​(𝒉t,𝒗m)),𝒉~t=(1−α)​𝒉t+α​∑k=1Kμk​𝒗k,\displaystyle\begin{split}\left\{\boldsymbol{v}_{k}\right\}_{k=1}^{K}&=\operatorname{arg\,top\mathit{K}}\left(\mathcal{SIM}(\boldsymbol{h}_{t},\boldsymbol{v}_{m})\right),\\
+\tilde{\boldsymbol{h}}_{t}&=(1-\alpha)\boldsymbol{h}_{t}+\alpha\sum_{k=1}^{K}\mu_{k}\boldsymbol{v}_{k},\end{split}
+(2)
+where the relevance score 𝒮​ℐ​ℳ​(𝒉t,𝒗m)\mathcal{SIM}(\boldsymbol{h}_{t},\boldsymbol{v}_{m}) is calculated using cosine similarity. The weight μk\mu_{k} denote the normalized similarity score assigned to the kk-th relevant retrieved features, while α\alpha serves as an enhancing factor.
+To balance the trade-off between previously accumulated experiences and newly observed information, CEM is efficiently evolved by refining the retrieved scene-contextual features through forward updates, rather than using time-consuming gradient-based backpropagation. This evolving process is governed by a factor β\beta and the enriched deterministic state is then used for future predictions:
+𝒗k←(1−β)​𝒗k+β​𝒉t,𝒉t←𝒉~t.\displaystyle\boldsymbol{v}_{k}\leftarrow(1-\beta)\boldsymbol{v}_{k}+\beta\boldsymbol{h}_{t},\;\boldsymbol{h}_{t}\leftarrow\tilde{\boldsymbol{h}}_{t}.
+(3)
+3.2 Foresight Action Planner (Predictive Network)
+Empowered by the world model, the agent acquires the ability to anticipate environmental changes resulting from its actions over an extended future period. Based on the state representations learned by the World-Aware Navigator, the Foresight Action Planner is designed to execute future planning by imagining potential scenarios in the latent space.
+In contrast to future predictions with observed images, we rely solely on the enhanced history states 𝒉1:t\boldsymbol{h}_{1:t} provided by the CEM-enhanced recurrent module, and the predicted states 𝒔^1:t\boldsymbol{\hat{s}}_{1:t}. Similar to inference network, 𝒔^t\boldsymbol{\hat{s}}_{t} is sampled from (𝒉t,𝒂^t)(\boldsymbol{h}_{t},\boldsymbol{\hat{a}}_{t}) with the Gaussian prior distribution, defined as:
+pθ​(𝒔^t|𝒉t,𝒔^t−1)∼𝒩⁡(μθ​(𝒉t,𝒂^t−1),σθ​(𝒉t,𝒂^t−1)​𝑰),\displaystyle p_{\theta}(\boldsymbol{\hat{s}}_{t}|\boldsymbol{h}_{t},\boldsymbol{\hat{s}}_{t-1})\sim\mathcal{N}(\mu_{\theta}(\boldsymbol{h}_{t},\boldsymbol{\hat{a}}_{t-1}),\sigma_{\theta}(\boldsymbol{h}_{t},\boldsymbol{\hat{a}}_{t-1})\boldsymbol{I}),
+(4)
+where (μθ,σθ)(\mu_{\theta},\sigma_{\theta}) are MLPs that parameterize the prior state distribution. Since the prior does not have access to the ground truth actions, the predicted action 𝒂^t−1\boldsymbol{\hat{a}}_{t-1} is estimated with the learned policy πθ​(𝒉t−1,𝒔^t−1){\pi}_{\theta}(\boldsymbol{h}_{t-1},\boldsymbol{\hat{s}}_{t-1}).
+Building upon this, the Foresight Action Planner extends the prediction of future states over TpT_{p} time steps without access to corresponding observations, leveraging the learned latent state and previously inferred actions over previous TT timesteps (i.e., observation window). In specific, the planner applies the learned policy to estimate actions 𝒂^T+j=πθ​(𝒉T+j,𝒔^T+j)\boldsymbol{\hat{a}}_{T+j}=\pi_{\theta}(\boldsymbol{h}_{T+j},\boldsymbol{\hat{s}}_{T+j}), predicts the next deterministic state 𝒉T+j+1=fθ​(𝒉T+j,𝒔^T+j)\boldsymbol{h}_{T+j+1}=f_{\theta}(\boldsymbol{h}_{T+j},\boldsymbol{\hat{s}}_{T+j}) and samples from the prior distribution: 𝒔^T+j+1∼𝒩⁡(μθ​(𝒉T+j+1,𝒂^T+j),σθ​(𝒉T+j+1,𝒂^T+j)​𝑰)\boldsymbol{\hat{s}}_{T+j+1}\sim\mathcal{N}(\mu_{\theta}(\boldsymbol{h}_{T+j+1},\boldsymbol{\hat{a}}_{T+j}),\sigma_{\theta}(\boldsymbol{h}_{T+j+1},\boldsymbol{\hat{a}}_{T+j})\boldsymbol{I}), j∈[1,Tp]j\in\left[1,T_{p}\right].
+Aiming for a comprehensive understanding of environmental dynamics to support action planning, we introduce a reconstruction task that guides foresight action planner to simulate potential future scenarios internally while learning useful latent representations.
+To achieve this, we reconstruct visual embeddings 𝒙t∈ℝdx\boldsymbol{x}_{t}\in\mathbb{R}^{d_{x}} derived from input observations 𝒐t\boldsymbol{o}_{t} through a visual decoder dθd_{\theta}, rather than direct pixel-level image reconstruction.
+While pixel-level generation methods [46, 39, 69, 9] are common for future observation prediction, they incur high computational costs and training complexity, while their reliance on pretrained generative models may introduce biases and hinder fair comparisons.
+This reconstruction objective serves to regularize and enhance the model’s future state predictions, with details provided in § 3.3. Additionally, the designed CEM enriches latent representations with contextually relevant historical information, leading to more informed reconstructions and improved planning.
+Discussion.
+The above analysis highlights the crucial role of CEM in our proposed world model, serving as a core component within RSSM to facilitate plausible foresight planning and enable efficient self-evolution. Given the limited exploration of dynamic evolution within existing world models, this paper aims to elucidate the potential of integrating evolutionary strategies into VLN world models. To this end, instead of designing a more complex evolution mechanism, we design a simple, direct, and effective approach that dynamically integrates scene contextual information during learning and online testing.
+Refer to Sec 4.3 and Supplementary Material for further discussion.
+3.3 Pre-training Objective
+Our evolving world model is trained by maximizing a variational lower bound on the data log-likelihood. This training process involves minimizing losses related to visual reconstruction and action prediction for both past and future states, as well as the divergence between the posterior and prior state distributions. Specifically, the model observes inputs over TT timesteps and subsequently forecasts visual embeddings and actions for an additional TpT_{p} timesteps. The loss function ℒW\mathcal{L}_{W} is defined as follows:
+ℒW=∑t=1T𝔼⁡[−log⁡p⁡(𝒙t|𝒉t,𝒔t)⏟Reconstruction Loss ℓr​e​−log⁡p⁡(𝒂t|𝒉t,𝒔t)⏟ℓa​c]\mathcal{L}_{W}=\sum_{t=1}^{T}\mathbb{E}\left[\underbrace{-\log p(\boldsymbol{x}_{t}|\boldsymbol{h}_{t},\boldsymbol{s}_{t})}_{\text{Reconstruction Loss $\ell_{re}$}}\underbrace{-\log p(\boldsymbol{a}_{t}|\boldsymbol{h}_{t},\boldsymbol{s}_{t})}_{\ell_{ac}}\right]
++∑j=1Tp𝔼[−log⁡p⁡(𝒙T+j|𝒉T,𝒔T)⏟ℓr​e−log⁡p⁡(𝒂T+j|𝒉T,𝒔T)⏟Action Prediction Loss ℓa​c]+∑t=1T𝔼[γ⋅DKL(q(𝒔t|𝒐1:t,𝒂1:t−1)∥p(𝒔t|𝒉t−1,𝒔t−1))⏟Posterior and Prior Matching Loss ℓk​l],\displaystyle\begin{split}&+\sum_{j=1}^{T_{p}}\mathbb{E}\left[\underbrace{-\log p(\boldsymbol{x}_{T+j}|\boldsymbol{h}_{T},\boldsymbol{s}_{T})}_{\ell_{re}}\underbrace{-\log p(\boldsymbol{a}_{T+j}|\boldsymbol{h}_{T},\boldsymbol{s}_{T})}_{\text{Action Prediction Loss $\ell_{ac}$}}\right]\\
+&+\sum_{t=1}^{T}\mathbb{E}\left[\gamma\cdot\underbrace{D_{\mathrm{KL}}\left(q(\boldsymbol{s}_{t}|\boldsymbol{o}_{1:t},\boldsymbol{a}_{1:t-1})\,\|\,p(\boldsymbol{s}_{t}|\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1})\right)}_{\text{Posterior and Prior Matching Loss $\ell_{kl}$}}\right],\end{split}
+(5)
+where γ\gamma is a weighting coefficient. For simplicity of notation, we use a unified notation (𝒔t,𝒂t,𝒙t\boldsymbol{s}_{t},\boldsymbol{a}_{t},\boldsymbol{x}_{t}) to represent variables across both the observation and prediction phases, omitting the hat notation (𝒔^t,𝒂^t,𝒙^t\hat{\boldsymbol{s}}_{t},\hat{\boldsymbol{a}}_{t},\hat{\boldsymbol{x}}_{t}). Please refer to Supplementary Material for the detailed derivation of ℒW\mathcal{L}_{W}.
+In practice, we implement the log-likelihood term with two components: a visual embedding reconstruction loss ℓr​e\ell_{re} and an action prediction loss ℓa​c\ell_{ac}, optimized using stochastic gradient ascent.
+While point-wise difference metrics (e.g., cross-entropy) provide a direct measure of prediction accuracy, they may not adequately capture the temporal nature of navigation trajectories and potential misalignments between predicted and actual routes. To mitigate this, we incorporate a regularization term based on Normalized Dynamic Time Warping (NDTW) [33], which constrains the predicted visual embeddings and actions. This regularization is specifically formulated as follows:
+ℓ⋆=1−1Tp∑t=1T∑j=1TpNDTW(⋆1:t+j,⋆^1:t+j),\displaystyle\ell_{\star}=1-\frac{1}{T_{p}}\sum_{t=1}^{T}\sum_{j=1}^{T_{p}}\text{NDTW}(\star_{1:t+j},\hat{\star}_{1:t+j}),
+(6)
+where ⋆1:t+j\star_{1:t+j} and ⋆^1:t+j\hat{\star}_{1:t+j} denote the ground-truth and predicted sequences, respectively.
+This NDTW-based regularization is applied to both ℓr​e\ell_{re} and ℓa​c\ell_{ac}, encouraging temporal consistency and alignment between predicted and actual navigation trajectories. Additionally, to ensure precise action predictions, we incorporate an L2 loss within ℓa​c\ell_{ac}, focusing on accurate estimation of 𝒂t=Δ​p​o​s​i​t​i​o​nt\boldsymbol{a}_{t}=\Delta position_{t} and leveraging supervision from ground truth actions.
+In addition to ensuring foresight latent states 𝒔^t\boldsymbol{\hat{s}}_{t} align with observed data, a Kullback-Leibler (KL) divergence-based loss is employed to align the prior distribution with the posterior.
+Since both the approximate q(𝒔t|𝒐1:t,𝒂1:t−1)q(\boldsymbol{s}_{t}|\boldsymbol{o}_{1:t},\boldsymbol{a}_{1:t-1}) and the prior p⁡(𝒔t|𝒉t−1,𝒔t−1)p(\boldsymbol{s}_{t}|\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1}) are modeled as Gaussian distributions (\left(\right.Eq. (1) and Eq. (4))\left.\right), the posterior and prior matching loss can be computed in closed form. Upon convergence, the KL divergence quantifies the information disparity between the prior and posterior distributions, ensuring the prior models state-action dynamics observed in actual navigation.
+Finally, the world model loss ℒW\mathcal{L}_{W} is combined with the imitation learning objective ℒI​L\mathcal{L}_{IL} [3], to form the complete loss function: ℒ=ℒW+ℒI​L\mathcal{L}=\mathcal{L}_{W}+\mathcal{L}_{IL}. Note that ℒI​L=−∑t=1Tlogp(𝒂∗|ℐ,𝒪)\mathcal{L}_{IL}=-\sum_{t=1}^{T}\log p(\boldsymbol{a}^{*}|\mathcal{I},\mathcal{O}), and 𝒂∗\boldsymbol{a}^{*} represents the teacher action node of each step, determined by an interactive demonstrator similar to DAgger algorithm [63].
+3.4 Working Modes
+Our world model operates in two distinct modes during the training and testing phases.
+During training, the model focuses on learning the underlying latent dynamics of environments through future state prediction. It processes sequences of observations and corresponding actions, optimizing loss functions delineated in § 3.3 to update the model via gradient descent.
+During testing, our self-evolving world model continually adapts to changing environments via the evolving mechanism.
+The recurrent module updates CEM in an online manner during testing, similar to the training phase as described in Eq. (3). This adaptive ability allows the model to retain insightful information from recent observations while adjusting to testing scenes, thereby maintaining a contextually enriched and up-to-date comprehension of its surroundings.
+Table 1: Experimental results on R2R-CE dataset. Results better than base model are shown in blue. Best results for the panoramic and monocular settings are each highlighted in bold. * indicates experimental results that we have reproduced in this work.
+Val Seen
+Val Unseen
+Test Unseen
+Camera
+Methods
+TL ↓\downarrow
+NE ↓\downarrow
+OSR
+SR
+SPL
+TL ↓\downarrow
+NE ↓\downarrow
+OSR
+SR
+SPL
+TL ↓\downarrow
+NE ↓\downarrow
+OSR
+SR
+SPL
+LAW [62]  [EMNLP21]
+9.34
+6.35
+49
+40
+37
+8.89
+6.83
+44
+35
+31
+9.67
+7.69
+28
+38
+25
+CM2 [20]  [CVPR22]
+12.05
+6.10
+50.7
+42.9
+34.8
+11.54
+7.02
+41.5
+34.3
+27.6
+13.90
+7.70
+39
+31
+24
+WS-MGMap [14]  [NeurIPS22]
+10.12
+5.65
+51.7
+46.9
+43.4
+10.00
+6.28
+47.6
+38.9
+34.3
+12.30
+7.11
+45
+35
+28
+NaVid [80]  [RSS24]
+-
+-
+-
+-
+-
+-
+5.47
+49.1
+37.4
+35.9
+-
+-
+-
+-
+-
+ETPNav/p [75]  [CoRL24]
+-
+-
+-
+-
+-
+-
+6.81
+42.4
+32.9
+23.1
+-
+-
+-
+-
+-
+VLN-3DFF [75]  [CoRL24]
+-
+-
+-
+-
+-
+-
+5.95
+55.8
+44.9
+30.4
+-
+6.24
+54.4
+43.7
+28.9
+VLN-3DFF*
+22.90
+4.92
+62.1
+52.7
+36.7
+26.16
+6.05
+54.9
+43.8
+29.4
+26.02
+6.22
+54.7
+43.8
+28.6
+Monocular
+NavMorph
+20.03
+4.58
+62.7
+55.8
+38.9
+22.54
+5.75
+56.9
+47.9
+33.2
+24.75
+6.01
+54.5
+45.7
+30.2
+Seq2Seq [5]  [CVPR18]
+9.26
+7.12
+46
+37
+35
+8.64
+7.37
+40
+32
+30
+8.85
+7.91
+36
+28
+25
+Sim2Sim [40]  [ECCV22]
+11.18
+4.67
+61
+52
+44
+10.69
+6.07
+52
+43
+36
+11.43
+6.17
+52
+44
+37
+CWP-CMA [29]  [CVPR22]
+11.47
+5.20
+61
+51
+45
+10.90
+6.20
+52
+41
+36
+11.85
+6.30
+49
+38
+33
+CWP-BERT [29] [CVPR22]
+12.50
+5.02
+59
+50
+44
+12.23
+5.74
+53
+44
+39
+13.51
+5.89
+51
+42
+36
+DREAMW [69]  [ICCV23]
+11.60
+4.09
+59
+66
+48
+11.30
+5.53
+49
+59
+44
+11.80
+5.48
+49
+57
+44
+GridMM [74]  [ICCV23]
+12.69
+4.21
+69
+59
+51
+13.36
+5.11
+61
+49
+41
+13.31
+5.64
+56
+46
+39
+FSTTA [19]  [ICML24]
+12.39
+4.25
+69
+58
+50
+11.58
+5.27
+58
+48
+42
+13.17
+5.84
+55
+46
+38
+ETPNav [3]  [TPAMI24]
+11.78
+3.95
+72
+66
+59
+11.99
+4.71
+65
+57
+49
+12.87
+5.12
+63
+55
+48
+ETPNav*
+11.35
+3.93
+72
+66
+59
+11.40
+4.69
+64
+57
+49
+12.72
+5.10
+63
+55
+48
+NavMorph
+11.43
+3.86
+73
+67
+60
+11.55
+4.62
+66
+59
+50
+12.88
+4.91
+64
+57
+49
+HNR [76]  [CVPR24]
+11.79
+3.67
+76
+69
+61
+12.64
+4.42
+67
+61
+51
+13.03
+4.81
+67
+58
+50
+HNR*
+11.84
+3.73
+76
+69
+61
+12.76
+4.57
+67
+61
+51
+12.92
+4.85
+67
+58
+50
+Panoramic
+NavMorph
+11.76
+3.66
+78
+70
+62
+12.68
+4.37
+68
+64
+53
+12.69
+4.69
+68
+60
+52
+•
+Note: Following established conventions, we report results with different precision formats across camera configurations: integers for panoramic settings and two decimal places for monocular settings.
+Table 2: Experimental results on RxR-CE dataset.
+Val Unseen
+Camera
+Methods
+NE ↓\downarrow
+SR
+SPL
+NDTW
+SDTW
+Monocular
+LAW [62]
+10.87
+8.0
+8.0
+-
+-
+CM2 [20]
+8.98
+14.4
+9.2
+-
+-
+WS-MGMap [14]
+9.83
+15.0
+12.1
+-
+-
+NaVid [80]
+8.41
+23.8
+32.2
+-
+-
+A2-Nav [15]
+-
+16.8
+6.3
+-
+-
+VLN-3DFF [75]
+8.79
+25.5
+18.1
+-
+-
+VLN-3DFF*
+9.41
+26.66
+20.11
+42.91
+20.36
+NavMorph
+8.85
+30.76
+22.84
+44.19
+23.30
+Panoramic
+LAW-Pano [62]
+11.04
+10.0
+9.0
+-
+-
+Seq2Seq [5]
+12.1
+13.93
+11.96
+30.86
+11.01
+CWP-CMA [29]
+8.76
+26.59
+22.16
+47.05
+-
+CWP-BERT [29]
+8.98
+27.08
+22.65
+46.71
+-
+AO-Planner [12]
+7.06
+43.3
+30.5
+50.1
+-
+Reborn [2]
+5.98
+48.60
+42.05
+63.35
+41.82
+ETPNav [3]
+5.64
+54.79
+44.89
+61.90
+45.33
+ETPNav*
+5.96
+54.83
+44.62
+61.36
+44.87
+NavMorph
+5.80
+56.23
+46.39
+63.23
+46.98
+HNR [76]
+5.51
+56.39
+46.73
+63.56
+47.24
+HNR*
+5.75
+56.48
+46.62
+63.43
+47.38
+NavMorph
+5.70
+58.02
+48.98
+64.77
+48.85
+4 Experiments
+We evaluate our model on R2R-CE and RxR-CE [41] datasets, which transform discrete paths of R2R [5] and RxR [43] datasets into continuous environments.
+Experiments and ablation studies show our effectiveness.
+4.1 Experimental Setup
+Datasets.
+R2R-CE dataset [41, 5] comprises 5,611 shortest-path trajectories, divided across training, validation, and test splits. Each trajectory is paired with approximately three English instructions, with an average path length of 9.89 meters and a mean instruction length of 32 words.
+Based on similar scene splits, RxR-CE dataset [41, 43] is larger and more challenging, offering substantially more instructions in multiple languages, including English, Hindi, and Telugu, with an average of 120 words per instruction.
+Notably, agents in R2R-CE have a chassis radius of 0.10 meters and can slide along obstacles during navigation, while agents in RxR-CE, with a larger chassis radius of 0.18 meters, are restricted from sliding thus more prone to collisions.
+Evaluation Metrics.
+We follow previous approaches [5, 4, 33] and adopt the standard metrics for evaluating VLN-CE agents, including TL (Trajectory Length), NE (Navigation Error), OSR (SR given Oracle stop policy), SR (Success Rate), SPL (Success weighted by Path Length), NDTW(Normalized Dynamic Time Warping), and SDTW (Success weighted by NDTW).
+Implementation Details.
+For panoramic settings, we follow standard VLN-CE setups [40, 29], where each location is represented by 12 RGB-D images captured at 30∘ intervals. We evaluate our approach with ETPNav[3] and HNR[76] to verify our efficacy.
+While monocular cameras offer advantages in real-world deployment, including lower cost, reduced size, and improved energy efficiency, we validate our method in a more practical setting. Specifically, we adopt VLN-3DFF [75], which adapts the original panoramic observation setting for deployment on real-world monocular robots, leveraging the pretrained 3D Feature Fields model [76].
+To align with practical applications, we adhere to the online VLN setting established in [19], setting the batch size to 1 during evaluation.
+All experiments were conducted using PyTorch framework [58] on a single NVIDIA RTX 3090 GPU. Please refer to Supplementary Material for detailed hyper-parameter settings.
+4.2 Comparison with State-of-the-art VLN Models
+R2R-CE.
+Table 1 presents a comparative analysis of our self-evolving world model against state-of-the-art methods on R2R-CE dataset.
+Compared to other monocular methods, our NavMorph consistently achieves strong performance across multiple metrics, particularly in unseen environments.
+Specifically, on the Val Unseen split, our model achieves remarkable gains of over 4%\% in both SR and SPL. The model’s generalization capabilities are further validated on Test Unseen split, where NavMorph surpasses baseline VLN-3DFF by 1.6%\% in SPL and approximately 2%\% in SR.
+Notably, our model achieves a marked reduction in trajectory length (TL) alongside increased SR under practical monocular settings, indicating more efficient navigation along optimized paths. This can be attributed to model’s robust ability to capture and predict latent environmental dynamics, enabling more informed decision-making through memory-enhanced representations.
+With panoramic inputs, our model maintains comparable trajectory efficiency while further enhancing SR, likely due to the extensive visual context provided by panoramic views, which supplies sufficient information for base models to select well-informed paths.
+These results underscore the efficacy of our NavMorph in improving navigation in continuous environments.
+RxR-CE.
+Table 2 compares NavMorph with existing methods on the RxR-CE dataset, illustrating its superior performance in both monocular and panoramic setups. In the monocular setting, NavMorph outperforms the previous state-of-the-art method VLN-3DFF by substantial margins of 4.1%\% in SR and 2.73%\% in SPL, highlighting its effectiveness in unseen environments.
+In panoramic setup, NavMorph achieves 58.02%\% SR and 48.98%\% SPL, performing competitively with specialized panoramic methods like ETPNav and HNR. The favorable performance across both NDTW (64.77) and SDTW (48.85) metrics further validates our model’s capability to follow instructions faithfully while maintaining path fidelity.
+These results underscore NavMorph’s robustness on the more challenging RxR-CE dataset, with its larger instruction set, multilingual support, and stricter navigation constraints.
+4.3 Further Remarks
+We perform ablation studies and other in-depth analysis of NavMorph on validation unseen set of R2R-CE dataset under the monocular setting, using VLN-3DFF as base model.
+Ablation Study of the proposed World Model.
+The ablation study presented in Table 3 offers critical insights into the efficacy of our proposed world model. The removal of individual loss terms leads to moderate performance declines, underscoring their collective importance in capturing latent dynamics of the world model.
+The visual embedding reconstruction loss ℓr​e\ell_{re} and the action prediction loss ℓa​c\ell_{ac}, both optimized using NDTW, are crucial for navigation success. Removing ℓr​e\ell_{re} leads to shorter path length (22.54 →\to 20.25) and reduced OSR (56.88%\% →\to 54.27%\%), emphasizing the role of visual consistency in maintaining a temporally stable representation of surroundings. Similarly, omitting ℓa​c\ell_{ac} degrades multiple metrics, as the constraint on predicted action sequence supports effective policy learning.
+Moreover, the alignment between posterior and prior distributions is vital for maintaining consistency between learned latent dynamics and practical navigation scenarios, ensuring well-calibrated latent representations.
+Additionally, to better assess contribution of self-evolution, we evaluate NavMorph w/o SE, a variant where NavMorph operates with a fixed CEM module, which remains unchanged and does not apply refinements introduced in Eq. 3.
+Rows 2-3 of Table 3 highlight the impact of CEM in facilitating online adaptation through dynamic navigation insights aggregation.
+Notably, the results validate not only the fundamental efficacy of our world model architecture—as evidenced by substantial performance gains even in the absence of self-evolution—but also complementary benefits of CEM-based adaptation, further enhancing navigation effectiveness. This underscores the collaborative nature of self-evolution and a well-structured world model, where self-evolution enhances adaptability while drawing support from the world model’s latent representations.
+Extended experiments on self-evolution are provided in Supplymentary Material.
+Table 3: Ablation Study of the proposed World Model.
+Methods
+R2R-CE Val Unseen
+TL ↓\downarrow
+NE ↓\downarrow
+OSR
+SR
+SPL
+NDTW
+SDTW
+Base model
+26.16
+6.05
+54.92
+43.77
+29.39
+40.94
+29.30
+NavMorph
+22.54
+5.75
+56.88
+47.91
+33.22
+44.86
+32.73
+w/o ℓr​e\ell_{re}
+20.25
+5.85
+54.27
+45.51
+32.38
+45.92
+32.21
+w/o ℓa​c\ell_{ac}
+25.14
+5.96
+56.06
+44.81
+31.22
+43.04
+30.49
+w/o ℓk​l\ell_{kl}
+25.69
+6.30
+57.15
+44.10
+30.44
+41.20
+29.91
+NavMorph w/o SE
+23.34
+5.92
+55.19
+45.08
+31.19
+42.70
+30.85
+•
+Note: ‘NavMorph w/o SE’ denotes NavMorph does not perform self-evolution. Last three rows denote NavMorph pretrained with ℒ\mathcal{L} without specific loss.
+Table 4: Ablation Study on Contextual Evolution Memory (CEM).
+Methods
+R2R-CE Val Unseen
+Testing
+Time*
+TL ↓\downarrow
+NE ↓\downarrow
+OSR
+SR
+SPL
+NDTW
+SDTW
+Base Model
+26.16
+6.05
+54.92
+43.77
+29.39
+40.94
+29.30
+20.53s
+NavMorph
+LSTM-based
+25.17
+6.11
+54.54
+43.67
+29.81
+41.71
+29.83
+44.56s
+CEM-based
+22.54
+5.75
+56.88
+47.91
+33.22
+44.86
+32.73
+21.22s
+•
+* Note: The last column displays the average execution time of the agnet for a single instruction, calculated on the Validation Unseen set of R2R-CE dataset. Best results are shown in bold.
+Ablation Study on CEM.
+In our model, CEM serves as the core module for self-evolution, enabling the agent to retain and refine historical scene information for improved adaptability in navigation tasks. Unlike conventional recurrent architectures (e.g., RNNs, LSTMs) that rely on gradient-based backpropagation to update model parameters for adaptation during online testing, CEM employs a forward iterative update mechanism, efficiently integrating new observations without incurring excessive computational costs.
+To further validate this design choice, we conduct an ablation study under identical evaluation settings, comparing our CEM-based self-evolution mechanism with LSTM-based alternative. In the LSTM-based mechanism, self-evolution is governed by an LSTM network, where optimization is performed via gradient backpropagation [19] during online testing, and latent states are recursively updated through recurrent processing: 𝒉~t=L​S​T​M​(𝒉t,𝒐t).\tilde{\boldsymbol{h}}_{t}=LSTM(\boldsymbol{h}_{t},\boldsymbol{o}_{t}).
+As shown in Table 4, our NavMorph with the CEM-based mechanism outperforms the LSTM-based approach across all key metrics, demonstrating superior adaptability in unseen environments. Notably, while both methods improve generalization through self-evolution, the LSTM-based approach incurs a 2.1×2.1\times increase in testing time due to its reliance on gradient-based optimization.
+These results underscore the efficacy of our forward-update mechanism in balancing generalization and efficiency in VLN-CE tasks.
+Size of Contextual Evolution Memory NmN_{m}.
+We conduct comprehensive ablation studies by varying the memory size NmN_{m} within our Contextual Evolution Memory (CEM) from 100 to 5000. As shown in Figure 4, the model achieves optimal performance with Nm=1000N_{m}=1000, where SR peaks at 47.91%\% (a 4.14%\% improvement over baseline), OSR reaches 56.88%\%, and SPL attains 33.22%\%. Interestingly, we observe that both smaller and larger memory sizes lead to performance degradation. This suggests that insufficient memory capacity constrains the model’s ability to store essential contextual information, while excessive memory potentially introduces noise and redundancy that may interfere with effective decision-making. The results empirically validate a memroy size of 10001000 within CEM as the optimal balance between contextual retention and adaptability, enhancing the agent’s navigational robustness.
+Figure 4: Experimental Results of Different Memory Sizes NmN_{m}.
+Table 5: Comparison with SOTA Online VLN Method.
+Methods
+R2R-CE Val Unseen
+Time*
+(s)
+TL ↓\downarrow
+NE ↓\downarrow
+OSR
+SR
+SPL
+NDTW
+SDTW
+Base model
+26.16
+6.05
+54.92
+43.77
+29.39
+40.94
+29.30
+20.53
+FSTTA [19]
+28.25
+6.67
+55.41
+43.94
+29.63
+42.76
+29.34
+27.34
+NavMorph
+22.54
+5.75
+56.88
+47.91
+33.22
+44.86
+32.73
+21.22
+•
+* Note that the last column displays the average execution time of the VLN agent for a single instruction, calculated on the Validation Unseen set of R2R-CE.
+Discussion.
+Astute readers may notice that our evolving world model accumulates scene-specific information from test environments stored as memory information during online testing.
+While this memory mechanism operates without access to ground truth actions of testing samples, it may potentially raise concerns about evaluation fairness.
+Recent research [19] has established the practical significance of online test-time adaptation in VLN tasks, demonstrating its value for real-world deployments where agents must continuously adapt to novel environments.
+As shown in Table 5, our self-evolving world model, which employs memory-based forward updates, significantly outperforms gradient-based test-time adaptation method, FSTTA [19], in both navigation accuracy and efficiency.
+In fact, Rows 2-3 of Table 3 also demonstrate the effectiveness of our approach in leveraging accumulated information for efficient adaptation while maintaining robust performance.
+5 Conclusion
+This paper presents NavMorph, a novel self-evolving world model architecture that addresses the challenges of vision-and-language navigation in continuous environments. At its core, NavMorph integrates World-aware Navigator and Foresight Action Planner to model environmental dynamics in latent space, enabling effective adaptation to diverse online scenarios through cross-episodic learning by the introduced Contextual Evolution Memory mechanism. Extensive experiments demonstrate the effectiveness of our approach, suggesting valuable directions for advancing adaptive navigation tasks in complex dynamic environments.
+An open challenge is to design a navigational reward function directly from ground truth, enabling explicit planning within world models to better balance task objectives with environmental constraints, thus enhancing long-term decision-making.
+Another promising direction lies in developing a modular world model framework with standardized components, enabling flexible composition and evolution of agent capabilities through systematic modular abstractions.
+Acknowledgment
+This work was supported in part by the National Key Research and Development Plan of China under Grant 2023YFC3310700, in part by the National Natural Science Foundation of China under Grants 62036012, U21B2044, 62236008, 62472422, and U2333215, and in part by Beijing Natural Science Foundation under Grant 4242051.
+References
+[1]
+Dong An, Yuankai Qi, Yangguang Li, Yan Huang, Liang Wang, Tieniu Tan, and Jing
+Shao.
+Bevbert: Topo-metric map pre-training for language-guided navigation.
+arXiv preprint arXiv:2212.04385, 2022a.
+[2]
+Dong An, Zun Wang, Yangguang Li, Yi Wang, Yicong Hong, Yan Huang, Liang Wang,
+and Jing Shao.
+1st place solutions for rxr-habitat vision-and-language navigation
+competition.
+arXiv preprint arXiv:2206.11610, 2022b.
+[3]
+Dong An, Hanqing Wang, Wenguan Wang, Zun Wang, Yan Huang, Keji He, and Liang
+Wang.
+Etpnav: Evolving topological planning for vision-language navigation
+in continuous environments.
+IEEE TPAMI, 2024.
+[4]
+Peter Anderson, Angel Chang, Devendra Singh Chaplot, Alexey Dosovitskiy,
+Saurabh Gupta, Vladlen Koltun, Jana Kosecka, Jitendra Malik, Roozbeh
+Mottaghi, Manolis Savva, et al.
+On evaluation of embodied navigation agents.
+arXiv preprint arXiv:1807.06757, 2018a.
+[5]
+Peter Anderson, Qi Wu, Damien Teney, Jake Bruce, Mark Johnson, Niko
+Sünderhauf, Ian Reid, Stephen Gould, and Anton Van Den Hengel.
+Vision-and-language navigation: Interpreting visually-grounded
+navigation instructions in real environments.
+In CVPR, pages 3674–3683, 2018b.
+[6]
+Peter Anderson, Ayush Shrivastava, Joanne Truong, Arjun Majumdar, Devi Parikh,
+Dhruv Batra, and Stefan Lee.
+Sim-to-real transfer for vision-and-language navigation.
+In CoRL, pages 671–681, 2021.
+[7]
+Pietro Balatti, Idil Ozdamar, Doganay Sirintuna, Luca Fortini, Mattia Leonori,
+Juan M Gandarias, and Arash Ajoudani.
+Robot-assisted navigation for visually impaired through adaptive
+impedance and path planning.
+In ICRA, pages 2310–2316, 2024.
+[8]
+Shurjo Banerjee, Jesse Thomason, and Jason Corso.
+The robotslang benchmark: Dialog-guided robot localization and
+navigation.
+In CoRL, pages 1384–1393, 2021.
+[9]
+Amir Bar, Gaoyue Zhou, Danny Tran, Trevor Darrell, and Yann LeCun.
+Navigation world models.
+ArXiv, 2024.
+[10]
+Angel Chang, Angela Dai, Thomas Funkhouser, Maciej Halber, Matthias Niessner,
+Manolis Savva, Shuran Song, Andy Zeng, and Yinda Zhang.
+Matterport3d: Learning from rgb-d data in indoor environments.
+arXiv preprint arXiv:1709.06158, 2017.
+[11]
+Jinyu Chen, Chen Gao, Erli Meng, Qiong Zhang, and Si Liu.
+Reinforced structured state-evolution for vision-language navigation.
+In CVPR, pages 15429–15438, 2022a.
+[12]
+Jiaqi Chen, Bingqian Lin, Xinmin Liu, Xiaodan Liang, and Kwan-Yee K Wong.
+Affordances-oriented planning using foundation models for continuous
+vision-language navigation.
+arXiv preprint arXiv:2407.05890, 2024.
+[13]
+Kevin Chen, Junshen Chen, Jo Chuang, Marynel V’azquez, and Silvio Savarese.
+Topological planning with transformers for vision-and-language
+navigation.
+In CVPR, pages 11271–11281, 2020.
+[14]
+Peihao Chen, Dongyu Ji, Kun-Li Channing Lin, Runhao Zeng, Thomas H. Li, Mingkui
+Tan, and Chuang Gan.
+Weakly-supervised multi-granularity map learning for
+vision-and-language navigation.
+In NeurIPS, pages 38149–38161, 2022b.
+[15]
+Peihao Chen, Xinyu Sun, Hongyan Zhi, Runhao Zeng, Thomas H Li, Gaowen Liu,
+Mingkui Tan, and Chuang Gan.
+A2 nav: Action-aware zero-shot robot navigation by exploiting
+vision-and-language ability of foundation models.
+arXiv preprint arXiv:2308.07997, 2023.
+[16]
+Shizhe Chen, Pierre-Louis Guhur, Makarand Tapaswi, Cordelia Schmid, and Ivan
+Laptev.
+Think global, act local: Dual-scale graph transformer for
+vision-and-language navigation.
+In CVPR, pages 16537–16547, 2022c.
+[17]
+Guangzhao Dai, Jian Zhao, Yuantao Chen, Yusen Qin, Hao Zhao, Guosen Xie, Yazhou
+Yao, Xiangbo Shu, and Xuelong Li.
+Unitedvln: Generalizable gaussian splatting for continuous
+vision-language navigation.
+ArXiv, abs/2411.16053, 2024.
+[18]
+Alexey Dosovitskiy.
+An image is worth 16x16 words: Transformers for image recognition at
+scale.
+arXiv preprint arXiv:2010.11929, 2020.
+[19]
+Junyu Gao, Xuan Yao, and Changsheng Xu.
+Fast-slow test-time adaptation for online vision-and-language
+navigation.
+In ICML, pages 14902–14919, 2024.
+[20]
+Georgios Georgakis, Karl Schmeckpeper, Karan Wanchoo, Soham Dan, Eleni
+Miltsakaki, Dan Roth, and Kostas Daniilidis.
+Cross-modal map learning for vision and language navigation.
+In CVPR, pages 15439–15449, 2022.
+[21]
+Taesik Gong, Jongheon Jeong, Taewon Kim, Yewon Kim, Jinwoo Shin, and Sung-Ju
+Lee.
+Note: Robust continual test-time adaptation against temporal
+correlation.
+In NeurIPS, pages 27253–27266, 2022.
+[22]
+David Ha and Jürgen Schmidhuber.
+Recurrent world models facilitate policy evolution.
+In NeurIPS, 2018.
+[23]
+Danijar Hafner, Timothy Lillicrap, Ian Fischer, Ruben Villegas, David Ha,
+Honglak Lee, and James Davidson.
+Learning latent dynamics for planning from pixels.
+In ICML, pages 2555–2565, 2019.
+[24]
+Danijar Hafner, Timothy Lillicrap, Jimmy Ba, and Mohammad Norouzi.
+Dream to control: Learning behaviors by latent imagination.
+In ICLR, 2020.
+[25]
+Danijar Hafner, Jurgis Pasukonis, Jimmy Ba, and Timothy Lillicrap.
+Mastering diverse domains through world models.
+arXiv preprint arXiv:2301.04104, 2023.
+[26]
+Shibo Hao, Yi Gu, Haodi Ma, Joshua Jiahua Hong, Zhen Wang, Daisy Zhe Wang, and
+Zhiting Hu.
+Reasoning with language model is planning with world model.
+arXiv preprint arXiv:2305.14992, 2023.
+[27]
+Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
+Deep residual learning for image recognition.
+In CVPR, pages 770–778, 2016.
+[28]
+Keji He, Chenyang Si, Zhihe Lu, Yan Huang, Liang Wang, and Xinchao Wang.
+Frequency-enhanced data augmentation for vision-and-language
+navigation.
+In NeurIPS, 2024.
+[29]
+Yicong Hong, Zun Wang, Qi Wu, and Stephen Gould.
+Bridging the gap between learning in discrete and continuous
+environments for vision-and-language navigation.
+In CVPR, pages 15418–15428, 2022.
+[30]
+Yicong Hong, Yang Zhou, Ruiyi Zhang, Franck Dernoncourt, Trung Bui, Stephen
+Gould, and Hao Tan.
+Learning navigational visual representations with semantic map
+supervision.
+In Proceedings of the IEEE/CVF international conference on
+computer vision, pages 3032–3044, 2023a.
+[31]
+Yicong Hong, Yang Zhou, Ruiyi Zhang, Franck Dernoncourt, Trung Bui, Stephen
+Gould, and Hao Tan.
+Learning navigational visual representations with semantic map
+supervision.
+In ICCV, pages 3055–3067, 2023b.
+[32]
+Anthony Hu, Gianluca Corrado, Nicolas Griffiths, Zachary Murez, Corina Gurau,
+Hudson Yeo, Alex Kendall, Roberto Cipolla, and Jamie Shotton.
+Model-based imitation learning for urban driving.
+In NeurIPS, pages 20703–20716, 2022.
+[33]
+Gabriel Ilharco, Vihan Jain, Alexander Ku, Eugene Ie, and Jason Baldridge.
+General evaluation for instruction conditioned navigation using
+dynamic time warping.
+arXiv preprint arXiv:1907.05446, 2019.
+[34]
+Muhammad Zubair Irshad, Niluthpol Chowdhury Mithun, Zachary Seymour, Han-Pang
+Chiu, Supun Samarasekera, and Rakesh Kumar.
+Semantically-aware spatio-temporal reasoning agent for
+vision-and-language navigation in continuous environments.
+In ICPR, pages 4065–4071, 2021.
+[35]
+Muhammad Zubair Irshad, Niluthpol Chowdhury Mithun, Zachary Seymour, Han-Pang
+Chiu, Supun Samarasekera, and Rakesh Kumar.
+Semantically-aware spatio-temporal reasoning agent for
+vision-and-language navigation in continuous environments.
+In ICPR, pages 4065–4071, 2022.
+[36]
+Johan Ludwig William Valdemar Jensen.
+Sur les fonctions convexes et les inégalités entre les
+valeurs moyennes.
+Acta mathematica, 30(1):175–193, 1906.
+[37]
+Aishwarya Kamath, Peter Anderson, Su Wang, Jing Yu Koh, Alexander Ku, Austin
+Waters, Yinfei Yang, Jason Baldridge, and Zarana Parekh.
+A new path: Scaling vision-and-language navigation with synthetic
+instructions and imitation learning.
+In CVPR, pages 10813–10823, 2023.
+[38]
+Seita Kayukawa, Daisuke Sato, Masayuki Murata, Tatsuya Ishihara, Hironobu
+Takagi, Shigeo Morishima, and Chieko Asakawa.
+Enhancing blind visitor’s autonomy in a science museum using an
+autonomous navigation robot.
+In Proceedings of the 2023 CHI Conference on Human Factors in
+Computing Systems, pages 1–14, 2023.
+[39]
+Jing Yu Koh, Honglak Lee, Yinfei Yang, Jason Baldridge, and Peter Anderson.
+Pathdreamer: A world model for indoor navigation.
+In ICCV, pages 14738–14748, 2021.
+[40]
+Jacob Krantz and Stefan Lee.
+Sim-2-sim transfer for vision-and-language navigation in continuous
+environments.
+In ECCV, pages 588–603, 2022.
+[41]
+Jacob Krantz, Erik Wijmans, Arjun Majumdar, Dhruv Batra, and Stefan Lee.
+Beyond the nav-graph: Vision-and-language navigation in continuous
+environments.
+In ECCV, pages 104–120, 2020.
+[42]
+Jacob Krantz, Aaron Gokaslan, Dhruv Batra, Stefan Lee, and Oleksandr Maksymets.
+Waypoint models for instruction-guided navigation in continuous
+environments.
+In ICCV, pages 15162–15171, 2021.
+[43]
+Alexander Ku, Peter Anderson, Roma Patel, Eugene Ie, and Jason Baldridge.
+Room-across-room: Multilingual vision-and-language navigation with
+dense spatiotemporal grounding.
+In EMNLP, pages 4392–4412, 2020.
+[44]
+Masaki Kuribayashi, Kohei Uehara, Allan Wang, Daisuke Sato, Simon Chu, and
+Shigeo Morishima.
+Memory-maze: Scenario driven benchmark and visual language navigation
+model for guiding blind people.
+arXiv preprint arXiv:2405.07060, 2024.
+[45]
+Yann LeCun.
+A path towards autonomous machine intelligence version 0.9. 2,
+2022-06-27.
+Open Review, 62(1):1–62, 2022.
+[46]
+Jialu Li and Mohit Bansal.
+Improving vision-and-language navigation by generating future-view
+image semantics.
+In CVPR, pages 10803–10812, 2023.
+[47]
+Jialu Li and Mohit Bansal.
+Panogen: Text-conditioned panoramic environment generation for
+vision-and-language navigation.
+In NeurIPS, 2024.
+[48]
+Jiaming Liu, Senqiao Yang, Peidong Jia, Ming Lu, Yandong Guo, Wei Xue, and
+Shanghang Zhang.
+Vida: Homeostatic visual domain adapter for continual test time
+adaptation.
+In ICLR, 2024.
+[49]
+Yinhan Liu.
+Roberta: A robustly optimized bert pretraining approach.
+arXiv preprint arXiv:1907.11692, 364, 2019.
+[50]
+Ilya Loshchilov and Frank Hutter.
+Decoupled weight decay regularization.
+In ICLR, 2017.
+[51]
+Arjun Majumdar, Anurag Ajay, Xiaohan Zhang, Pranav Putta, Sriram Yenamandra,
+Mikael Henaff, Sneha Silwal, Paul Mcvay, Oleksandr Maksymets, Sergio Arnaud,
+et al.
+Openeqa: Embodied question answering in the era of foundation models.
+In CVPR, pages 16488–16498, 2024.
+[52]
+Chen Min, Dawei Zhao, Liang Xiao, Jian Zhao, Xinli Xu, Zheng Zhu, Lei Jin,
+Jianshu Li, Yulan Guo, Junliang Xing, et al.
+Driveworld: 4d pre-trained scene understanding via world models for
+autonomous driving.
+In CVPR, pages 15522–15533, 2024.
+[53]
+Yao Mu, Qinglong Zhang, Mengkang Hu, Wenhai Wang, Mingyu Ding, Jun Jin, Bin
+Wang, Jifeng Dai, Yu Qiao, and Ping Luo.
+Embodiedgpt: Vision-language pre-training via embodied chain of
+thought.
+In NeurIPS, 2024.
+[54]
+Shuaicheng Niu, Jiaxiang Wu, Yifan Zhang, Zhiquan Wen, Yaofo Chen, Peilin Zhao,
+and Mingkui Tan.
+Towards stable test-time adaptation in dynamic wild world.
+In ICLR, 2023.
+[55]
+Masashi Okada and Tadahiro Taniguchi.
+Dreamingv2: Reinforcement learning with discrete world models without
+reconstruction.
+In IROS, pages 985–991, 2022.
+[56]
+Shivam K Panda, Yongkyu Lee, and M Khalid Jawed.
+Agronav: Autonomous navigation framework for agricultural robots and
+vehicles using semantic segmentation and semantic line detection.
+In CVPR, pages 6272–6281, 2023.
+[57]
+Sang-Min Park and Young-Gab Kim.
+Visual language navigation: A survey and open challenges.
+Artificial Intelligence Review, 56(1):365–427, 2023.
+[58]
+Adam Paszke, Sam Gross, Francisco Massa, Adam Lerer, James Bradbury, Gregory
+Chanan, Trevor Killeen, Zeming Lin, Natalia Gimelshein, Luca Antiga, et al.
+Pytorch: An imperative style, high-performance deep learning library.
+In NeurIPS, 2019.
+[59]
+Rudra PK Poudel, Harit Pandya, Stephan Liwicki, and Roberto Cipolla.
+Recore: Regularized contrastive representation learning of world
+model.
+In CVPR, pages 22904–22913, 2024.
+[60]
+Yuankai Qi, Qi Wu, Peter Anderson, Xin Wang, William Yang Wang, Chunhua Shen,
+and Anton van den Hengel.
+Reverie: Remote embodied visual referring expression in real indoor
+environments.
+In CVPR, pages 9982–9991, 2020.
+[61]
+Yanyuan Qiao, Yuankai Qi, Yicong Hong, Zheng Yu, Peng Wang, and Qi Wu.
+Hop+: History-enhanced and order-aware pre-training for
+vision-and-language navigation.
+IEEE TPAMI, 45(7):8524–8537, 2023.
+[62]
+Sonia Raychaudhuri, Saim Wani, Shivansh Patel, Unnat Jain, and Angel X. Chang.
+Language-aligned waypoint (law) supervision for vision-and-language
+navigation in continuous environments.
+In EMNLP, pages 4018–4028, 2021.
+[63]
+Stéphane Ross, Geoffrey Gordon, and Drew Bagnell.
+A reduction of imitation learning and structured prediction to
+no-regret online learning.
+In AISTATS, pages 627–635, 2011.
+[64]
+Manolis Savva, Abhishek Kadian, Oleksandr Maksymets, Yili Zhao, Erik Wijmans,
+Bhavana Jain, Julian Straub, Jia Liu, Vladlen Koltun, Jitendra Malik, et al.
+Habitat: A platform for embodied ai research.
+In ICCV, pages 9339–9347, 2019.
+[65]
+Hao Tan and Mohit Bansal.
+Lxmert: Learning cross-modality encoder representations from
+transformers.
+arXiv preprint arXiv:1908.07490, 2019.
+[66]
+Petros Toupas, Georgios Tsamis, Andreas Kargakos, Dimitrios Giakoumis,
+Konstantinos Votis, and Dimitrios Tzovaras.
+A framework towards ambient assisted living enhanced by service
+robots.
+In Proceedings of the 16th International Conference on
+PErvasive Technologies Related to Assistive Environments, pages 423–428,
+2023.
+[67]
+Jan Vanus, Radim Hercik, and Petr Bilik.
+Using interoperability between mobile robot and knx technology for
+occupancy monitoring in smart home care.
+Sensors, 23(21):8953, 2023.
+[68]
+Dequan Wang, Evan Shelhamer, Shaoteng Liu, Bruno Olshausen, and Trevor Darrell.
+Tent: Fully test-time adaptation by entropy minimization.
+In ICLR, 2021.
+[69]
+Hanqing Wang, Wei Liang, Luc Van Gool, and Wenguan Wang.
+Dreamwalker: Mental planning for continuous vision-language
+navigation.
+In ICCV, pages 10873–10883, 2023a.
+[70]
+Tai Wang, Xiaohan Mao, Chenming Zhu, Runsen Xu, Ruiyuan Lyu, Peisen Li, Xiao
+Chen, Wenwei Zhang, Kai Chen, Tianfan Xue, et al.
+Embodiedscan: A holistic multi-modal 3d perception suite towards
+embodied ai.
+In CVPR, pages 19757–19767, 2024a.
+[71]
+Ting Wang, Zongkai Wu, Feiyu Yao, and Donglin Wang.
+Graph-based environment representation for vision-and-language
+navigation in continuous environments.
+In ICASSP, pages 8331–8335, 2024b.
+[72]
+Yuqi Wang, Jiawei He, Lue Fan, Hongxin Li, Yuntao Chen, and Zhaoxiang Zhang.
+Driving into the future: Multiview visual forecasting and planning
+with world model for autonomous driving.
+In CVPR, pages 14749–14759, 2024c.
+[73]
+Zun Wang, Jialu Li, Yicong Hong, Yi Wang, Qi Wu, Mohit Bansal, Stephen Gould,
+Hao Tan, and Yu Qiao.
+Scaling data generation in vision-and-language navigation.
+In Proceedings of the IEEE/CVF international conference on
+computer vision, pages 12009–12020, 2023b.
+[74]
+Zihan Wang, Xiangyang Li, Jiahao Yang, Yeqi Liu, and Shuqiang Jiang.
+Gridmm: Grid memory map for vision-and-language navigation.
+In ICCV, pages 15625–15636, 2023c.
+[75]
+Zihan Wang, Xiangyang Li, Jiahao Yang, and Shuqiang Jiang.
+Sim-to-real transfer via 3d feature fields for vision-and-language
+navigation.
+In CoRL, 2024d.
+[76]
+Zihan Wang, Xiangyang Li, Jiahao Yang, Yeqi Liu, Junjie Hu, Ming Jiang, and
+Shuqiang Jiang.
+Lookahead exploration with neural radiance representation for
+continuous vision-language navigation.
+In CVPR, pages 13753–13762, 2024e.
+[77]
+Philipp Wu, Alejandro Escontrela, Danijar Hafner, Pieter Abbeel, and Ken
+Goldberg.
+Daydreamer: World models for physical robot learning.
+In CoRL, pages 2226–2240, 2023.
+[78]
+Wansen Wu, Tao Chang, Xinmeng Li, Quanjun Yin, and Yue Hu.
+Vision-language navigation: a survey and taxonomy.
+Neural Computing and Applications, 36(7):3291–3316, 2024.
+[79]
+Yue Yang, Fan-Yun Sun, Luca Weihs, Eli VanderBilt, Alvaro Herrasti, Winson Han,
+Jiajun Wu, Nick Haber, Ranjay Krishna, Lingjie Liu, et al.
+Holodeck: Language guided generation of 3d embodied ai environments.
+In CVPR, pages 16227–16237, 2024.
+[80]
+Jiazhao Zhang, Kunyu Wang, Rongtao Xu, Gengze Zhou, Yicong Hong, Xiaomeng Fang,
+Qi Wu, Zhizheng Zhang, and Wang He.
+Navid: Video-based vlm plans the next step for vision-and-language
+navigation.
+In RSS, 2024a.
+[81]
+Weipu Zhang, Gang Wang, Jian Sun, Yetian Yuan, and Gao Huang.
+Storm: Efficient stochastic transformer based world models for
+reinforcement learning.
+In NeurIPS, 2024b.
+Supplementary Material
+§ 6 provides a detail lower bound derivation for the defined loss ℒW\mathcal{L}_{W}. § 7 presents more details about evaluation metrics. Implementation details for experiments are provided in § 8, and further comparisons against state-of-the-art methods are shown in § 9. Finally, we present several visualizations for qualitative analysis in § 10.
+6 Lower Bound Derivation
+Following the predictive network described in §\lx@sectionsign 3 of our main paper, the joint probability distribution for our proposed world model can be factorized as:
+p(𝒉1:T,𝒔1:T,𝒙1:T+Tp𝒂1:T+Tp)=∏t=1Tp(𝒉t,𝒔t|𝒉t−1,𝒔t−1,𝒂t−1)p(𝒙t,𝒂t|𝒉t,𝒔t)∏j=1Tpp(𝒉T+j,𝒔T+j|𝒉T,𝒔T,𝒂T+j−1)p(𝒙T+j,𝒂T+j|𝒉T,𝒔T),\displaystyle\begin{split}p&(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T},\boldsymbol{x}_{1:T+T_{p}}\boldsymbol{a}_{1:T+T_{p}})=\\
+&\prod_{t=1}^{T}p(\boldsymbol{h}_{t},\boldsymbol{s}_{t}|\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1},\boldsymbol{a}_{t-1})p(\boldsymbol{x}_{t},\boldsymbol{a}_{t}|\boldsymbol{h}_{t},\boldsymbol{s}_{t})\\
+&\prod_{j=1}^{T_{p}}p(\boldsymbol{h}_{T+j},\boldsymbol{s}_{T+j}|\boldsymbol{h}_{T},\boldsymbol{s}_{T},\boldsymbol{a}_{T+j-1})p(\boldsymbol{x}_{T+j},\boldsymbol{a}_{T+j}|\boldsymbol{h}_{T},\boldsymbol{s}_{T}),\end{split}
+(7)
+For the first item for step 1 to TT, we have:
+p(𝒉t,𝒔t|𝒉t−1,OPEN𝒔t−1,𝒂t−1)=p⁡(𝒉t|𝒉t−1,𝒔t−1)​p​(𝒔t|𝒉t,𝒂t−1),\displaystyle\begin{split}p(\boldsymbol{h}_{t},\boldsymbol{s}_{t}|\boldsymbol{h}_{t-1},&\boldsymbol{s}_{t-1},\boldsymbol{a}_{t-1})=\\
+&p(\boldsymbol{h}_{t}|\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1})p(\boldsymbol{s}_{t}|\boldsymbol{h}_{t},\boldsymbol{a}_{t-1}),\end{split}
+(8)
+p(𝒙t,𝒂t|𝒉t,𝒔t)=p(𝒙t|𝒉t,𝒔t)p(𝒂t|𝒉t,𝒔t),\displaystyle p(\boldsymbol{x}_{t},\boldsymbol{a}_{t}|\boldsymbol{h}_{t},\boldsymbol{s}_{t})=p(\boldsymbol{x}_{t}|\boldsymbol{h}_{t},\boldsymbol{s}_{t})p(\boldsymbol{a}_{t}|\boldsymbol{h}_{t},\boldsymbol{s}_{t}),
+(9)
+Given that 𝒉t\boldsymbol{h}_{t} is deterministic as discussed earlier, we have p⁡(𝒉t|𝒉t−1,𝒔t−1)=δ⁡(𝒉t−fθ​(𝒉t−1,𝒔t−1))p(\boldsymbol{h}_{t}|\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1})=\delta\left(\boldsymbol{h}_{t}-f_{\theta}(\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1})\right).
+Therefore, we need to infer the latent variables 𝒔1:T\boldsymbol{s}_{1:T}. Since no observations are available during the prediction phase [T+1:T+Tp][T+1:T+T_{p}], the inference process focuses on maximizing the marginal likelihood over the observed data p(𝒙1:T,𝒂1:T)p(\boldsymbol{x}_{1:T},\boldsymbol{a}_{1:T}). Based on deep variational inference, we introduce a variational distribution qH,Sq_{H,S} and factorize as follows, for we assume that independence of (𝒙1:T,𝒂1:T)(\boldsymbol{x}_{1:T},\boldsymbol{a}_{1:T}) given (𝒐1:T,𝒂1:T−1)(\boldsymbol{o}_{1:T},\boldsymbol{a}_{1:T-1}):
+qH,S≜q(𝒉1:T+Tp,𝒔1:T+Tp|𝒐1:T,𝒙1:T+Tp,𝒂1:T+Tp)≜q(𝒉1:T,𝒔1:T|𝒐1:T,𝒙1:T,𝒂1:T)≜q(𝒉1:T,𝒔1:T|𝒐1:T,𝒂1:T−1)=∏t=1Tq(𝒉t|𝒉t−1,𝒔t−1)q(𝒔t|𝒐1:t,𝒂1:t−1),\displaystyle\begin{split}q_{H,S}&\triangleq q(\boldsymbol{h}_{1:T+T_{p}},\boldsymbol{s}_{1:T+T_{p}}|\boldsymbol{o}_{1:T},\boldsymbol{x}_{1:T+T_{p}},\boldsymbol{a}_{1:T+T_{p}})\\
+&\triangleq q(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}|\boldsymbol{o}_{1:T},\boldsymbol{x}_{1:T},\boldsymbol{a}_{1:T})\\
+&\triangleq q(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}|\boldsymbol{o}_{1:T},\boldsymbol{a}_{1:T-1})\\
+&=\prod_{t=1}^{T}q(\boldsymbol{h}_{t}|\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1})q(\boldsymbol{s}_{t}|\boldsymbol{o}_{1:t},\boldsymbol{a}_{1:t-1}),\end{split}
+(10)
+with q⁡(𝒉t|𝒉t−1,𝒔t−1)=p⁡(ht|𝒉t−1,𝒔t−1)q(\boldsymbol{h}_{t}|\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1})=p(h_{t}|\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1}) and q1​(𝒉1)=δ⁡(𝟎)q_{1}(\boldsymbol{h}_{1})=\delta(\boldsymbol{0}). The Kullback-Leibler (KL) divergence between the prior and posterior distributions can be calculated as:
+DKL(q(𝒉1:T,𝒔1:T|𝒐1:T,𝒙1:T+Tp,𝒂1:T+Tp)∥p(𝒉1:T,𝒔1:T|𝒙1:T+Tp,𝒂1:T+Tp))=𝔼𝒉1:T,𝒔1:T∼qH,S[logq(𝒉1:T,𝒔1:T|𝒐1:T,𝒙1:T+Tp,𝒂1:T+Tp)p(𝒉1:T,𝒔1:T|𝒙1:T+Tp,𝒂1:T+Tp)]=𝔼𝒉1:T,𝒔1:T∼qH,S[logq(𝒉1:T,𝒔1:T|𝒐1:T,𝒙1:T+Tp,𝒂1:T+Tp)p(𝒉1:T,𝒔1:T|𝒙1:T+Tp,𝒂1:T+Tp)]=𝔼𝒉1:T,𝒔1:T∼qH,S[logq(𝒉1:T,𝒔1:T|𝒐1:T,𝒙1:T+Tp,𝒂1:T+Tp)p(𝒙1:T+Tp,𝒂1:T+Tp)p(𝒉1:T,𝒔1:T|𝒙1:T+Tp,𝒂1:T+Tp)p(𝒉1:T,𝒔1:T)]=logp(𝒙1:T+Tp,𝒂1:T+Tp)−𝔼𝒉1:T,𝒔1:T∼qH,S[logp(𝒙1:T+Tp,𝒂1:T+Tp|𝒉1:T,𝒔1:T)]+DKL(q(𝒉1:T,𝒔1:T|𝒐1:T,𝒙1:T+Tp,𝒂1:T+Tp)∥p(𝒉1:T,𝒔1:T)).\displaystyle\begin{split}&D_{\mathrm{KL}}(q(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}|\boldsymbol{o}_{1:T},\boldsymbol{x}_{1:T+T_{p}},\boldsymbol{a}_{1:T+T_{p}})\\
+&\qquad\qquad\parallel p(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}|\boldsymbol{x}_{1:T+T_{p}},\boldsymbol{a}_{1:T+T_{p}}))\\
+&=\mathbb{E}_{\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}\sim q_{H,S}}\left[\log\frac{q(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}|\boldsymbol{o}_{1:T},\boldsymbol{x}_{1:T+T_{p}},\boldsymbol{a}_{1:T+T_{p}})}{p(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}|\boldsymbol{x}_{1:T+T_{p}},\boldsymbol{a}_{1:T+T_{p}})}\right]\\
+&=\mathbb{E}_{\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}\sim q_{H,S}}\left[\log\frac{q(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}|\boldsymbol{o}_{1:T},\boldsymbol{x}_{1:T+T_{p}},\boldsymbol{a}_{1:T+T_{p}})}{p(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}|\boldsymbol{x}_{1:T+T_{p}},\boldsymbol{a}_{1:T+T_{p}})}\right]\\
+&=\mathbb{E}_{\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}\sim q_{H,S}}\\
+&\left[\log\frac{q(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}|\boldsymbol{o}_{1:T},\boldsymbol{x}_{1:T+T_{p}},\boldsymbol{a}_{1:T+T_{p}})p(\boldsymbol{x}_{1:T+T_{p}},\boldsymbol{a}_{1:T+T_{p}})}{p(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}|\boldsymbol{x}_{1:T+T_{p}},\boldsymbol{a}_{1:T+T_{p}})p(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T})}\right]\\
+&=\log p(\boldsymbol{x}_{1:T+T_{p}},\boldsymbol{a}_{1:T+T_{p}})\\
+&-\mathbb{E}_{\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}\sim q_{H,S}}\left[\log p(\boldsymbol{x}_{1:T+T_{p}},\boldsymbol{a}_{1:T+T_{p}}|\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T})\right]\\
+&+D_{\mathrm{KL}}\left(q(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}|\boldsymbol{o}_{1:T},\boldsymbol{x}_{1:T+T_{p}},\boldsymbol{a}_{1:T+T_{p}})\,\|\,p(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T})\right).\end{split}
+(11)
+Since DK​L≥0D_{KL}\geq 0, the left side of Eq. (11) should be non-negative. Based on Jensen’s inequality [36], a variational lower bound on the log evidence can be obtained as follows:
+log⁡p(𝒙1:T+Tp,𝒂1:T+Tp)≥𝔼𝒉1:T,𝒔1:T∼qH,S[logp(𝒙1:T+Tp,𝒂1:T+Tp|𝒉1:T,𝒔1:T)]−DKL(q(𝒉1:T,𝒔1:T|𝒐1:T,𝒙1:T+Tp,𝒂1:T+Tp)∥p(𝒉1:T,𝒔1:T)).\displaystyle\begin{split}\log p&(\boldsymbol{x}_{1:T+T_{p}},\boldsymbol{a}_{1:T+T_{p}})\geq\\
+&\mathbb{E}_{\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}\sim q_{H,S}}\left[\log p(\boldsymbol{x}_{1:T+T_{p}},\boldsymbol{a}_{1:T+T_{p}}|\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T})\right]-\\
+&D_{\mathrm{KL}}\left(q(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}|\boldsymbol{o}_{1:T},\boldsymbol{x}_{1:T+T_{p}},\boldsymbol{a}_{1:T+T_{p}})\,\|\,p(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T})\right).\end{split}
+(12)
+As for the first term of the lower bound in Eq. (12):
+𝔼𝒉1:T,𝒔1:T∼qH,S[logp(𝒙1:T+Tp,𝒂1:T+Tp|𝒉1:T,𝒔1:T)]=𝔼𝒉1:T,𝒔1:T∼qH,S[log∏t=1Tp(𝒙t|𝒉t,𝒔t)p(𝒂t|𝒉t,𝒔t)∏j=1Tpp(𝒉T+j,𝒔T+j|𝒉T,𝒔T,𝒂T+j−1)p(𝒙T+j,𝒂T+j|𝒉T,𝒔T)]=∑t=1T𝔼𝒉1:t,𝒔1:t∼q(𝒉t,𝒔t|𝒐1:t,𝒂1:t−1)[logp(𝒙t|𝒉t,𝒔t)+logp(𝒂t|𝒉t,𝒔t)]+∑j=1Tp𝔼𝒉T,𝒔T∼q(𝒉T,𝒔T|𝒐1:t,𝒂1:t−1)[log⁡p⁡(𝒙T+j|𝒉T,𝒔T)+log⁡p⁡(𝒂T+j|𝒉T,𝒔T)],\displaystyle\begin{split}&\mathbb{E}_{\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}\sim q_{H,S}}\left[\log p(\boldsymbol{x}_{1:T+T_{p}},\boldsymbol{a}_{1:T+T_{p}}|\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T})\right]\\
+&=\mathbb{E}_{\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}\sim q_{H,S}}\left[\log\prod_{t=1}^{T}p(\boldsymbol{x}_{t}|\boldsymbol{h}_{t},\boldsymbol{s}_{t})p(\boldsymbol{a}_{t}|\boldsymbol{h}_{t},\boldsymbol{s}_{t})\right.\\
+&\quad\left.\prod_{j=1}^{T_{p}}p(\boldsymbol{h}_{T+j},\boldsymbol{s}_{T+j}|\boldsymbol{h}_{T},\boldsymbol{s}_{T},\boldsymbol{a}_{T+j-1})p(\boldsymbol{x}_{T+j},\boldsymbol{a}_{T+j}|\boldsymbol{h}_{T},\boldsymbol{s}_{T})\right]\\
+&=\sum_{t=1}^{T}\mathbb{E}_{\boldsymbol{h}_{1:t},\boldsymbol{s}_{1:t}\sim q(\boldsymbol{h}_{t},\boldsymbol{s}_{t}|\boldsymbol{o}_{1:t},\boldsymbol{a}_{1:t-1})}[\log p(\boldsymbol{x}_{t}|\boldsymbol{h}_{t},\boldsymbol{s}_{t})\\
+&\quad+\log p(\boldsymbol{a}_{t}|\boldsymbol{h}_{t},\boldsymbol{s}_{t})]+\sum_{j=1}^{T_{p}}\mathbb{E}_{\boldsymbol{h}_{T},\boldsymbol{s}_{T}\sim q(\boldsymbol{h}_{T},\boldsymbol{s}_{T}|\boldsymbol{o}_{1:t},\boldsymbol{a}_{1:t-1})}\\
+&\qquad[\log p(\boldsymbol{x}_{T+j}|\boldsymbol{h}_{T},\boldsymbol{s}_{T})+\log p(\boldsymbol{a}_{T+j}|\boldsymbol{h}_{T},\boldsymbol{s}_{T})],\end{split}
+(13)
+where Eq. (13) is obtained by integrating over remaining latent variables (𝒉t:1+T,𝒔t:1+T)(\boldsymbol{h}_{t:1+T},\boldsymbol{s}_{t:1+T}).
+Regarding second term of the lower bound in Eq. (12), since there are no observations available during the prediction phase [T+1:T+Tp][T+1:T+T_{p}], the posterior distribution qq is no longer updated with new input information. Consequently, it converges to the prior distribution, making the KL divergence between the posterior q(𝒉T:T+Tp,𝒔T:T+Tp)q(\boldsymbol{h}_{T:T+T_{p}},\boldsymbol{s}_{T:T+T_{p}}) and the prior p(𝒉T:T+Tp,𝒔T:T+Tp)p(\boldsymbol{h}_{T:T+T_{p}},\boldsymbol{s}_{T:T+T_{p}}) equal to zero. As a result, only the KL divergence for the observed phase [1:T][1:T] needs to be considered, which can be calculated according to Eq. (10):
+DKL(q(𝒉1:T,𝒔1:T|𝒐1:T,𝒙1:T+Tp,𝒂1:T+Tp)∥p(𝒉1:T,𝒔1:T))≜DKL(q(𝒉1:T,𝒔1:T|𝒐1:T,𝒂1:T−1)∥p(𝒉1:T,𝒔1:T))=𝔼𝒉1:T,𝒔1:T∼qH,S[logq(𝒉1:T,𝒔1:T|𝒐1:T,𝒂1:T−1)p(𝒉1:T,𝒔1:T)]=∫𝒉1:T,𝒔1:Tq(𝒉1:T,𝒔1:T|𝒐1:T,𝒂1:T−1)(logq(𝒉1:T,𝒔1:T|𝒐1:T,𝒂1:T−1)p(𝒉1:T,𝒔1:T))d𝒉1:Td𝒔1:T=∫𝒉1:T,𝒔1:Tq(𝒉1:T,𝒔1:T|𝒐1:T,𝒂1:T−1)log[∏t=1Tq(𝒉t|𝒉t−1,𝒔t−1)q(𝒔t|𝒐1:t,𝒂1:t−1)p⁡(𝒉t|𝒉t−1,𝒔t−1)​p​(𝒔t|𝒉t−1,𝒔t−1)]d𝒉1:Td𝒔1:T=∫𝒉1:T,𝒔1:T(∏t=1Tq(𝒉t|𝒉t−1,𝒔t−1)q(𝒔t|𝒐1:t,𝒂1:t−1))(∑t=1Tlogq(𝒔t|𝒐1:t,𝒂1:t−1)p⁡(𝒔t|𝒉t−1,𝒔t−1))d𝒉1:Td𝒔1:T.\displaystyle\begin{split}D&{}_{\mathrm{KL}}\left(q(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}|\boldsymbol{o}_{1:T},\boldsymbol{x}_{1:T+T_{p}},\boldsymbol{a}_{1:T+T_{p}})\,\|\,p(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T})\right)\\
+\triangleq&D_{\mathrm{KL}}\left(q(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}|\boldsymbol{o}_{1:T},\boldsymbol{a}_{1:T-1})\,\|\,p(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T})\right)\\
+=&\mathbb{E}_{\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}\sim q_{H,S}}\left[\log\frac{q(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}|\boldsymbol{o}_{1:T},\boldsymbol{a}_{1:T-1})}{p(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T})}\right]\\
+=&\int_{\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}}q(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}|\boldsymbol{o}_{1:T},\boldsymbol{a}_{1:T-1})\\
+&\left(\log\frac{q(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}|\boldsymbol{o}_{1:T},\boldsymbol{a}_{1:T-1})}{p(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T})}\right)\,\mathrm{d}\boldsymbol{h}_{1:T}\,\mathrm{d}\boldsymbol{s}_{1:T}\\
+=&\int_{\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}}q(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}|\boldsymbol{o}_{1:T},\boldsymbol{a}_{1:T-1})\\
+&\log\left[\prod_{t=1}^{T}\frac{q(\boldsymbol{h}_{t}|\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1})q(\boldsymbol{s}_{t}|\boldsymbol{o}_{1:t},\boldsymbol{a}_{1:t-1})}{p(\boldsymbol{h}_{t}|\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1})p(\boldsymbol{s}_{t}|\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1})}\right]\mathrm{d}\boldsymbol{h}_{1:T}\,\mathrm{d}\boldsymbol{s}_{1:T}\\
+=&\int_{\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}}\left(\prod_{t=1}^{T}q(\boldsymbol{h}_{t}|\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1})q(\boldsymbol{s}_{t}|\boldsymbol{o}_{1:t},\boldsymbol{a}_{1:t-1})\right)\\
+&\left(\sum_{t=1}^{T}\log\frac{q(\boldsymbol{s}_{t}|\boldsymbol{o}_{1:t},\boldsymbol{a}_{1:t-1})}{p(\boldsymbol{s}_{t}|\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1})}\right)\mathrm{d}\boldsymbol{h}_{1:T}\,\mathrm{d}\boldsymbol{s}_{1:T}.\\
+\end{split}
+(14)
+Based on the above deduction, we iteratively integrate out each latent variable and, by recursively applying this process to the sum of logarithmic terms indexed by tt, decompose the KL divergence into a summation over time steps.
+DKL(q(𝒉1:T,𝒔1:T|𝒐1:T,𝒙1:T,𝒂1:T)∥p(𝒉1:T,𝒔1:T))=∫𝒉1:T,𝒔1:T(∏t=1Tq(𝒉t|𝒉t−1,𝒔t−1)q(𝒔t|𝒐1:t,𝒂1:t−1))(logq⁡(𝒔1|𝒐1)p⁡(𝒔1)+∑t=2Tlogq(𝒔t|𝒐1:t,𝒂1:t−1)p⁡(𝒔t|𝒉t−1,𝒔t−1))d𝒉1:Td𝒔1:T=𝔼𝒔1∼q⁡(𝒔1|𝒐1)​[log⁡q⁡(𝒔1|𝒐1)p⁡(𝒔1)]+∫𝒉1:T,𝒔1:T(∏t=1Tq(𝒉t|𝒉t−1,𝒔t−1)q(𝒔t|𝒐1:t,𝒂1:t−1))(∑t=2Tlogq(𝒔t|𝒐1:t,𝒂1:t−1)p⁡(𝒔t|𝒉t−1,𝒔t−1))d𝒉1:Td𝒔1:T\displaystyle\begin{split}D&{}_{\mathrm{KL}}\left(q(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}|\boldsymbol{o}_{1:T},\boldsymbol{x}_{1:T},\boldsymbol{a}_{1:T})\,\|\,p(\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T})\right)\\
+=&\int_{\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}}\left(\prod_{t=1}^{T}q(\boldsymbol{h}_{t}|\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1})q(\boldsymbol{s}_{t}|\boldsymbol{o}_{1:t},\boldsymbol{a}_{1:t-1})\right)\\
+&\left(\log\frac{q(\boldsymbol{s}_{1}|\boldsymbol{o}_{1})}{p(\boldsymbol{s}_{1})}+\sum_{t=2}^{T}\log\frac{q(\boldsymbol{s}_{t}|\boldsymbol{o}_{1:t},\boldsymbol{a}_{1:t-1})}{p(\boldsymbol{s}_{t}|\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1})}\right)\mathrm{d}\boldsymbol{h}_{1:T}\,\mathrm{d}\boldsymbol{s}_{1:T}\\
+=&\mathbb{E}_{\boldsymbol{s}_{1}\sim q(\boldsymbol{s}_{1}|\boldsymbol{o}_{1})}\left[\log\frac{q(\boldsymbol{s}_{1}|\boldsymbol{o}_{1})}{p(\boldsymbol{s}_{1})}\right]\\
+&+\int_{\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}}\left(\prod_{t=1}^{T}q(\boldsymbol{h}_{t}|\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1})q(\boldsymbol{s}_{t}|\boldsymbol{o}_{1:t},\boldsymbol{a}_{1:t-1})\right)\\
+&\left(\sum_{t=2}^{T}\log\frac{q(\boldsymbol{s}_{t}|\boldsymbol{o}_{1:t},\boldsymbol{a}_{1:t-1})}{p(\boldsymbol{s}_{t}|\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1})}\right)\mathrm{d}\boldsymbol{h}_{1:T}\,\mathrm{d}\boldsymbol{s}_{1:T}\end{split}
+=DKL(q(𝒔1|𝒐1)∥p(𝒔1))+∫𝒉1:T,𝒔1:T(∏t=1Tq(𝒉t|𝒉t−1,𝒔t−1)q(𝒔t|𝒐1:t,𝒂1:t−1))(logq(𝒔2|𝒐1:2,𝒂1)p⁡(𝒔2|𝒉1,𝒔1)+∑t=3Tlogq(𝒔t|𝒐1:t,𝒂1:t−1)p⁡(𝒔t|𝒉t−1,𝒔t−1))d𝒉1:Td𝒔1:T=DKL(q(𝒔1|𝒐1)∥p(𝒔1))+𝔼𝒉1,𝒔1∼q⁡(𝒉1,𝒔1|𝒐1)[DKL(q(𝒔2|𝒐1:2,𝒂1)∥p(𝒔2|𝒉1,𝒔1))]+∫𝒉1:T,𝒔1:T(∏t=1Tq(𝒉t|𝒉t−1,𝒔t−1)q(𝒔t|𝒐1:t,𝒂1:t−1))(∑t=3Tlogq(𝒔t|𝒐1:t,𝒂1:t−1)p⁡(𝒔t|𝒉t−1,𝒔t−1))d𝒉1:Td𝒔1:T=∑t=1T𝔼𝒉t−1,𝒔t−1∼q(𝒉t−1,𝒔t−1|𝒐1:t−1,𝒂1:t−2)[DKL(q(𝒔t|𝒐1:t,𝒂1:t−1)∥p(𝒔t|𝒉t−1,𝒔t−1))]\displaystyle\begin{split}=&D_{\mathrm{KL}}\left(q(\boldsymbol{s}_{1}|\boldsymbol{o}_{1})\,\|\,p(\boldsymbol{s}_{1})\right)\\
+&+\int_{\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}}\left(\prod_{t=1}^{T}q(\boldsymbol{h}_{t}|\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1})q(\boldsymbol{s}_{t}|\boldsymbol{o}_{1:t},\boldsymbol{a}_{1:t-1})\right)\\
+&\left(\log\frac{q(\boldsymbol{s}_{2}|\boldsymbol{o}_{1:2},\boldsymbol{a}_{1})}{p(\boldsymbol{s}_{2}|\boldsymbol{h}_{1},\boldsymbol{s}_{1})}+\sum_{t=3}^{T}\log\frac{q(\boldsymbol{s}_{t}|\boldsymbol{o}_{1:t},\boldsymbol{a}_{1:t-1})}{p(\boldsymbol{s}_{t}|\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1})}\right)\mathrm{d}\boldsymbol{h}_{1:T}\,\mathrm{d}\boldsymbol{s}_{1:T}\\
+=&D_{\mathrm{KL}}\left(q(\boldsymbol{s}_{1}|\boldsymbol{o}_{1})\,\|\,p(\boldsymbol{s}_{1})\right)+\\
+&\mathbb{E}_{\boldsymbol{h}_{1},\boldsymbol{s}_{1}\sim q(\boldsymbol{h}_{1},\boldsymbol{s}_{1}|\boldsymbol{o}_{1})}\left[D_{\mathrm{KL}}\left(q(\boldsymbol{s}_{2}|\boldsymbol{o}_{1:2},\boldsymbol{a}_{1})\,\|\,p(\boldsymbol{s}_{2}|\boldsymbol{h}_{1},\boldsymbol{s}_{1})\right)\right]\\
+&+\int_{\boldsymbol{h}_{1:T},\boldsymbol{s}_{1:T}}\left(\prod_{t=1}^{T}q(\boldsymbol{h}_{t}|\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1})q(\boldsymbol{s}_{t}|\boldsymbol{o}_{1:t},\boldsymbol{a}_{1:t-1})\right)\\
+&\left(\sum_{t=3}^{T}\log\frac{q(\boldsymbol{s}_{t}|\boldsymbol{o}_{1:t},\boldsymbol{a}_{1:t-1})}{p(\boldsymbol{s}_{t}|\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1})}\right)\mathrm{d}\boldsymbol{h}_{1:T}\,\mathrm{d}\boldsymbol{s}_{1:T}\\
+=&\sum_{t=1}^{T}\mathbb{E}_{\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1}\sim q(\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1}|\boldsymbol{o}_{1:t-1},\boldsymbol{a}_{1:t-2})}\\
+&\quad\left[D_{\mathrm{KL}}\left(q(\boldsymbol{s}_{t}|\boldsymbol{o}_{1:t},\boldsymbol{a}_{1:t-1})\,\|\,p(\boldsymbol{s}_{t}|\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1})\right)\right]\end{split}
+(15)
+Combining Eq. (14), Eq. (15) and Eq. (12), the final lower bound can be obtained as follows:
+log⁡p(𝒙1:T+Tp,𝒂1:T+Tp)≥∑t=1T𝔼𝒉1:t,𝒔1:t∼q(𝒉t,𝒔t|𝒐1:t,𝒂1:t−1)[logp(𝒙t|𝒉t,𝒔t)+logp(𝒂t|𝒉t,𝒔t)]+∑j=1Tp𝔼𝒉T,𝒔T∼q(𝒉T,𝒔T|𝒐1:t,𝒂1:t−1)[log⁡p⁡(𝒙T+j|𝒉T,𝒔T)+log⁡p⁡(𝒂T+j|𝒉T,𝒔T)],−∑t=1T𝔼𝒉t−1,𝒔t−1∼q(𝒉t−1,𝒔t−1|𝒐1:t−1,𝒂1:t−2)[DKL(q(𝒔t|𝒐1:t,𝒂1:t−1)∥p(𝒔t|𝒉t−1,𝒔t−1))]\displaystyle\begin{split}\log p&(\boldsymbol{x}_{1:T+T_{p}},\boldsymbol{a}_{1:T+T_{p}})\geq\\
+&\sum_{t=1}^{T}\mathbb{E}_{\boldsymbol{h}_{1:t},\boldsymbol{s}_{1:t}\sim q(\boldsymbol{h}_{t},\boldsymbol{s}_{t}|\boldsymbol{o}_{1:t},\boldsymbol{a}_{1:t-1})}[\log p(\boldsymbol{x}_{t}|\boldsymbol{h}_{t},\boldsymbol{s}_{t})\\
+&+\log p(\boldsymbol{a}_{t}|\boldsymbol{h}_{t},\boldsymbol{s}_{t})]+\sum_{j=1}^{T_{p}}\mathbb{E}_{\boldsymbol{h}_{T},\boldsymbol{s}_{T}\sim q(\boldsymbol{h}_{T},\boldsymbol{s}_{T}|\boldsymbol{o}_{1:t},\boldsymbol{a}_{1:t-1})}\\
+&\quad[\log p(\boldsymbol{x}_{T+j}|\boldsymbol{h}_{T},\boldsymbol{s}_{T})+\log p(\boldsymbol{a}_{T+j}|\boldsymbol{h}_{T},\boldsymbol{s}_{T})],\\
+&-\sum_{t=1}^{T}\mathbb{E}_{\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1}\sim q(\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1}|\boldsymbol{o}_{1:t-1},\boldsymbol{a}_{1:t-2})}\\
+&\qquad\left[D_{\mathrm{KL}}\left(q(\boldsymbol{s}_{t}|\boldsymbol{o}_{1:t},\boldsymbol{a}_{1:t-1})\,\|\,p(\boldsymbol{s}_{t}|\boldsymbol{h}_{t-1},\boldsymbol{s}_{t-1})\right)\right]\end{split}
+(16)
+7 Evaluation Metrics for VLN-CE agents
+We follow previous approaches [5, 4, 33] and adopt the standard metrics for evaluating VLN-CE agents:
+•
+TL (Trajectory length) measures the average length of the predicted navigation trajectories.
+•
+NE (Navigation Error) measures the average distance (in meter) between the agent’s final position in the predicted trajectory and the target in the ground truth.
+•
+SR (Success Rate) is the proportion of the agent stopping
+in the predicted route within a threshold distance (set as 3 meters) of the goal
+in the reference route.
+•
+OSR (Oracle Success Rate) is the proportion of the closest point in the predicted trajectory to the target in the reference trajectory within a threshold distance.
+•
+SPL (Success weighted by Path Length) )is a comprehensive metric method integrating SR and TL that takes both effectiveness and efficiency into account.
+•
+NDTW (Normalized Dynamic Time Warping) measures the normalized cumulative distance between reference path and agent position.
+•
+SDTW (Success weighted by normalized Dynamic Time
+Warping) is a comprehensive metric method integrating NDTW and SR that takes both path efficiency and task completion into account.
+8 Implementation Details
+The Baseline Framework.
+In conventional panoramic VLN-CE frameworks [3, 74], the agent perceives its surroundings through multi-view RGB-D panoramas captured at 30-degree intervals at each timestep tt. These panoramic observations are processed by a trained waypoint prediction module[29] to identify navigable waypoints. The VLN model then encodes both the visual features of these waypoints and their spatial information (relative direction and distance) to construct a topological map. This map is subsequently integrated with the navigation instruction via the Cross-Modal Graph Transformer[16, 3], which selects the optimal waypoint as the agent’s next navigation goal.
+Monocular VLN-CE settings rely on a single RGB-D camera, which presents challenges in waypoint estimation due to the lack of full panoramic coverage. To address this, an enhanced waypoint predictor [75] utilizes a semantic traversability map and 3D feature fields to infer viable waypoints, ensuring effective decision-making even with limited field-of-view.
+Model Configuration.
+Following the previous baseline model [3, 75], we utilize CLIP-pretrained ViT-B/32 [18] for RGB feature extraction, while depth information is processed through a point-goal navigation pretrained ResNet-50 [27]. The framework maintains encoder depths of 2, 9, and 4 layers for panoramic, textual, and cross-modal graph components respectively, aligned with [29, 20]. Other hyperparameters are the same as LXMERT [65] on the R2R-CE dataset and pre-trained RoBerta [49] for the multilingual RxR-CE dataset. The camera’s HFOV is set to 90∘90^{\circ} for R2R-CE and 79∘79^{\circ} for RxR-CE.
+Experimental Details.
+NavMorph was trained over 10K episodes on the R2R-CE dataset and 20K episodes on the RxR-CE dataset, following the same initialization and training strategies as the pretrained baseline [75, 3].
+The learning rate is set to 1×10−51\times 10^{-5}, while the weighting coefficient for loss function ℒ\mathcal{L} is γ=10−3\gamma=10^{-3}. Note that the weighting coefficients are heuristically adjusted to balance each loss term, ensuring they remain at the same order of magnitude based on initial values.
+At each timestep of a navigation task, the model predicts actions for Tp=2T_{p}=2 consecutive future states, starting from t=1t=1 (i.e., the next position after the agent’s initial point). Accordingly, the observation window TT dynamically expands throughout the navigation process, increasing until the agent selects ‘stop’ action or reaches the maximum step limit.
+For input image dimensions No×h×w×cN_{o}\times h\times w\times c, we set 1×224×224×31\times 224\times 224\times 3 for monocular settings and 12×224×224×312\times 224\times 224\times 3 for panoramic settings. The encoded visual embedding has a dimension of dx=512d_{x}=512, while both scene-contextual features (dvd_{v}) and action embedding (dad_{a}) are set to 768.
+Our Contextual Evolution Memory (CEM) is initially randomized and progressively updated with informative scene-contextual features. These features are derived from panoramic visual representations extracted by the panoramic encoder during training, encapsulating comprehensive environmental information to enhance navigation. The memory size NmN_{m} is set to 1000.
+For the monocular setting, KK is set to 16 for top-KK retrieval with update factors α=β=0.7\alpha=\beta=0.7.
+For panoramic setting, KK is set to 10 for top-KK retrieval with update factors α=β=0.9\alpha=\beta=0.9.
+Working Modes.
+During the training phase, NavMorph operates through two core components: the world-aware navigator, which executes navigation actions for VLN-CE tasks, and the foresight action planner, which performs imaginative rollouts for future TpT_{p} steps. This collaborative framework enables the model to learn effective navigation strategies while simultaneously refining its latent state representation capabilities.
+During the online testing phase, the world-aware navigator performs navigation planning by leveraging the predicted future actions generated by the foresight action planner as guidance. Specifically, the navigator evaluates each candidate waypoint by assigning navigation scores based on the learned policy, which are subsequently refined according to their proximity to the predicted trajectory points. This weighting strategy prioritizes candidates closer to the predicted path, seamlessly integrating the foresight planner’s predictions into final navigation decision-making process.
+Table 6: Experimental results on R2R-CE dataset. Results better than base model are shown in blue. Best results for the panoramic and monocular settings are each highlighted in bold. * indicates experimental results that we have reproduced in this work.
+Val Seen
+Val Unseen
+Test Unseen
+Camera
+Methods
+TL ↓\downarrow
+NE ↓\downarrow
+OSR
+SR
+SPL
+TL ↓\downarrow
+NE ↓\downarrow
+OSR
+SR
+SPL
+TL ↓\downarrow
+NE ↓\downarrow
+OSR
+SR
+SPL
+LAW [62]
+9.34
+6.35
+49
+40
+37
+8.89
+6.83
+44
+35
+31
+9.67
+7.69
+28
+38
+25
+CM2 [20]
+12.05
+6.10
+50.7
+42.9
+34.8
+11.54
+7.02
+41.5
+34.3
+27.6
+13.90
+7.70
+39
+31
+24
+WS-MGMap [14]
+10.12
+5.65
+51.7
+46.9
+43.4
+10.00
+6.28
+47.6
+38.9
+34.3
+12.30
+7.11
+45
+35
+28
+NaVid [80]
+-
+-
+-
+-
+-
+-
+5.47
+49.1
+37.4
+35.9
+-
+-
+-
+-
+-
+ETPNav/p [75]
+-
+-
+-
+-
+-
+-
+6.81
+42.4
+32.9
+23.1
+-
+-
+-
+-
+-
+VLN-3DFF [75]
+-
+-
+-
+-
+-
+-
+5.95
+55.8
+44.9
+30.4
+-
+6.24
+54.4
+43.7
+28.9
+VLN-3DFF*
+22.90
+4.92
+62.1
+52.7
+36.7
+26.16
+6.05
+54.9
+43.8
+29.4
+26.02
+6.22
+54.7
+43.8
+28.6
+Monocular
+NavMorph
+20.03
+4.58
+62.7
+55.8
+38.9
+22.54
+5.75
+56.9
+47.9
+33.2
+24.75
+6.01
+54.5
+45.7
+30.2
+Seq2Seq [5]
+9.26
+7.12
+46
+37
+35
+8.64
+7.37
+40
+32
+30
+8.85
+7.91
+36
+28
+25
+SASRA [34]
+8.89
+7.71
+-
+36
+34
+7.89
+8.32
+-
+24
+22
+-
+-
+-
+-
+-
+CWTP [13]
+-
+7.10
+56
+36
+31
+-
+7.90
+38
+26
+23
+-
+-
+-
+-
+-
+AG-CMTP [11]
+-
+6.60
+56
+36
+31
+-
+7.90
+39
+23
+19
+-
+-
+-
+-
+-
+R2R-CMTP [11]
+-
+7.10
+45
+36
+31
+-
+7.90
+38
+26
+23
+-
+-
+-
+-
+-
+WPN [71]
+8.54
+5.48
+53
+46
+43
+7.62
+6.31
+40
+36
+34
+8.02
+6.65
+37
+32
+30
+Sim2Sim [40]
+11.18
+4.67
+61
+52
+44
+10.69
+6.07
+52
+43
+36
+11.43
+6.17
+52
+44
+37
+CWP-CMA [29]
+11.47
+5.20
+61
+51
+45
+10.90
+6.20
+52
+41
+36
+11.85
+6.30
+49
+38
+33
+CWP-BERT [29]
+12.50
+5.02
+59
+50
+44
+12.23
+5.74
+53
+44
+39
+13.51
+5.89
+51
+42
+36
+ERG [71]
+11.80
+5.04
+61
+46
+42
+9.96
+6.20
+52
+41
+36
+-
+-
+-
+-
+-
+DUET [16]
+12.62
+4.13
+67
+57
+49
+11.86
+5.13
+55
+46
+40
+13.13
+5.82
+50
+42
+36
+DREAMW [69]
+11.60
+4.09
+59
+66
+48
+11.30
+5.53
+49
+59
+44
+11.80
+5.48
+49
+57
+44
+Ego2-Map [30]
+-
+-
+-
+-
+-
+-
+4.93
+-
+52
+46
+-
+5.54
+56
+47
+41
+ScaleVLN [73]
+-
+-
+-
+-
+-
+-
+4.80
+-
+55
+51
+-
+5.11
+-
+55
+50
+GridMM [74]
+12.69
+4.21
+69
+59
+51
+13.36
+5.11
+61
+49
+41
+13.31
+5.64
+56
+46
+39
+BEVBert [1]
+13.98
+3.77
+73
+68
+60
+13.27
+4.57
+67
+59
+50
+15.31
+4.70
+67
+59
+50
+FSTTA [19]
+12.39
+4.25
+69
+58
+50
+11.58
+5.27
+58
+48
+42
+13.17
+5.84
+55
+46
+38
+ETPNav [3]
+11.78
+3.95
+72
+66
+59
+11.99
+4.71
+65
+57
+49
+12.87
+5.12
+63
+55
+48
+ETPNav*
+11.35
+3.93
+72
+66
+59
+11.40
+4.69
+64
+57
+49
+12.72
+5.10
+63
+55
+48
+NavMorph
+11.43
+3.86
+73
+67
+60
+11.55
+4.62
+66
+59
+50
+12.88
+4.91
+64
+57
+49
+HNR [76]
+11.79
+3.67
+76
+69
+61
+12.64
+4.42
+67
+61
+51
+13.03
+4.81
+67
+58
+50
+HNR*
+11.84
+3.73
+76
+69
+61
+12.76
+4.57
+67
+61
+51
+12.92
+4.85
+67
+58
+50
+Panoramic
+NavMorph
+11.76
+3.66
+78
+70
+62
+12.68
+4.37
+68
+64
+53
+12.69
+4.69
+68
+60
+52
+•
+Note: Following established conventions in prior works, we report experimental results with different precision formats across camera configurations: integers for panoramic settings and two decimal places for monocular settings.
+9 Complementary Experiments
+9.1 Full Results
+In our main paper, we provide representative comparison results on the R2R-CE [41, 5] and RxR-CE [41, 43] benchmarks due to space constraints. Here, we present the complete results across the ‘validation seen’, ‘validation unseen’, and ‘test unseen’ splits of these benchmarks, including comparisons with a broader range of state-of-the-art methods, as detailed in Table 6 and Table 7. Our self-evolving world model enhances its ability to anticipate future states based on current observations and cross-episodic experiences, effectively handling complex navigation tasks even with monocular input.
+Performance Improvement on Seen/Unseen sets.
+Based on the experimental results in Table 6 and Table 7, our proposed NavMorph consistently achieves notable performance improvements across different datasets. While performance gains varies between seen and unseen environments, we analyze relative improvements to better quantify the effectiveness of our self-evolving world model across different settings.
+Taking the monocular setup as an example, NavMorph improves the success rate (SR) by 6.85%\% in unseen environments, compared to 5.88%\% in seen environments on R2R-CE dataset.
+The improvement in SPL is even more pronounced, reaching 9.26%\% in unseen environments versus 5.99%\% in seen environments. A similar trend is observed in RxR-CE, where unseen SR improves by 10.94%\%, while seen SR increases by 7.54%\%. Likewise, SPL improves 11.29%\% in unseen settings, compared to 12.71%\% in seen ones.
+These results indicate that NavMorph achieves higher or comparable performance gains in unseen environments (average of val/test unseen) compared to seen ones, demonstrating its capacity to generalize across novel tasks.
+A key factor contributing to this generalization ability is self-evolution, which enhances adaptation uniformly across both seen and unseen data rather than specifically optimizing for new scenarios. The observed gains in seen settings further suggest that the model effectively adapts to novel instructions within familiar scenes, rather than merely overfitting to training data.
+Table 7: Experimental results on RxR-CE datasets. Results better than the base model are shown in blue. Best results for the panoramic and monocular settings are each highlighted in bold.
+Val Seen
+Val Unseen
+Test Unseen
+Camera
+Methods
+TL ↓\downarrow
+NE ↓\downarrow
+OSR
+SR
+SPL
+NDTW
+SDTW
+TL ↓\downarrow
+NE ↓\downarrow
+OSR
+SR
+SPL
+NDTW
+SDTW
+TL ↓\downarrow
+NE ↓\downarrow
+OSR
+SR
+SPL
+NDTW
+SDTW
+LAW [62]
+7.92
+11.94
+20.0
+7.0
+6.0
+-
+-
+4.01
+10.87
+21.0
+8.0
+8.0
+-
+-
+-
+-
+-
+-
+-
+-
+-
+CM2 [20]
+-
+-
+-
+-
+-
+-
+-
+12.29
+8.98
+25.3
+14.4
+9.2
+-
+-
+-
+-
+-
+-
+-
+-
+-
+WS-MGMap [14]
+10.37
+10.19
+27.7
+14.0
+12.3
+-
+-
+10.80
+9.83
+29.8
+15.0
+12.1
+-
+-
+-
+-
+-
+-
+-
+-
+-
+NaVid [80]
+-
+-
+-
+-
+-
+-
+-
+10.59
+8.41
+34.5
+23.8
+32.2
+-
+-
+-
+-
+-
+-
+-
+-
+-
+A2-Nav [15]
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+16.8
+6.3
+-
+-
+-
+-
+-
+-
+-
+-
+-
+VLN-3DFF [75]
+-
+-
+-
+-
+-
+-
+-
+-
+8.79
+36.7
+25.5
+18.1
+-
+-
+-
+-
+-
+-
+-
+-
+-
+VLN-3DFF*
+18.91
+9.87
+40.54
+27.72
+20.61
+42.37
+20.94
+16.21
+9.41
+38.40
+26.66
+20.11
+42.91
+20.36
+20.85
+10.19
+-
+23.41
+15.43
+32.38
+14.75
+Monocular
+NavMorph
+21.61
+9.80
+41.27
+29.81
+23.23
+44.51
+22.68
+20.28
+8.85
+43.05
+30.76
+22.84
+44.19
+23.30
+21.13
+9.81
+-
+24.93
+16.82
+33.71
+15.64
+Seq2Seq [5]
+-
+-
+-
+-
+-
+-
+-
+7.33
+12.1
+-
+13.93
+11.96
+30.86
+11.01
+-
+12.10
+-
+13.93
+11.96
+30.86
+11.01
+Reborn [2]
+-
+5.69
+-
+52.43
+45.46
+66.27
+44.47
+-
+5.98
+-
+48.60
+42.05
+63.35
+41.82
+-
+7.10
+-
+45.82
+38.82
+55.43
+38.42
+CWP-CMA [29]
+-
+-
+-
+-
+-
+-
+-
+-
+8.76
+-
+26.59
+22.16
+47.05
+-
+20.04
+10.4
+-
+24.08
+19.07
+37.39
+18.65
+CWP-RecBERT [29]
+-
+-
+-
+-
+-
+-
+-
+-
+8.98
+-
+27.08
+22.65
+46.71
+-
+20.09
+10.4
+-
+24.85
+19.61
+37.30
+19.05
+AO-Planner [12]
+-
+-
+-
+-
+-
+-
+-
+-
+7.06
+-
+43.3
+30.5
+50.1
+-
+-
+-
+-
+-
+-
+-
+-
+LAW-Pano [62]
+6.27
+12.07
+17.0
+9.0
+9.0
+-
+-
+4.62
+11.04
+16.0
+10.0
+9.0
+-
+-
+-
+-
+-
+-
+-
+-
+-
+UnitedVLN [17]
+-
+4.74
+-
+65.1
+52.9
+69.4
+53.6
+-
+5.48
+-
+57.9
+45.9
+63.9
+48.1
+-
+-
+-
+-
+-
+-
+-
+ETPNav [3]
+-
+5.03
+-
+61.46
+50.83
+66.41
+51.28
+-
+5.64
+-
+54.79
+44.89
+61.90
+45.33
+-
+6.99
+-
+51.21
+39.86
+54.11
+41.30
+ETPNav*
+18.16
+5.06
+64.06
+62.09
+50.64
+66.06
+51.17
+18.92
+5.96
+63.66
+54.83
+44.62
+61.36
+44.87
+21.83
+6.92
+-
+51.38
+39.90
+53.85
+40.91
+NavMorph
+18.97
+5.08
+65.86
+63.88
+52.28
+67.94
+52.54
+19.93
+5.80
+64.83
+56.23
+46.39
+63.23
+46.98
+21.29
+6.90
+-
+51.97
+41.56
+55.01
+42.60
+HNR [76]
+-
+4.85
+-
+63.72
+53.17
+68.81
+52.78
+-
+5.51
+-
+56.39
+46.73
+63.56
+47.24
+-
+6.81
+-
+53.22
+41.14
+55.61
+42.89
+HNR*
+19.74
+4.93
+66.01
+63.55
+53.37
+69.02
+52.66
+20.41
+5.75
+64.93
+56.48
+46.62
+63.43
+47.38
+23.02
+6.88
+-
+53.33
+41.18
+55.47
+42.95
+Panoramic
+NavMorph
+20.80
+5.10
+67.88
+64.95
+54.17
+70.94
+54.82
+21.33
+5.67
+66.02
+58.02
+48.98
+64.77
+48.85
+23.36
+6.67
+-
+54.98
+43.02
+57.31
+44.76
+•
+Note: Official evaluation on the Test Unseen split of RxR-CE dataset only provides TL, NE, SR, SPL, NDTW and SDTW metrics, thus OSR metric is not reported for the test split in this table.
+9.2 Extended Results for Self-Evolution
+Detailed Ablation Study on Self-Evolution Strategy.
+In our main paper (Table 3), we conducted an ablation study on the effect of self-evolution, in which the proposed Contextual Evolution Memory (CEM) module was entirely prevented from updating. The results demonstrated the effectiveness of self-evolution in enhancing model performance and learning dynamics.
+To further investigate its role only in online adaptation, we introduce ‘NavMorph w/o SE*’, a variant where CEM undergoes self-evolution following Eq. (3) in main paper during training, progressively refining its stored representations. Once training is complete, the finalized memory is used as the initial state for deployment and remains unchanged throughout online testing.
+As shown in Table 8, enabling self-evolution during online testing improves performance in online unseen environments, highlighting its crucial role in real-time adaptation.
+Moreover, since the self-evolution process benefits from prolonged environmental interaction—where unsupervised learning progressively refines the model’s dynamic latent state—we extend our analysis to a larger, more diverse dataset, RxR-CE, to examine its influence on generalization. The results indicate a notable improvement in SPL (21.46→\to22.84), further validating the effectiveness of self-evolution in enhancing adaptability in unseen environments.
+Different Steps of Predictive Future States TpT_{p}.
+As shown in Table 9, we further investigate the impact of varying predictive steps in our foresight action planner on navigational performance. Notably, predicting two steps (Tp=2T_{p}=2) achieves the optimal balance across key metrics, offering sufficient foresight for reliable decision-making without introducing excessive uncertainty.
+As TpT_{p} increases beyond 2, we observe a slight decline in SPL, SR, and NDTW, possibly due to compounding errors (accumulation of inaccuracies over multiple predictive steps) or over-commitment to future predictions (focuses too heavily on long-term predictions), which reduces the agent’s flexibility to adapt to changing environments.
+These results demonstrate the need of striking a balance between foresight and adaptability. Predicting too few steps may limit the agent’s strategic planning, while predicting too many steps introduces unnecessary complexity, diminishing trajectory efficiency.
+Table 8: Ablation Study on Self-Evolution.
+Dataset
+Methods
+TL ↓\downarrow
+NE ↓\downarrow
+OSR
+SR
+SPL
+NDTW
+SDTW
+R2R-CE
+Val
+Unseen
+Base Model
+26.16
+6.05
+54.92
+43.77
+29.39
+40.94
+29.30
+NavMorph w/o SE*
+23.33
+5.77
+56.12
+46.87
+32.56
+44.42
+32.16
+NavMorph
+22.54
+5.75
+56.88
+47.91
+33.22
+44.86
+32.73
+RxR-CE
+Val
+Unseen
+Base Model
+16.21
+9.41
+38.40
+26.66
+20.11
+42.91
+20.36
+NavMorph w/o SE*
+20.83
+9.08
+41.49
+28.78
+21.46
+43.26
+21.52
+NavMorph
+20.28
+8.85
+43.05
+30.76
+22.84
+44.19
+23.30
+•
+Note: Results better than ‘NavMorph w/o SE*’ are shown in blue.
+Table 9: Experimental Results for Different Predictive Steps.
+Methods
+Predictive
+Steps TpT_{p}
+R2R-CE Val Unseen
+TL ↓\downarrow
+NE ↓\downarrow
+OSR
+SR
+SPL
+NDTW
+SDTW
+Base model
+-
+26.16
+6.05
+54.92
+43.77
+29.39
+40.94
+29.30
+NavMorph
+1
+22.05
+5.99
+55.57
+46.06
+32.78
+44.89
+32.36
+2
+22.54
+5.75
+56.88
+47.91
+33.22
+44.86
+32.73
+3
+25.36
+5.99
+56.50
+44.97
+31.30
+42.99
+30.57
+4
+20.91
+5.81
+55.52
+46.82
+32.04
+44.61
+32.20
+5
+25.94
+5.69
+56.66
+47.18
+31.79
+43.72
+31.92
+9.3 Other Ablation Studies
+Comparison with Representative TTA Strategies.
+In our main paper, we discussed how our evolving world model accumulates scene-specific information from test environments as memory knowledge during online testing. This mechanism allows the model to refine its predictions in dynamically changing environments without requiring ground truth actions.
+A related class of approaches, referred to as Test-Time Adaptation (TTA), also aims to improve model generalization by dynamically adjusting model parameters during testing, often through gradient-based updates or statistical alignment methods (e.g., batch normalization adaptation, entropy minimization).
+Given the comparison with the most related method, FSTTA [19], in our main paper, we further evaluate representative TTA approaches under the same test conditions as FSTTA (i.e., updating the same set of parameters) and compare them with our NavMorph. To ensure a fair and robust evaluation, we conduct experiments under three different random seeds, reporting both the mean and standard deviation of the results.
+As demonstrated in Table 10, our proposed NavMorph achieves the best overall performance while exhibiting more stable results (with lower standard deviation). These results highlight the effectiveness of incorporating a world model in VLN-CE tasks, as conventional TTA methods alone yield limited improvements, underscoring the necessity of structured world modeling for online adaptation to novel tasks.
+Additionally, the configurations of these TTA strategies for VLN are detailed as follows:
+•
+Tent [68]. We adopt all hyperparameter settings as specified in Tent. Specifically, the optimizer is AdamW [50], and for a batch size of 1, the learning rate is set to 0.001/640.001/64.
+•
+NOTE [21]. The hyperparameter configurations strictly follow those defined in NOTE. In particular, the soft-shrinkage width is set to 44, and the EMA momentum is 0.010.01. The optimization is performed using AdamW with a learning rate of 0.00010.0001.
+•
+SAR [54]. We adhere to the default hyperparameters in SAR. Specifically, the entropy constant E0E_{0} (for reliable sample identification) is set to 0.4×ln⁡10000.4\times\ln{1000}, while the neighborhood size for sharpness-aware minimization is configured as 0.050.05. For model recovery, the moving average factor is 0.90.9, and the reset threshold is 0.20.2.
+•
+ViDA [48]. The experimental setup follows the original ViDA configuration. Random augmentation compositions, including Gaussian noise and dropout, are incorporated. The AdamW optimizer, identical to that in Tent, is utilized. The threshold value is set to 0.20.2, and the updating weight is 0.9990.999.
+Table 10: Comparison with Representative TTA Strategies.
+Methods
+R2R-CE Val Unseen
+TL ↓\downarrow
+NE ↓\downarrow
+OSR
+SR
+SPL
+NDTW
+SDTW
+Base Model
+26.16
+6.05
+54.92
+43.77
+29.39
+40.94
+29.30
++ Tent [68]
+28.56±\pm 1.59
+7.21±\pm 1.01
+52.13±\pm 1.98
+40.97±\pm 1.77
+27.46±\pm 0.94
+37.90±\pm 1.53
+27.65±\pm 1.60
++ NOTE [21]
+26.88±\pm 1.82
+6.71±\pm 0.63
+53.87±\pm 1.71
+42.85±\pm 0.88
+28.43±\pm 0.56
+39.02±\pm 0.93
+28.37±\pm 0.88
++ SAR [54]
+27.15±\pm 1.40
+6.57±\pm 0.83
+53.50±\pm 1.30
+43.02±\pm 0.91
+27.98±\pm 0.72
+38.77±\pm 0.95
+27.92±\pm 0.75
++ ViDA [48]
+26.74±\pm 1.26
+6.88±\pm 0.75
+55.26±\pm 0.98
+43.58±\pm 0.86
+28.29±\pm 0.53
+40.89±\pm 0.94
+28.73±\pm 0.56
++ FSTTA [19]
+28.25±\pm 0.72
+6.67±\pm 0.34
+55.41±\pm 0.91
+43.94±\pm 0.32
+29.63±\pm 0.47
+42.76±\pm 0.65
+29.34±\pm 0.49
+NavMorph
+22.54±\pm 0.07
+5.75±\pm 0.03
+56.88±\pm 0.05
+47.91±\pm 0.04
+33.22±\pm 0.02
+44.86±\pm 0.07
+32.73±\pm 0.04
+•
+Note: The reported values represent the mean results, with the standard deviation provided in a reduced font size. Best results are shown in bold.
+Ablation Study of Action Embedding.
+In our proposed world model, action embedding 𝒂t\boldsymbol{a}_{t} plays a crucial role in modeling state transitions and long-term predictive reasoning within RSSM, enabling the model to generate plausible future trajectories based on past observations and actions (Section 3.1 in main paper).
+Some readers may wonder whether the model’s performance improvement arises from learning an action-state mapping through action embedding.
+To further investigate this, we conduct an ablation study to assess its role in latent representation learning. Specifically, we introduce a variant, ‘Base-AE’, which retains the same backbone as the baseline model (VLN-3DFF [75]) without world modeling but includes an additional action embedding input.
+As shown in Table 11, the results indicate only marginal differences (OSR: 54.9→\to55.1, SR: 43.8→\to43.4, SPL: 29.4→\to29.3), indicating that explicitly encoding actions has a negligible effect on performance. This finding highlights that the observed improvements in our method stem primarily from the self-evolving world model’s ability to model environmental dynamics, rather than the mere inclusion of action embedding.
+Table 11: Ablation Study of Action Embedding.
+Methods
+R2R-CE Val Unseen
+TL ↓\downarrow
+NE ↓\downarrow
+OSR
+SR
+SPL
+NDTW
+SDTW
+Base Model
+26.16
+6.05
+54.92
+43.77
+29.39
+40.94
+29.30
+Base-AE
+26.01
+6.09
+55.1
+43.4
+29.3
+41.34
+29.42
+NavMorph
+22.54
+5.75
+56.88
+47.91
+33.22
+44.86
+32.73
+•
+Note: ‘Base Model’ denotes the chosen baseline under monocular setting, VLN-3DFF. ‘Base-AE’ denotes the baseline incorporating action information into the input without the world model. Best results are shown in bold.
+Computational Analysis. Table 4 in main paper demonstrates that NavMorph maintains comparable inference efficiency to the base model, with an average episode time of 21.22s vs 20.53s, while achieving nearly 4% improvements in both SR and SPL.
+In terms of parameter overhead, our CEM introduces only a marginal increase—adding 2.30M parameters compared to the base model’s 228.96M, accounting for merely 1.0% of the total model size. Given the consistent performance improvements, the computational and memory overheads are lightweight and acceptable.
+Figure 5: Qualitative results of NavMorph on the R2R-CE dataset are presented, showcasing a comparison between ground truth paths (GT Trajectory), NavMorph’s executed navigation routes (Trajectory), and the predictive paths generated by the Foresight Action Planner (Imagined Path). These visualizations highlight NavMorph’s ability to perform effective navigation. Additionally, key input observations at critical timesteps during NavMorph’s navigation are provided to illustrate its decision-making process.
+9.4 Extensive Discussion
+While our method shares similarities with test-time adaptation (TTA), NavMorph fundamentally extends beyond this paradigm. Traditional TTA typically applies gradient-based parameter updates during inference for static classification tasks. In contrast, our approach incorporates a contextual evolution mechanism (CEM) within the RSSM framework, explicitly modeling environment state transitions during both training and inference phases. This mechanism enables the agent to adapt proactively to dynamic environments—not just during inference—by selectively integrating new scene observations while retaining historically relevant information.
+At the core of this design lies the Contextual Evolution Memory (CEM), which enhances long-term reasoning by dynamically maintaining latent scene representations. Rather than accumulating all past experiences, CEM performs top-K scene retrieval based on visual similarity, maintaining memory entries that are most pertinent to the current context. This suppresses noisy or outdated trajectories and enhances the agent’s ability to infer plausible future transitions, particularly in out-of-distribution or evolving scenes, as often encountered in VLN-CE tasks.
+We provide ablations (Table 8) comparing variants of NavMorph with and without online evolution (NavMorph w/o SE*), confirming that the model remains effective even without runtime adaptation (SR: Base Model 43.77 → NavMorph w/o SE* 46.87 → NavMorph 47.91).
+Importantly, our contribution lies not in the memory design itself, but in showing that adaptive evolution—when tightly integrated into a world model—can effectively improve navigation performance in VLN-CE literature.
+10 Qualitative Analysis
+To evaluate the predictive performance of NavMorph, we conduct qualitative analysis by comparing trajectories generated through our Foresight Action Planner with executed paths and ground truth sequences.
+Since our world model encodes high-level features instead of raw images, direct visualization of latent states remains non-trivial. Therefore, to effectively illustrate NavMorph’s reasoning process, we resort to trajectory-based evaluations, where the predicted and executed navigation sequences serve as an implicit reflection of the model’s latent space dynamics.
+Figure 5 presents trajectory visualizations across diverse navigational scenarios, where the coherence between predicted and executed paths demonstrates the model’s capacity for environmental dynamics modeling and anticipatory planning. Furthermore, we visualize key observational inputs at critical navigation timesteps to provide insights into NavMorph’s decision-making process.
+We observe that in simple scenarios with clear navigation paths (Figure 5(a)), the predicted trajectories closely align with the actual execution, demonstrating robust state modeling capabilities. For complex environments involving multiple room transitions (Figure 5(b)), NavMorph maintains trajectory consistency with only minor deviations at critical decision points. Notably, in challenging multi-level scenarios (Figure 5(c)), where descending stairs introduces visual discontinuities and occlusions, the model exhibits resilient prediction performance.
+Notably, the imagined paths predicted by the foresight action planner (indicated by green dashed trajectories) occasionally traverse through physical obstacles such as walls or furniture. This limitation stems from the world model’s imaginative rollouts lacking immediate environmental feedback, particularly navigation rewards that would typically penalize obstacle intersections. Nevertheless, the foresight action planner proves effective as an approximation mechanism, generating target-oriented trajectories that the world-aware navigator can dynamically adjust during execution to satisfy environmental constraints. These visualization results validate our world model’s proficiency in capturing environmental dynamics and spatial-temporal relationships, facilitating effective predictive planning in navigation tasks.
+Experimental support, please
+view the build logs
+for errors. Generated by
+L
+A
+T
+E
+xml
+.
+Instructions for reporting errors
+We are continuing to improve HTML versions of papers, and your feedback helps enhance accessibility and mobile
+support. To report errors in the HTML that will help us improve conversion and rendering, choose any of the
+methods listed below:
+Click the "Report Issue" (
+) button, located in the page header.
+Tip: You can select the relevant text first, to include it in your report.
+Our team has already identified the following issues. We appreciate your time reviewing and reporting rendering errors we
+may not have found yet. Your efforts will help us improve the HTML versions for all readers, because disability
+should not be a barrier to accessing research. Thank you for your continued support in championing open access for
+all.
+Have a free development cycle? Help support accessibility at arXiv! Our collaborators at LaTeXML maintain a list of packages that need conversion, and welcome developer contributions.
+We gratefully acknowledge support from
+our major funders,
+member institutions, ,
+and all contributors.
+About
+·
+Help
+·
+Contact
+·
+Subscribe
+·
+Copyright
+·
+Privacy
+·
+Accessibility
+·
+Operational Status (opens in new tab)
+Major funding support from

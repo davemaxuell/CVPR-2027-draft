@@ -1,0 +1,1713 @@
+=== PDF PAGE 1 ===
+            Uncertainty-Aware World Model for Aerial Image-Goal Navigation
+
+
+            Deyi Zhu*, Haoyu Fan*, Yinan Zhu, Weichen Zhang, Shilin Ma, Xinlei Chen, Yansong Tang†
+                     Tsinghua Shenzhen International Graduate School, Tsinghua University
+                       zhudy21@mails.tsinghua.edu.cn, tang.yansong@sz.tsinghua.edu.cn
+
+                                         Project Page: https://duryi.github.io/UA-NWM-Project-Page
+
+
+                         Abstract
+                                                                                       Goal Position
+
+          Aerial image-goal navigation requires an unmanned aerial
+           vehicle (UAV) to reach a target location specified by a goal
+          image.  Existing world-model-based methods rank candi-
+          date trajectories using predicted futures, but typically rely
+                                                                                                                        Limited View         on only one or a few point predictions, which is inade-         Current Position2026    quate for large-scale outdoor environments with substantial
+           future-state uncertainty. To address this limitation, we pro-         Context States     Future Actions          Future State
+          pose the Uncertainty-Aware Navigation World Model (UA-
+       NWM), an efficient latent world model for aerial image-Aug
+          goal navigation, which formulates trajectory scoring as
+6           conditional out-of-distribution detection. UA-NWM repre-
+           sents plausible futures with an uncertainty subspace and de-                              ?
+         composes the prediction–goal discrepancy into uncertainty-
+          explainable and unexplainable components. Only the unex-
+          plainable residual is used for scoring, enabling robust se-
+           lection without multiple future samples. Extensive experi-[cs.CV]         ments demonstrate that UA-NWM consistently outperforms
+           existing navigation world models while maintaining low in-
+           ference latency. Real-world UAV experiments further vali-
+          date its practical applicability.
+                                                                   ?
+                                                                                                                             Future State
+          1. Introduction                                                   Goal State                             Distribution
+
+          Image-goal navigation maps current observation and a goal              Figure 1. Illustration of future-state uncertainty.
+         image to actions that guide an embodied agent toward the
+            target position. Conventional methods [18, 44, 49, 50, 56]
+                                                                         sion foundation models (VFMs) [40, 54] to improve effi-           directly predict actions or trajectories, whereas recent ap-
+                                                                            ciency, but most of them remain deterministic, and can only          proaches [5, 52, 66, 72, 75, 78] use world models to score
+                                                                  produce a single estimate, rather than representing the full          candidate trajectories by predicting their future states, and
+                                                                                future-state distribution. Recent methods [7, 25, 53] begin            select the one most likely to reach the goal for execution.arXiv:2608.05597v1                                                                 exploring stochastic prediction in VFM latent spaces.
+             Existing world models can be broadly categorized as
+                                                                        Despite these advances, a critical limitation remains—
+           stochastic or deterministic. Stochastic world models [1, 9,
+                                                                                future-state uncertainty  is not fully exploited in world-
+          34, 84] can generate different plausible futures, but are typ-
+                                                                 model-based trajectory scoring for navigation. This issue is
+            ically computationally expensive. Some studies [4, 10, 24,
+                                                                            especially pronounced in large-scale outdoor scenes, such
+          81] therefore perform prediction in the latent spaces of vi-
+                                                                         as urban aerial navigation, where long-horizon motion and
+               *Equal contribution.                                        unseen regions yield multiple plausible futures under the
+               †Corresponding author.                                  same context and actions. As illustrated in Figure 1, oc-
+
+
+                                                          1
+
+=== PDF PAGE 2 ===
+        Deterministic World Models                  Stochastic World Models              UA-NWM (Ours)
+
+                                     Similarity                                                                                                                                           Distance to
+                                                                                                             Similarity                                                                               the subspace
+                                                           Fast                                                        Diversity                                                             Fast
+ Conditional mean                    No variance  One sampled future                    Sampling-sensitive  Conditional mean                    No variance
+ of all plausible futures                  Blurry, no diversity  per forward pass               High computational Cost & Uncertainty subspace               Uncertainty-aware
+
+                    Low Similarity                     Low Similarity                               Close to Subspace
+                    Bad Trajectory                      Bad Trajectory                     Good Trajectory
+                               Reject it!                                    Reject it!                                      Select it!
+
+      Pred.          Goal       Incorrect Scoring         Pred.          Goal       Incorrect Scoring          Pred.         Goal        Correct Scoring
+
+       Conditional future state distribution      Examples of plausible future states      Goal state      Model prediction       Trajectory scoring mechanism
+
+     Figure 2. Comparison of UA-NWM and previous navigation world models in terms of future prediction and trajectory scoring.
+
+
+clusion by the building leaves the future appearance of      chical Error Projection (HEP) module to model an uncer-
+the left region ambiguous. Under the manifold hypothe-      tainty subspace around each prediction. HEP decomposes
+sis [6], these plausible futures concentrate around a low-      the discrepancy between the predicted and goal representa-
+dimensional manifold. Trajectory scoring can therefore be      tions into parallel and orthogonal components, correspond-
+viewed as determining whether the goal image lies within     ing to uncertainty-explainable variation and unexplained
+the conditional future-state distribution.                          residual error, respectively. Only the orthogonal residual is
+   However, existing navigation world models typically     used for trajectory scoring, avoiding penalties on plausible
+compare the goal with only one or a few point predictions,     uncertainty-induced deviations.
+as shown in Figure 2. Deterministic models [77, 78] col-     We construct a high-quality dataset from existing aerial
+lapse multiple plausible futures into a single, often over-     navigation benchmarks and train UA-NWM with a staged
+smoothed estimate that may even  lie outside the high-     optimization scheme. Extensive offline and online exper-
+density region of the true distribution, making it unreliable     iments demonstrate that UA-NWM substantially outper-
+for scoring.  Stochastic models [5, 52, 66, 72] can cap-     forms existing methods while maintaining low inference la-
+ture diverse plausible futures, but determining whether the      tency, with the uncertainty-aware HEP consistently improv-
+goal belongs to this distribution requires sufficient samples     ing trajectory-scoring accuracy.  Real-world UAV experi-
+to approximate it, incurring high computational cost. Re-     ments further validate its effectiveness for real application.
+lying on only one or a few samples makes scoring sensi-       Our main contributions are summarized as follows:
+tive to sampling randomness. Consequently, under future-      • We propose UA-NWM, an uncertainty-aware navigation
+state uncertainty, both paradigms are prone to assigning       world model that formulates trajectory scoring as con-
+low scores to promising candidates and incorrectly reject-        ditional OOD detection and represents plausible future
+ing them, thereby degrading navigation performance.               states with an uncertainty subspace.
+  To address these limitations, we formulate trajectory      • We introduce a Hierarchical Error Projection (HEP) mod-
+scoring as a conditional out-of-distribution (OOD) detec-        ule that decomposes the prediction–goal discrepancy into
+tion problem.  Each candidate trajectory defines a con-        uncertainty-explainable and unexplainable components,
+ditional future-state distribution, where the goal state is       using only the latter for robust trajectory scoring.
+in-distribution  if the trajectory can reach  it and out-of-      • UA-NWM achieves state-of-the-art performance in both
+distribution otherwise. Since this distribution can only be        offline and online evaluations while maintaining low in-
+modeled implicitly, directly determining whether the goal       ference latency. Its effectiveness and practicality are fur-
+lies within it remains challenging. Instead of sampling mul-        ther demonstrated through real-world UAV experiments.
+tiple futures, we approximate this distribution with a pre-
+dicted uncertainty subspace, as shown in Figure 2. Trajec-     2. Related Work
+tories are scored by the distance between the goal state and
+                                                               2.1. Image-Goal Navigationthis subspace, avoiding reliance on either an over-smoothed
+deterministic prediction or an arbitrary stochastic sample.      Image-goal  navigation  guides an  agent  to an image-
+  Based on this formulation, we propose the Uncertainty-      specified position, supporting applications such as deliv-
+Aware Navigation World Model (UA-NWM) for aerial      ery, inspection, and rescue when precise coordinates are un-
+image-goal navigation. UA-NWM uses a lightweight de-      available.
+terministic backbone to predict future representations in         Classical methods rely on mapping or localization for
+the DINOv3 [54] latent space, and introduces a Hierar-      collision-free planning [8, 19, 63, 74], but may accumu-
+
+
+                                                 2
+
+=== PDF PAGE 3 ===
+late errors in complex scenes. Learning-based approaches      trajectory, the world model predicts its terminal visual rep-
+directly predict actions or waypoints from observations      resentation and evaluates its compatibility with the goal im-
+and goals.  Early methods [83] use reinforcement learn-     age og. Formally, the world model assigns each candidate a
+ing, while recent studies [49, 50, 68] improve generaliza-      trajectory cost
+tion with heterogeneous robot data, Transformer policies,
+                                                        s(A, og | Ot−C+1:t) = D (Fθ(Ot−C+1:t, A), ϕ(og)) , (1)or LLM backbones. Generative policies [11, 18, 44, 56, 70]
+further model multimodal action or trajectory distributions.
+                                                     where ϕ(·) is a frozen visual feature extractor, Fθ predicts
+   Recent work has extended image-goal navigation to
+                                                                the future feature representation conditioned on the obser-
+UAVs, but they mainly target indoor exploration [15, 67],
+                                                               vation context and candidate actions, and D(·, ·) measures
+language guidance [76], or local pose alignment [29]. These
+                                                                       their discrepancy. The optimal action sequence is then se-
+methods generally lack action-conditioned prediction of
+                                                                 lected as
+multi-step visual outcomes for candidate trajectories, lim-
+iting reliable long-horizon planning in complex outdoor en-        A⋆= argminA∈As(A, og | Ot−C+1:t).       (2)
+vironments.
+                                                              Existing world-model rankers typically define D as a point-
+2.2. World Models for Navigation                                                                  to-point distance. Pixel-space models compare the gener-
+World models have been widely adopted in embodied     ated future image with the goal using perceptual metrics
+tasks [33, 69, 71], while the broader ideas of future pre-     such as LPIPS [73], whereas latent-space models measure
+diction and prediction-guided selection have also been ex-      the cosine or Euclidean distance between feature represen-
+plored across diverse visual applications [28, 35, 60–62,      tations. This formulation also applies to standalone plan-
+82].  For navigation world models allow agents to score      ning, where A is iteratively refined by a sampling-based op-
+candidate actions by predicting their future visual conse-      timizer such as the cross-entropy method (CEM) [46], with
+quences.  Early work [26, 57, 59] explored future-scene      the cost s serving as the optimization objective.
+imagination for indoor and long-horizon navigation, while
+NWM [5] introduced action-conditioned video prediction     4. Method
+for trajectory scoring.   Following NWM, recent meth-
+                                    UA-NWM scores candidate trajectories by measuring goal
+ods have improved prediction efficiency and representation
+                                                               compatibility with the future-state distribution conditioned
+quality. One-Step WM [52] generates future observations
+                                                    on the current context and each candidate action sequence.
+in a single step, while LS-NWM [77], ReL-NWM [78], and
+                                        We  first formulate the idea of uncertainty-aware trajec-
+RAE-NWM [72] perform prediction in dense VFM feature
+                                                                tory scoring and introduce the Hierarchical Error Projection
+spaces. Another line of work [2, 14, 36] jointly integrates
+                                                   (HEP) module to implement it, then describe the determin-
+future prediction with trajectory planning.  In aerial nav-
+                                                                              istic latent world model backbone and training procedure.
+igation, WorldVLN [79] and ImagineUAV [32] focus on
+language-conditioned flight, while ANWM [75] uses depth-     4.1. Uncertainty-Aware Trajectory Scoring
+assisted future-frame projection for image-goal navigation.
+                                                      Given context observations Ot−C+1:t and a candidate ac-   Despite these advances, existing methods typically score
+                                                                   tion sequence At:t+H−1, the latent world model makes aeach trajectory using only one or a few predicted futures.
+                                                                 deterministic prediction of the final-horizon DINO featureSuch point-wise comparison cannot distinguish plausible
+                                                    map:future variations from action-inconsistent errors. Determin-
+                                                    µ = Fθ(Ot−C+1:t, At:t+H−1),            (3)istic models collapse multiple outcomes into a single blurry
+estimate, while stochastic models remain sensitive to sam-     where µ contains N patch tokens. Let xg = ϕ(og) denote
+pling variance. This motivates an explicit representation of      the DINO feature map of the goal og.  Their normalized
+the future-state distribution for trajectory scoring.              discrepancy is
+
+3. Preliminaries                                                    e = norm(xg) −norm(µ),             (4)
+
+In image-goal navigation, a world model can serve as a tra-     where norm(·) denotes channel-wise ℓ2 normalization. Pre-
+jectory ranker rather than directly predicting the next con-     vious deterministic scorers penalize the full discrepancy e.
+trol command. At time t, the agent observes a context of     We instead formulate trajectory scoring as conditional
+C images, Ot−C+1:t = {ot−C+1, . . . , ot}, and scores ac-   OOD detection. For each candidate trajectory, its future-
+tion sequences over a horizon of H steps. Each candidate      state distribution defines an in-distribution region in the
+sequence is denoted by A = {at, . . . , at+H−1}. A pro-    DINO feature space. As shown in Figure 3(a), we approx-
+posal policy or sampling-based planner generates a finite     imate this region with an uncertainty subspace S around µ
+candidate set A = {A(1), . . . , A(Q)}. For each candidate     and decompose e into an explainable component e∥and an
+
+
+                                                 3
+
+=== PDF PAGE 4 ===
+                              Deterministic Pred. 𝜇                                                                                         −Element-wise subtraction                                                                              Deterministic
+                         Goal                                        state                                  𝑥!                                                                                                                                                                                                              SAP  Spatial average pooling
+                              Plausible                                            states                                                in 𝑆                               Baseline                                        m14
+                                                                                               SAP            SAP            SAP            L2  Channel-wise l2 norm
+              e⊥      e    𝑥!                                                                      m1         m2         m7              P Projection onto subspace
+        𝑆                  e∥
+              𝜇                 𝑥!%
+                                                                                    Cross        Cross        Cross        Cross
+                                (a)                                       Pred. 𝜇         Attention     Attention      Attention     Attention
+                                                                                               q1            q2            q7             q14      Context                                    Trajectory A (Better)
+                                                      MLP      MLP      MLP      MLP           Latents                       𝑥!                                e  𝜇(#)     e∥                                                e                      U1         U2         U7          U14  𝑆
+
+                                                                                            SAP    P     SAP    P     SAP    P         P          Cost s                                    e∥                         Goal 𝑥!                         e⊥
+                          𝑥!"($)                                                                   e∥     Goal Position                                                  L2    L2
+                                                Compatible  small e⊥                                                                                        SAP
+                                                         −
+                       Traj. A           Trajectory B (Worse)                                   p1            p2            p7             p14
+                                            e        −         −         −         −              L2                       𝑥!                                e  𝜇(&)     large e⊥           Traj. B                                                                               e⊥
+                                                e
+                                    e∥                         e⊥
+                          𝑥!"(&)                                           r1                 r2              r7              r14             r14+
+                                                       e∥        r1=e                r2               r7              r14                e⊥=r14+
+                                                  Incompatible                                   p1         p1+p2      p1+p2+p7    e∥= p1+p2+p7+p14
+                               (b)                                                                            (c)
+
+Figure 3.  (a) Illustration of the uncertainty-aware trajectory scoring idea. Conventional deterministic methods score based on e. We
+divide e as e⊥and e∥, and use only e⊥for scoring. (b) An example of how uncertainty-aware trajectory scoring can improve navigation
+performance. (c) The overall pipeline of our proposed Hierarchical Error Projection (HEP) module.
+
+
+orthogonal residual e⊥. Only the unexplained residual e⊥      spatially coherent uncertainty, it decomposes the discrep-
+is penalized:                                             ancy field through a coarse-to-fine pyramid with grid scales
+
+                           N                            G = {1, 2, 7, 14}.                  (6)
+                               1           2
+     s(At:t+H−1, og | Ot−C+1:t) =           X e⊥i  2 ,   (5)     At each scale g, spatial average pooling partitions the 14 ×                   N
+                                      i=1                14 patch grid of µ into g × g cells and yields a descriptor
+                                                       mg,c for each cell c. Then a context descriptor qg,c is ob-
+where e⊥i  is the residual at the i-th patch of e⊥.                                                                tained through cross-attention with context latents, enabling
+   Therefore, a candidate receives a low cost when the goal
+                                                         each cell to retrieve relevant contextual evidence. Finally,
+differs from the predicted mean primarily along plausible
+                                                          a scale-specific MLP fg generates a rank-R basis for each
+uncertainty directions, and a high cost when the discrepancy
+                                                                           cell:
+cannot be explained by S. In Figure 3(b), trajectories A and
+B have similar total discrepancies e. For trajectory A, most            Ug,c = fg([mg,c, qg,c])
+                                                                                                                             (7)
+of the discrepancy between µ(A) and xg can be explained by         = {ug,c,1, . . . , ug,c,R},   ug,c,r ∈RD,
+occlusion, yielding a small e⊥. For trajectory B, however,
+                                                     where [·, ·] denotes concatenation.the tree and road in the lower-right region of xg is incon-
+                                           HEP projects the discrepancy hierarchically from coarsesistent with the plausible future appearances around µ(B),
+                                                                   to fine. It maintains a residual field r containing the discrep-where this region is expected to contain buildings, resulting
+                                                       ancy unexplained by coarser scales. Let rg,i ∈RD denotein a large e⊥. Our score thus correctly favors trajectory A.
+                                                                the residual at patch i upon entering scale g, initialized as
+4.2. Hierarchical Error Projection (HEP)                    r1,i = ei. At each scale, the residuals within each cell c are
+                                                             averaged:
+To decompose e into e∥and e⊥, we introduce the Hierar-                          1
+chical Error Projection (HEP) module, illustrated in Fig-                               ¯rg,c =  X  rg,i,               (8)                                                                                            |Ωg,c|
+ure 3(c). HEP takes the deterministic prediction µ and con-                                      i∈Ωg,c
+text observation latents as input and models plausible de-     where Ωg,c denotes the set of patches in cell c. We then
+viations using multi-scale low-rank subspaces. To capture      project ¯rg,c onto the subspace spanned by Ug,c by solving a
+
+
+                                                 4
+
+=== PDF PAGE 5 ===
+                   Deterministic Baseline            Frozen        i Trained at the i th stage                                                                                                                          𝐿+,-                                                                                                                                                      𝑒!"#.                                                                                                               Deterministic          0
+                                                        1        Delta    1                1                            Baseline             DINOv3            Compressor                            Fuser
+                                𝑋!$%"#:!                  𝑧!    Decoder        ̂𝑧!"#                                                            𝑍!$%"#:!
+   𝑂!$%"#:!                              𝑍!$%"#:!                                                   𝑂!$%"#:!           Compressor                                                                                                     HEP
+                                                                        𝐿'()*                                                         𝜇!"#
+                  Action   2            Causal     2                                                              Fuser
+                 Encoder   𝜓𝑎!   Transformer      !𝛿!"#     𝑥!"#            𝜇!"#           …                    𝑥!"#
+      𝑎!                                                                                             𝑎!
+                     (a) Deterministic baseline training                                       (b) HEP training
+
+                                      Figure 4. The overall training procedure of UA-NWM.
+
+
+ridge-regularized least-squares problem:                         learn compact representations and latent transitions. These
+                                                      modules are then frozen, while the action encoder and                                         2
+                   R                                  causal Transformer are trained to predict future latent states.
+   αg,c = argmin  ¯rg,c − X αrug,c,r  + λ∥α∥22,    (9)    The prediction µt+1 is directly supervised by the DINO fea-
+         α∈RR        r=1          2                                                                   ture of the future observation xt+1 = ϕ(ot+1).  Further
+where λ is a small regularization coefficient. The resulting      training details are provided in Section B.2.
+uncertainty-explainable component is                         With the deterministic baseline frozen, HEP  is then
+                                                                 trained to minimize the fraction of unexplained discrepancy
+                 R                               e⊥:
+                   pg,c = X αg,c,rug,c,r.             (10)                                           PNi=1 ∥e⊥t+1,i∥22
+                      r=1                                  LHEP =                               .          (15)
+                                          PNi=1 ∥et+1,i∥22 + ϵThis component is subtracted from every patch in the cell to
+obtain the residual for the next finer scale:                  The normalized objective prevents large-error samples from
+                                                         dominating training, whereas inference uses the unnormal-
+              rg+,i = rg,i −pg,c,   i ∈Ωg,c,         (11)     ized orthogonal residual energy for trajectory scoring. The
+                                                                prediction and HEP losses are averaged over an eight-stepwhere g+ denotes the next finer scale in G. After process-
+                                                                autoregressive rollout to mitigate error accumulation.ing the finest scale, the remaining residual defines e⊥, while
+the explained component is given by e∥= e −e⊥. Overall,
+                                                          5. ExperimentsHEP constructs a coarse-to-fine, region-specific uncertainty
+subspace that approximates the conditional future-state dis-     5.1. Experimental Settings
+tribution around the deterministic prediction. This enables
+                                                                     5.1.1. Benchmarkuncertainty-aware trajectory scoring in one forward pass
+without sampling multiple future observations.                 Existing UAV navigation benchmarks mainly target vision-
+                                                          and-language navigation (VLN) [58, 64] or indoor environ-
+4.3. Deterministic Baseline and Training                                                      ments [15, 67], leaving no public benchmark for large-scale
+HEP is built upon a deterministic latent world model. A     outdoor 3D UAV image-goal navigation available. There-
+frozen DINOv3 [54] encoder extracts dense features xt =      fore, we construct a new benchmark named AirGoal-10k,
+ϕ(ot), which are compressed into K latent tokens zt =     using the AirSim simulator [51] and building upon existing
+Cη(xt). Following DeltaWorld [25], the transition from zt      aerial VLN benchmarks [17, 30].
+to zt+1 is represented by M delta tokens that encode their        In our preliminary analysis, directly cropping short seg-
+differences. An action-conditioned causal Transformer pre-     ments from the original VLN trajectories led to a highly
+dicts these delta tokens rather than the next state directly:       imbalanced turning  distribution:  most segments had a
+                                                         heading-change angle below 15◦. Such data would make
+                 ˆδt+1 = Pω(Zt−C+1:t, ψ(at)),          (12)                                                                the learned world model accurate for nearly straight mo-
+                 ˆzt+1 = D∆(zt, ˆδt+1),                  (13)      tion but unreliable under large turns, which are important
+                                                                   for closed-loop navigation. We therefore use the original            µt+1 = Gζ(ˆzt+1),                     (14)
+                                                                    trajectory annotations only as feasible start-state pools, and
+where D∆is the delta decoder and Gζ fuses the predicted     resample the future motion ourselves to cover a broad range
+compact tokens into the dense DINO feature map µt+1.         of turn magnitudes and directions.
+  The deterministic baseline is trained in two stages. First,        After trajectory sampling, rendering, and quality filter-
+the compressor, fuser, and delta decoder are optimized to      ing, AirGoal-10k contains 9000 trajectories for training,
+
+
+                                                 5
+
+=== PDF PAGE 6 ===
+                                                                              is C = 4, the autoregressive prediction horizon is H = 8,
+                                                      and each visual state is compressed into K = 32 latent to-
+                                                               kens. The model is trained with AdamW on four NVIDIA
+                                        RTX 4090 GPUs. Further details are provided in Section B.
+
+                                                               5.2. Offline Experiments
+
+                                       (a)                     We evaluate two offline settings:  trajectory ranking with
+      Deviation From Initial Heading (!)       Azimuthal Angle (")        externally generated candidates and standalone planning
+                                                Up              without an external policy.  For trajectory ranking, No-        Small        Medium          Large
+Ratio    Deviation        Deviation        Deviation           135° 16.6% 17.5%  45°     MaD [56] generates 8, 16, or 32 candidate action sequences,
+                                                     which are then scored and selected by each world-model-
+                                                15.7%         15.3%
+                                                                                              Left                                                       Right     based method using identical candidate sets for fairness.
+                                                10.5%         10.9%      As shown in Table 1, UA-NWM achieves the lowest ATE
+                                                      and RPE across all candidate-set sizes while remaining sub-                                                    6.7%  6.8%         13.8%      12.7%      11.3%      11.4%      11.1%      11.2%      11.3%      11.7%     5.5%        225°                                                                       315°
+                                        !                              stantially faster than previous methods, especially stochas-
+  0°  10°  20°  30°  40°  50°  60°  70°  80°  90°           Down
+                       (b)                                     (c)                  tic models requiring iterative generation.  For standalone
+                                                              planning, policy-based methods directly predict one trajec-
+Figure 5. Overview of the AirGoal-10k benchmark. (a) Diverse      tory, whereas world models optimize action sequences with
+navigation environments. (b) Distribution of deviations from the                                    CEM [46] following NWM [5]. At each of three iterations,
+initial heading. (c) Distribution of azimuthal angles.
+                                    CEM samples and scores 32 candidates and updates the
+                                                         sampling distribution using the top 16 elites, after which the
+                                                                         final distribution mean is used as the planned trajectory. As1000 trajectories for validation, and 1000 trajectories for
+                                                  shown in Table 2, UA-NWM still achieves the best planningtesting.  Each trajectory comprises 3D waypoints paired
+                                                           performance.with egocentric RGB observations. As shown in Figure 5,
+these trajectories span diverse urban navigation environ-                                                               5.3. Online Simulation Experiments
+ments. The distribution of the initial-heading deviation θ
+is approximately uniform over [0, 90◦], while the azimuth   We evaluate closed-loop navigation on 100 episodes in Air-
+angle φ covers the full range of [0, 360◦]. Together, these    Sim [51].  In each episode, the agent navigates to the lo-
+distributions preserve diverse left–right and up–down mo-      cation specified by a goal image with unknown goal dis-
+tion components for trajectory-conditioned future predic-      tance. At each step, policy-based methods directly predict
+tion. Further details are provided in Section C.                 a trajectory, whereas world models plan with CEM [46].
+                                               As shown in Table 3, UA-NWM achieves the best online
+5.1.2. Baselines                                                           performance. Compared with offline planning, this setting
+We compare our method with representative policy-based     introduces a distribution shift from fixed-length trajectories
+and world-model-based baselines. The policy-based meth-      to variable-length, long-horizon navigation.  Policy-based
+ods include GNM, ViNT, NoMaD, FlowNav, and NaviB-     methods degrade substantially, while autoregressive world
+ridger [18, 44, 49, 50, 56], which directly predict actions     models generalize more robustly.
+or trajectories from visual observations. The world-model-
+based methods include NWM, One-Step WM, MWM, and     5.4. Qualitative Analysis
+RAE-NWM [5, 52, 66, 72], which predict future observa-                                                            Figure 6 compares predictions under ground-truth trajecto-
+tions or latent states to rank candidate trajectories.                                                                             ries. NWM [5] and RAE-NWM [72] exhibit substantial er-
+5.1.3. Evaluation Metrics                                       ror accumulation during multi-step autoregressive rollout.
+                                                           For UA-NWM, the deterministic backbone predicts aFor offline evaluation, we use Absolute Trajectory Error
+                                                                blurry mean future latent µ, which may deviate consider-(ATE) and Relative Pose Error (RPE), following [5]. For
+                                                            ably from xg when multiple futures are plausible. HEP de-online closed-loop evaluation, we report Success Rate (SR),
+                                                     composes their residual e. The projection xPg = µ + e∥=Success weighted by Path Length (SPL), and the average
+planning time per step, following [78]. An episode is con-     xg −e⊥is the point in the subspace S closest to xg.  Its
+                                                          remaining discrepancy from xg is exactly e⊥, which is sub-sidered successful if the agent stops within 20 meters of the
+                                                                       stantially smaller than the original e, and will be used fortarget position within the maximum step budget.
+                                                                    trajectory scoring.
+5.1.4. Implementation Details                                                         Sampling additional points from S yields various plausi-
+We use a frozen DINOv3 ViT-B/16 [54] to extract dense vi-      ble futures, demonstrating that it captures meaningful vari-
+sual features. Unless otherwise specified, the context length      ations beyond a single deterministic prediction, which fur-
+
+
+                                                 6
+
+=== PDF PAGE 7 ===
+                                       8 Candidates      16 Candidates      32 Candidates
+ Methods                    #Params                                                      Time/Frame ↓
+                              ATE ↓   RPE ↓   ATE ↓   RPE ↓   ATE ↓   RPE ↓
+
+ Random Selection               –       1.76      0.48      1.79      0.49      1.80      0.49        –
+
+NWM [5]                 195M     1.47      0.40      1.40      0.38      1.37      0.37     438.67 ms
+ One-Step WM [52]          176M     1.52      0.41      1.48      0.40      1.44      0.39      10.44 ms
+MWM [66]                202M     1.58      0.43      1.60      0.43      1.59      0.43     122.78 ms
+RAE-NWM [72]            223M     1.54      0.42      1.54      0.42      1.50      0.41     386.00 ms
+
+ Deterministic Baseline (Ours)  115M     1.39      0.38      1.33      0.36      1.27      0.35      8.06 ms
+UA-NWM (Ours)           122M     1.26      0.35      1.17      0.33      1.09      0.30      8.47 ms
+
+ Oracle Selection                –       0.90      0.26      0.76      0.22      0.63      0.19        –
+
+
+                  Table 1. Comparison with world-model-based methods on trajectory ranking task of AirGoal-10k.
+
+
+ Methods           ATE ↓  RPE ↓   VENUE         Methods           SR ↑   SPL ↑   Time/Step ↓
+
+                 Policy-based Methods                                        Policy-based Methods
+
+ GNM [49]              1.29     0.35    ICRA’2023     GNM [49]           48.0%  40.9%    37.46 ms
+ ViNT [50]              1.37     0.38   CoRL’2023      ViNT [50]           53.0%  46.0%    48.47 ms
+ NoMaD [56]            1.79     0.49    ICRA’2024      NoMaD [56]         56.0%  47.2%   117.49 ms
+ FlowNav [18]           1.81     0.50    IROS’2025       FlowNav [18]         45.0%  38.6%   117.55 ms
+ NaviBridgerCVAE [44]    1.58     0.44   CVPR’2025        NaviBridgerCVAE [44]   48.0%  41.8%   166.08 ms
+             World-model-based Methods                               World-model-based Methods
+
+ NWM [5]               1.40     0.39   CVPR’2025    NWM [5]            63.0%  52.1%    191.71 s
+ One-Step WM [52]      1.53     0.44    Arxiv’2026        One-Step WM [52]    55.0%  43.5%      3.39 s
+ MWM [66]             1.54     0.43    Arxiv’2026    MWM [66]           69.0%  56.0%     66.57 s
+ RAE-NWM [72]        1.46     0.43   ECCV’2026     RAE-NWM [72]      70.0%  57.8%    202.54 s
+
+ Det. Baseline (Ours)    1.26     0.35        –             Det. Baseline (Ours)   70.0%  60.1%      2.38 s
+ UA-NWM (Ours)       1.22     0.33        –        UA-NWM (Ours)     76.0%  64.5%      2.70 s
+
+
+Table 2. Comparison with policy-based and world-model-based      Table 3. Comparison with policy-based and world-model-based
+methods on standalone planning task of AirGoal-10k.               methods on online closed-loop navigation task.
+
+
+ther reveal two major sources of future-state uncertainty in         drift.  Modeling this uncertainty too broadly may ab-
+navigation:                                                    sorb true trajectory errors and weaken scoring, as seen
+                                                                     in NWM [5] and RAE-NWM [72]. UA-NWM instead
+• Occlusion-induced ambiguity.   In the  first example,                                                                preserves global geometry while modeling plausible local
+  foreground trees limit the initial observation, leaving both                                                                       variations, balancing uncertainty tolerance and trajectory
+  tree coverage and roof structure in future observation un-                                                                   discrimination.
+  certain. The goal image represents one plausible future
+                                                                Additional qualitative results are provided in Section I.
+  with no trees in view and a curvilinear gable on the roof.
+  While µ averages over these possibilities, xPg  recovers     5.5. Ablation Studies
+  this goal-consistent state.  Other samples show varying
+                                                                     5.5.1. Hierarchical Structure  tree coverage or a roof without the gable, all plausible
+  given the limited initial evidence.                  We ablate each scale of HEP to assess its contribution.
+• Long-horizon drift. Small pose errors accumulate over    As shown in Table 4, removing any scale degrades perfor-
+  long rollouts, making fine-grained details uncertain even     mance. Scale 14 contributes the most, suggesting that ex-
+  without occlusion.  In the second example, the over-      plainable errors e∥predominantly arise from fine-grained
+   all building layout remains predictable, whereas win-      local variations, whereas Scale 1 contributes the least be-
+  dow positions vary substantially with minor trajectory     cause such variations rarely span the entire image.
+
+
+                                                 7
+
+=== PDF PAGE 8 ===
+Curr. Obs. 𝑜! &    Goal 𝑥"    NWM    RAE-NWM                  UA-NWM (Ours)GT Future Traj.                                                         Predicted 𝜇        𝑥!" in Pred. 𝑆     Other Plausible Samples in Predicted Subspace 𝑆
+
+
+
+
+
+Figure 6. Qualitative comparison of future predictions. The DINO latent features predicted by RAE-NWM and UA-NWM are decoded
+using RAE [80] and RAEv2 [55], respectively, solely for visualization. RAE-NWM and UA-NWM perform trajectory scoring directly in
+the latent space, whereas NWM scores LPIPS [73] of predicted RGB images. Details for latent visualization are provided in Section D.5.
+
+
+      Scales g       16 Candidates    32 Candidates            Scenes            RGB Observations from UAV
+
+  1   2   7   14  ATE ↓  RPE ↓  ATE ↓  RPE ↓
+ ×  ×  ×  ✓    1.22     0.34     1.15     0.32
+ ×  ✓  ✓  ✓    1.20     0.33     1.12     0.31                     Goal Image      RGB Obs.   MacBook Air
+ ✓  ×  ✓  ✓    1.21     0.34     1.13     0.31
+ ✓  ✓  ×  ✓    1.21     0.34     1.14     0.32                                   UA-NWM
+ ✓  ✓  ✓  ×    1.24     0.34     1.17     0.32                                                          Waypoints
+ ✓  ✓  ✓  ✓    1.17     0.33     1.09     0.30                              Jetson Orin NX                 Third-person Perspective
+                                                                   RGB Camera
+                                     …         Livox Mid-360 LiDAR
+   Table 4. Ablation on HEP’s components of different scales.
+
+                                                                        Figure 7. Illustration of real-world UAV experiments.
+            16 Candidates         32 Candidates
+ Rank R
+        ATE ↓    RPE ↓    ATE ↓    RPE ↓
+                                                          performs onboard planning, and transmits the predicted 3D
+   1       1.23       0.34       1.16       0.32         waypoints to the low-level flight controller for execution.
+   2       1.17       0.33       1.09       0.30        At each step, UA-NWM plans an 8-waypoint trajectory us-
+   3       1.20       0.33       1.13       0.31         ing CEM [46], executes the first waypoint, and replans from
+   4       1.21       0.34       1.14       0.32          the latest observation. On-device planning takes approxi-
+   5       1.21       0.33       1.14       0.32         mately 9 seconds per trajectory, including communication
+                                                                    latency. Experiments on five navigation tasks across multi-
+    Table 5. Ablation on different values of the basis rank R.         ple scenes demonstrate successful closed-loop deployment
+                                                      and zero-shot sim-to-real generalization without fine-tuning
+                                                    on real-world data. Details are provided in Section D.4.
+5.5.2. Rank of the Basis
+We vary the basis rank R across all scales.  As shown     6. Conclusion
+in Table 5, R = 2 performs best, suggesting that a low-                                        We  presented UA-NWM,  an  uncertainty-aware  world
+dimensional subspace is sufficient to capture the dominant                                                    model for aerial image-goal navigation. UA-NWM formu-
+directions of e∥. A smaller rank underrepresents future un-                                                                       lates trajectory scoring as conditional OOD detection, mod-
+certainty, whereas a larger rank may absorb unexplainable                                                                      els plausible future variations through an uncertainty sub-
+errors and weaken trajectory discrimination.                                                               space, and separates plausible uncertainty-induced devia-
+                                                                   tions from unexplained residual errors. This enables effi-
+5.6. Real-world Experiments                                                                   cient distribution-aware trajectory scoring without stochas-
+To evaluate real-world applicability, we deploy UA-NWM       tic future sampling. Experiments show that UA-NWM im-
+locally on a battery-powered MacBook Air and test it on     proves navigation performance across diverse tasks, while
+a custom-built quadrotor, as shown in Figure 7. The Mac-     preserving low inference latency, and real-world UAV de-
+Book communicates with the UAV via a mobile hotspot,     ployment further supports its practical applicability.
+
+
+                                                 8
+
+=== PDF PAGE 9 ===
+References                                                      [13] Xin Ding, Jianyu Wei, Yifan Yang, Shiqi Jiang, Qianxi
+                                                                  Zhang, Hao Wu, Fucheng Jia, Liang Mi, Yuxuan Yan, Wei-
+ [1] Niket Agarwal, Arslan Ali, Jon Allen, Martin Antolini, Ade-                                                                         jun Wang, et al.  Adanav:  Adaptive reasoning with un-
+      line Aubame, Alisson Azzolini, Junjie Bai, Maciej Bala, Yo-                                                                                certainty for vision-language navigation.   arXiv preprint
+     gesh Balaji, Josh Bapst, et al. Cosmos 3: Omnimodal world                                                                      arXiv:2509.24387, 2025. 13
+     models for physical ai.  arXiv preprint arXiv:2606.02800,
+                                                                     [14] Yifei Dong, Fengyi Wu, Guangyu Chen, Zhi-Qi Cheng,
+     2026. 1
+                                                              Qiyu Hu, Yuxuan Zhou, Jingdong Sun, Jun-Yan He, Qi
+ [2] Daichi Azuma, Taiki Miyanishi, Koya Sakamoto, Shuhei
+                                                                         Dai, and Alexander G Hauptmann.  Unified world models:
+      Kurita, Yaonan Zhu, Petr Khrapchenkov, Motoaki Kawan-
+                                                             Memory-augmented planning and foresight for visual navi-
+     abe, Yusuke Iwasawa, and Yutaka Matsuo. Navwam: A nav-
+                                                                               gation. arXiv preprint arXiv:2510.08713, 2025. 3
+      igation world action model for goal-conditioned visual navi-
+                                                                     [15] Junjie Gao, Yuqi Chen, Yongzhou Pan, Yaosheng Deng, Ji-
+      gation. arXiv preprint arXiv:2606.13494, 2026. 3
+                                                                      aping Xiao, and Mir Feroskhan. Flying to image-specified
+ [3] Utkarsh Bajpai, Julius R¨uckin, Cyrill Stachniss, and Marija
+                                                                                objects: 3d quadrotor navigation via cross-graph memory
+      Popovi´c.  Uncertainty-informed active perception for open
+                                                                 and viewpoint planning. arXiv preprint arXiv:2606.29917,
+     vocabulary object goal navigation. In 2025 European Con-
+                                                                     2026. 3, 5
+     ference on Mobile Robots (ECMR), pages 1–7. IEEE, 2025.
+                                                                     [16] Jianzhe Gao, Rui Liu, Yuxuan Xu, Tongtong Cao, Yingxue    13
+                                                                  Zhang, Zhanguang Zhang, Sida Peng, Yi Yang, and Wen-
+ [4] Federico Baldassarre, Marc Szafraniec, Basile Terver, Vasil
+                                                                guan Wang.  Uncertainty-aware gaussian map for vision-
+     Khalidov, Francisco Massa, Yann LeCun, Patrick Labatut,
+                                                                     language navigation. In The Fourteenth International Con-
+     Maximilian Seitzer, and Piotr Bojanowski. Back to the fea-
+                                                                           ference on Learning Representations, 2026. 13
+      tures: Dino as a foundation for video world models. arXiv
+                                                                     [17] Yunpeng Gao, Chenhui Li, Zhongrui You, Junli Liu, Zhen     preprint arXiv:2507.19468, 2025. 1
+                                                                                  Li, Pengan Chen, Qizhi Chen, Zhonghan Tang, Liansheng [5] Amir Bar, Gaoyue Zhou, Danny Tran, Trevor Darrell, and
+                                                             Wang, Penghui Yang, et al. Openfly: A comprehensive plat-    Yann LeCun. Navigation world models. In 2025 IEEE/CVF
+                                                                form for aerial vision-language navigation.  arXiv preprint     Conference on Computer Vision and Pattern Recognition
+                                                                      arXiv:2502.18041, 2025. 5, 18, 19     (CVPR), pages 15791–15801. IEEE, 2025. 1, 2, 3, 6, 7, 18,
+                                                                     [18] Samiran Gode,  Abhijeet Nayak,  D´ebora NP  Oliveira,     19, 21, 22, 25
+                                                                  Michael Krawez, Cordelia Schmid, and Wolfram Burgard. [6] Yoshua Bengio, Aaron Courville, and Pascal Vincent. Rep-
+                                                                   Flownav: Combining flow matching and depth priors for      resentation learning: A review and new perspectives. IEEE
+                                                                                      efficient navigation.  In 2025 IEEE/RSJ International Con-     transactions on pattern analysis and machine intelligence,
+                                                                           ference on Intelligent Robots and Systems (IROS), pages     35(8):1798–1828, 2013. 2
+                                                                 17762–17768. IEEE, 2025. 1, 3, 6, 7, 19
+ [7] Gabrijel Boduljak, Yushi Lan, Christian Rupprecht, and
+                                                                     [19] Wenxuan Guo, Xiuwei Xu, Hang Yin, Ziwei Wang, Jianjiang     Andrea Vedaldi.   Vfmf:  World modeling by forecast-
+                                                                     Feng, Jie Zhou, and Jiwen Lu. Igl-nav: Incremental 3d gaus-     ing  vision foundation model  features.    arXiv  preprint
+                                                                             sian localization for image-goal navigation. In Proceedings     arXiv:2512.11225, 2025. 1
+                                                                                of the IEEE/CVF International Conference on Computer Vi- [8] Francisco Bonin-Font, Alberto Ortiz, and Gabriel Oliver. Vi-
+                                                                                 sion, pages 6808–6817, 2025. 2      sual navigation for mobile robots: A survey. Journal of In-
+      telligent and Robotic Systems, 53(3):263–296, 2008. 2           [20] Sudarshan S Harithas, Ayyappa Swamy Thatavarthy, Gurki-
+                                                                                        rat Singh, Arun K Singh, and K Madhava Krishna.  Ur- [9] Jake Bruce, Michael D Dennis, Ashley Edwards, Jack
+                                                                              banfly: Uncertainty-aware planning for navigation amongst     Parker-Holder, Yuge Shi, Edward Hughes, Matthew Lai,
+                                                                               high-rises with monocular visual-inertial slam maps. In 2023     Aditi Mavalankar, Richie Steigerwald, Chris Apps, et al. Ge-
+                                                                American Control Conference (ACC), pages 557–563. IEEE,      nie: Generative interactive environments.  In International
+                                                                     2023. 13     Conference on Machine Learning, pages 4603–4623. PMLR,
+     2024. 1                                                        [21] Dan Hendrycks and Kevin Gimpel. A baseline for detect-
+[10]  Jialei Chen, Kai Wang, Kang Chen, Shuaihang Chen, Feng           ing misclassified and out-of-distribution examples in neural
+     Gao, Wenhao Tang, Zhiyuan Li, Weilin Liu, Zhuyu Yao,           networks. arXiv preprint arXiv:1610.02136, 2016. 14
+    Boxun Li,  et  al.  Lawam:  Latent world action models      [22] Noriaki Hirose, Amir Sadeghian, Marynel V´azquez, Patrick
+      for efficient dynamics-aware robot policies. arXiv preprint           Goebel, and Silvio Savarese.  Gonet: A semi-supervised
+     arXiv:2606.15768, 2026. 1                                      deep learning approach for traversability estimation. In 2018
+[11] Yuqi Chen, Junjie Gao, Yongzhou Pan, Siyuan Song, Zixuan         IEEE/RSJ international conference on intelligent robots and
+     Zhang, Jiaping Xiao, and Mir Feroskhan. Geninav: Gener-           systems (IROS), pages 3044–3051. IEEE, 2018. 21, 22
+      ative model driven image-goal navigation via imagination-      [23] Ifueko Igbinedion and Sertac Karaman.  Learning when to
+     guided consistency flow matching.  In Proceedings of the           ask for help: Efficient interactive navigation via implicit un-
+    IEEE/CVF Conference on Computer Vision and Pattern            certainty estimation.  In 2024 IEEE International Confer-
+     Recognition, pages 996–1005, 2026. 3                             ence on Robotics and Automation (ICRA), pages 9593–9599.
+[12] Gabriele Costante,  Christian  Forster,  Jeffrey Delmerico,          IEEE, 2024. 13
+     Paolo Valigi, and Davide Scaramuzza.  Perception-aware      [24] Efstathios Karypidis, Ioannis Kakogeorgiou, Spyridon Gi-
+     path planning. arXiv preprint arXiv:1605.04151, 2016. 13               daris, and Nikos Komodakis. Dino-foresight: Looking into
+
+
+                                                 9
+
+=== PDF PAGE 10 ===
+     the future with dino. Advances in Neural Information Pro-      [37] Zhiting Mei, Tenny Yin, Micah Baker, Ola Shorinwa, and
+     cessing Systems, 38:163779–163811, 2026. 1                      Anirudha Majumdar.  World models that know when they
+[25] Tommie Kerssies, Gabriele Berton, Ju He, Qihang Yu, Wufei           don’t know: Controllable video generation with calibrated
+    Ma, Daan de Geus, Gijs Dubbelman, and Liang-Chieh Chen.            uncertainty. arXiv preprint arXiv:2512.05927, 2025. 14
+   A frame is worth one token: Efficient generative world mod-      [38] Eric Nalisnick, Akihiro Matsukawa, Yee Whye Teh, Di-
+      eling with delta tokens.  In Proceedings of the IEEE/CVF            lan Gorur, and Balaji Lakshminarayanan. Do deep gener-
+     Conference on Computer Vision and Pattern Recognition            ative models know what they don’t know?  arXiv preprint
+     (CVPR), pages 27978–27988, 2026. 1, 5, 14, 21, 22                  arXiv:1810.09136, 2018. 14
+[26] Jing Yu Koh, Honglak Lee, Yinfei Yang, Jason Baldridge,      [39] Huan Nguyen, Rasmus Andersen, Evangelos Boukas, and
+     and Peter Anderson. Pathdreamer: A world model for indoor           Kostas Alexis. Uncertainty-aware visually-attentive naviga-
+     navigation. In Proceedings of the IEEE/CVF International            tion using deep neural networks. The International Journal
+     Conference on Computer Vision, pages 14738–14748, 2021.            of Robotics Research, 43(6):840–872, 2024. 13
+    3                                                               [40] Maxime Oquab, Timoth´ee Darcet, Th´eo Moutakanni, Huy
+[27] Kimin Lee, Kibok Lee, Honglak Lee, and Jinwoo Shin. A           Vo, Marc Szafraniec,  Vasil Khalidov,  Pierre Fernandez,
+     simple unified framework for detecting out-of-distribution           Daniel Haziza, Francisco Massa, Alaaeldin El-Nouby, et al.
+     samples and adversarial attacks. Advances in neural infor-          Dinov2: Learning robust visual features without supervision.
+     mation processing systems, 31, 2018. 14                             Transactions on Machine Learning Research Journal, 2024.
+                                                                                   1, 19[28] Ao Li, Yonggen Ling, Yiyang Lin, Yuji Wang, Yong Deng,
+                                                                     [41] Yiyuan Pan, Yunzhe Xu, Zhe Liu, and Hesheng Wang. See-     and Yansong Tang. Taihri: Task-aware 3d human keypoints
+                                                                         ing through uncertainty: Robust task-oriented optimization      localization for close-range human-robot interaction. arXiv
+                                                                                in visual navigation. Advances in Neural Information Pro-     preprint arXiv:2604.08921, 2026. 3
+                                                                          cessing Systems, 38:25259–25286, 2026. 13
+[29] Yaxuan Li, Jiarui Zeng, Shaofei Huang, and Zhedong Zheng.
+                                                                     [42] Sara Pohland and Claire Tomlin. Competency-aware plan-
+     Last-meter precision navigation  for uavs: A  diffusion-
+                                                                      ning for probabilistically safe navigation under perception
+      refined aerial visual servoing approach.   arXiv preprint
+                                                                                uncertainty. In 2025 IEEE/RSJ International Conference on
+     arXiv:2607.04352, 2026. 3
+                                                                                   Intelligent Robots and Systems (IROS), pages 15291–15298.
+[30] Shubo Liu, Hongsheng Zhang, Yuankai Qi, Peng Wang, Yan-
+                                                                IEEE, 2025. 13
+     ning Zhang, and Qi Wu.  Aerialvln: Vision-and-language
+                                                                     [43] Sai  Prasanna,  Daniel Honerkamp,  Kshitij  Sirohi, Tim
+     navigation for uavs.  In Proceedings of the IEEE/CVF In-
+                                                                     Welschehold,  Wolfram  Burgard,  and  Abhinav  Val-
+     ternational Conference on Computer Vision, pages 15384–
+                                                                            ada.   Perception matters:  Enhancing embodied ai with
+     15394, 2023. 5, 18, 19
+                                                                         uncertainty-aware semantic segmentation.  arXiv preprint
+[31] Weitang Liu, Xiaoyun Wang, John Owens, and Yixuan                                                                      arXiv:2408.02297, 2024. 13
+      Li.  Energy-based out-of-distribution detection.  Advances
+                                                                     [44] Hao Ren, Yiming Zeng, Zetong Bi, Zhaoliang Wan, Junlong
+      in neural information processing systems, 33:21464–21475,
+                                                                Huang, and Hui Cheng. Prior does matter: Visual navigation
+     2020. 14
+                                                                            via denoising diffusion bridge models.  In Proceedings of
+[32] Xuchen Liu, Jiawei Huang, Shihao Xia, Bingxi Liu, Jin-                                                                            the IEEE/CVF Conference on Computer Vision and Pattern
+     qiang Cui, and Jiankun Yang.  Imagineuav: Aerial vision-                                                                          Recognition, pages 12100–12110, 2025. 1, 3, 6, 7, 19
+     language navigation via world-action modeling and kinody-                                                                     [45]  Jie Ren, Peter J Liu, Emily Fertig, Jasper Snoek, Ryan
+     namic planning. arXiv preprint arXiv:2606.01205, 2026. 3                                                                            Poplin, Mark Depristo, Joshua Dillon, and Balaji Lakshmi-
+[33] Guanxing Lu, Shiyi Zhang, Ziwei Wang, Changliu Liu, Ji-           narayanan.  Likelihood ratios for out-of-distribution detec-
+    wen Lu, and Yansong Tang. Manigaussian: Dynamic gaus-             tion.  Advances in neural information processing systems,
+      sian splatting for multi-task robotic manipulation.  In Eu-           32, 2019. 14
+     ropean Conference on Computer Vision, pages 349–366.      [46] Reuven Y Rubinstein. Optimization of computer simulation
+     Springer, 2024. 3                                             models with rare events. European Journal of Operational
+[34] Guanxing Lu, Baoxiong Jia, Puhao Li, Yixin Chen, Ziwei           Research, 99(1):89–112, 1997. 3, 6, 8
+    Wang, Yansong Tang, and Siyuan Huang. Gwm: Towards      [47] Junwon Seo,  Kensuke Nakamura,  and Andrea  Bajcsy.
+      scalable gaussian world models for robotic manipulation. In           Uncertainty-aware latent safety filters for avoiding out-of-
+     Proceedings of the IEEE/CVF International Conference on            distribution failures.   In Conference on Robot Learning,
+    Computer Vision, pages 9263–9274, 2025. 1                        pages 4442–4472. PMLR, 2025. 14
+[35] Shilin Ma, Chubin Zhang, Changyuan Wang, Yuji Wang,      [48] Dhruv Shah, Benjamin Eysenbach, Gregory Kahn, Nicholas
+    Yue Wu, Zixuan Wang, Jingqi Tian, Zheng Zhu, and Yan-           Rhinehart, and Sergey Levine. Rapid exploration for open-
+     song Tang. Safe-pruner: Semantic attention-guided future-          world navigation with latent goal models.  arXiv preprint
+     aware token pruning for efficient vision-language-action ma-           arXiv:2104.05859, 2021. 21, 22
+      nipulation. arXiv preprint arXiv:2605.29662, 2026. 3            [49] Dhruv Shah, Ajay Sridhar, Arjun Bhorkar, Noriaki Hirose,
+[36] Yanghong Mei, Longteng Guo, Ming-Ming Yu, Guiyu Zhao,          and Sergey Levine. Gnm: A general navigation model to
+     Xingjian He, and Jing Liu. Navwm: A unified navigation            drive any robot. In 2023 IEEE International Conference on
+     world model for foresight-driven planning.  arXiv preprint           Robotics and Automation (ICRA), pages 7226–7233. IEEE,
+     arXiv:2606.24101, 2026. 3                                        2023. 1, 3, 6, 7, 19
+
+
+                                                 10
+
+=== PDF PAGE 11 ===
+[50] Dhruv Shah, Ajay Sridhar, Nitish Dashora, Kyle Stachowicz,           aided audio-visual scenes.  In 2025 IEEE/CVF Conference
+     Kevin Black, Noriaki Hirose, and Sergey Levine.  Vint: A         on Computer Vision and Pattern Recognition (CVPR), pages
+     foundation model for visual navigation.  In Conference on          28932–28932. IEEE, 2025. 3
+     Robot Learning, pages 711–733. PMLR, 2023. 1, 3, 6, 7, 19      [63] Qiaoyun Wu, Jun Wang, Jing Liang, Xiaoxi Gong, and Di-
+[51] Shital Shah, Debadeepta Dey, Chris Lovett, and Ashish          nesh Manocha. Image-goal navigation in complex environ-
+     Kapoor.  Airsim: High-fidelity visual and physical simula-          ments via modular learning. IEEE Robotics and Automation
+      tion for autonomous vehicles. In Field and service robotics:             Letters, 7(3):6902–6909, 2022. 2
+     Results of the 11th international conference, pages 621–635.      [64] Jianqiang Xiao, Yuexuan Sun,  Yixin Shao, Boxi Gan,
+     Springer, 2017. 5, 6, 17, 19                                     Rongqiang Liu, Yanjin Wu, Weili Guan, and Xiang Deng.
+[52] Wangtian Shen, Ziyang Meng, Jinming Ma, Mingliang          Uav-on: A benchmark for open-world object goal naviga-
+     Zhou, and Diyun Xiang. An efficient and multi-modal nav-            tion with aerial agents. In Proceedings of the 33rd ACM In-
+      igation system with one-step world model.  arXiv preprint            ternational Conference on Multimedia, pages 13023–13029,
+     arXiv:2601.12277, 2026. 1, 2, 3, 6, 7, 19                            2025. 5
+[53] Minglei Shi, Haolin Wang, Wenzhao Zheng, Ziyang Yuan,      [65] Wei Xu and Fu Zhang. Fast-lio: A fast, robust lidar-inertial
+     Xiaoshi Wu, Xintao Wang, Pengfei Wan, Jie Zhou, and Ji-          odometry package by tightly-coupled iterated kalman  fil-
+    wen Lu. Latent diffusion model without variational autoen-               ter. IEEE Robotics and Automation Letters, 6(2):3317–3324,
+      coder. In International Conference on Learning Representa-           2021. 19
+      tions, pages 154506–154537, 2026. 1                            [66] Han Yan, Zishang Xiang, Zeyu Zhang, and Hao Tang. Mwm:
+[54] Oriane Sim´eoni, Huy V Vo, Maximilian Seitzer, Federico          Mobile world models for action-conditioned consistent pre-
+     Baldassarre, Maxime Oquab, Cijo Jose, Vasil Khalidov,            diction. arXiv preprint arXiv:2603.07799, 2026. 1, 2, 6, 7,
+    Marc Szafraniec, Seungeun Yi,  Micha¨el Ramamonjisoa,         19
+      et al. Dinov3. arXiv preprint arXiv:2508.10104, 2025.  1,      [67] Zichen Yan, Rui Huang, Lei He, Shao Guo, and Lin Zhao.
+      2, 5, 6, 14, 20                                                       Sign: Safety-aware image-goal navigation for autonomous
+[55] Jaskirat  Singh,  Boyang  Zheng,  Zongze Wu,  Richard           drones via reinforcement learning. IEEE Robotics and Au-
+     Zhang, Eli Shechtman, and Saining Xie.  Improved base-           tomation Letters, 11(2):1962–1969, 2025. 3, 5
+      lines with representation autoencoders.   arXiv preprint      [68] Hang Yin, Xiuwei Xu, Linqing Zhao, Ziwei Wang, Jie Zhou,
+     arXiv:2605.18324, 2026. 8, 20                                  and Jiwen Lu. Unigoal: Towards universal zero-shot goal-
+[56] Ajay Sridhar, Dhruv Shah, Catherine Glossop, and Sergey            oriented navigation. In Proceedings of the IEEE/CVF Con-
+     Levine. Nomad: Goal masked diffusion policies for nav-           ference on Computer Vision and Pattern Recognition, pages
+      igation and exploration.  In 2024 IEEE International Con-          19057–19066, 2025. 3
+     ference on Robotics and Automation (ICRA), pages 63–70.      [69] Tengbo Yu, Guanxing Lu, Zaijia Yang, Haoyuan Deng, Sea-
+     IEEE, 2024. 1, 3, 6, 7, 19, 21, 22                                  son Si Chen, Jiwen Lu, Wenbo Ding, Guoqiang Hu, Yan-
+[57] Hanqing Wang, Wei Liang, Luc Van Gool, and Wen-          song Tang, and Ziwei Wang.  Manigaussian++:  General
+     guan Wang.  Dreamwalker:  Mental planning for contin-            robotic bimanual manipulation with hierarchical gaussian
+     uous vision-language navigation.   In Proceedings of the          world model. In 2025 IEEE/RSJ International Conference on
+    IEEE/CVF International Conference on Computer Vision,             Intelligent Robots and Systems (IROS), pages 12232–12239.
+     pages 10873–10883, 2023. 3                                    IEEE, 2025. 3
+[58] Xiangyu Wang, Donglin Yang, Hohin Kwan, Jinyu Chen,      [70] Yiming Zeng, Hao Ren, Shuhang Wang, Junlong Huang, and
+    Hongsheng Li, Yue Liao, Si Liu, et al.  Towards realistic         Hui Cheng. Navidiffusor: Cost-guided diffusion model for
+     uav vision-language navigation: Platform, benchmark, and            visual navigation.  In 2025 IEEE International Conference
+     methodology. In International Conference on Learning Rep-         on Robotics and Automation (ICRA), pages 11994–12001.
+      resentations, pages 7292–7310, 2025. 5                           IEEE, 2025. 3
+[59] Yunheng Wang, Yuetong Fang, Taowen Wang, Yixiao Feng,      [71] Chubin Zhang, Jianan Wang, Zifeng Gao, Yue Su, Tianru
+    Yawen Tan, Shuning Zhang, Peiran Liu, Yiding Ji, and Ren-           Dai, Cai Zhou, Jiwen Lu, and Yansong Tang.   Clap:
+      jing Xu. Dreamnav: A trajectory-based imaginative frame-           Contrastive latent action pretraining for learning vision-
+    work for zero-shot vision-and-language navigation.  arXiv           language-action models from human videos. arXiv preprint
+     preprint arXiv:2509.11197, 2025. 3                                 arXiv:2601.04061, 2026. 3
+[60] Yuji Wang, Wenlong Liu, Jingxuan Niu, Haoji Zhang, and      [72] Mingkun Zhang, Wangtian Shen, Fan Zhang, Haijian Qin,
+     Yansong Tang.   Vg-refiner:  Towards tool-refined refer-          Zihao Pei, and Ziyang Meng. Rae-nwm: Navigation world
+      ring grounded reasoning via agentic reinforcement learning.         model in dense visual representation space. arXiv preprint
+     arXiv preprint arXiv:2512.06373, 2025. 3                           arXiv:2603.09241, 2026. 1, 2, 3, 6, 7, 19, 21, 22
+[61] Yuji Wang, Jingchen Ni, Yong Liu, Chun Yuan, and Yan-      [73] Richard Zhang, Phillip Isola, Alexei A Efros, Eli Shecht-
+     song Tang.  Iterprime: Zero-shot referring image segmen-          man, and Oliver Wang. The unreasonable effectiveness of
+      tation with iterative grad-cam refinement and primary word          deep features as a perceptual metric. In Proceedings of the
+     emphasis. In Proceedings of the AAAI Conference on Artifi-         IEEE conference on computer vision and pattern recogni-
+      cial Intelligence, pages 8159–8168, 2025.                                  tion, pages 586–595, 2018. 3, 8, 18, 20
+[62] Yuji Wang, Haoran Xu, Yong Liu, Jiaze Li, and Yansong      [74] Tianyao Zhang, Xiaoguang Hu,  Jin Xiao, and Guofeng
+     Tang. Sam2-love: Segment anything model 2 in language-          Zhang. A survey of visual navigation: From geometry to
+
+
+                                                 11
+
+=== PDF PAGE 12 ===
+     embodied ai. Engineering Applications of Artificial Intelli-
+     gence, 114:105036, 2022. 2
+[75] Weichen Zhang, Peizhi Tang, Xin Zeng, Fanhang Man, Shi-
+     quan Yu, Zichao Dai, Baining Zhao, Hongjin Chen, Yu
+     Shang, Wei Wu, et al. Aerial world model for long-horizon
+      visual generation and navigation in 3d space. arXiv preprint
+     arXiv:2512.21887, 2025. 1, 3
+[76] Yuhang Zhang, Haosheng Yu, Jiaping Xiao, and Mir Fer-
+     oskhan.   Grounded vision-language navigation for uavs
+     with open-vocabulary goal understanding.  arXiv preprint
+     arXiv:2506.10756, 2025. 3
+[77] Zhiwei Zhang, Hui Zhang, Xieyuanli Chen, Kaihong Huang,
+    Chenghao Shi, and Huimin Lu. Latent-space autoregressive
+     world model for efficient and robust image-goal navigation.
+     arXiv e-prints, pages arXiv–2511, 2025. 2, 3
+[78] Zhiwei Zhang, Hui Zhang, Kaihong Huang, Chenghao
+      Shi, and Huimin Lu.    Efficient image-goal navigation
+     with representative latent world model.   arXiv preprint
+     arXiv:2511.11011, 2025. 1, 2, 3, 6
+[79] Baining Zhao, Jiacheng Xu, Weicheng Feng, Xin Zhang,
+     Zhaolu Wang, Haoyang Wang, Shilong Ji, Ziyou Wang, Jian-
+       jie Fang, Zhiheng Zheng, et al.  Worldvln: Autoregressive
+     world action model for aerial vision-language navigation.
+     arXiv preprint arXiv:2605.15964, 2026. 3
+[80] Boyang Zheng, Nanye Ma, Shengbang Tong, and Saining
+     Xie.   Diffusion transformers with representation autoen-
+     coders. arXiv preprint arXiv:2510.11690, 2025. 8
+[81] Gaoyue Zhou, Hengkai Pan, Yann Lecun, and Lerrel Pinto.
+    Dino-wm: World models on pre-trained visual features en-
+     able zero-shot planning. In International Conference on Ma-
+     chine Learning, pages 79115–79135. PMLR, 2025. 1
+[82] Deyi Zhu, Yuji Wang, Yong Liu, Yansong Tang, Bingyao
+     Yu, Jiwen Lu, and Jie Zhou. Segment anything with motion,
+     geometry, and semantic adaptation for complex nonlinear vi-
+      sual object tracking. arXiv preprint arXiv:2605.22538, 2026.
+    3
+[83] Yuke Zhu, Roozbeh Mottaghi, Eric Kolve, Joseph J. Lim,
+     Abhinav Gupta, Li Fei-Fei, and Ali Farhadi. Target-driven
+      visual navigation in indoor scenes using deep reinforce-
+    ment learning.  In 2017 IEEE International Conference on
+     Robotics and Automation (ICRA), pages 3357–3364. IEEE,
+     2017. 3
+[84] Yixuan Zhu, Jiaqi Feng, Wenzhao Zheng, Yuan Gao, Xin
+     Tao, Pengfei Wan, Jie Zhou, and Jiwen Lu. Astra: General
+      interactive world model with autoregressive denoising. arXiv
+     preprint arXiv:2512.08931, 2025. 1
+
+
+
+
+
+                                                 12
+
+=== PDF PAGE 13 ===
+      Uncertainty-Aware World Model for Aerial Image-Goal Navigation
+
+                           Supplementary Material
+
+Contents                                                         E. Additional Ablation Studies                    20
+                                                                       E.1. Rollout Steps for Training   .  .  .  .  .  .  .  .  .  .  20
+1. Introduction                                  1          E.2. Staged Training and Delta Representation  .  .  22
+                                                                       E.3. Number of Compressed and Delta Tokens  .  .  22
+2. Related Work                                 2
+    2.1. Image-Goal Navigation .  .  .  .  .  .  .  .  .  .  .  .   2      F. Performance on 2D Navigation Benchmarks      22
+    2.2. World Models for Navigation    .  .  .  .  .  .  .  .   3
+                                                                   G. Further Analysis of HEP                      22
+3. Preliminaries                                 3                                                                       G.1. Residual Energy as a Conditional Compati-
+                                                                                     bility Score   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  22
+4. Method                                      3
+                                                                       G.2. What the Hierarchical Projection Computes  .  23
+    4.1. Uncertainty-Aware Trajectory Scoring .  .  .  .   3
+                                                                       G.3. Why the Training Objective Learns Plausible
+    4.2. Hierarchical Error Projection (HEP)  .  .  .  .  .   4
+                                                                    Residual Directions  .  .  .  .  .  .  .  .  .  .  .  .  .  23
+    4.3. Deterministic Baseline and Training  .  .  .  .  .   5
+
+                                                                   H. Further Discussions and Future Work           24
+5. Experiments                                  5
+    5.1. Experimental Settings   .  .  .  .  .  .  .  .  .  .  .  .   5                                                                     I. Additional Visualization Results                25
+          5.1.1 . Benchmark  .  .  .  .  .  .  .  .  .  .  .  .  .  .   5                                                                            I.1 . Hierarchical Error Projection .  .  .  .  .  .  .  .  .  25
+          5.1.2 . Baselines  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .   6                                                                            I.2 . Uncertainty Subspace    .  .  .  .  .  .  .  .  .  .  .  .  25
+          5.1.3 . Evaluation Metrics  .  .  .  .  .  .  .  .  .  .   6                                                                            I.3 . Offline Trajectory Ranking .  .  .  .  .  .  .  .  .  .  25
+          5.1.4 . Implementation Details   .  .  .  .  .  .  .   6                                                                            I.4 . Offline Standalone Planning   .  .  .  .  .  .  .  .  .  25
+    5.2. Offline Experiments   .  .  .  .  .  .  .  .  .  .  .  .  .   6
+                                                                            I.5 . Online Simulation   .  .  .  .  .  .  .  .  .  .  .  .  .  .  25
+    5.3. Online Simulation Experiments   .  .  .  .  .  .  .   6
+                                                                            I.6 . Real-world UAV Navigation  .  .  .  .  .  .  .  .  .  25
+    5.4. Qualitative Analysis   .  .  .  .  .  .  .  .  .  .  .  .  .   6
+    5.5. Ablation Studies   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .   7
+                                             A. Additional Related Work
+          5.5.1 . Hierarchical Structure   .  .  .  .  .  .  .  .   7
+          5.5.2 . Rank of the Basis    .  .  .  .  .  .  .  .  .  .   8     A.1. Uncertainty-Aware Visual Navigation
+    5.6. Real-world Experiments   .  .  .  .  .  .  .  .  .  .  .   8
+                                                             Uncertainty in visual navigation has been studied primarily
+                                                                   in current perception and semantic representation. Existing6. Conclusion                                   8
+                                                      methods calibrate and temporally aggregate segmentation
+A. Additional Related Work                      13      predictions for object navigation [43], use vision–language
+    A.1. Uncertainty-Aware Visual Navigation  .  .  .  .  13      uncertainty to guide active object search [3], or integrate
+                                                             geometric, semantic, and appearance uncertainty into 3D    A.2. OOD Detection  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  14
+                                                         Gaussian maps for vision-language navigation [16]. Oth-
+B. Implementation Details of UA-NWM            14      ers estimate model familiarity or action confidence to detect
+    B.1. Model Structure    .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  14      out-of-distribution observations, invoke additional reason-
+    B.2. Training and Inference Procedure   .  .  .  .  .  .  16      ing, or request assistance [13, 23, 42].
+    B.3. Hyper-parameter Settings    .  .  .  .  .  .  .  .  .  .  17     A complementary line of work considers uncertainty in
+                                                                     localization, mapping, and motion planning.  Perception-
+C. Details of AirGoal-10k Benchmark              17     aware planners select trajectories that reduce visual local-
+    C.1. Dataset Construction  .  .  .  .  .  .  .  .  .  .  .  .  .  17      ization uncertainty [12], while UrbanFly [20] models un-
+    C.2. Task Definition  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  18      certainty in monocular visual–inertial maps for collision-
+                                                       aware UAV planning.  Other approaches propagate state-
+D. Experimental Details                         19     estimation and model uncertainty into collision prediction
+    D.1. Baseline Implementation  .  .  .  .  .  .  .  .  .  .  .  19     and action selection [39], or construct calibrated uncertainty
+    D.2. Offline Experiments   .  .  .  .  .  .  .  .  .  .  .  .  .  19      sets from noisy visual predictions for robust task-level opti-
+    D.3. Online Simulation Experiments   .  .  .  .  .  .  .  19     mization [41].
+    D.4. Real-world Experiments   .  .  .  .  .  .  .  .  .  .  .  19       These methods primarily address uncertainty in current
+    D.5. DINO Latent Visualization .  .  .  .  .  .  .  .  .  .  20      perception, localization, semantic mapping, or planning
+
+
+                                                 13
+
+=== PDF PAGE 14 ===
+constraints.  In contrast, we focus on future-state uncer-     and are projected to the 384-dimensional attention space in-
+tainty: given the same visual context and candidate trajec-      side the cross-attention layer. Let QC ∈RK×384 denote
+tory, multiple future observations may be plausible.             the learned compressor queries. The compression process
+                                                                              is formulated as
+A.2. OOD Detection
+                                                 hCt = MHAC LN(QC), LN(xt), LN(xt)  ,     (18)Out-of-distribution (OOD) detection aims to identify test
+samples that deviate from the distribution represented by             zt = hCt + MLPC LN(hCt )  ,                 (19)
+a model. Conventional approaches derive OOD scores from
+                                                     where the three inputs to MHAC correspond to the queries,classifier confidence, energy functions, or distances in a
+                                                               keys, and values,  respectively.  The feed-forward net-learned feature space [21, 27, 31]. Generative approaches
+                                                   work MLPC  consists of Linear(384, 384), GELU, andinstead use likelihood, reconstruction error, or predictive
+                                                          Linear(384, 384). All dropout rates in the token compres-uncertainty to determine whether an observation is sup-
+                                                                sor are set to zero.ported by the learned data distribution [38, 45]. However,
+these methods are primarily designed to detect distribution
+shifts in static inputs and do not account for how future ob-     Delta encoder and decoder.  Following the delta-aware
+servations depend on an agent’s context and actions.             transition parameterization of DeltaWorld [25], we use
+   Recent studies have incorporated uncertainty and OOD  M = 32 delta tokens, each with dimension 384, to rep-
+detection into world models to identify unreliable predic-      resent the transition between two adjacent frames. During
+tions or unseen hazards [37, 47]. Their primary objective      representation training, a teacher delta encoder extracts the
+is to determine whether a world model is operating outside      latent transition from two adjacent compressed states. For
+its training distribution, rather than to evaluate whether a     each token slot, it concatenates the current state, next state,
+visual goal is compatible with the future induced by a par-     and their discrepancy,
+ticular candidate trajectory.                                                                ut+1 = [zt; zt+1; zt+1 −zt] ∈RK×3d,      (20)
+B. Implementation Details of UA-NWM            and projects ut+1 from 1152 to 384 dimensions. The pro-
+                                                                 jected tokens are processed by two pre-norm Transformer
+This section provides further details on the architecture,
+                                                         encoder layers, each containing 6-head self-attention and an
+training and inference procedures, and hyperparameter set-
+                                      MLP with dimensions 384 →1536 →384 and GELU ac-
+tings of UA-NWM.
+                                                                        tivation. A final LayerNorm and linear projection produce
+B.1. Model Structure
+                                                                       δt+1 = E∆(zt, zt+1) ∈R32×384.        (21)
+UA-NWM consists of a lightweight deterministic latent
+                                                  The delta encoder is used only to provide teacher delta to-world model and the proposed Hierarchical Error Projection
+                                                         kens during representation training and is not required at(HEP) module. Their overall architectures are illustrated in
+                                                                 inference.Figure 3(c) and Figure 4(a), respectively. We provide the
+                                                    The delta decoder has the same two-layer Transformerdetailed structure of each component below.
+                                                                     structure.  It first concatenates zt and a delta latent token-
+                                                         wise and projects the resulting 768-dimensional features to
+DINO encoder  Each RGB observation  is  resized  to
+                                                    384 dimensions.  After two pre-norm Transformer layers
+224 × 224 and encoded by a frozen DINOv3 ViT-B/16 en-
+                                                      and a final LayerNorm-linear projection, it predicts a resid-
+coder [54]. We discard the class and register tokens and re-
+                                                                ual update that is added to the current state:
+tain the 14 × 14 patch grid, yielding N = 196 patch tokens
+with feature dimension D = 768:                                D∆(zt, δ) = zt + W∆LN Tr∆([zt; δ])  .     (22)
+
+                 xt = ϕ(ot) ∈RN×D.              (16)     Here, δ ∈RM×384 denotes the input delta tokens,  [·; ·]
+                                                            denotes token-wise feature concatenation, Tr∆denotes the
+Token compressor.  The compressor maps  the dense     Transformer decoder, and W∆is the final linear projection.
+DINO feature representation into K = 32 compact latent
+tokens, each with dimension d = 384:                        Action-conditioned causal transformer.  Given the com-
+                                                             pressed context states and a future action sequence, UA-
+                   zt = Cη(xt) ∈RK×d.              (17)   NWM autoregressively applies a one-step transition at each
+                                                                action step. The normalized four-dimensional action at is
+It comprises K learnable queries of dimension 384 and                                                   embedded as
+a six-head cross-attention layer.  The normalized 768-
+dimensional DINO patch tokens are used as keys and values               ψ(at) = W2 SiLU(W1at) ∈R384,        (23)
+
+
+                                                 14
+
+=== PDF PAGE 15 ===
+where W1 and W2 denote linear projections, and both     and the compressed observation context Zctx ∈R(CK)×d
+the hidden and output dimensions are 384.  The predic-     as input, where C = 4, K = 32, and thus CK = 128.
+tor receives C = 4 compressed context states.  Learned       The goal feature is not involved in basis prediction;  it
+frame and token positional embeddings are added before       is introduced only when the goal–prediction discrepancy is
+the 4 × 32 = 128 context tokens are flattened and pro-     projected onto the subspace spanned by the predicted bases.
+cessed by six causal Transformer blocks. Each block con-     Therefore, the uncertainty subspace is determined solely by
+tains 6-head self-attention and an MLP with dimensions      the observation context and candidate trajectory through the
+384 →1536 →384 and GELU activation. The atten-      rolled-out latent state, independently of the goal image.
+tion mask is causal across frames while allowing all tokens     HEP operates over a spatial pyramid. At scale g, the
+within the same frame to interact.                         14 × 14 patch grid is partitioned into g2 cells and average-
+  The action embedding modulates every Transformer     pooled within each cell, producing a cell descriptor
+block through adaptive LayerNorm (AdaLN). Each block                                                                       1
+uses an independent SiLU-linear modulation layer that                mg,c =  X hi ∈R384.         (27)
+                                                                                         |Ωg,c|maps the 384-dimensional action embedding to six 384-                                   i∈Ωg,c
+dimensional vectors: shift, scale, and residual gate param-
+                                                  The four scales contain 1, 4, 49, and 196 cells, correspond-
+eters for the attention and MLP branches. The modulation
+                                                             ing to 196, 49, 4, and 1 DINO patches per cell, respectively.
+output layer is zero-initialized. After the six blocks, only
+                                                      Each scale has an independent 4-head context cross-
+the 32 tokens associated with the most valuable informa-
+                                                                   attention layer. The cell descriptors are used as queries,
+tion are retained and passed through a final LayerNorm and
+                                                          while the full 128 compressed context tokens are used as
+linear head to predict the delta latent:
+                                                         keys and values:
+          ˆδt+1 = Pω Zt−C+1:t, ψ(at) ∈R32×384.    (24)                                                                        qg,c = MHAg LNg(mg,c), LN(Zctx), LN(Zctx) ∈R384.
+                                                                                                                   (28)The next absolute latent state is then composed by the delta
+                                                  The cell descriptor and attended context descriptor are con-decoder,
+                                                              catenated and passed through a scale-specific basis MLP,                     ˆzt+1 = D∆(zt, ˆδt+1).              (25)
+The predicted state is appended to the context and the oldest                 Ug,c = fg([mg,c, qg,c]) ∈RD×R,        (29)
+state is removed before processing the next action, yielding
+                                                     where R = 2, D = 768, and each fg has the structure
+an autoregressive rollout over At:t+H−1.                                                    768 →384 →384 →1536 with GELU after the first two
+                                                                    linear layers. The final 1536-dimensional output represents
+Token fuser.  The token fuser decodes a predicted com-     two 768-dimensional basis directions. The four scales use
+pressed state into a dense DINO-space feature map. It starts      separate attention and MLP parameters.
+from 196 learned 384-dimensional output queries and ap-       Given the normalized goal discrepancy e, HEP performs
+plies two cross-attention blocks over the 32 compressed to-     a one-pass coarse-to-fine residual decomposition. Let r de-
+kens.  Each block contains pre-normalized 6-head cross-     note the residual entering a scale, initialized as r = e. For
+attention, a residual connection, and a pre-normalized MLP     each cell, HEP computes the cell-average residual ¯rg,c and
+with dimensions 384 →1536 →384 and GELU activa-     obtains ridge-regularized projection coefficients
+tion. A final LayerNorm produces the shared per-patch hid-
+                                                        ⊤         −1  ⊤den field ht+1 ∈R196×384, and a linear readout maps it to                 αg,c = Ug,cUg,c + λI   Ug,c¯rg,c,       (30)
+the deterministic mean prediction
+                                                     where λ =  10−3.  The explained component pg,c =
+            µt+1 = Gζ(ˆzt+1) ∈R196×768.          (26)     Ug,cαg,c is subtracted from every patch residual in the cell.
+                                                  The resulting residual is then passed to the next finer scale.
+The deterministic baseline scores a candidate trajectory us-     Coarse scales remove globally or regionally coherent devia-
+ing the flattened cosine distance between its final-step mean      tions, whereas the finest 14 × 14 scale performs patch-wise
+prediction and the DINO feature map of the goal image.     low-rank projection. The basis vectors are not explicitly
+HEP uses the same output from the fuser , ensuring that the     orthogonalized; the Gram-matrix solve above projects onto
+deterministic and uncertainty-aware variants share an iden-      their span and remains stable when the predicted directions
+tical predictive backbone.                                       are correlated.
+                                                                After the finest scale, the remaining field is the hierar-
+Hierarchical Error Projection module.  HEP predicts      chically unexplained residual e⊥. This procedure is a se-
+context- and trajectory-conditioned directions along which      quential ridge projection over the scale pyramid, rather than
+the true future feature may plausibly deviate from the deter-     a single global orthogonal projection onto the union of all
+ministic prediction. Its basis predictor takes the fuser output     scale-wise subspaces.
+
+
+                                                 15
+
+=== PDF PAGE 16 ===
+  (a) Training Stage 1
+                                                                                                                      𝑧!                         𝐿$%&'(
+                                                                                                         Fuser
+               DINOv3           Compressor                𝑜!                   𝑥!                                                               𝑧!                                                                                                                                                                                                     -𝑥!              𝑥!                                                                  𝑧!
+                                                                    Delta                Delta         ̃𝑧!"#                       𝐿∆!                                                                                                         Fuser
+                                                            Encoder      𝛿!"#   Decoder
+                                                                                                    𝐿∆"                    .𝑥!"#           𝑥!"#
+               DINOv3          Compressor     𝑧!"#                                                                     𝐿$%&'(
+              𝑜!"#               𝑥!"#                                                                     Fuser                                                                                                       𝑧!"#
+                                                                                                                                                     -𝑥!"#           𝑥!"#
+
+  (b) Training Stage 2                                                                                                                                 Trainable
+                          Deterministic Baseline                                                       𝜇!"#                Frozen
+                                                                         Delta
+                                            Compressor                   DINOv3                                                                                          Fuser                            Shared weights               𝑂!*+"#:!                                         𝑋!*+"#:!                                                                           𝑧!    Decoder         ̂𝑧!"#
+                                                   𝑍!*+"#:!                                                     𝐿-%(.%            Calculate loss                                                                              𝐿&'/0
+                                                                                                                 Forward                          Action     𝜓𝑎!       Causal           )𝛿!"#               𝑧!"#
+                 𝑎!       Encoder               Transformer                                                                  Autoregressive
+                                                                                                        𝑥!"#                 Rollout
+
+  (c) Training Stage 3                                   (d) Inference
+                                           𝐿123   4                           UA-NWM                          Deterministic       0         𝑒!"#
+                            Baseline                                                                                                                                                   sdet
+               𝑂!*+"#:!                      𝑍!*+"#:!                                𝑂!*+"#:!                     𝜇!"1
+                         Compressor                                                       Deterministic
+                                            𝜇!"#    HEP                                     Baseline            HEP      𝑥5                              Fuser
+                                                                                                                      𝑍!*+"#:!
+                 𝑎!    …                  𝑥!"#                        𝐴!:!"1*#                                                   sHEP
+
+
+
+                                 Figure 8. Detailed training and inference procedure of UA-NWM.
+
+
+B.2. Training and Inference Procedure                  space and dense DINO space:
+
+UA-NWM is trained in three stages, as illustrated in Fig-                                                         L∆z = ∥˜zt+1 −zt+1∥22 ,             (33)
+ure 8.  The  first two stages learn the deterministic la-
+tent world model baseline, and the final stage learns the     L∆x = ∥˜xt+1 −xt+1∥22 + ρ (1 −cos(˜xt+1, xt+1)) . (34)
+uncertainty-aware HEP module.
+                                                  The objective of stage 1 is:
+
+Stage 1: representation training.  We first train the rep-          Lrep = γ1 · Lrecon + γ2 · L∆z + γ3 · L∆x,      (35)
+resentation modules, including the compressor, fuser, delta
+encoder, and delta decoder. Given an input feature map xt,     where γ1, γ2 and γ3 are scalar weights applied to each term
+the compressor produces zt = Cη(xt), and the fuser recon-      in implementation.
+structs ˆxt = Gζ(zt). The basic reconstruction objective is
+                                                        Stage 2:  deterministic prediction training.  We then
+    Lrecon = ∥ˆxt −xt∥22 + βrec (1 −cos(ˆxt, xt)) .    (31)                                                                       train the action encoder and action-conditioned causal
+This stage also trains the delta encoder and decoder. Given     Transformer with the compressor, fuser and delta decoder
+two adjacent compressed states zt and zt+1, the delta en-      fixed. The prediction is supervised by the DINO feature
+coder extracts transition latent δt+1, and the delta decoder     and compressed latent of the target:
+reconstructs the next compressed state:
+                                                            Ldense = ∥µt+1 −xt+1∥22 + βpred (1 −cos(µt+1, xt+1)) ,
+    δt+1 = E∆(zt, zt+1),   ˜zt+1 = D∆(zt, δt+1).    (32)                                                          (36)
+                                                             Lcomp = λcomp ∥ˆzt+1 −zt+1∥22 ,        (37)We decode the reconstructed state as ˜xt+1 = Gζ(˜zt+1).
+This transition  is supervised in both compressed latent                    Lpred = Ldense + Lcomp.            (38)
+
+
+                                                 16
+
+=== PDF PAGE 17 ===
+Stage 3: HEP training.   Finally, we freeze the determin-     output is not fed back into the rollout dynamics. Let
+istic baseline and train only HEP. Given the predicted dense
+feature µt+1 and target feature xt+1, HEP predicts the un-              et+H = norm(xg) −norm(µt+H),       (41)
+certainty subspace and computes the orthogonal residual
+e⊥t+1. The objective minimizes the normalized orthogonal     and let e⊥t+H be the residual left by the HEP decomposition.
+residual fraction:                                     The trajectory cost is the unnormalized residual energy:
+
+                                                           N
+                                                                        1            PNi=1 e⊥t+1,i  22                          X                                                                                                                                                           .           (42)                                                                .          (39)                sHEP =          LHEP =                                                                        e⊥t+H,i  22
+           PNi=1 ∥et+1,i∥22 + ϵ                       N i=1
+
+This loss is magnitude-invariant and encourages HEP to     This differs from the normalized training loss: at test time,
+learn directions along which the true future may plausibly      retaining the absolute magnitude gives sharper discrimina-
+deviate from the deterministic mean.                             tion between candidate trajectories. In offline ranking, the
+   Although the objectives above are written for a sin-     candidate with the lowest score is selected from the fixed
+gle transition for clarity, UA-NWM uses an autoregressive     candidate set. In CEM planning, the same score is used as
+eight-step rollout for both stage 2 and stage 3 training in      the optimization cost for sampled action sequences.
+order to mitigate error accumulation. The same losses are
+                                                         B.3. Hyper-parameter Settingsapplied to every predicted step and averaged over time.
+   During training, we enable short-context augmentation.     Unless otherwise stated,  all training stages use AdamW
+When a sampled window is close to the beginning of a tra-     with β1 = 0.9, β2 = 0.95, bf16 automatic mixed preci-
+jectory with fewer than C = 4 real context frames available,      sion, gradient clipping with norm 1.0, and a linear warmup
+the missing front context slots are filled by repeating the     followed by cosine decay. The action representation is a
+earliest available frame. The corresponding repeated-frame     4-dimensional local-frame delta pose.  Position deltas are
+action intervals become zero-motion actions. This exposes     normalized by the waypoint spacing of 5.0 meters, and the
+the model to deficient context windows that may occur at      action normalizer is reused for both training and evaluation.
+the beginning of closed-loop simulation or deployment.           For training stage 1, we use a per-GPU batch size of
+                                                    12 under 4-GPU DDP, giving an effective batch size of
+                                                              48.  Stage 1 is trained for 10k steps with learning rateInference.  At inference time, UA-NWM consists of the
+                                                        10−4, weight decay 0.05, 600 warmup steps, and minimumdeterministic latent baseline as backbone and the HEP
+                                                                  learning-rate ratio 0.01. The loss weights are βrec = 0.05,module as a scoring head.  Given a candidate action se-
+                                                  ρ = 0.2, and γ1 = γ2 = γ3 = 1.0. We inject Gaussianquence At:t+H−1, the backbone first encodes the observa-
+                                                              noise with standard deviation 0.01 into compressed latentstion context into Zt−C+1:t and autoregressively predicts fu-
+                                                      and 0.005 into teacher delta tokens during this stage.ture compressed states. At each rollout step, the predictor
+                                                           For training stage 2, the rollout horizon is 8. The predic-estimates a delta latent from the current latent context and
+                                                                      tor is trained for 24k steps with learning rate 10−4, weightthe corresponding action window; the delta decoder com-
+                                                        decay 0.05, 1000 warmup steps, and minimum learning-rateposes the next compressed state, which is then appended to
+                                                                       ratio 0.01. The dense DINO loss uses βpred = 0.05, and thethe context for the following step. After H steps, the rollout
+                                                             compressed-latent supervision weight is λcomp = 0.1.returns predicted states ˆzt+1:t+H. Candidate selection uses
+                                                           For training stage 3, the deterministic baseline is initial-only the final state, whose fuser output is the final-horizon
+                                                              ized from the best prediction checkpoint and kept frozen.dense DINO prediction µt+H = Gζ(ˆzt+H), because the
+                                         HEP is trained on a single GPU with batch size 48 for 8kgoal image specifies the desired terminal observation.
+                                                                     steps, using learning rate 5×10−4, 300 warmup steps, min-  The deterministic baseline and UA-NWM share the same
+                                             imum learning-rate ratio 0.02, and no weight decay. Thebackbone and differ only in the scoring mechanism. The de-
+                                                                    rollout horizon is also 8, and the HEP loss is averaged overterministic baseline directly compares the mean prediction
+                                                                              all predicted steps. For the normalized HEP cost, the de-with the goal DINO feature using flattened cosine distance:
+                                                         nominator clamp uses ϵ = 10−9.
+           sdet = 1 −cos(vec(µt+H), vec(xg)) .      (40)
+                                             C. Details of AirGoal-10k Benchmark
+UA-NWM instead applies HEP as a final-step scoring head
+                                                       C.1. Dataset Construction
+after the autoregressive rollout has finished. HEP predicts
+the uncertainty subspace from the deterministic prediction   We construct a UAV image-goal navigation benchmark
+and the compressed context tokens; the goal feature is used     from AirSim [51], with the goal of learning first-person vi-
+only when projecting the final discrepancy, and the HEP      sual dynamics conditioned on future motion.
+
+
+                                                 17
+
+=== PDF PAGE 18 ===
+Start points.  Instead of uniformly sampling arbitrary                      INPUT                   OUTPUT
+poses in AirSim, which often produces invalid viewpoints
+inside geometry, below the ground, or at unrealistic alti-
+tudes, we sample start states from trajectory annotations of
+existing aerial VLN benchmarks [17, 30]. This reuses poses
+that are already near feasible navigation regions while still        Context Observations   Goal Image    Candidate Trajs.      Selected Traj.
+allowing us to resample new future motions. Start states are
+                                                                                                                  (a) Trajectory Ranking
+deduplicated by scene, position, and yaw, and the held-out
+validation/test splits are constructed so that their start states                      INPUT                   OUTPUT
+do not overlap with the training split.
+
+
+Future trajectory sampling.  For each selected start state,
+we generate future trajectories by sampling a target direc-
+tion in the local coordinate frame of the UAV. Let the start             Context Observations         Goal Image            Planned Traj.
+position and yaw be p0 = (x0, y0, z0) and ψ0. We define                                 (b) Standalone Planning
+the local forward, right, and upward directions as
+                                                                  Figure 9. Comparison of (a) trajectory ranking and (b) standalone
+               ef = (cos ψ0, sin ψ0, 0),                         planning tasks of the AirGoal-10k benchmark.
+                er = (−sin ψ0, cos ψ0, 0),           (43)
+              eu = (0, 0, −1),                                    at high resolution and then center-cropped and resized to
+                                                 512×512. We apply automatic quality filters during collec-
+where eu follows the AirSim NED convention, in which                                                                        tion, including invalid-height checks, black-frame rejection,
+negative z corresponds to upward motion. For each trajec-                                                      and an LPIPS-based [73] threshold for crash detection.
+tory, we sample
+                                                       C.2. Task Definition
+           θ ∼U(0, 85◦),  φ ∼U(0, 2π),         (44)
+                                                        AirGoal-10k supports two offline evaluation tasks, as illus-
+and construct the target direction                                  trated in Figure 9. Both tasks start from the same image-
+                                                            goal navigation input: the agent observes a context of C =
+  dtarget = cos θ ef + sin θ cos φ er + sin θ sin φ eu.  (45)     4 RGB frames and is given a goal image.
+
+The angle θ controls the deviation from the initial heading,
+                                                         Trajectory ranking.  In trajectory ranking, a set of can-while the azimuthal angle φ determines whether this devia-
+                                                                didate trajectories are provided before scoring. In our testtion is left/right, upward/downward, or a combined 3D turn.
+                                                                               split, each case contains 32 externally generated candidate  Given dtarget, the segment direction at each timestep is
+                                                                      trajectories stored with the trajectory metadata. These can-obtained by spherical interpolation from ef to dtarget with
+                                                                didates share the same observed context but branch intoa smoothstep schedule. The UAV position is then generated
+                                                                    different 8-step future waypoint sequences. Each methodby forward integration:
+                                                              scores the same candidates for fairness and selects
+                 pi+1 = pi + sidi,
+                                         A⋆= argmin s(A, og | Ot−C+1:t),       (47)
+                       si = s0(1 + ϵi),                 (46)                 A∈AN
+                         ϵi ∼U(−0.1, 0.1).
+                                                     where AN  denotes the  first N  candidates and N  ∈
+The base step size s0 is set to match the average motion     {8, 16, 32}. This task evaluates the quality of the trajectory
+interval observed in the existing VLN trajectories. In our     scoring function under a fixed proposal set.
+implementation this corresponds to approximately five me-
+ters per frame interval. Roll and pitch are fixed to zero, and     Standalone planning.  Standalone planning removes the
+yaw is updated from the horizontal projection of the instan-      external candidate set. Policy based methods can directly
+taneous motion direction.                                        predict one or several trajectories, while world-model based
+                                                      methods use CEM following NWM [5]. At each iteration,
+Rendering and filtering.  AirSim is launched scene-by-      the planner samples a set of action sequences, rolls out and
+scene and each accepted trajectory is rendered from the     scores them with the world model, keeps the lowest-cost
+front RGB camera. AerialVLN [30] scenes are rendered di-       elites, and refits the sampling distribution over trajectory
+rectly at 512 × 512. OpenFly [17] scenes are first rendered     parameters. After the last iteration, the planned trajectory
+
+
+                                                 18
+
+=== PDF PAGE 19 ===
+is generated from the mean parameter of the final CEM dis-     D.3. Online Simulation Experiments
+tribution.  This setting tests whether the scorer can guide
+                                                             All online experiments are conducted on 4 NVIDIA RTX
+search without relying on a proposal policy. In our imple-
+                                                    3090 GPUs with 24GB memory each.
+mentation, CEM uses 32 samples, the top 16 elites, and 3
+                                          We evaluate online navigation on 100 start–goal pairs
+optimization iterations.
+                                                                 collected from AirSim [51], including 57 AerialVLN [30]
+                                                            episodes and 43 OpenFly [17] episodes.  The start-to-
+                                                            goal distance is computed as the three-dimensional Eu-  For both tasks, the selected or planned trajectory is com-
+                                                               clidean distance between the initial UAV position and thepared with the ground-truth future path using ATE and RPE.
+                                                            goal position. The average distance is 57 m. Among the
+                                                    100 episodes, 76% have distances between 45 m and 60 m,
+D. Experimental Details                               while the remaining 24% are longer-range cases between
+                                                    60 m and 80 m.
+D.1. Baseline Implementation
+                                                             Navigation is performed in a closed-loop manner.  At
+Since previous baselines, including policy-based [18, 44,     each step, the UAV captures a new front-camera observa-
+49, 50, 56] and world-model-based [5, 52, 66, 72] meth-      tion, plans its trajectory conditioned on the context obser-
+ods, are originally designed for 2D navigation, we modify      vations and the goal image, and executes only the first ac-
+their action encoding modules to adapt them to 3D space.      tion of the predicted trajectory. The maximum navigation
+For methods with different model size options, we select     budget is 20 executed actions.
+variants with similar parameter counts for fair comparison.      An episode is considered successful if the UAV’s final
+For NWM [5] and MWM [66], we adopt CDiT-B/2. For     three-dimensional distance to the ground-truth goal is no
+RAE-NWM [72], we adopt CDiT-B/2 and DINOv2-B [40].      greater than 20 m at termination. Observation-capture fail-
+   All baselines are trained on the training set of AirGoal-     ures and collisions are recorded as separate failure modes.
+10k until full convergence. For NaviBridger [44], we ad-     We report Success Rate (SR) and Success weighted by
+ditionally train  its CVAE model on AirGoal-10k in ad-     Path Length (SPL). SPL is computed using the initial start-
+vance and use it as the learning-based prior. For One-Step      to-goal distance as the reference distance and the accumu-
+WM [52], the official implementation includes a pretraining      lated flown distance as the executed path length:
+strategy, but the corresponding pretrained checkpoint has
+not been released. Therefore, we train it from scratch.                           1 N        Li
+                                                   SPL = X Si                       (48)   During inference, policy-based methods use diffusion              N      max(Li, Pi),
+or flow matching to generate trajectories, and we follow                             i=1
+their default sampling steps.  NoMaD [56] and NaviB-                                                     where N is the number of episodes, Si ∈{0, 1} indicates
+ridger [44] use 10-step diffusion, while FlowNav [18] uses                                                        whether episode i is successful, Li denotes the initial start-
+10-step flow matching ODE. In contrast, world models use                                                                to-goal distance, and Pi denotes the accumulated flown dis-
+diffusion or flow matching to generate future observations.                                                                  tance. For runtime evaluation, we report the average planner
+For NWM [5], the official setting with 250 sampling steps                                                          time per online step, excluding simulator startup, environ-
+is prohibitively slow for practical applications (approxi-                                                    ment reset, and scene-switching overhead.
+mately 30 minutes per step in online simulation experi-
+ments). Therefore, following MWM [66], we use 25 dif-     D.4. Real-world Experiments
+fusion steps for NWM, reducing its latency to a comparable
+                                                  To evaluate the deployability of our method in real-worldlevel with others. For other world models, we follow their
+                                                            environments, we develop a custom-built quadrotor plat-official settings: MWM [66] uses 5 diffusion steps, RAE-
+                                                     form equipped with an NVIDIA Jetson Orin NX (16 GB),NWM [72] uses 50-step flow matching ODE, and One-Step
+                                                          a forward-facing RGB camera, a Livox Mid-360 LiDAR,WM [52] uses one-step shortcut flow matching.
+                                                      and a MicoAir NxtPX4v2 flight controller, as illustrated in
+D.2. Offline Experiments                                 Figure 10. The RGB camera provides egocentric visual ob-
+                                                                servations for image-goal navigation, while the Jetson Orin
+All offline experiments are conducted on 4 NVIDIA RTX   NX serves as the onboard computing and communication
+4090 GPUs with 24GB memory each. All speed tests are      unit. The LiDAR measurements and onboard IMU data are
+measured on a single GPU with the same batch size.            fused by FAST-LIO [65] to estimate the real-time position
+   For the trajectory ranking task, we additionally report     and orientation of the UAV. The resulting state estimates
+random selection and oracle selection strategies as refer-      are provided to the low-level flight-control system, while
+ences. Oracle selection always selects the trajectory with      the NxtPX4v2 flight controller is responsible for executing
+the smallest ATE with respect to the ground-truth trajectory.      control commands and maintaining stable UAV motion.
+
+
+                                                 19
+
+=== PDF PAGE 20 ===
+         Custom-built UAV Platform                         System Architecture
+
+
+                                                                                Mission Management         Ground              MacBook Air
+      NVIDIA Jetson Orin NX (16 GB)                  & High-Level Planning           Station            M4 (16 GB)
+
+                                                                                                            Mission commands                  Waypoints   RGB obs.
+
+       Livox Mid-360 LiDAR                                          Communication                      Mobile Hotspot
+
+                                                                                                                             Mission Commands / Waypoints   RGB obs.
+
+
+                                                                        RGB Camera     RGB Camera                                                   OnboardPerceptionComputing&                                           Jetson Orin                                                                                     NX (16 GB)
+
+                                                                                                                                           Control / State commands
+
+                                                                                               State Estimation          LiDAR                  MicoAir
+       MicoAir NxtPX4v2 Flight Controller                 & Flight Control          IMU                 NxtPX4v2
+
+
+
+              Figure 10. Configuration of custom-built UAV platform and system architecture for real-world experiments.
+
+
+  The system adopts a distributed computation architec-     camera.  This setting further tests the robustness of UA-
+ture.  The UAV communicates with a Windows laptop   NWM to camera-parameter gaps between goal images and
+ground station and a MacBook Air M4 (16 GB) through     onboard observations. Additional real-world visualizations
+a mobile-phone hotspot.  The ground station is used for      are provided in Figure 18.
+mission management and flight supervision, whereas world
+model inference and high-level navigation planning is per-     D.5. DINO Latent Visualization
+formed locally on the MacBook.  In our experiments, the
+                                                  The trajectory scoring process of UA-NWM and the deter-MacBook runs on battery power without being plugged
+                                                                ministic baseline is performed directly in the DINOv3 [54]into an external power supply. During navigation, the cur-
+                                                                      latent space. For visualizing the predicted DINOv3 latents,rent RGB observation is captured by the onboard camera
+                                             we adopt RAEv2 [55] and fine-tune the officially releasedand forwarded through the Jetson Orin NX to the high-
+                                                           checkpoint on the AirGoal-10k training set to improve re-level planner. Conditioned on the current observation and
+                                                               construction quality. The decoded RGB images are onlythe goal image, UA-NWM plans with CEM, sampling 32
+                                                         used for qualitative visualization and may not faithfully rep-candidate trajectories at each of three optimization itera-
+                                                                 resent all information contained in the predicted DINOv3tions, and sends the resulting waypoint command back to
+                                                                         latents. Since DINOv3 is not optimized for pixel-level re-the UAV. The Jetson Orin NX subsequently converts the re-
+                                                                 construction, the decoded images may exhibit blurry detailsceived waypoint into control commands and forwards them
+                                                              or color shifts, while still providing meaningful semanticto the NxtPX4v2 flight controller for execution. This com-
+                                                      and structural cues for qualitative analysis.munication and control process is repeated in a closed-loop
+manner after each executed action. Navigation is terminated       The sampling procedure for other plausible states within
+when the LPIPS [73] distance between the current observa-      the predicted subspace is discussed in Section H.
+tion and the goal image falls below 0.5.
+                                               E. Additional Ablation Studies   Importantly, the proposed navigation model does not di-
+rectly access the LiDAR measurements, IMU states, FAST-                                                         E.1. Rollout Steps for Training
+LIO pose estimates, ground-truth goal position, or ground-
+truth distance to the goal. FAST-LIO is used only for low-    As described in Section B.2, we employ autoregressive roll-
+level state estimation and flight control to ensure stable and     out in stages 2 and 3 and average the losses across all rollout
+safe motion execution. High-level navigation decisions are      steps to mitigate error accumulation in autoregressive world
+made solely from the egocentric RGB observations and the     models. We vary the number of rollout steps to investigate
+given goal image.  This separation allows us to evaluate       its effect on navigation performance. As shown in Table 6,
+whether the proposed method can generate executable navi-     performance generally improves with longer rollouts. Ex-
+gation decisions on a physical UAV without relying on priv-     posing the model to its own intermediate predictions dur-
+ileged geometric information. All real-world goal images     ing training better matches autoregressive inference and im-
+are captured by a mobile phone, whose camera intrinsics     proves robustness to accumulated errors. We therefore use
+and viewpoint characteristics differ from the onboard UAV     an eight-step rollout in both Stages 2 and 3.
+
+
+                                                 20
+
+=== PDF PAGE 21 ===
+                       8 Candidates                  16 Candidates                 32 Candidates
+  Rollout Steps
+               ATE ↓       RPE ↓       ATE ↓       RPE ↓       ATE ↓       RPE ↓
+
+       1             1.373           0.378           1.296           0.358           1.292           0.357
+       2             1.319           0.364           1.244           0.345           1.185           0.329
+       3             1.298           0.358           1.218           0.337           1.155           0.322
+       4             1.301           0.358           1.197           0.332           1.134           0.315
+       5             1.297           0.357           1.203           0.333           1.132           0.314
+       6             1.286           0.354           1.198           0.332           1.114           0.310
+       7             1.281           0.354           1.199           0.332           1.123           0.312
+       8             1.256           0.347           1.174           0.326           1.091           0.304
+
+
+                             Table 6. Ablation study on different numbers of rollout steps for training.
+
+
+                                           8 Candidates         16 Candidates         32 Candidates
+   Staged Training     Delta Representation
+                                 ATE ↓    RPE ↓    ATE ↓    RPE ↓    ATE ↓    RPE ↓
+     ×           ✓              1.309      0.360      1.222      0.338      1.189      0.330
+     ✓           ×              1.370      0.375      1.309      0.359      1.263      0.347
+     ✓          ✓              1.256      0.347      1.174      0.326      1.091      0.304
+
+
+                         Table 7. Ablation study on the staged training strategy and delta representation [25]
+
+
+                           8 Candidates                16 Candidates               32 Candidates
+  K    M
+                   ATE ↓       RPE ↓       ATE ↓       RPE ↓       ATE ↓       RPE ↓
+
+    32        16         1.342          0.370          1.264          0.350          1.204          0.334
+    32        64         1.359          0.374          1.289          0.355          1.233          0.341
+    16        32         1.309          0.360          1.235          0.341          1.159          0.321
+    64        32         1.309          0.360          1.230          0.340          1.155          0.320
+    32        32         1.256          0.347          1.174          0.326          1.091          0.304
+
+
+                                  Table 8. Ablation study on different combinations of K and M.
+
+
+                                 RECON                  GO Stanford
+ Methods
+                              ATE ↓          RPE ↓          ATE ↓          RPE ↓
+
+ NWM [5] + NoMaD (×8)                 1.01                0.27                2.06                0.59
+ NWM [5] + NoMaD (×16)                1.00                0.27                2.11                0.60
+ NWM [5] + NoMaD (×32)                0.99                0.27                2.11                0.60
+
+ RAE-NWM [72] + NoMaD (×8)           1.07                0.30                1.97                0.57
+ RAE-NWM [72] + NoMaD (×16)          1.09                0.31                2.02                0.58
+ RAE-NWM [72] + NoMaD (×32)          1.11                0.32                2.01                0.59
+
+ UA-NWM (Ours) + NoMaD (×8)          0.94                0.25                1.68                0.49
+ UA-NWM (Ours) + NoMaD (×16)         0.92                0.25                1.52                0.44
+ UA-NWM (Ours) + NoMaD (×32)         0.92                0.25                1.51                0.44
+
+
+Table 9. Comparison of NWM [5],RAE-NWM [72] and UA-NWM on the RECON [48] and GO Stanford [22] datasets using different
+numbers of trajectories generated by NoMaD [56].
+
+
+
+
+
+                                                 21
+
+=== PDF PAGE 22 ===
+E.2. Staged Training and Delta Representation       G. Further Analysis of HEP
+
+As described in Section B.2, our deterministic backbone     This section provides a closer look at the proposed Hi-
+adopts a staged training strategy that first learns compact      erarchical Error Projection (HEP). We use a probabilistic
+representations and latent transitions before learning future     view to clarify why the unexplained residual can serve as a
+prediction. Following DeltaWorld [25], we further employ      trajectory-goal compatibility score, and then describe what
+a delta representation to encode the change in visual repre-      the coarse-to-fine projection actually computes. We also
+sentations between adjacent frames, allowing the predictor     discuss how the training objective encourages the predicted
+to estimate this delta rather than the full representation of     bases to capture residual directions that recur under simi-
+the next frame. We ablate both designs in Table 7.                 lar context-action conditions. Our purpose is to make the
+   Training the deterministic backbone end-to-end without     assumptions behind the HEP interpretation explicit, rather
+staged training degrades performance, indicating that pre-     than to claim that HEP estimates a fully calibrated likeli-
+training the compressor, fuser, and delta decoder to model     hood of future observations.
+compact representations and latent transitions provides a
+                                                     G.1. Residual Energy as a Conditional Compatibil-
+more stable and effective initialization for future prediction.
+                                                                       ity Score
+Replacing delta prediction with direct prediction of the full
+next-frame representation causes a larger performance drop     For a fixed observation context Ot−C+1:t and a candidate
+across different numbers of candidate trajectories. This sug-      action sequence At:t+H−1, let µ be the deterministic DINO
+gests that predicting inter-frame changes reduces the redun-      feature prediction and xg = ϕ(og) be the DINO feature of
+dancy shared by adjacent observations and enables the pre-      the goal image. UA-NWM computes the discrepancy
+dictor to focus on temporally varying information, thereby
+                                                                     e = norm(xg) −norm(µ).           (49)facilitating more accurate dynamics modeling. Combining
+both strategies yields the best overall performance.
+                                                          Let E denote the residual induced by plausible futures un-
+                                                             der the same context and action. Suppose that most plau-
+E.3. Number of Compressed and Delta Tokens                                                                     sible variation around µ lies in an R-dimensional subspace
+                                           S = span(V ), where the columns of V are orthonormal. AWe further investigate the effects of K and M by evaluat-
+                                                          simple conditional residual model ising different combinations of the two hyperparameters. As
+shown in Table 8, the setting K = 32 and M = 32 achieves
+                                    E = V a + ξ,  a ∼N(0, τ 2I),   ξ ∼N(0, σ2I).  (50)
+the best performance across all candidate-set sizes. Deviat-
+ing from this configuration in either direction consistently                                                           Here, V a denotes uncertainty-explainable variation and ξ
+leads to inferior results, indicating that both representations                                                            denotes residual variation outside the plausible subspace.
+benefit from a moderate capacity. Smaller values may limit                                                  The covariance is
+their expressive power, whereas larger values may introduce
+unnecessary redundancy and make optimization more diffi-              Σ = τ 2V V ⊤+ σ2I.              (51)
+cult. We therefore adopt K = 32 and M = 32 as the default
+setting.                                                     For  this Gaussian residual model,  the negative log-
+                                                                likelihood of an observed residual contains the quadratic
+                                                       Mahalanobis term e⊤Σ−1e; with fixed R, τ, and σ, the
+F. Performance on 2D Navigation Benchmarks                                                          remaining log-determinant term is constant with respect
+                                                                   to the observed residual.  Decomposing any residual asWe further evaluate UA-NWM on two 2D ground image-
+                                                        e = e∥+ e⊥, with e∥∈S and e⊥⊥S, givesgoal navigation benchmarks, RECON [48] and GO Stan-
+ford  [22], and compare  it with NWM  [5] and RAE-                            ∥e∥∥22    ∥e⊥∥22
+NWM [72]. We use the official inference settings of 250              e⊤Σ−1e =  2   +           .         (52)                                                                                   τ + σ2     σ2
+diffusion steps for NWM and 50 flow-matching ODE steps
+for RAE-NWM. For fair comparison, all methods rank the    The exact Gaussian score therefore penalizes both compo-
+same candidate trajectory sets generated by NoMaD [56].      nents, but with different weights. UA-NWM uses only the
+As shown in Table 9, UA-NWM consistently outperforms     second term, corresponding to the high-anisotropy regime
+both baselines across the two datasets and all candidate-     where plausible variation inside S is much larger than un-
+set sizes.  Although UA-NWM is primarily designed for     explained variation outside it, i.e., τ 2 ≫σ2. In this case,
+aerial navigation in 3D environments, these results demon-      the penalty on e∥is strongly down-weighted and the dom-
+strate that its uncertainty-aware trajectory scoring mecha-      inant criterion becomes ∥e⊥∥22.  If τ 2 is not substantially
+nism also transfers effectively to 2D ground navigation, in-      larger than σ2, a calibrated quadratic score would also re-
+dicating broader applicability beyond the original setting.        tain a non-negligible penalty on e∥; our score should then
+
+
+                                                 22
+
+=== PDF PAGE 23 ===
+be viewed as a conservative compatibility approximation    An exact orthogonal projection would solve one global
+that treats variation inside S as acceptable for navigation.      least-squares problem,
+This yields the OOD interpretation in the main paper: a
+candidate is penalized primarily when the goal discrepancy              p⋆= argmin ∥e −p∥22,             (58)
+                                                                                                  p∈Sall
+cannot be explained by the predicted uncertainty subspace,
+rather than simply when it differs from the deterministic     and would produce a residual e −p⋆that is orthogonal to
+mean prediction.                                               the whole space Sall. This global solve is not what HEP
+                                                          implements.
+G.2. What the Hierarchical Projection Computes           Instead, HEP performs a one-pass coarse-to-fine resid-
+The full feature discrepancy is a spatial field over N DINO      ual decomposition.   It first removes the component pre-
+                                                                dicted at the coarsest scale, then applies the next scale topatches. HEP constructs a multi-scale approximation of
+the plausible residual subspace using grid scales G =      the remaining residual, and continues until the finest scale.
+{1, 2, 7, 14}. At scale g, the patch grid is partitioned into     This is greedy because each scale explains only the residual
+cells Ωg,c. Let rg,i denote the residual at patch i when en-       left by previous scales and the earlier components are not
+tering scale g, initialized by r1,i = ei. The cell-average      jointly re-optimized. If the scale-wise subspaces are mutu-
+                                                                     ally orthogonal, this sequential procedure is equivalent toresidual is
+                      1                                    the exact orthogonal projection onto their direct sum, since
+                        ¯rg,c =  X  rg,i.             (53)
+                         |Ωg,c|                            components from different scales do not interfere with each
+                                i∈Ωg,c                              other. The implementation does not explicitly enforce this
+                                                                condition.  Therefore, in the general case, the final resid-The bar indicates that this is an average over all patches
+                                                                ual should be interpreted as the unexplained component leftin the cell, not the residual of a single patch.  For each
+cell, HEP predicts a basis Ug,c = {ug,c,1, . . . , ug,c,R}.  It     by the hierarchical projection procedure, rather than as the
+                                                              exact Euclidean distance to a globally projected subspace.then computes a ridge-regularized projection of ¯rg,c onto
+                                                          This residual is the quantity used by UA-NWM for trajec-the span of this basis:
+                                                                tory scoring.
+                                         2
+                  R                             G.3. Why the Training Objective Learns Plausible
+   αg,c = argmin  ¯rg,c − X αrug,c,r  + λ∥α∥22,   (54)                                                        Residual Directions
+        α∈RR        r=1          2
+                                                       During HEP training, the deterministic baseline is fixed and
+                 R                        HEP is optimized with the normalized residual loss
+                   pg,c = X αg,c,rug,c,r.             (55)
+                      r=1                             PNi=1 ∥e⊥t+1,i∥22
+                                                      LHEP =                               .          (59)
+                                          PNi=1 ∥et+1,i∥22 + ϵWhen λ = 0, pg,c is the ordinary least-squares projection of
+¯rg,c onto span(Ug,c). With λ > 0, it is a regularized projec-
+                                                          This objective encourages the predicted bases to explain
+tion that improves numerical stability and prevents unstable
+                                                                  residual directions that repeatedly occur under the same
+coefficients when the predicted basis vectors are correlated.
+                                                            type of context and action.  To connect the loss to sub-
+The projected vector is then subtracted from every patch in
+                                                          space learning, consider a fixed scale-cell pair (g, c) and
+the cell:
+                                                             temporarily view  its predicted basis span as a fixed R-
+              rg+,i = rg,i −pg,c,   i ∈Ωg,c,         (56)     dimensional subspace S. For a single training sample, the
+                                                                cell-average residual ¯rg,c is decomposed into an explainedwhere g+ denotes the next finer scale.
+                                                                   part PS¯rg,c and an unexplained part (I −PS)¯rg,c. The loss
+   This operation has a clear geometric meaning. At each
+                                                            reduces this unexplained component, while the denomina-
+scale, HEP removes a low-rank, cell-wise constant residual
+                                                                      tor in LHEP only rescales the sample contribution.
+component. Coarse scales explain broad spatially coherent
+                                                       Over the whole training set, minimizing this residual
+deviations, while fine scales explain more localized devia-
+                                                         term corresponds to minimizing the empirical average of
+tions. The finest 14×14 scale reduces to patch-wise residual
+                                                                the unexplained energy. In population form, this empirical
+projection because each cell contains one DINO patch.
+                                                           average is written as
+  We distinguish HEP from a single exact orthogonal pro-
+jection. Let Sg denote the space of residual fields that are              E ∥(I −PS)¯ρg,c∥22  ,              (60)
+constant within each cell of scale g and whose cell value
+lies in the corresponding local basis span, and let             where ¯ρg,c denotes the random variable corresponding to
+                                                                the cell-average residual ¯rg,c when a transition is sampled
+                 Sall = S1 + S2 + S7 + S14.           (57)     from the training distribution, and PS is the projection onto
+
+
+                                                 23
+
+=== PDF PAGE 24 ===
+S. Minimizing this quantity is equivalent to maximizing the     GTCurr.FutureObs. Traj.𝑜! &     UA-NWM             Predicted 𝜇and subspace 𝑆
+expected explained energy
+                                                                                                                  Deterministic                                                                                       HEP          +
+             E ∥PS ¯ρg,c∥22  .                 (61)                              Baseline
+
+                                                                                                                                        (a)Thus, for a fixed context-action condition, the optimal low-
+rank subspace contains the principal residual directions of                         Random Sampling
+plausible futures. HEP does not store a separate subspace
+for each condition. Instead, it learns a conditional mapping        𝑆
+from the deterministic prediction and context features to the
+local basis Ug,c. Since the deterministic prediction µ de-
+                                                                                                                                  (b)
+pends on the candidate action sequence, different candidate
+trajectories can induce different predicted bases and there-                              Goal-oriented Sampling
+                                                                            Goal 𝑥!                                                  Projected 𝑥!"fore different uncertainty directions.
+   This argument also clarifies why the design does not sim-
+                                                                                                                                   small e⊥  Project onto subspaceply memorize arbitrary training residuals. Each cell predicts
+                                                                                     𝑆
+only R basis directions, so it cannot explain all channel-
+space errors when R ≪D, where D is the DINO feature-              Image editing
+channel dimension. At coarser scales, the same projected
+                                                                                          Plausible                                                     Plausible
+vector is subtracted from all patches in a cell, so only spa-        Pseudo Goal                                        Sample in 𝑆
+tially coherent deviations can be explained at that scale. In
+addition, the deterministic baseline is frozen during HEP                              Project onto subspace   small e⊥
+training, which prevents HEP from changing the mean pre-                         𝑆
+diction µ to absorb residual errors. These restrictions make
+the easiest residuals to explain those that appear consis-          Implausible                                                   Plausible
+tently under similar context-action conditions.  Therefore,        Pseudo Goal                                        Sample in 𝑆
+the HEP loss provides a principled surrogate for learning
+conditional plausible-variation directions, while the final                        Project onto subspace   large e⊥
+navigation score uses the remaining unexplained residual                         𝑆
+to distinguish goal-compatible and goal-incompatible can-
+didate trajectories.                                                                                                             (c)
+
+                                                                  Figure 11. Different strategies of sampling plausible states on pre-
+H. Further Discussions and Future Work              dicted subspace.
+
+In Figure 6, we visualize alternative plausible states sam-
+pled from the predicted uncertainty subspace. Here, we de-
+tail the sampling procedure and further discuss the capabil-     density region of the true distribution, and random sam-
+ity and role of UA-NWM as a world model.                     pling in it does not always yield high-quality results. As
+  As illustrated in Figure 11(a), UA-NWM first predicts    shown in Figure 11(b), these samples exhibit meaningful di-
+the deterministic future state µ and the uncertainty subspace      versity from the mean prediction µ and generally preserve
+S. We then sample different points within S to obtain xPg      reasonable global layouts, but their spatial coherence is lim-
+and other plausible future states.                                     ited.  In particular, different regions of the same building
+  The state xPg can be interpreted as the point in S that is    may exhibit inconsistent colors, making the image resem-
+closest to the goal state xg. It is obtained as µ + e∥, which      ble a shuffled jigsaw puzzle.  This likely arises because,
+can be viewed as projecting xg onto S. Compared with the     although the hierarchical projection captures some spatial
+discrepancy between µ and xg, the decoded xPg  typically      correlations across image regions, the resulting uncertainty
+exhibits a substantially smaller gap from xg. It also tends to     subspace remains insufficient to enforce fully coherent vari-
+preserve a plausible appearance because it is derived from      ations among correlated patches. When multiple building
+µ through hierarchical error projection, which is trained to      colors are plausible, independent sampling within S may
+explain residuals along plausible uncertainty directions.         assign different colors to correlated patches rather than se-
+                                                                   lecting a coherent appearance for the entire structure.   Nevertheless, although HEP is trained to capture plausi-
+ble residual directions, S remains only a low-dimensional,       To obtain more interpretable samples, we introduce a
+local approximation to the conditional future-state distribu-      goal-oriented sampling strategy. Inspired by the construc-
+tion.  Consequently, not every point in S lies in a high-      tion of xPg , we generate alternative plausible samples from
+
+
+                                                 24
+
+=== PDF PAGE 25 ===
+modified goal images. As shown in Figure 11(c), we first      in S, demonstrating that the predicted subspace captures
+use image-editing tools to construct a visually distinct yet     meaningful future-state diversity, primarily arising from
+contextually plausible pseudo-goal image from the original     occlusion-induced ambiguity or long-horizon drift.
+goal image xg.  If the pseudo-goal is plausible under the
+                                                                    I.3. Offline Trajectory Rankinggiven initial observation and action sequence, it should lie
+near a high-density region of the same conditional future-      Qualitative comparisons on the offline trajectory ranking
+state distribution.  Projecting it onto S using HEP should      task are shown in Figure 14. When ranking 32 candidates,
+therefore produce a plausible state that remains close to the   NWM [5] is susceptible to error accumulation and sampling
+pseudo-goal while differing in appearance from xPg .               variability, which may cause it to favor inferior trajectories.
+   Conversely, if the pseudo-goal is incompatible with the     In contrast, UA-NWM leverages HEP to score trajectories
+initial observation or action sequence, its projection will     using the unexplained residual, yielding more robust rank-
+not closely reproduce the pseudo-goal, but will instead re-     ings that favor candidates closer to the ground-truth trajec-
+main constrained by the plausible future states represented      tory under future-state uncertainty.
+by S. In the last example of Figure 11(c), the pseudo-goal
+                                                                    I.4. Offline Standalone Planningis captured from another 3D position in the simulation en-
+vironment and corresponds to the endpoint of a different      Qualitative comparisons on the offline standalone planning
+trajectory. It is therefore incompatible with the conditional      task are shown in Figures 15 and 16. Under the same CEM
+future-state distribution induced by the original trajectory.     planning framework, UA-NWM effectively identifies the
+After projection onto the original subspace S, the resulting      direction toward the goal through iterative sampling, pre-
+state preserves the overall layout associated with the origi-      diction, and optimization, whereas NWM [5] often fails to
+nal trajectory rather than reproducing the pseudo-goal. The     recover the correct path.
+resulting large projection discrepancy allows UA-NWM to
+identify the pseudo-goal as incompatible with the predicted      I.5. Online Simulation
+future-state distribution.                                         Qualitative results from the online simulation experiments
+   These observations suggest that UA-NWM is effective      are shown in Figure 17.  Given a goal image with an
+as a navigation discriminator and also shows promise as    unknown target distance, UA-NWM performs multi-step
+an efficient stochastic generator. Through hierarchical er-   CEM planning and progressively approaches the target lo-
+ror projection, it can assess whether a candidate trajectory is      cation through closed-loop planning.
+compatible with the goal image while accounting for future-
+state uncertainty, making it well suited to image-goal navi-      I.6. Real-world UAV Navigation
+gation. However, fully realizing future-distribution predic-     Additional qualitative results from the real-world UAV ex-
+tion for efficient stochastic generation requires a more ex-     periments are shown in Figure 18. Across varying weather
+pressive uncertainty representation. Future work may ex-      conditions, including sunny, cloudy, and post-rain condi-
+plore more expressive uncertainty representations that cap-      tions, and different times of day, including morning, after-
+ture spatial coherence across patches and temporal coher-     noon, and dusk, UA-NWM demonstrates strong sim-to-real
+ence across frames more precisely, enabling stochastic fu-      transfer and robust generalization in real-world scenes.
+ture generation by predicting a future-state distribution in
+a single forward pass and sampling diverse futures from it
+without running the full model again for each sample.
+
+I. Additional Visualization Results
+
+I.1. Hierarchical Error Projection
+
+Visualizations of the hierarchical error projection process
+are shown in Figure 12. As the projection proceeds, the un-
+explained residual progressively decreases.  Starting from
+µ, we gradually add the explained component e∥on it, ulti-
+mately obtaining xPg that closely resembles xg.
+
+I.2. Uncertainty Subspace
+
+Additional visualizations of samples from the predicted un-
+certainty subspace are shown in Figure 13. For each case,
+besides xPg , we identify two alternative plausible samples
+
+
+                                                 25
+
+=== PDF PAGE 26 ===
+Obs. & Act.        r1 = e              r2                r7                r14          e⊥=r14+
+  Goal !!      Predicted "      "+p1       "+(p1+p2)   "+(p1+p2+p3)    !!"= "+e∥
+
+
+
+
+
+                     Figure 12. Visualizations of hierarchical error projection process.
+
+
+
+                                       26
+
+=== PDF PAGE 27 ===
+Obs. & GT Act.   Goal !!      Predicted "        e             !!# in #       Residual e⊥   Other Samples in Subspace #
+
+
+
+
+
+                       Figure 13. Additional visualizations of samples from the predicted uncertainty subspace.
+
+
+
+
+
+                                                 27
+
+=== PDF PAGE 28 ===
+                          NWM           UA-NWM (Ours)             Curr. Obs. "" &Overview                           Goal !!         Oracle-Traj.        Selected-Traj.       Selected-Traj.       Selected-Traj.        GT Future Traj.
+                                                              Prediction          Prediction         Predicted !             "!" in #
+
+
+
+
+
+                              Figure 14. Qualitative comparisons on the trajectory ranking task.
+
+
+
+
+
+                                              28
+
+=== PDF PAGE 29 ===
+             Curr. Obs. "" &         NWM      UA-NWM (Ours)Overview                   Goal !!        GT Future Traj.                        Selected-Traj.       Selected-Traj.       Selected-Traj.
+                                                                                              "
+                                                              Prediction         Predicted !          "! in #
+
+
+
+
+
+                            Figure 15. Qualitative comparisons on the standalone planning task.
+
+
+
+
+
+                                              29
+
+=== PDF PAGE 30 ===
+             Curr. Obs. "" &         NWM      UA-NWM (Ours)Overview                   Goal !!        GT Future Traj.                        Selected-Traj.       Selected-Traj.       Selected-Traj.
+                                                                                              "
+                                                              Prediction         Predicted !          "! in #
+
+
+
+
+
+                            Figure 16. Qualitative comparisons on the standalone planning task.
+
+
+
+
+
+                                              30
+
+=== PDF PAGE 31 ===
+Goal !!        Initial Obs.             Observations During Navigation Process
+
+
+
+
+
+                        Figure 17. Qualitative results of online closed-loop navigation experiments.
+
+
+
+                                             31
+
+=== PDF PAGE 32 ===
+Goal Image                 RGB Observations from UAV
+ Overview                              Third-person Perspective
+
+
+
+
+
+                   Figure 18. Additional qualitative results of real-world UAV experiments.
+
+
+
+                                        32

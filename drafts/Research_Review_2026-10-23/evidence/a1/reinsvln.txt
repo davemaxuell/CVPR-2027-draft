@@ -1,0 +1,607 @@
+                                                     ReInsVLN: Revisiting Historical Evidence for Training-Free
+                                                                Vision-and-Language Navigation
+                                                                    Siwei Cheng1,3,∗ , Hao Wu2,3,∗ , Zitong Qi3 , Xinming Zhang1,3 , Haoyu Xi2,3 ,
+                                                                   Peiran Yin2,3 , Haozhe Hu2,3 , Xudong Wang3 , Xiaoyu Shen3,† , Wei Zhang3,†
+
+                                                                                                                                          Pass the armchair beside the blue cabinet,
+                                            Abstract— Vision-and-language navigation (VLN) relies on                                            then stop at the next armchair.
+                                         retaining and using relevant observations. Yet growing histories
+                                                                                                                     Past observation
+                                         introduce redundancy, and retained information may remain
+                                         underused. We introduce ReInsBench, a diagnostic benchmark
+                                         that examines history utilization through controlled continu-
+arXiv:2610.26545v1 [cs.RO] 19 Oct 2026
+
+
+
+
+                                         ation trials. Its results show that history-review reinstruction
+                                         can recover navigation failures using the existing task context.
+                                         Motivated by this finding, we propose ReInsVLN, a training-                          Briefly seen: cabinet beside this chair
+                                         free framework supporting memory construction and utiliza-
+                                                                                                                                                                           Memory construction
+                                         tion in frozen navigators. Coverage- and Instruction-Aware
+                                         Compression constructs compact visual context through tem-                  Retained historical context
+                                         poral redundancy reduction, coverage-aware protection, and
+                                         instruction-guided token selection. Forgetting-Inspired History
+                                         Reminders guide navigators to revisit retained observations
+                                         according to a predefined schedule, without additional model                                         Landmark relation retained
+
+                                         calls. On R2R Val-Unseen, ReInsVLN improves success rates                                          Retained cue                   Memory utilization
+                                         by 8.48 and 3.37 percentage points over the native StreamVLN                                         not used
+                                         and InternVLA-N1, reaching 64.27% and 64.44%, respectively.                 Current decision
+                                                                                                                               Which chair should I stop at?
+                                         Visual compression largely preserves navigation performance
+                                         while reducing prefill latency and KV cache memory by up                                          Chair to pass
+                                         to 21.77% and 32.25%, respectively, on matched observation
+                                         workloads. Real-world trials on humanoid and quadruped
+                                         robots further support the applicability of ReInsVLN to se-
+                                                                                                                                                                           Next chair
+                                         quential instruction following and ordinal navigation.
+
+                                                                 I. I NTRODUCTION                                                                            Wrong stop
+
+                                            Vision-and-language navigation (VLN) requires an agent
+                                         to follow natural-language instructions using a sequence                              Cabinet now out of view
+
+                                         of visual observations [1], [2]. Partial observability makes                                      The cue is retained, but is it used?
+                                         decisions depend on previously encountered landmarks [3].
+                                         As illustrated in Fig. 1, following the instruction “Pass the             Fig. 1. Navigation memory requires retaining and using relevant observa-
+                                         armchair beside the blue cabinet, then stop at the next arm-              tions. Although the blue cabinet is no longer visible, its retained relation to
+                                                                                                                   the first armchair helps identify the next armchair as the stopping point.
+                                         chair” requires the navigator to use the previously observed
+                                         relation between the cabinet and the first armchair to identify
+                                         the next armchair as the stopping point. Such dependencies                cues for later decisions. However, retained information does
+                                         make memory essential for retaining information from past                 not guarantee effective use, even in long-context language
+                                         observations and using it to guide subsequent actions [4].                models [10]. In the example in Fig. 1, the cabinet observation
+                                            Effective navigation memory involves two complementary                 may remain in the navigator’s history without guiding it to
+                                         capabilities: memory construction and memory utilization.                 stop at the correct armchair. This raises a central question:
+                                         Here, memory construction selects and organizes past obser-               even when relevant historical information is retained, can
+                                         vations into available context, while memory utilization uses             the navigator use it effectively?
+                                         that context to guide decisions. Spatial maps offer one way                  To examine this question, we introduce ReInsBench, a
+                                         to organize navigation history [5]. As navigation proceeds,               diagnostic benchmark constructed from selected R2R [1]
+                                         repeated views introduce redundancy into the growing obser-               navigation episodes. At selected decision points, a frozen
+                                         vation history, increasing the cost of processing it [6]–[9].             navigator continues under different prompts from the same
+                                         This requires retaining useful historical information within              observation history and environment state. The benchmark
+                                         limited context and computation budgets, while preserving                 assesses whether directing the navigator to revisit its exist-
+                                                                                                                   ing history improves subsequent navigation, using neutral
+                                           1 University of Science and Technology of China, 2 Shanghai Jiao Tong
+                                                                                                                   reminders to control for the effect of generic prompting. In
+                                         University, 3 Eastern Institute of Technology, Ningbo
+                                           ∗ Equal Contribution, † Corresponding Authors: Xiaoyu Shen, Wei Zhang   a controlled subset of 198 instances, history review yields
+                                         (email: {xyshen, zhw}@eitech.edu.cn)                                      64 successful continuations, compared with 53 for neutral
+reminders and 40 without an additional prompt. These find-             KV cache storage. Real-world trials on humanoid and
+ings suggest that navigators do not always make effective              quadruped robots further support the training-free gen-
+use of the historical information already available to them.           eralization of ReInsVLN to challenging tasks requiring
+   Building on this diagnosis, we aim to improve memory                sequential landmark tracking.
+construction and utilization within existing navigators. A
+compact visual context must preserve cues whose relevance                             II. R ELATED W ORK
+may emerge only later [11], [12]. Once retained, these cues        A. History Modeling in VLN
+need to inform subsequent decisions at appropriate moments,
+                                                                      History modeling connects current observations with pre-
+requiring guidance that encourages their use while limiting
+                                                                   viously encountered landmarks. Explicit visual-language
+interference with otherwise correct navigation.
+   To this end, we propose ReInsVLN, a training-free frame-        maps [14] organize observations spatially, while NaVid
+work that combines visual context compression and history-         incorporates historical observations into action prediction.
+review reminders within the existing context mechanisms            StreamVLN separates recent interactions from slowly up-
+of navigators. For memory construction, we adopt a two-            dated visual memory and reuses cached states across de-
+stage visual compression strategy consisting of pre-LLM            cisions. ReInsBench complements these approaches by as-
+compression and in-LLM compression. The pre-LLM stage              sessing history utilization through controlled prompting.
+reduces temporal redundancy before visual tokens enter the         ReInsVLN builds on existing context mechanisms, com-
+language model, combining causal token reduction with              bining visual compression and history-review reminders to
+dynamic-token protection to prioritize content poorly covered      reduce redundancy and improve history utilization.
+by previously retained tokens. The in-LLM stage builds a           B. Visual Token Compression
+query from the original instruction and expands it with high-
+scoring visual seeds. It then combines semantic relevance             Visual token compression accelerates MLLM inference by
+with positional information to select a compact subset of          shortening visual token sequences, either in a single step
+visual tokens, restoring their original order after selection.     or progressively across multiple stages [15]–[17]. LLaVA-
+For memory utilization, short reminders guide the navigator        PruMerge [18] prunes and merges tokens before the LLM.
+to revisit retained observations in relation to the original in-   FastV [19] prunes at a selected LLM layer, while Pyramid-
+struction. A predefined, forgetting-inspired schedule uses the     Drop [20] and HiDrop [21] prune progressively across layers.
+number of decision calls elapsed since the previous reminder       For streaming video, StreamForest [22] uses hierarchical
+as a temporal prior for determining when to introduce history      event-level merging, and ViCoStream [23] uses chunk-level
+review. The prompts are inserted at existing decision calls,       temporal token dropping. In VLN, STEP-Nav [11] and
+preserving the native action-execution pipeline.                   history-conditioned pruning [12] reduce spatial and temporal
+   Experiments on R2R Val-Unseen evaluate ReInsVLN                 redundancy. While prior compression work primarily targets
+with StreamVLN and InternVLA-N1, representing streaming            inference efficiency, ReInsVLN couples two-stage compres-
+and non-streaming inference, respectively. With Coverage-          sion with history-review reminders to improve the utilization
+and Instruction-Aware Compression and Forgetting-Inspired          of retained visual context.
+History Reminders applied together, ReInsVLN improves
+                                                                   C. Memory Utilization and Reactivation
+success rates by 8.48 and 3.37 points over the corresponding
+native navigators. These improvements exceed the sum of               Memory utilization connects retained information with
+individual gains on both navigators, suggesting synergy            current decisions. CMMR-VLN [24] retrieves prior naviga-
+between two components. Visual compression also reduces            tion cases as rules, while Memoir [25] queries observation
+prefill latency and KV cache usage. Physical deployment is         and behavioral histories using predicted states. MemVR [26]
+another focus of legged-robot VLN [13].                            reinjects visual evidence into intermediate layers under
+   The main contributions are summarized as follows:               uncertainty, and VisRef [27] reintroduces selected visual
+   • We introduce ReInsBench to diagnose history utilization       tokens during reasoning. MemoryBank [28] and DART-
+      through controlled prompting comparisons, showing            VLN [29] incorporate temporal priors into memory retention
+      that history-review reinstruction can recover navigation     and readout, respectively. ReInsVLN provides reactivation at
+      failures using the existing task context.                    the input level through scheduled history-review prompts,
+   • We develop Coverage- and Instruction-Aware Compres-           guiding frozen navigators to revisit existing observations
+      sion for memory construction in ReInsVLN, combining          without additional retrieval or model calls.
+      temporal redundancy reduction with instruction-guided
+      visual token selection.                                      III. R E I NS B ENCH : D IAGNOSING H ISTORY U TILIZATION
+   • We introduce Forgetting-Inspired History Reminders to            Retaining history does not guarantee its effective use.
+      support memory utilization by guiding frozen navigators      ReInsBench is a diagnostic benchmark that examines this gap
+      to revisit retained observations according to a predefined   through matched R2R continuation trials. A frozen navigator
+      schedule, without additional model calls.                    resumes from the same observation history and environment
+   • Simulation experiments show navigation gains on both          state under different prompting conditions. Paired outcomes
+      navigators, together with reduced prefill latency and        quantify navigation recovery and disruption.
+                                                                                                              TABLE I
+   1 Select episodes        2 Replay failures            3 Branch & compare           M ATCHED CONTINUATION SUCCESS COUNTS ON R E I NS B ENCH . B IS
+      R2R val-unseen         2 failed runs per episode    Frozen continuation         EVALUATED ONLY ON THE 198- INSTANCE SUBSET. T HE FINAL TWO
+                                                                                                 ROWS SUMMARIZE ALL 812 INSTANCES .
+                                                                     B    No text
+                                                                                                          Diagnostic set                                              n        B         N        R0
+                                                                                                          Three-branch subset          198 40 53 64
+     3 frozen navigators                                             N    Neutral                         Subset with prior navigation 148 37 47 51
+    π1       π2       π3          Replay prefix
+                                                                                                          Complete two-branch set      812 – 190 209
+                                                         same
+                                       t*         Run    state
+                                                                                                          N only / R0 only                                                               82 / 101
+                                                                          History
+                                                                    R0    review                          Both succeed / either succeeds                                                108 / 291
+                                                  Ref.
+     406 episodes           Before the first mismatch      Matched trials
+                                                                                    compare the resulting successes and failures. Comparisons
+                              ReInsBench                                            with B assess the benefit of reinstruction over unprompted
+                   How Well Does Your Model Use Memory?                             continuation, while comparisons with N assess its additional
+                                                                                    benefit over a generic reminder. The full benchmark contains
+Fig. 2. Construction of ReInsBench. Episodes solved by exactly one of               812 instances evaluated under N and R0 , including a subset
+three frozen navigators contribute two unsuccessful rollouts each. Recorded         of 198 instances evaluated under all three conditions.
+prefixes are replayed to the state before the first disagreement with refer-
+ence actions, yielding 812 model-specific checkpoints from 406 episodes.            C. Behavioral Profiles of History Review
+Matched continuations from each checkpoint compare neutral prompting
+(N) and history review with task restatement (R0 ); a 198-instance subset              ReInsBench identifies recoverable continuations after nav-
+additionally includes controlled continuation without added text (B).               igation begins (Table I). On the 148 later checkpoints with all
+                                                                                    three conditions, R0 recovers 24 of 111 B failures, compared
+A. Benchmark Construction                                                           with 17 for N. Accounting for ten regressions, R0 gains
+   ReInsBench is constructed from R2R Val-Unseen                                    9.46 percentage points over B and 2.70 over N. Across
+in continuous environments, using recorded rollouts of                              the 198-instance subset, the corresponding gains are 12.12
+StreamVLN, InternVLA-N1, and AwareVLN. As illustrated                               and 5.56 points, with recoveries on all three navigators. In
+in Fig. 2, episodes are retained only when exactly one navi-                        the full collection, recoveries relative to N are partly offset
+gator succeeds. The successful rollout demonstrates episode-                        by regressions, yielding a net gain of 2.34 points (95%
+level solvability, while the two unsuccessful rollouts pro-                         trajectory-cluster interval [−0.99, 5.68]).
+vide diagnostic instances. This yields 812 model-specific                              These outcomes show recovery and disruption, while the
+instances from 406 episodes, spanning 296 scene–trajectory                          full-set confidence interval leaves the advantage over neutral
+pairs across 11 scenes.                                                             prompting uncertain. Seven of the 198-instance subset’s
+   For each unsuccessful rollout, the first disagreement be-                        eleven net R0 − N successes arise at initial registration.
+tween recorded and reference actions defines an offline                             Figure 3 illustrates selected recoveries. Because R0 combines
+checkpoint. The recorded prefix is replayed to restore the                          history review with task restatement, attribution to histor-
+simulator state, with the checkpoint registered before the                          ical evidence alone requires content-matched and history-
+disagreeing action is executed. The collection contains 451                         availability controls. Registration can precede actual prompt
+checkpoints after navigation begins and 361 initial check-                          consumption, particularly for StreamVLN. The supplement
+points, allowing separate analyses of navigation with prior                         details these boundaries and attribution controls.
+history and initial instruction grounding.                                                    Baseline: failure                        ReIns: success               Reminder cue                Goal                S    Start
+                                                                                     Red text: goal not completed                                        Green text: revisited by reminder
+
+                                                                                      (a) R2R_unseen episode 1511                                         (b) R2R_unseen episode 1273
+B. Intervention and Evaluation Protocol                                                                                    Instruction excerpts                                              Instruction excerpts
+                                                                                                                             REVISITED CUE                                                     REVISITED CUE
+                                                                                                                             ... the fireplace is
+   Controlled continuation (B) adds no text and controls for                                                                 behind you, exit the
+                                                                                                                             room going forward. ...
+                                                                                                                                                                                               Walk up stairs into
+                                                                                                                                                                                               sitting room ...
+                                                                                                               S
+renewed inference. Neutral prompting (N) requests careful                               1
+                                                                                        m                                    UNMET GOAL
+                                                                                                                                                            1
+                                                                                                                                                            m
+                                                                                                                                                                                         S     UNMET GOAL
+
+continuation. History-review reinstruction (R0 ) asks the                             Baseline: 11.26 m | 500-step limit
+                                                                                      ReIns: 0.85 m | 69 steps
+                                                                                                                             ... stairs going down,
+                                                                                                                             then stop on the landing.    Baseline: 6.14 m | 59 steps
+                                                                                                                                                          ReIns: 0.13 m | 46 steps
+                                                                                                                                                                                               ... stop next to coffee
+                                                                                                                                                                                               table.
+
+navigator to revisit available history and realign subgoals
+                                                                                      (c) R2R_unseen episode 101                                          (d) R2R_unseen episode 1203
+with the original instruction. The intervention combines                                                                   Instruction excerpts
+                                                                                                                                                            S
+                                                                                                                                                                                             Instruction excerpts
+                                                                                                                             REVISITED CUE                                                     REVISITED CUE
+a review request with task restatement. For 794 template                                                                     exit room walk through                                            ... the black chair alone
+                                                                                                                             double doors ...                                                  at the wall ...
+reminders, reference sequence length determines a coarse
+                                                                                        1                           S                                       1
+                                                                                                                             UNMET GOAL                                                        UNMET GOAL
+starting clause and the repeated instruction suffix; 18 pilot                           m
+                                                                                      Baseline: 3.74 m | 34 steps
+                                                                                                                             ... stop on top step of
+                                                                                                                                                            m
+                                                                                                                                                          Baseline: 5.19 m | 87 steps
+                                                                                                                                                                                               ... stop behind the first
+                                                                                                                             hottub.                                                           chair.
+reminders use fixed semantic restatements. Reference infor-                           ReIns: 1.48 m | 47 steps                                            ReIns: 0.59 m | 54 steps
+
+
+mation informs offline construction, but no new reference
+action sequence is supplied to the navigator.                                       Fig. 3. Selected StreamVLN continuations on ReInsBench: B/N fail and
+                                                                                    R0 succeeds. Habitat-Sim replays show final navigation errors alongside
+   At each checkpoint, the frozen navigator resumes from                            original instruction excerpts. Green and red spans mark revisited cues and
+the same replayed state under different prompting conditions.                       unmet goals, ellipses mark omissions. Maps, cue diamonds, and goal stars
+We evaluate whether each continuation reaches the goal and                          are for illustration only, not navigator inputs or causal labels.
+  ReInsVLN: Lighten the load. Take the ReIns.                                                                                                     Compact visual context + timely history review
+
+                                                           Original instruction                       “Pass the blue cabinet, then turn left.”
+
+                                                                                                     Frozen navigator                                        StreamVLN / InternVLA-N1 S2
+
+                                  Vision             A     Pre-LLM                                                         B       In-LLM
+                                 encoder                                                                                                                                        Action               Execute
+                                                                                                                                                                               decoding               action
+                                 Projector
+
+  Observation history                                                             Context           Early layers                                         Later layers
+
+                                                                                                                                History-review cue + original instruction ·same model call
+
+  CIAC · Memory construction                                                                                                                          FHR · Memory utilization
+                   A Pre-LLM compression                                                    B In-LLM compression                                              C History-review reminders
+   Temporal redundancy reduction                                          Instruction-guided query expansion                                              Sparse, forgetting-inspired schedule
+     Previous          Current           Merge static                      Instruction            Visual seeds            Expanded query               Age prior
+
+                                       Select dynamic
+                                                                          Refined semantic relevance
+                                                                                                                                                               Early cue                    Later review
+   Coverage-aware protection
+                                          Current                                                                                                                                           Decision calls
+    Full F
+                                                     Covered in F
+                                                     Missing in R         Position candidates                                  Rotary cos / sin
+    Retained R                                                                                                                                                     Review retained history.
+                                                                                                                                                                               +
+    Protect within
+    the frame budget                                                                                                                                           Restate the original instruction
+                                   Priority slots    Remaining slots                 Union + semantic fill; restore token order
+
+     Static / merged         Visual            Protected                            Early-layer KV and non-visual tokens are preserved.                               No extra model call
+
+
+Fig. 4. Overview of ReInsVLN. CIAC supports memory construction through Pre-LLM redundancy reduction and coverage-aware protection, followed by
+instruction-guided In-LLM token selection. FHR supports memory utilization by guiding the frozen navigator to revisit retained history through scheduled
+reminders, without additional model calls.
+
+
+
+  IV. R E I NS VLN: V ISUAL C OMPRESSION AND T IMELY                                                      tokens with both the full and retained references. For a
+                        R EMINDERS                                                                        current visual token xi , let F and R denote the full and
+                                                                                                          retained token sets of the preceding frame. Their coverage
+A. Overview
+                                                                                                          is measured by maximum cosine similarity:
+   As shown in Fig. 4, ReInsVLN combines Coverage- and
+Instruction-Aware Compression (CIAC) and Forgetting-                                                                       ui = max cos(xi , f),                   vi = max cos(xi , r).                     (1)
+                                                                                                                                     f∈F                                 r∈R
+Inspired History Reminders (FHR) for memory construc-
+                                                                                                          Given a similarity threshold θ , tokens satisfying ui ≥ θ and
+tion and utilization. CIAC reduces temporal redundancy and
+                                                                                                          vi < θ resemble full reference content but are insufficiently
+protects content poorly covered by retained tokens in the
+                                                                                                          covered by retained tokens. These candidates are ranked by
+Pre-LLM stage, then selects visual tokens by instruction                                                                                            
+relevance and position in the In-LLM stage. FHR inserts                                                                       di = s̄i 1 + (ui − vi ) ,              (2)
+scheduled reminders into existing decision calls to prompt
+                                                                                                          where θ is a similarity threshold and s̄i is normalized token
+history review guided by the original instruction. Both use
+                                                                                                          saliency. Up to K highest-ranked candidates are retained first,
+the frozen navigator’s existing context mechanisms, preserv-
+                                                                                                          with the remaining budget allocated to static-token merging
+ing native action decoding and execution.
+                                                                                                          and dynamic-token selection.
+                                                                                                          In-LLM Compression. The In-LLM stage further selects
+B. Coverage- and Instruction-Aware Compression (CIAC)
+                                                                                                          visual tokens using the original instruction and positional
+Pre-LLM Compression. Pre-LLM compression combines                                                         information. At pruning layer ℓ, let V ∈ Rn×d and QI ∈ Rm×d
+causal temporal reduction with dynamic-token protection.                                                  denote the concatenated value-head representations of one
+Tokens at corresponding patch positions in the current and                                                frame’s visual tokens and the original instruction tokens,
+preceding uncompressed frames are classified as static if                                                 respectively. For a query matrix Q, visual relevance is
+their cosine similarity exceeds a threshold, and dynamic
+                                                                                                                                                   QV⊤
+                                                                                                                                                       
+otherwise. The frame budget Bpre is allocated proportion-                                                            a(Q) = Meanrows softmax √              ,        (3)
+ally between these groups. Static tokens are clustered and                                                                                             d
+merged, while dynamic tokens are selected by saliency [30].                                               with softmax over visual tokens and averaging over query
+   The compressed representation of the preceding frame                                                   tokens. The value representations of the top ks visual tokens
+may fail to preserve some original content. Dynamic token                                                 under a(QI ) are appended to QI , forming an expanded query
+protection identifies this coverage gap by comparing current                                              Q′ with refined scores ã = a(Q′ ).
+   Positional information provides an additional source of         streaming visual observations to the server and receiving
+candidates. For each visual token, the components of its           action commands for execution.
+rotary cosine and sine vectors are summed separately. The
+                                                                   B. Implementation Details
+indices of the top k p tokens under each score are combined
+into a positional candidate set P. If this set exceeds the frame      We evaluate ReInsVLN with two frozen navigators:
+budget Bin , it is reduced by semantic rank. The remaining         StreamVLN [7] for streaming inference and InternVLA-N1
+slots are filled using ã:                                         System 2 [8], [9] for non-streaming inference.
+                                                                      By default, Pre-LLM compression retains Bpre = 128 of
+               T = P ∪ TopKi∈P
+                            / (ãi , Bin − |P|) ,           (4)    196 tokens per eligible frame. The temporal similarity and
+where TopK returns the indices with the highest scores,            coverage thresholds are both 0.9, with at most K = 8 dynamic
+and T denotes the selected token index set. The selected           tokens protected within this budget. This protection applies
+tokens retain their original positions and sequence order. The     to eligible frames entering StreamVLN’s fast branch and only
+shortened hidden sequence is passed to subsequent layers,          to current-observation frames in InternVLA-N1. Static-token
+reducing the tokens they process and cache. Layers up to ℓ         merging uses density-peak clustering with a neighborhood
+retain their KV entries, and non-visual tokens are preserved.      size of 7 and a cluster-center weight of 0.6.
+                                                                      In-LLM pruning retains Bin = 96 tokens per eligible frame
+C. Forgetting-Inspired History Reminders (FHR)                     after layer ℓ = 20. For n input tokens, query expansion uses
+   Compression determines which visual evidence remains            ks = ⌈0.01n⌉ visual seeds, and positional selection takes
+available, but retaining evidence does not ensure its use in       k p = ⌈0.05n⌉ candidates from each cosine and sine ranking.
+later decisions. FHR complements CIAC by reconnecting              Pruning applies only to Pre-LLM-compressed frames.
+retained observations with the original instruction. The re-          For FHR, we instantiate the timing heuristic with a fixed
+coveries and regressions observed in ReInsBench motivate           schedule, triggering reminders only at the 2nd and 13th
+sparse reminders that encourage history utilization while          model decision calls. Each reminder prompts the navigator
+limiting repeated intervention.                                    to revisit retained observations and restates the original
+   Inspired by forgetting curves and forgetting-based memory       instruction. Reminders are incorporated into existing decision
+refresh [28], we schedule reminders using an exponential age       calls without additional model invocations.
+prior. Let t index model decision calls and tlast denote the       C. Main Results
+last reminder call. Before reminder k, the prior is
+                                                                 Simulation Experimental Results. Table II reports naviga-
+                                  t − tlast                        tion performance on R2R Val-Unseen. ReInsVLN improves
+                    q(t) = exp −              ,          (5)
+                                     τk                            SR by 8.48 and 3.37 points over the native StreamVLN and
+   where τk > 0 specifies the reminder interval. A reminder        InternVLA-N1, reaching 64.27% and 64.44%, respectively.
+is triggered when q(t) ≤ e−1 , equivalently when t −tlast ≥ τk .   These gains are accompanied by SPL improvements of 6.52
+The trigger resets tlast to t and advances the schedule. This      and 3.12 points and NE reductions of 0.46 m and 0.17 m.
+forgetting-inspired temporal heuristic does not estimate the       Higher SPL and lower NE complement the success-rate
+navigator’s actual recall probability.                             gains, indicating improvements in success-weighted path ef-
+   At each trigger, a fixed prompt asks the navigator to review    ficiency and final-goal proximity. The consistent gains across
+its available history against the original instruction, followed   both navigators support the effectiveness of ReInsVLN under
+by a restatement of that instruction. The reminder uses only       streaming and non-streaming inference.
+the retained context, without retrieving discarded frames or       Inference Efficiency. Since pruning ratios alone do not de-
+introducing future observations, reference actions, or route       termine practical speedups [31], we benchmark CIAC against
+progress labels. It adds text within an existing decision call,    native inference on 33 episodes across 11 scenes, with FHR
+preserving the visual compression budget and native action         disabled. Matched observations are replayed at controlled
+pipeline without requiring an additional model invocation.         four-action boundaries. We sample three normal decision
+                                                                                             TABLE II
+                      V. E XPERIMENTS
+                                                                   S IMULATION RESULTS ON R2R VAL -U NSEEN . C HANGES ARE RELATIVE
+A. Experimental Setup                                                             TO THE CORRESPONDING BASELINE .
+Simulation Benchmark Setup. We evaluate ReInsVLN on
+all 1,839 R2R val-unseen episodes from 11 scenes. Perfor-                                       R2R Val-Unseen
+                                                                             Method
+mance is measured by success rate (SR), success weighted                                SR (%) ↑ SPL (%) ↑ NE (m) ↓
+by path length (SPL), and navigation error (NE).                                      Streaming VLN: StreamVLN
+Real-World Evaluation Setup. We conduct real-world ex-                       Baseline      55.79         49.90         4.81
+periments using a Unitree G1 EDU humanoid robot and a                        ReInsVLN    64.27↑ 8.48   56.42↑ 6.52   4.35↓ 0.46
+Unitree Go2 EDU quadruped robot, each equipped with an                           Non-Streaming VLN: InternVLA-N1
+external Intel®RealSense™D435i camera on the front. Both
+platforms connect to an inference server equipped with an                    Baseline      61.07         55.67         4.26
+                                                                             ReInsVLN    64.44↑ 3.37   58.79↑ 3.12   4.09↓ 0.17
+NVIDIA®RTX 4090 GPU through a Wi-Fi access point,
+               Humanoid (G1) : Fine-Grained Spatial Instruction Following
+
+
+
+
+                                                                                                    yellow chair
+
+
+
+                 hallway        ✓                     wooden door        ✓                                       ✓                   turn around          ✓                  refrigerator      ✓
+   ☞        Go straight forward the hall way until the wooden door, After going through the door, turn right when you see the near yellow chair, then turn around and walk stop at the refrigerator.
+
+
+               Quadruped (Go2) : Ordinal Navigation in Repetitive Environments
+
+
+
+     1                                                                                    3
+                                                                                                                                                                        5
+                                                  2                                                                             4
+
+
+                                                                                                                                                                              Goal reached
+                                                                                                                                                                                                 ✓
+    ☞        Walk forward through the brown door, pass by the red box, then continue walking and stop next to the fifth green potted plant you saw from the beginning.
+
+
+
+Fig. 5. Representative real-world navigation examples. Top: the Unitree G1 humanoid follows a sequence of landmark-dependent spatial instructions.
+Bottom: the Unitree Go2 quadruped navigates through repeated landmarks and stops beside the fifth potted plant in encounter order. Red text highlights
+instruction clauses, and numbered markers indicate the order of encountered plants.
+
+
+                                                                                                                                     TABLE III
+          Visual tokens                  LLM prefill                     KV storage
+                                                                                                            R EAL - WORLD RESULTS ON ORDINAL NAVIGATION WITH REPEATED
+             after L20                         ms                             MiB
+    StreamVLN                                                                                               LANDMARKS USING U NITREE G O 2. T HE ROBOT IS INSTRUCTED TO
+                                                                                                            STOP BESIDE THE FIFTH POTTED PLANT. P ROVISIONAL SR COUNTS
+           ↓ 11.88%                        ↓ 5.14%                       ↓ 10.27%
+                                                                                                                        STOPS BETWEEN ADJACENT PLANTS AS FAILURES .
+         433.58 → 382.06                64.82 → 61.49                  87.14 → 78.19
+    InternVLA-N1 S2                                                                                              Method                       Trials               Successes          SR (%) ↑
+                                                                                                                 StreamVLN                     4 w/                    1               25.00
+           ↓ 45.65%                       ↓ 21.77%                       ↓ 32.25%
+                                                                                                                 InternVLA-N1                 4 w/o                    0                0.00
+     1241.33 → 674.67                  121.17 → 94.80                  74.13 → 50.22                             ReInsVLN                  4 w/ + 4 w/o              3+2               62.50
+                                                                                                        w/: with doorway crossing; w/o: without doorway crossing. Instructions
+          Compressed                  Saved                                  Native = 100%
+                                                                                                        differ accordingly, but both variants target the fifth potted plant in the
+                                                                                                        same corridor scene.
+Fig. 6. Compression efficiency with reminders disabled. Bars are normal-
+ized to Native (100%): blue indicates compressed cost and gold indicates                                robot to stop beside the fifth potted plant along a corridor
+savings. Percentages report relative reductions; values below show Native
+→ compressed means. Metrics are visual tokens after layer 20, LLM GPU                                   with repeated landmarks, testing its ability to track landmark
+prefill time, and end-of-call KV tensor storage excluding weights. Means                                encounters across observations.
+cover 99 matched normal calls from 33 episodes, each repeated three times;                                 As shown in Table III, ReInsVLN succeeds in five of eight
+each condition uses a distinct dedicated A100 40GB GPU.
+                                                                                                        ordinal navigation trials (62.5%), compared with one of four
+calls per episode at early, middle, and late stages, giving                                             (25.0%) for StreamVLN and zero of four for InternVLA-N1.
+99 matched calls, each repeated three times. InternVLA-N1                                               These results suggest that better utilization of retained history
+look-down continuations are excluded. Each condition uses                                               can improve frozen navigators’ real-world generalization,
+a dedicated A100 40GB GPU. Figure 6 shows that CIAC re-                                                 helping them handle sequential landmark tracking tasks
+duces visual tokens after layer 20, LLM GPU prefill latency,                                            that challenge their native counterparts. Figure 5 presents
+and KV cache memory by 11.88%, 5.14%, and 10.27%                                                        representative navigation sequences for both tasks.
+on StreamVLN, respectively. InternVLA-N1 exhibits larger
+corresponding reductions of 45.65%, 21.77%, and 32.25%.                                                 D. Ablation Studies
+This may partly reflect their inference patterns. StreamVLN                                             Component Ablation. ReInsVLN consists of two com-
+incrementally processes incoming frames reusing cached                                                  ponents: Coverage- and Instruction-Aware Compression
+history, whereas InternVLA-N1 jointly processes uniformly                                               (CIAC) and Forgetting-Inspired History Reminders (FHR).
+sampled historical frames and the current observation, pro-                                             To explore the contribution of each component to our nav-
+viding more visual context for compression per call.                                                    igator, we conduct ablation studies on different component
+Real-World Experimental Results. We evaluate ReInsVLN                                                   combinations. The results are summarized in Table IV. CIAC
+on two real-world tasks: sequential spatial instruction follow-                                         substantially reduces visual tokens while largely preserving
+ing with the Unitree G1 humanoid and ordinal navigation                                                 navigation performance. Its two-stage compression reduces
+with the Unitree Go2 quadruped. The latter requires the                                                 the token budget per eligible frame from 196 to 128 and then
+                          TABLE IV                                                                  TABLE VI
+    C OMPONENT ABLATION ON R2R VAL -U NSEEN . S HADED ROWS                A BLATION OF IN -LLM COMPRESSION SETTINGS ON R2R VAL -U NSEEN .
+           INDICATE THE SETTINGS USED IN R E I NS VLN.
+                                                                                Pruning Keep       Early KV        R2R Val-Unseen
+                                                                           #                 Scope
+                                                                                 Layer Ratio        Pruning SR (%) ↑ SPL (%) ↑ NE (m) ↓
+          Components      R2R Val-Unseen
+        #
+          CIAC FHR SR (%) ↑ SPL (%) ↑ NE (m) ↓                                                   Streaming VLN: StreamVLN
+
+                      Streaming VLN: StreamVLN                             1      16    .75     Proj.    ×        54.87     48.57   5.02
+                                                                           2      16    .75     Proj.    ✓        56.33     50.09   4.80
+        1                       55.79         49.90         4.81           3      16    .50     Proj.    ×        55.30     49.11   5.02
+        2    ✓                56.77↑ 0.98   50.71↑ 0.81   4.83↑ 0.02       4      16    .50     Proj.    ✓        55.95     49.51   4.88
+        3              ✓      60.96↑ 5.17   54.33↑ 4.43   4.62↓ 0.19       5      20    .75     Proj.    ×        56.77     50.71   4.83
+        4    ✓         ✓      64.27↑ 8.48   56.42↑ 6.52   4.35↓ 0.46       6      20    .75     Proj.    ✓        56.06     49.77   4.95
+                                                                           7      20    .75      All     ×        56.17     50.22   4.94
+                   Non-Streaming VLN: InternVLA-N1
+                                                                           8      20    .75      All     ✓        56.06     50.03   4.98
+        5                       61.07         55.67         4.26                              Non-Streaming VLN: InternVLA-N1
+        6    ✓                60.74↓ 0.33   55.78↑ 0.11   4.29↑ 0.03
+                                                                            9     16    .75     Proj.    ×        59.43     54.66   4.44
+        7              ✓      64.06↑ 2.99   58.05↑ 2.38   4.09↓ 0.17
+                                                                           10     16    .75     Proj.    ✓        60.30     55.48   4.37
+        8    ✓         ✓      64.44↑ 3.37   58.79↑ 3.12   4.09↓ 0.17
+                                                                           11     16    .50     Proj.    ×        58.18     53.43   4.48
+                                                                           12     16    .50     Proj.    ✓        58.51     53.76   4.45
+                                                                           13     20    .75     Proj.    ×        60.74     55.78   4.29
+to 96. Despite this reduction, SR remains close to the base-               14     20    .75     Proj.    ✓        60.47     55.30   4.31
+line, with changes of +0.98% and -0.33% on StreamVLN                       15     20    .75      All     ×        60.90     55.41   4.27
+and InternVLA-N1, respectively, while SPL increases by                     16     20    .75      All     ✓        59.82     54.73   4.28
+0.81% and 0.11%. FHR alone improves SR by 5.17 and
+2.99 percentage points on StreamVLN and InternVLA-N1,                     Coverage-Aware Protection. Table V compares protec-
+respectively, with higher SPL and lower NE. It recovers                   tion strategies and targets within CIAC. On StreamVLN,
+173 and 126 baseline failures, while introducing 78 and 71                coverage-based protection of dynamic tokens outperforms
+success-to-failure regressions. The recoveries outweigh the               saliency-based protection and other target configurations.
+regressions on both navigators, producing net gains of 95                 Compared with no protection, it improves SR and SPL by
+and 55 successful episodes, respectively. Combining CIAC                  0.54% and 0.33%, respectively, and reduces NE by 0.06 m.
+and FHR achieves the highest reported SR and SPL among                    The limited benefit on InternVLA-N1 may reflect larger tem-
+the evaluated configurations on both navigators. Compared                 poral gaps from uniform frame sampling, potentially weaken-
+with FHR alone, SR increases by a further 3.31% and 0.38%                 ing the inter-frame correspondence used by coverage-based
+on StreamVLN and InternVLA-N1, respectively.                              protection. Current-frame dynamic-token protection, corre-
+                                                                          sponding to fast-branch protection in StreamVLN, achieves
+                          TABLE V                                         higher SR and lower NE than protection over all frames
+   A BLATION OF PROTECTION STRATEGIES AND TARGETS ON R2R                  or historical frames. Compared with no protection, NE
+VAL -U NSEEN . S TAT. AND DYN . DENOTE STATIC AND DYNAMIC TOKENS ,        decreases from 4.32 to 4.24 m, while SR and SPL decrease
+     RESPECTIVELY. C URR . AND H IST. REFER TO THE CURRENT AND
+                                                                          slightly by 0.22% and 0.29%, respectively. These results
+       HISTORICAL FRAMES , RESPECTIVELY. I N NON - STREAMING
+                                                                          suggest adapting the protection scope to each navigator.
+  I NTERN VLA-N1, CURRENT- FRAME PROTECTION CORRESPONDS TO                Keep Ratio, Pruning Layer, Scope, and Early KV Prun-
+            FAST- BRANCH PROTECTION IN S TREAM VLN.
+                                                                          ing. Table VI evaluates in-LLM compression settings, pri-
+                                                                          oritizing navigation performance preservation. A 0.75 keep
+           Protection                      R2R Val-Unseen
+   #                                                                      ratio retains 96 of 128 tokens per eligible frame. Reducing it
+       Method     Target            SR (%) ↑ SPL (%) ↑ NE (m) ↓
+                                                                          to 0.50 degrades performance on InternVLA-N1 but yields
+                      Streaming VLN: StreamVLN                            mixed results on StreamVLN. With other settings at their
+   1   w/o prot.        -              56.77         50.48         4.79   defaults, moving pruning from layer 16 to 20 improves
+   2   Saliency        Dyn.            56.99         50.79         4.76   SR by 1.90% and 1.31% on StreamVLN and InternVLA-
+   3   Coverage      Stat.             55.79         49.71         4.83   N1, respectively, alongside higher SPL and lower NE. Proj.
+   4   Coverage     Dyn.               57.31         50.81         4.73   targets frames already compressed at the projector stage,
+   5   Coverage Stat. & Dyn.           55.14         49.48         4.89   while All targets all frames. Under otherwise default settings,
+                   Non-Streaming VLN: InternVLA-N1                        Proj. improves all metrics on StreamVLN and SPL on
+   6   w/o prot.        -              61.45         55.94         4.32
+                                                                          InternVLA-N1, with slightly worse SR and NE on the latter.
+   7   Saliency        Dyn.            60.74         55.48         4.35      We further evaluate early KV pruning, which additionally
+                                                                          removes the KV cache entries of discarded visual tokens
+    8 Coverage      Stat.              60.58         55.47         4.30
+    9 Coverage     Dyn.                61.01         55.71         4.34
+                                                                          from all layers up to the pruning layer. Adding it to the
+   10 Coverage Stat. & Dyn.            59.92         54.91         4.30   default configuration reduces SR by 0.71% and 0.27% on
+                                                                          StreamVLN and InternVLA-N1, respectively, while also
+   11 Coverage       Curr. Dyn.        61.23         55.65         4.24
+   12 Coverage       Hist. Dyn.        60.79         55.60         4.31
+                                                                          lowering SPL and increasing NE.
+                          VI. C ONCLUSION                                        [14] S. Wen, Z. Zhang, Y. Sun, and Z. Wang, “OVL-MAP: An Online
+                                                                                      Visual Language Map Approach for Vision-and-Language Navigation
+   We presented ReInsVLN, a training-free framework for ef-                           in Continuous Environments,” IEEE Robotics and Automation Letters,
+ficient embodied navigation through compact visual context                            vol. 10, no. 4, pp. 3294–3301, 2025.
+and improved history utilization. ReInsBench examines his-                       [15] H. Wu, J. Tong, X. Wang, Y. Tan, C. Zeng, A. Antsiferova, and
+                                                                                      X. Shen, “From Data to Model: A Survey of the Compression
+tory utilization through controlled prompting comparisons,                            Lifecycle in MLLMs,” TechRxiv preprint, 2026.
+motivating the combination of coverage- and instruction-                         [16] P. Yin, H. Wu, Z. Yang, F. Zhou, Y. Liang, H. Hu, X. Wang, W. Zhang,
+aware compression with scheduled history-review reminders.                            and X. Shen, “Bifocal: Training-free mixed granularity visual token
+                                                                                      pruning for multimodal llms,” arXiv preprint arXiv:2610.18399, 2026.
+Experiments on R2R Val-Unseen show improved navigation                           [17] Y. Zheng, H. Wu, F. Li, H. Fu, P. Yin, X. Wang, H. Hu, X. Chen,
+performance on StreamVLN and InternVLA-N1, while vi-                                  Y. Ma, W. Zhang, et al., “Geogr: Spatial-semantic token com-
+sual compression reduces prefill latency and KV cache stor-                           pression and group routing for efficient 3d vlms,” arXiv preprint
+                                                                                      arXiv:2610.13035, 2026.
+age. These findings support visual context compression and                       [18] Y. Shang, M. Cai, B. Xu, Y. J. Lee, and Y. Yan, “LLaVA-PruMerge:
+history review as complementary approaches to improving                               Adaptive Token Reduction for Efficient Large Multimodal Models,”
+navigation performance and reducing inference overhead in                             in 2025 IEEE/CVF International Conference on Computer Vision
+                                                                                      (ICCV). IEEE, 2025, pp. 22 857–22 867.
+embodied systems.                                                                [19] L. Chen, H. Zhao, T. Liu, S. Bai, J. Lin, C. Zhou, and B. Chang,
+                                                                                      “An Image is Worth 1/2 Tokens After Layer 2: Plug-and-Play Infer-
+                              R EFERENCES                                             ence Acceleration for Large Vision-Language Models,” in European
+                                                                                      Conference on Computer Vision, 2024.
+ [1] P. Anderson, Q. Wu, D. Teney, J. Bruce, M. Johnson, N. Sünderhauf,          [20] L. Xing, Q. Huang, X. Dong, J. Lu, P. Zhang, Y. Zang, Y. Cao, C. He,
+     I. Reid, S. Gould, and A. van den Hengel, “Vision-and-Language                   J. Wang, F. Wu, et al., “PyramidDrop: Accelerating Your Large Vision-
+     Navigation: Interpreting Visually-Grounded Navigation Instructions               Language Models via Pyramid Visual Redundancy Reduction,” arXiv
+     in Real Environments,” in Proceedings of the IEEE Conference on                  preprint arXiv:2410.17247, 2024.
+     Computer Vision and Pattern Recognition, 2018, pp. 3674–3683.               [21] H. Wu, Y. Fan, J. Dai, J. Tong, Y. Ma, and X. Shen, “HiDrop: Hierar-
+ [2] J. Krantz, E. Wijmans, A. Majumdar, D. Batra, and S. Lee, “Beyond                chical Vision Token Reduction in MLLMs via Late Injection, Concave
+     the Nav-Graph: Vision-and-Language Navigation in Continuous Envi-                Pyramid Pruning, and Early Exit,” in International Conference on
+     ronments,” in European Conference on Computer Vision, 2020.                      Learning Representations, 2026.
+ [3] Y. Hong, Q. Wu, Y. Qi, C. Rodriguez-Opazo, and S. Gould, “VLN               [22] X. Zeng, K. Qiu, Q. Zhang, X. Li, J. Wang, J. Li, Z. Yan, K. Tian,
+     BERT: A Recurrent Vision-and-Language BERT for Navigation,” in                   M. Tian, X. Zhao, et al., “StreamForest: Efficient Online Video
+     Proceedings of the IEEE/CVF Conference on Computer Vision and                    Understanding with Persistent Event Memory,” Advances in Neural
+     Pattern Recognition, 2021, pp. 1643–1653.                                        Information Processing Systems, vol. 38, pp. 75 804–75 835, 2025.
+ [4] S. Chen, P.-L. Guhur, C. Schmid, and I. Laptev, “History Aware              [23] Y. Tan, J. Tong, L. Yue, H. Wu, P. Fang, and X. Shen, “Vicostream:
+     Multimodal Transformer for Vision-and-Language Navigation,” in                   Streaming videollms can run beyond 100 fps with stage-wise coordi-
+     Advances in Neural Information Processing Systems, vol. 34, 2021,                nated inference,” arXiv preprint arXiv:2606.19849, 2026.
+     pp. 5834–5847.                                                              [24] H. Li, X. Dong, H. Jiang, Y. Zhou, and X. Ma, “CMMR-
+ [5] S. Chen, P.-L. Guhur, M. Tapaswi, C. Schmid, and I. Laptev, “Think               VLN: Vision-and-Language Navigation via Continual Multimodal
+     Global, Act Local: Dual-Scale Graph Transformer for Vision-and-                  Memory Retrieval,” arXiv:2603.07997, 2026. [Online]. Available:
+     Language Navigation,” in Proceedings of the IEEE/CVF Conference                  https://arxiv.org/abs/2603.07997
+     on Computer Vision and Pattern Recognition, 2022, pp. 16 537–16 547.        [25] Y. Xu, Y. Pan, and Z. Liu, “Dream to Recall: Imagination-Guided Ex-
+ [6] J. Zhang, K. Wang, R. Xu, G. Zhou, Y. Hong, X. Fang, Q. Wu,                      perience Retrieval for Memory-Persistent Vision-and-Language Navi-
+     Z. Zhang, and H. Wang, “NaVid: Video-based VLM Plans the                         gation,” IEEE Transactions on Pattern Analysis and Machine Intelli-
+     Next Step for Vision-and-Language Navigation,” in Proceedings of                 gence, vol. 48, no. 8, pp. 9035–9049, 2026.
+     Robotics: Science and Systems, 2024.                                        [26] X. Zou, Y. Wang, Y. Yan, Y. Lyu, K. Zheng, S. Huang, J. Chen,
+ [7] M. Wei, C. Wan, X. Yu, T. Wang, Y. Yang, X. Mao, C. Zhu, W. Cai,                 P. Jiang, J. Liu, C. Tang, and X. Hu, “Look Twice Before You
+     H. Wang, Y. Chen, X. Liu, and J. Pang, “StreamVLN: Streaming                     Answer: Memory-Space Visual Retracing for Hallucination Mitigation
+     Vision-and-Language Navigation via SlowFast Context Modeling,” in                in Multimodal Large Language Models,” in Proceedings of the 42nd
+     IEEE International Conference on Robotics and Automation (ICRA),                 International Conference on Machine Learning, ser. Proceedings of
+     2026.                                                                            Machine Learning Research, vol. 267, 2025, pp. 80 873–80 899.
+ [8] InternNav Contributors, “InternNav: InternRobotics’ open platform           [27] S. S. Ghosal, Y. Kim, Z. Li, R. Chaudhry, L. Xu, H. Zhang, J. Zablocki,
+     for building generalized navigation foundation models,” https://github.          Y. Xing, and Q. Zhang, “VisRef: Visual Refocusing while Thinking
+     com/InternRobotics/InternNav, 2025.                                              Improves Test-Time Scaling in Multi-Modal Large Reasoning Mod-
+ [9] M. Wei, C. Wan, J. Peng, X. Yu, Y. Yang, D. Feng, W. Cai, C. Zhu,                els,” in Proceedings of the IEEE/CVF Conference on Computer Vision
+     T. Wang, J. Pang, and X. Liu, “Ground Slow, Move Fast: A Dual-                   and Pattern Recognition, 2026.
+     System Foundation Model for Generalizable Vision-and-Language               [28] W. Zhong, L. Guo, Q. Gao, H. Ye, and Y. Wang, “MemoryBank:
+     Navigation,” in International Conference on Learning Representations,            Enhancing Large Language Models with Long-Term Memory,” in
+     2026.                                                                            Proceedings of the AAAI Conference on Artificial Intelligence, vol. 38,
+[10] N. F. Liu, K. Lin, J. Hewitt, A. Paranjape, M. Bevilacqua, F. Petroni,           no. 17, 2024, pp. 19 724–19 731.
+     and P. Liang, “Lost in the Middle: How Language Models Use                  [29] S. Zhang, Z. Li, G. Ma, and J. Mei, “DART-VLN: Test-Time
+     Long Contexts,” Transactions of the Association for Computational                Memory Decay and Anti-Loop Regularization for Discrete Vision-
+     Linguistics, vol. 12, pp. 157–173, 2024.                                         Language Navigation,” arXiv:2607.01043, 2026. [Online]. Available:
+[11] Y. Lu, S. Sun, N. Liu, B. Jiang, Y. Zhang, J. Chen, and C. Du, “STEP-            https://arxiv.org/abs/2607.01043
+     Nav: Spatial-Temporal Efficient Visual Token Pruning for Vision-and-        [30] X. Chen, K. Tao, K. Shao, and H. Wang, “StreamingTOM: Streaming
+     Language Navigation with Large Language Models,” in Proceedings                  Token Compression for Efficient Video Understanding,” in Proceed-
+     of the AAAI Conference on Artificial Intelligence, vol. 40, no. 29, 2026,        ings of the IEEE/CVF Conference on Computer Vision and Pattern
+     pp. 24 097–24 105.                                                               Recognition, 2026, pp. 24 675–24 685.
+[12] Q. Wang, Y. Liang, M. Li, T. Zhou, and C. Rasmussen, “History-              [31] H. Hu, H. Wu, A. Zhao, L. Ding, P. Yin, Y. Ma, and X. Shen, “Beyond
+     Conditioned Spatio-Temporal Visual Token Pruning for Efficient                   flops: Benchmarking real inference acceleration of llm pruning under
+     Vision-Language Navigation,” arXiv:2603.06480, 2026. [Online].                   a gemm-centric taxonomy,” arXiv preprint arXiv:2606.09080, 2026.
+     Available: https://arxiv.org/abs/2603.06480
+[13] A.-C. Cheng, Y. Ji, Z. Yang, Z. Gongye, X. Zou, J. Kautz, E. Biyik,
+     H. Yin, S. Liu, and X. Wang, “NaVILA: Legged Robot Vision-
+     Language-Action Model for Navigation,” in Proceedings of Robotics:
+     Science and Systems, 2025.
+

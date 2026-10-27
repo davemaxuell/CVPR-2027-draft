@@ -1,0 +1,18 @@
+{
+  "version": "scorer_v1_2026-10-23",
+  "status": "reference_design_not_CE_validated",
+  "prediction_horizon_actions": 1,
+  "candidate_actions": ["FORWARD", "LEFT", "RIGHT", "STOP"],
+  "canonical_action_ids": {"FORWARD": 0, "LEFT": 1, "RIGHT": 2, "STOP": 3, "START": 4},
+  "action_id_note": "These are internal IDs. Map explicitly to the actual Habitat task; do not assume its integer IDs match.",
+  "world_model_calls_for_stop": 0,
+  "future_samples_per_nonstop_candidate": 1,
+  "visual_features": {"proposed_encoder": "dinov2_vits14", "input_resolution": 224, "feature_width": 384, "raw_patches": 256, "pooled_patches": 64},
+  "text_and_context": {"source": "frozen trained navigation VLM", "hidden_widths": {"smolvlm2": 960, "onevision": 896, "qwen3vl": 2048}, "candidate_generation_states_allowed": false},
+  "architecture": {"width": 256, "heads": 4, "memory_slots": 8, "candidate_blocks": 2, "feedforward_width": 512, "readout_width": 128, "heads_out": ["utility", "success_logit", "collision_logit"]},
+  "labels": {"continuation_policy": "same frozen navigation policy with one-action replanning", "success_weight": 0.7, "ndtw_weight": 0.3, "remaining_action_cost": 0.01, "remaining_collision_cost": 0.02, "cost_denominator": "configured maximum episode action count", "reference_path_used_at_inference": false},
+  "loss": {"utility_mse": 1.0, "terminal_success_bce": 0.1, "immediate_forward_collision_bce": 0.1, "ranking_loss": 0.0},
+  "initial_training_proposal": {"optimizer": "AdamW", "learning_rate": 0.0001, "weight_decay": 0.01, "root_batch_size": 8, "gradient_clip_norm": 1.0, "bptt_real_steps": 32, "features": "cached frozen features; recompute trainable memory from actual prefix", "tuning_status": "not_run"},
+  "selection": {"override_margin": null, "margin_selection": "held-out CE training scenes; disable overrides until validated", "fallback": "base policy first action", "tie_break": "base action if its score ties for best; otherwise canonical candidate order"},
+  "comparison": {"scorer_per_navigation_policy": true, "same_scorer_weights_across_four_world_models": true, "world_model_identity_input": false, "world_models_frozen_during_scorer_training": true}
+}

@@ -1,0 +1,1070 @@
+=== PDF PAGE 1 ===
+           Imagining Recovery: Inference-Time Counterfactual Realignment for
+                             Vision-Language-Action Models
+
+                     Yanyan Zhang, Disheng Liu, Kai Ye, Chaoda Song, Xinpeng Li,
+                      Mohsen Hariri, Vikash Singh, Yu Yin, Vipin Chaudhary
+                                              Case Western Reserve University
+                                                           Cleveland, OH, USA
+                                                    yxz3106@case.edu
+
+
+
+                                                                                                     a) Post-training with failure data
+                              Abstract                                                                                                                              retrained
+             Vision-language-action (VLA) models have improved the                          Failure & Correction  post-train    VLA π                  Recovery
+                flexibility and generality of robotic manipulation, yet they re-                             Data                                                Behavior
+           main fragile to online disruptions, such as changes in task goal,               b) Delegating recovery to an external module
+            scene configuration, or robot state. Existing recovery meth-                                               frozen       diagnose                                             auxiliary
+            ods often require failure data, policy retraining, or external                VLA π                    LLM/VLM Agent ·
+              corrective agents, introducing additional data requirements                                                 override actions        Residual Policy
+           and execution risks. We propose Counterfactual Realignment                 c) CoRe (ours): counterfactual realignment
+            (CoRe), a training-free framework that recovers a frozen VLA
+                                                                                                                                                                         frozen2026       at inference time without failure data. Upon detecting a devi-                                      Imagined Continuation           Minimal
+               ation, CoRe imagines how the policy would continue toward              VLA π                                            Realignment
+             the current goal from a recent viable state, using synthesized                                                             synth obs + FK, zero motion
+             observations in place of physical execution, and then min-Aug      imally realigns the robot and scene to rejoin this imagined         Figure 1: OOD recovery paradigms for VLA models. (a)
+
+                is therefore planned without physical trial-and-error, preserves         external module both hinge on costly retraining or a reliable14      continuation before returning control to the policy. Recovery         Post-training on failure data and (b) delegating recovery to an
+            completed task progress, and handles both mid-episode in-         auxiliary system. (c) CoRe instead plans recovery virtually
+              struction changes and physical perturbations in a unified man-                                                                and returns control to the same frozen policy.
+               ner. Extensive experiments across multiple simulators, VLA
+            backbones, and real-world settings show that CoRe improves
+             success rates by up to 85.0 percentage points to near-nominal
+              levels while reducing physical restorations by 42.2%, without
+             policy fine-tuning or failure-specific recovery training.               failure-conditioned supervision, collected from human inter-[cs.RO]                                                                   ventions during deployment (Wu et al. 2026), from perturba-
+                                                                               tions injected into successful trajectories with corrective seg-
+                       Introduction                        ments appended (Zhao et al. 2026a), or from failed rollouts
+       By coupling large-scale vision-language representations with      synthesized through simulators, learned world models, and
+         robot action generation, vision-language-action (VLA) mod-       policy-driven exploration (Lin et al. 2025; Li et al. 2026; Xiao
+           els offer a promising path toward general-purpose robots        et al. 2026), and then post-trains the policy through behav-
+          that follow diverse instructions across objects, tasks, and       ioral cloning (Zhao et al. 2026a; Xiao et al. 2026), preference
+         environments (Zitkovich et al. 2023; Kim et al. 2024; Ma      optimization (Wu et al. 2026), or related objectives (Liufu
+           et al. 2026b). Yet, trained almost exclusively on success-        et al. 2026). Such methods require costly failure-data col-
+            ful, forward-progressing demonstrations (Dai et al. 2025;       lection and may require repeated collection and retraining
+       Duan et al. 2025), VLAs remain brittle to out-of-distribution       as new failure modes emerge (Wu et al. 2026; Karli and
+       (OOD) execution states (Pumacay et al. 2024; Guo et al.       Fitzgerald 2026). The second direction delegates recovery
+         2026). Once the joint consistency of language, observation,       to an auxiliary module, including LLM/VLM-based agents
+        and robot configuration breaks, the policy lacks corrective       that diagnose failures and replan (Liu, Bahety, and Song
+         behavior to recover autonomously (Fei et al. 2026; Xiao et al.      2023), external supervisors that issue textual, visual, or ex-
+         2026), and closed-loop execution compounds minor errors       ecutable corrections (Ye et al. 2026; Lin et al. 2025; ZengarXiv:2608.14822v1   into task failure (Belkhale, Cui, and Sadigh 2023; Liu et al.        et al. 2025), and learned residual policies that modify ac-
+         2025). Such deviations are routine in deployment, where       tions at runtime (Hu et al. 2026). Such modules add training
+          physical disturbances alter the scene or robot state and in-       or inference overhead and must themselves produce reliable,
+          structions change mid-task (Liu et al. 2025; Shi et al. 2025).      executable recovery decisions (Lin et al. 2025; Ye et al. 2026;
+           Recognizing this limitation, recent work explores failure    Hu et al. 2026). Beyond these two lines, resetting or rewind-
+          correction and recovery for VLAs along two main directions      ing execution to a predetermined state, whether a fixed sub-
+          (Fig. 1). The first augments nominal demonstrations with       task checkpoint or a frame retrieved from prior demonstra-
+
+=== PDF PAGE 2 ===
+        REAL-WORLD EXECUTION (VLA EXECUTION  · MOTION PLANNING)
+                                                                                                                                                      Physical Motion
+            VLA Policy                                      Online Perturbation     OOD Detector
+                              aₜ = π(oₜ, ℓ)       Nominal Execution                                                            suffix latent: sₜ > τₖ
+                                                                   Language · Physical Changes                                                                                         pick-&-placePhysicalrestoreRearrangementS* → move arm &to q*Handoff→ truncate 𝒯
+
+
+                                                                            Trigger Recovery                                                                           S*, c*
+
+         VIRTUAL RECOVERY PLANNING · SYNTH OBS + FK · ZERO PHYSICAL MOTION  solves c* = argmin c |ℛ(c)| s.t. π(·|c, ℓ′) ∈ 𝒟 ℓ′, 𝒫(cnow ) ⊆ 𝒫(c)
+
+                  Phase-Aware Recovery Anchoring                            Synthesized Counterfactual Continuation                          Probe-Based Minimal Restoration
+
+                          dₜ
+                                                                                                                                                                                                         Candidate                                                                                                                                                                                                                              Subsets
+                                           Divergence                                                                                           Observation                                                                                                               Synthesis                   π( ôₜ , ℓ′ )                                                   Interaction                                                                                                                                                                            S ⊇ ℱ Probe
+                                            Onset                                                (skipped)
+                                                                                                  Exo view                                                     δ                                                                                                ℱ           ℱ:                                                                                                                                                                                                                                                  ℓ′-referenced                                                                                                                                                                                                                                                                                                                      · near
+                                                                                                     Anchor                                                                                                                   frame editing
+                                                                                                             ôₜ₊₁        policyImaginedsees only ticksynth obs    aₜ                                                     task entity · goal region                                                                                                  Ego view
+                                                                                                                        Re-project                                                                                                                            scene                                                                                                                      from
+                                                                                                                                         voxels                             τB, c*                     Virtual(S at rejoinProbeposesfrom· restHybridstay live)Seed                                                         Anchor          Voxel stores                                                                                                                  from                                                                                            RGB-D                                                                                                                                                   history
+                                                                        tₐ      𝒯                      FK arm render · hole inpainting                Synthesize           FK integrate                                                         probe roll under S
+                                                                 (qₐ, pₐ)                                                                  ôₜ₊₁ = Synth(·)                  qₜ₊₁ = FK(qₜ, aₜ)
+                                   Sub-step Refinement within Chunk                                                                                                                                                                    reference (full restore)
+                                                  > δ                         Imagined rollout τB                                               h* : meanj≤h                                                                                               dt′,                                                                                                                                                         j
+                                                                                                          dprox             qₜ₊₁                          d arm(S) = (1/L) Σₜ ‖qₜ  S − qₜ  ref ‖₂                                            Advance                                                     anchor by                                                           h*                                                                           control
+                                                      steps                                                          via                                       FK                                                                  integration
+                                                                                                                                                          Accept                                                                                                                                                                                                                             first S :                                                                                                                                                                                                                (S)                                                                                                                                                       <                                                                                                                                                                                                            ε →                                                                                                                                                                        S*                                                                                                                                                                                   darm
+                                                                     ( ℓ                                           = ℓ′                                                                                              : clean-rollout                         dₜ = ‖(aₜ ℓ− aₜ  ℓ′ ) ⊘ σ‖₂                                                                                             drift ‖q ₜ − qₜ‖₂ )                Rejoin c* = latest pre-contact frame                                                         All                                                                                                                                                                         probes virtual:                                                                                                                                                                                                  synth                                                                                                                                                                                      obs                                                                                                                               +                                                                                                                                                                          FK,                                                                                                                                                                                 no                                                                                                                                                                                                  motion
+
+Figure 2: Overview of CoRe. An online perturbation trips the suffix OOD detector and interrupts the frozen VLA (top). Recovery
+runs through the virtual planning stages (bottom), passing the recovery anchor, the rejoin state c∗, and the restoration subset S∗
+left to right. Only the final rearrangement and handoffproduces physical motion before control returns to the frozen VLA.
+
+
+tions (Ma et al. 2026a; Shin et al. 2026; Zhao et al. 2026b),                    Related Work
+can discard completed progress, fail to escape the OOD state,
+or remain confined to states already in the repertoire.
+  We propose Counterfactual Realignment (CoRe), an      Vision-Language-Action Models. VLA models  adapt
+inference-time framework that recovers a frozen VLA from       pre-trained vision-language backbones  to action predic-
+online language switches, environmental disturbances, and       tion (Zitkovich et al. 2023; Kim et al. 2024; Liu et al. 2024).
+robot state interference without retraining, failure-specific      Autoregressive designs co-tokenize discretized actions with
+data, or auxiliary models, as shown in Fig. 2. The central      language (Zitkovich et al. 2023; Kim et al. 2024), while
+idea is a counterfactual continuation, a short closed-loop      continuous-action architectures generate high-frequency ac-
+rollout of what the VLA would do under the current target       tion chunks through flow matching or diffusion for dexterous
+from a recent in-distribution state, from which a minimal      and bimanual control (Black et al. 2024; Liu et al. 2024). As
+physical recovery plan is derived. CoRe detects OOD states       these models lack built-in recovery, CoRe keeps the policy
+from the VLA’s own action-expert latent, anchors recovery      frozen and builds recovery externally without modifying its
+at the latest in-distribution frame that preserves completed       architecture or training.
+progress, and rolls out the policy from there using obser-
+vations synthesized from accumulated RGB-D history and
+forward kinematics, requiring neither ground-truth access
+                                                             Failure Detection and Recovery for VLA Models.  One
+nor physical robot motion. The rollout yields a safe rejoin       line augments training data with failure-conditioned supervi-
+state, and virtual probes over progressively smaller restora-       sion, injecting perturbations into successful trajectories and
+tion subsets select the minimum set of displaced objects                                                                     training corrective behaviors (Zhao et al. 2026a; Lin et al.
+whose restoration preserves the imagined trajectory. Physi-                                                          2025; Li et al. 2026) or fine-tuning with subtask progress
+cal motion occurs only after this validated plan is established,                                                                     labels to enable proactive backtracking (Ma et al. 2026a).
+replacing the physical trial-and-error of iterative correction                                                   The other delegates recovery to an external module, an
+methods with virtual planning. Our key contributions are:                                        LLM/VLM agent that diagnoses failures and replans (Liu,
+                                                              Bahety, and Song 2023; Ye et al. 2026), a learned residual
+ • We propose CoRe, a training-free framework that recovers       policy (Hu et al. 2026), or an uncertainty-aware detector that
+   frozen VLAs from online perturbations through counter-                                                                      triggers replanning (Xu et al. 2025; Gu et al. 2026). As dis-
+   factual continuation and minimal physical realignment.                                                            cussed above, the former requires costly failure collection
+                                                       and retraining (Zhao et al. 2026a; Li et al. 2026) while the • We show that VLA policies are robust to geometrically
+                                                                              latter stands or falls with the auxiliary system itself (Gu et al.   synthesized observations, so closed-loop counterfactual
+                                                              2026). Recent work further shows that VLA internal features   rollouts suffice for recovery planning without a learned
+                                                                 separate successful from failed rollouts, enabling lightweight   world model or privileged environment access.
+                                                                        failure detection. CoRe shares this insight but goes beyond
+ • Extensive experiments across simulators, VLA back-       detection, constructing the full pipeline from anchor identi-
+   bones, and real-world settings show consistent success       fication through counterfactual planning to minimal physical
+   gains under diverse online perturbations without policy       intervention without retraining the policy, learning a separate
+   fine-tuning.                                                recovery model, or relying on an external reasoning agent.
+
+=== PDF PAGE 3 ===
+                Exocentric           Egocentric                     rollouts for task k,  ¯zk and     are the mean and ridge-                                                                                                     eΣk
+                                                                 regularized covariance of the standardized features, and τk is
+                                                            a high quantile of st calibrated offline on held-out successes.
+                                     A trigger fires when st > τk for nconsec consecutive queries.
+          Sim                                                   Unlike SAFE (Gu et al. 2026), which trains a neural classi-
+                                                                                fier and aborts execution upon detection, CoRe calibrates a
+                                                                threshold solely from successful rollouts and uses each trig-
+                                                                ger to initiate autonomous realignment. This design avoids
+                                                                     training a separate detector and goes beyond failure contain-
+                                                          ment: it preserves completed progress, realigns the system,
+                                                       and resumes task execution autonomously.
+              Real                                                Phase-Aware Recovery Anchoring
+                                                 Upon detection, CoRe identifies a recovery anchor, the latest
+                                                                     trace frame from which recovery can begin while preserving
+                                                          completed progress. Scanning T forward from the most re-
+Figure 3: Synthesized observations. Exocentric and egocen-       cent recovery endpoint, or from t = 0 on the first recovery, it
+tric views at imagined ticks, arm rendered by FK, residual      compares the chunks predicted at each frame under the two
+holes inpainted.                                                      instructions, one forward pass each,
+
+                                                                                              dt,j =   aℓt,j −aℓ′t,j ⊘σ  2,             (3)              Methodology
+A VLA policy π maps an observation ot, RGB images      where aℓt,j is the j-th action predicted under ℓand σ holds
+from one or more cameras plus a language instruction ℓ,      per-dimension in-distribution action standard deviations. The
+to an action chunk at of N actions executed open-loop       frame-level divergence is then
+before the next query. During execution we record a trace
+T = {(ot, at, qt, pt)}Tt=0 of observations, actions, arm joint            (dt,0                    if ℓ̸= ℓ′                                                                                                                               (4)configurations                    scene                           object                               poses                                     An                   dt =                 qt, and                                        pt = {(xi, ri)}.                                                                                                            qcleant    −qtracet    2   if ℓ= ℓ′                      at                                a mid-execution                                                       instruc-online      perturbation                                    (e.g.,                    time tp
+tion change ℓ→ℓ′ or a physical disturbance altering pt or qt),      using the first, immediately executed action. When the in-
+drives execution offthe policy’s distribution D while π stays       struction is unchanged the two chunks coincide, so    in-                                                                                                                     dt
+frozen. Recovery seeks a target configuration c∗= (q∗, p∗),       stead compares a clean rollout against the recorded con-
+an arm pose with a possibly partial scene arrangement, that                                                                       figuration. The scan is phase-aware, skipping frames until
+minimizes physical effort                                                                displaced objects or articulated joints settle and requiring
+                                                                gripper clearance from every movable object, so the anchor            c∗= arg min |R(c)|
+                                                                             lies in reproducible free space. The first frame with dt > δ                         c∈C                           (1)
+                                                       marks the divergence onset, with a fallback to the most re-            s.t.  π(· | c, ℓ′) ∈Dℓ′,   P(cnow) ⊆P(c).
+                                                                cent in-distribution frame whose short rollout under ℓ′ stays
+where |R(c)| counts the object manipulations required to       clean. As the policy is queried per chunk, the onset is local-
+reach c, the first constraint keeps the VLA’s continuation un-       ized only to chunk resolution, so CoRe refines it within the
+der ℓ′ on the in-distribution manifold Dℓ′, and the second,      chunk executed from the last sub-threshold frame t′, whose
+with P(c) the subgoals completed at c, preserves all accumu-       per-step divergences are already available, cutting at the first
+lated task progress. CoRe solves Eq. 1 entirely at inference       control step whose running mean crosses δ
+time, as illustrated in Fig. 2.
+                                            h∗= min n h  : h+11 Phj=0 dt′,j > δ o,      (5)
+Online Suffix OOD Detection
+Following SAFE (Gu et al. 2026), we monitor the action-      and advancing the anchor arm h∗control steps from t′ by
+expert suffix latent, the last hidden state of the action head      forward-kinematic integration of that chunk, inheriting its
+before motor decoding. At each policy query, K stochas-        static pre-interaction scene.
+tic forward passes produce K latent vectors that are mean-
+pooled into ht ∈Rd. We then compute a per-task Maha-     Synthesized Counterfactual Continuation
+lanobis score
+                                                 From the recovery anchor, CoRe rolls out the frozen VLA π
+        q                                                                                      instruction                                                                                                   a counterfactual                                                                                                                     ℓ′ to construct              st =                      (zt −¯zk)⊤eΣ−1k  (zt −¯zk)           (2)      undercontinuationthe target                                                                            a short trajectory                                                                                                  of what the                                                                                                             policy would                                                                      τB,
+where zt = (ht −µk) ⊘σk is the z-standardized feature and     do from an in-distribution state, built entirely on synthesized
+⊘denotes element-wise division. Here µk and σk are the per-      observations rather than ground-truth renders or physical
+dimension mean and standard deviation from in-distribution      robot motion, so no simulator access is required.
+
+=== PDF PAGE 4 ===
+                       1⃣ Re-grounding                            2⃣ Re-skilling                              3⃣ Conflict
+                        Place → Place: different cube & bin color                        Pick → Push: different cube color                  Stack → Stack: different combo but same workspace
+
+
+
+
+
+                 “Place the cyan cube           “Place the pink cube                                “Push the orange cube    “Build a pyramid: green +     “Build a pyramid: cyan +
+                                                                       “Pick up the blue cube.”
+                     into the cyan bin.”              into the orange bin.”                                   onto the front target.”     purple base, orange top.”      green base, purple top.”
+               Same Task Family, Different Target Object                  Different Task Type and Target Object                Same Target Object or Workspace
+                       No Intersection                            No Intersection                                    Conflicted Target or Goal
+
+Figure 4: Overview of the LangSwitch Tasks, spanning the Re-grounding, Re-skilling, and Conflict switch families defined in
+the Experimental Setup.
+
+
+
+                                                    Re-grounding                          Re-skilling                            Conflict                  Average
+    Method                    No-Switch
+                                   Pk→Pk    Ps→Ps    Pc→Pc    Pk→Ps    Pc→Pl    St→Pk    Ps→Pl    Pc→Ps     St→St      Switch     All
+     π0 (Black et al. 2024)             90.6      8.3±13.6    0.7±0.6    0.0±0.0    7.7±9.0    12.3±7.5   27.0±20.9   0.7±1.2    91.0±8.2   17.0±12.1   18.3±5.9   44.1
+  Base  π0.5GR00T(IntelligenceN1.7 (NVIDIAet al. 2025)2026)      97.888.4     29.0±50.25.0±2.6    21.3±37.04.0±5.3    0.0±0.00.0±0.0   33.0±39.84.7±5.7    56.3±5.527.7±1.2   65.7±56.912.7±11.0   7.0±12.17.7±12.4   85.0±11.588.7±4.0   22.3±17.117.0±15.6   35.5±21.318.6±4.6   57.843.5
+     π0 + CoRe                       90.0      98.7±1.5    87.7±1.5   73.0±2.6   95.7±0.6   88.7±2.9   95.3±4.7   83.3±8.1   97.0±2.0    68.0±7.9    87.5±0.6   88.4
+  Ours  GR00Tπ0.5 + CoReN1.7 + CoRe              97.290.2      93.7±3.597.7±0.6    98.3±1.576.0±4.6   87.0±1.074.7±2.9   89.7±5.099.7±0.6   89.3±2.996.0±1.0   87.7±9.392.7±1.5   92.3±7.483.3±1.5   91.7±2.598.7±1.5   72.0±11.857.7±5.7    82.6±2.192.7±1.3   85.394.3
+
+Table 1: Success rate (%) on the LangSwitch tasks with an xArm6 robot. Each switch pair is evaluated at 3 switch timings
+(shallow, mid, deep), 100 episodes each; per-pair cells and the Switch average report the mean ± sample standard deviation
+across the 3 timings. No-Switch reports the mean over the 5 base skills (100 episodes each), and All is the macro average over
+all 14 task settings (5 No-Switch + 9 switch pairs). Pk=Pick, Ps=Push, Pc=Place, Pl=Pull, St=Stack.
+
+
+Observation synthesis.  Each imagined tick must show the       as possible. Backbones that execute long action chunks fully
+VLA the imagined state, with the arm at the pose its imagined      open loop must additionally keep a larger clearance, since an
+actions would have reached, namely the FK-computed pose,       entire chunk runs without re-observation after handoff.
+and objects possibly away from their real positions. CoRe
+maintains per-object voxel stores in each object’s local frame,
+accumulated from segmented RGB-D observations, plus a     Probe-Based Minimal Restoration
+world-frame background store. The third-person (exocen-                                                      Not every displaced object needs physical restoration, sincetric) view from the fixed camera is synthesized by editing                                                        an object far from the task-relevant workspace may not af-the real frame at the anchor. Pixels of the arm and displaced
+                                                                         fect the continuation from the rejoin state. CoRe thereforeobjects are removed, the vacated regions are filled by pro-
+                                                                      selects the minimum subset whose restoration is necessary.jecting background voxels, displaced objects are re-rendered
+                                            An object counts as displaced when its pose deviates fromat their imagined poses through z-buffered voxel splatting,
+                                                                 the rejoin state c∗beyond a position or orientation toleranceand the arm is composited from a forward-kinematic render.
+                                                                                (ϵpos, ϵrot). A forced set F is always restored, covering ob-The first-person (egocentric) view moves with the imagined
+                                                                         jects referenced by ℓ′, objects within a radius rveto of anyarm pose, so the entire image is instead reconstructed from
+                                                                     task-relevant entity, and objects occupying a designated goalthe voxel stores at the imagined viewpoint. Residual holes in
+                                                                   region, while the remaining displaced objects are candidatesboth views are filled by neural or classical inpainting (Fig. 3).
+                                                                       for exclusion. Each candidate subset S ⊇F is evaluated by a
+Closed-loop rollout.  Each imagined tick synthesizes ob-       virtual probe, a counterfactual rollout from a hybrid seed in
+servations for both cameras, queries π with them under ℓ′,      which objects in S sit at their rejoin poses and all others keep
+and advances the arm by forward kinematics                        their current live poses. The probe trajectory is compared to
+                                                            a full-restore reference through
+      qt+1 = FK(qt, at),   ˆot+1 = Synth(qt+1, pt)    (6)
+
+where FK applies the robot-specific forward-kinematic in-                           L
+                                                                          1
+tegration of action at at configuration qt and ˆot+1 is the                   darm(S) = X ∥qSt −qreft ∥2            (7)                                                      Lsynthesized observation at the updated configuration. The                                t=1
+rollout terminates once the tool-center-point comes within a
+proximity threshold dprox of any scene object, beyond which      where qSt and qreft  are the arm configurations under S and the
+contact dynamics cannot be modeled by FK alone. The latest       reference and L = min(|τS|, |τref|) counts the comparable
+pre-contact frame becomes the rejoin state c∗to which the      frames. Probing subsets in order of increasing size from F
+real system will be realigned, keeping the rejoin state in free       alone, CoRe accepts the first with darm(S) < ϵ, a trajectory-
+space while preserving as much of the generated approach      equivalence threshold.
+
+=== PDF PAGE 5 ===
+                         1⃣ Arm Collision                           2⃣ Grasp Failure                           3⃣ Object Displace                             4⃣ Object Tip
+                         Robot State Perturbation:                         Robot State Perturbation:                         Environmental Perturbation:                        Environmental Perturbation:
+                    Robot arm suddenly deflects off course               Held object drops from the gripper                      Target object horizontally moves                   Target object tips over (rotation changes)
+
+
+
+
+
+               Random torques injected into the arm joints           Gripper fingers forced open during carrying        Target object teleported to a random nearby position        Torque wrench applied at the target object
+
+Figure 5: Overview of the LIBERO-Long with Perturbation Tasks, spanning the Arm Collision, Grasp Failure, Object
+Displace, and Object Tip perturbation families defined in the Experimental Setup.
+
+
+                                                                     Perturbation Type
+      Method                                                                                            Average
+                                      Arm Coll.     Grasp Fail.     Obj. Disp.      Obj. Tip
+
+     OpenVLA (Kim et al. 2024)                    3.3±2.5      41.3±1.6      3.2±1.0       3.3±0.6         12.8±0.3
+     OpenVLA-OFT (Kim, Finn, and Liang 2025)     18.7±4.3      65.0±9.5      13.5±6.4      10.3±3.9        26.9±1.8
+        π0.5 (Intelligence et al. 2025)                   37.0±8.7      65.0±1.7      43.8±7.0      28.0±2.8        43.5±2.3
+      VLA-Adapter (Wang et al. 2026)                21.3±5.8      65.0±4.5      10.8±1.9      10.5±2.8        26.9±2.4Baselines    X-VLA (Zheng et al. 2026)                     60.5±5.2      51.2±7.3      6.2±0.6       9.7±0.8         31.9±2.8
+     GR00T N1.7 (NVIDIA 2026)                  15.7±6.3      46.0±4.8      16.3±3.5      15.5±2.6        23.4±2.5
+      RobustVLA (Guo et al. 2026)                  13.2±5.1     47.2±11.9      2.7±1.0       3.3±0.8         16.6±4.3
+        π0.5 + CoRe                                 89.0±2.8      90.2±3.0      87.5±1.0      86.3±2.1     88.2±0.8 (81.9)
+                                                                              88.3±4.3      83.0±5.2     84.5±2.6 (79.0)Ours    X-VLA + CoRe                              84.8±3.8      81.7±1.3     GR00T N1.7 + CoRe                          74.3±8.5      71.5±0.5      72.2±4.4     61.2±13.3     69.8±3.3 (65.0)
+
+Table 2: Post-perturbation success rate (%) on LIBERO-Long with a Franka Panda robot. Each of the 3 perturbation
+timings (shallow, mid, deep) is evaluated over 200 episodes (10 tasks × 20 episodes); cells report mean ± sample standard
+deviation across the 3 timings. For CoRe, the Average additionally reports in parentheses the fully autonomous Arm-Only
+variant, which weights each restoration by the arm’s measured execution feasibility.
+
+
+Physical Rearrangement and Handoff                      Condition                        π0.5   +CoRe   ∆[n (pp)]
+Only this final stage moves the robot. Each object in S∗is      • Language Switch
+returned to its rejoin pose through motion-planned pick-and-         Re-grounding (pick→pick)     6/20    18/20   +12 (+60)
+place in top-first height order, every placement is verified to          Re-skilling (pick→push)       1/20    18/20   +17 (+85)
+within ϵverify with one retry, and unrecoverable cases such          Conflict (place→push)         1/20    18/20   +17 (+85)
+as a failed grasp or an unreachable pose are reported as a                                                          • Physical Perturbation
+structured intervention request. The arm is then moved to the      Arm Collision (place)          9/20    17/20   +8 (+40)
+rejoin configuration q∗, with backbone-specific handoffsteps        Scene Rearrangement (pick)    4/20    19/20   +15 (+75)
+deferred to the Appendix, and control returns to the frozen
+                                                             Nominal           pick 19/20     place 19/20     push 20/20
+π. The execution trace is truncated to the recovery anchor, so
+any later recovery builds on this one’s progress rather than
+                                                             Table 3: Real-world xArm6 results, evaluated using layout-regressing to earlier states.
+                                                                paired trials with stratified perturbation timings.
+
+               Experiments
+Experimental Setup                                       with a different one, and Conflict issues a goal contradicting
+Simulation. We evaluate CoRe on two benchmarks that sep-       the workspace or target state the ongoing task has produced.
+arately target goal switches and physical perturbations across      Timing is taken within the ongoing skill. (2) LIBERO-Long
+distinct simulators and embodiments. Both vary a perturba-      with Perturbation (Fig. 5) studies online physical pertur-
+tion along two axes, its type and its timing, the latter injected      bations with a Franka Panda in robosuite, on the most chal-
+at a shallow, mid, or deep point. (1) LangSwitch (Fig. 4)      lenging LIBERO suite of 10 long-horizon tasks. A single
+studies online language switches with an xArm6 in Man-       perturbation is injected per episode, in four families. Arm
+iSkill. Five tasks, placing, pushing, pulling, pick-and-place,       Collision knocks the arm off course with a random joint
+and pyramid stacking, share a unified environment, baselines      torque impulse, Grasp Failure forces the gripper open mid-
+are trained jointly on their demonstrations, and mid-episode       transport and drops the held object, Object Displace relo-
+the instruction changes from ℓto a new target ℓ′. Switch       cates the target before the arm reaches it, and Object Tip
+types form three families. Re-grounding redirects the cur-       topples the target in place with a torque wrench. Timing is
+rent skill to a different object, Re-skilling replaces the skill      taken within the phase each family targets, namely the full
+
+=== PDF PAGE 6 ===
+              (a) LangSwitch         π 0      π 0.5     GR00T N1.7                                                     “Pick up the tennis ball.”
+
+                                        Bare backbone        +CoRe
+
+             100  93.993.9                          92.992.9                           91.391.3
+           (%)       87.487.4                          88.188.1                           86.986.9              rate   75  84.684.6                          83.083.0                           80.380.3                                                                                      PICK
+                   59.659.6
+              50                         success
+                                                                                28.028.0              25  24.724.7                   23.923.9                          19.019.0                                                                                17.217.2                                                 15.915.9
+                                                                                16.016.0                PUSH              PLACE                         Average    0                                13.013.0
+                Shallow (30%)              Mid (55%)           Deep (75%)
+                               Injection timing (% of nominal execution)
+
+             (b) LIBERO-Long     π 0.5     GR00T N1.7   X-VLA
+                                        Bare backbone        +CoRe
+
+             100
+                                                 89.089.0           (%)                                                                                88.488.4                   87.487.4                                                                                        “Push                                                                                                                     the                                                                                                                  blue gum                                                                                                                             “Put                                                                                                                                                          the                                                                                                                                                     red                                                                                                                                         box                                                 85.485.4                                                                                81.581.5                   86.586.5
+                                                                                                                        bottle                                                                                                       forward.”                                                                                                                  on                                                                                                                                                       the                                                                                                                                                   blue                                                                                                                                                                         plate.”              rate   75                                                 73.073.0                                                                                69.969.9                   66.566.5
+                         success              50  45.645.6                          41.041.0                           43.843.8            Figure 7: Overview of the Real-World Tasks. We vali-
+                                                                                31.031.0                                                 35.035.0              25  29.629.6                                                 24.824.8                   20.520.5
+                                               xArm6 across multiple task families and objects.                         Average    0                                                               24.924.9             date the feasibility of CoRe beyond simulation on a physical
+                Shallow (30%)              Mid (55%)           Deep (75%)
+                               Injection timing (% of nominal execution)
+
+                                                        duced by the original task. No false triggers occur in 1,500Figure 6: Effect of injection timing. Success rate at each
+                                                           unswitched runs. On LIBERO-Long (Tab. 2), CoRe reachesinjection timing, bare versus with CoRe. Bare policies are
+                                                          69.8–88.2%, compared with 12.8–43.5% for bare baselines;timing-sensitive under language switches yet nearly timing-
+                                                                 the Arm-Only variant retains 65.0–81.9%. Bare policies areinvariant under physical perturbations, and CoRe lifts and
+                                                               highly timing-sensitive under language switches but nearlyflattens all curves.
+                                                                  timing-invariant under physical perturbations (Fig. 6). Mid-
+                                                                             skill language switches often lock the policy onto the object
+                                                               already being manipulated, whereas physical perturbationsepisode for collisions, the pre-contact approach for displace-
+                                                                     invalidate the demonstrated approach regardless of priorment and tipping, and the post-lift carry for grasp failures,
+                                                                  progress. By handing control back at a validated counter-with phase boundaries calibrated per backbone from its own
+                                                                     factual rejoin state, CoRe reduces the timing spread to atclean rollouts so that policies of different speeds are per-
+                                                       most 6.5 points.turbed at comparable stages. Restoration differs between the
+benchmarks. LangSwitch executes every restoration physi-      Real-World. As shown in Tab. 3, the bare π0.5 completes at
+cally through motion-planned pick-and-place, demonstrating      most 9/20 episodes under any perturbation despite 19–20/20
+that recovery plans are executable, whereas LIBERO applies      nominal competence, collapsing to 1/20 when the switch de-
+restorations by direct state writes and accounts for executabil-     mands a new skill or conflicts with already-produced scene
+ity through the grasp-feasibility weighting in Tab. 2, decou-        state. CoRe lifts every condition to 17–19/20 (85–95%), in-
+pling the quality of recovery decisions from the mechanics      cluding 1/20 →18/20 on both Re-skilling and Conflict, and
+of executing them. Injection parameters and timing specifi-       the gains hold across all three injection depths. Every re-
+cations are given in the Appendix.                             covery here is executed entirely on hardware. Restorations
+Real-World. We deploy CoRe on a physical xArm6 with       are motion-planned pick-and-place actions on the real scene,
+two RealSense D435i cameras, one fixed third-person and      and the median recovery realigns only the arm, occupying
+one wrist-mounted (Fig. 7). A     backbone is fine-tuned       8.8 s of physical motion. This demonstrates CoRe end to end,                                π0.5
+with 100 teleoperated demonstrations per  skill, covering      without ground-truth state or privileged information.
+pick, place, and push over three household objects and two
+plates. Five conditions comprise the three LangSwitch fami-     Ablation Studies
+lies defined above and two physical perturbations, with Arm       Fidelity of Synthesized Counterfactual Rollouts.  Be-
+Collision applying a randomized impulse to all six joints      cause recovery decisions rely on synthesized rollouts, we
+and Scene Rearrangement having an operator relocate every       replay them from identical anchors under ground-truth ren-
+object midway through the episode. Each condition runs 20       ders and measure endpoint TCP divergence under a reduced
+episodes across shallow, mid, and deep timings, with phase       protocol detailed in the Appendix. Across all 6 settings in
+boundaries recalibrated on real nominal rollouts. Trials are       Fig. 8, the median ranges from 0.36 to 3.28 cm, remaining be-
+paired by layout, instruction, and replayed collision impulse.      low the 2 cm (LangSwitch) and 8 cm (LIBERO) pre-contact
+                                                          margins used for recovery decisions. A second ground-truth
+Experimental Results and Analysis                         replay controls for the policy’s own sampling variability, and
+Simulation. On LangSwitch, CoRe raises the three back-     on LangSwitch the synthesized rollout stays within 1.2–1.7×
+bones from 18.3–35.5% to 82.6–92.7% average success and       of this floor. The heaviest tail (GR00T on LIBERO, p90 of
+improves all 27 switch settings (Tab. 1). Conflict remains the       9.7 cm) arises where the two ground-truth replays themselves
+hardest family because the new goal contradicts the state pro-      diverge by 11–41 cm, so it reflects policy multimodality, and
+
+=== PDF PAGE 7 ===
+               π0 + CoRe     π0.5 + CoRe   GR00T N1.7 + CoRe   X-VLA + CoRe
+                                                                                                          Post-hand
+                10                                              Method        SR (%) ↑   #Restored ↓
+                    (cm)     8                                                                                                     Steps ↓
+                                                                   Episode Reset        88.5         1.18         108.7
+                 6                                                   Anchor Rollback      89.6         1.14         108.1                                                   divergence     4                                             3.28                  CoRe w/o Sub        88.1         1.16          74.1
+                                                    CoRe (ours)         90.7         0.67          74.4                 2    1.16   0.63   1.39                                                  0.36   0.66                                         Synth–GT
+                 0                                                                                                    Episode Reset     Anchor Rollback    CoRe w/o Sub   CoRe (ours)
+                     LangSwitch (xArm6)      LIBERO-Long (Franka)
+                                                                                                                                                                 1.23 1.21 1.22          1.26 1.20 1.27
+                                                                                                                                                                                                                 1.11Figure 8: Fidelity of synthesized rollouts. Endpoint TCP                                 1.06 1.00 0.98
+                                                                                                              1                                                                                                                                                                                                                                                                                                                                                                            episode/divergence between synthesized and GT rollouts from the
+same anchor (bars: median, whiskers: 90th percentile).                                                                                         objects                                                                                                                                   0.5                   0.47                     0.43
+                                                                                                                                                                                                                                                                                                                                                                                                                                Restored
+even long-chunk X-VLA stays at one fifth of its 15 cm rejoin                        0
+standoff.                                                                                                 Re-grounding          Re-skilling             Conflict
+                                                              Figure 9: Mechanism ablation on LangSwitch. Top, over-
+Recovery Mechanism Ablation.  As shown in Fig. 9, we        all comparison of the 4 recovery variants. #Restored is the
+compare CoRe with three variants that share the same detec-
+                                                    number of objects physically moved per episode, and Post-
+tion, physical rearrangement, and handoff components but
+                                                       hand Steps counts the control steps executed after handoff.
+differ in the state to which the system is realigned. Episode                                                            Bottom, #Restored split by switch family.Reset returns the scene and arm to their initial states, An-
+chor Rollback restores everything at the recovery anchor,
+and CoRe w/o Sub follows the counterfactual continuation           er action  Virtual planning          9.7 s
+but restores every displaced object. All variants share an                                   cycle
+                                                                                                 arm motion
+                                                                                                                                                                                                                    s                                                                                                 One physical                                                                                                                                                           20.5 s                       46.6identical 270-episode LangSwitch protocol on π0.5 (Ap-
+                                                                                                                                                                                                                                                                          incl. in-move                                                                                                                           manipulationpendix), and restoration pruning is additionally measured                                                                                                          planning
+on the real Scene-Rearrangement suite. (a) Necessity of the           er recovery,
+Counterfactual Continuation. Counterfactual rejoining re-          cene RearrangementPlanning spent           9.7 s
+duces post-handoff execution from about 108 to 74 steps                 Arm time avoided                      33.2 s                                    75.5 s
+while maintaining slightly higher success than Episode Reset                                    0             20            40            60            80
+and Anchor Rollback, as it hands control back at a rollout-                                                         seconds
+validated pre-contact state rather than an earlier recorded                                                              Figure 10: Virtual probing versus physical execution.
+state. (b) Minimal Restoration in Simulation and on Hard-      Probing a recovery hypothesis in imagination is 2-5 times
+ware. CoRe restores 0.67 objects per episode versus 1.16      cheaper than testing it with the arm.
+under full restoration, with comparable post-handoff exe-
+cution and slightly higher success.  It prunes 52–65% of
+restorations under Re-grounding and Re-skilling but only                                                                 the arm, and on Scene Rearrangement the 1.62 manipula-
+13% under Conflict, where most displaced objects affect the                                                                     tions pruned per recovery convert 9.7 s of planning into 33
+continuation. On the real suite, where the operator displaces                                                                     to 76 s of avoided arm time, as summarized in Fig. 10. The
+all three objects every episode, CoRe restores 1.15 of 2.77                                                    same substitution buys safety. Under identical layouts and
+above-tolerance displacements per recovery and leaves 58%                                                               replayed injections, 21 of the 100 baseline episodes end in
+untouched, squarely within the simulated 52–65% band. In                                                            a collision or an operator emergency stop, 27 percent of all
+11 of 13 recovery episodes it moves exactly the instruction-                                                                 baseline failures, whereas CoRe ends with 5, one of them the
+referenced target, and in the other two the solo-target probe                                                                   injected impulse itself striking clutter. Exploratory contact
+itself rejects the smaller subset with darm = 0.19 > ϵ, so the        is displaced into imagination, where rollouts truncate at a
+extra object it admits is probe-certified rather than conserva-                                                             proximity boundary rather than at the object.
+tively included.
+Cost and Safety of Virtual Probing.  Virtual probing buys                     Conclusion
+two things over physical trial, time and safety, both measured    We  presented  Counterfactual  Realignment  (CoRe),  a
+over the 165 recoveries of the 100 layout-paired real episodes.       training-free framework that recovers frozen VLAs from on-
+A complete virtual planning cycle takes a median of 9.7 s,       line language switches and physical perturbations. By imag-
+which amortizes to 1.2 s per imagined action chunk over the       ining a continuation from a viable prior state, CoRe identi-
+median 8 chunk counterfactual. A single physical manipu-        fies a pre-contact rejoin state and restores only the objects
+lation, picking one object up and placing it elsewhere with      needed to resume execution, replacing physical trial-and-
+the arm handoffexcluded, occupies the arm for a median of       error with virtual recovery planning. Extensive experiments
+20.5 s of motion and 46.6 s of wall clock including in-move      demonstrate that CoRe restores near-nominal success with
+planning and perception. Probing a hypothesis in imagina-      fewer physical interventions, without policy fine-tuning or
+tion is thus two to five times cheaper than testing it with       failure-specific data.
+
+=== PDF PAGE 8 ===
+             Technical Appendix                            Family          Pair            Target relation
+                                                                     Re-grounding   pick→pick      different color
+           CoRe Algorithm                              Re-grounding  push→push     different color
+Algorithm A1 summarizes one control tick of CoRe around           Re-grounding   place→place    different color and bin
+the frozen policy π. Notation follows the main paper.                    Re-skilling     pick→push     different color
+                                                                               Re-skilling     place→pull     different color
+                                                                               Re-skilling     stack→pick     leftover cube
+Algorithm A1: CoRe control loop (one episode)                          Conflict       push→pull    same color
+ 1: loop at each policy query t                                            Conflict       place→push   same color
+ 2:    at, ht ←K stochastic forward passes of π(ot, ℓ′)                 Conflict        stack→stack    different top color
+ 3:   append (ot, at, qt, pt) to trace T ; st ←Eq. 2 of the
+   main paper                                               Table A1: The nine LangSwitch pairs. Colors are drawn per
+ 4:     if st > τk for nconsec queries then Recover; continue      episode from eight colors.
+ 5:    execute chunk at open-loop for N control steps
+ 6: procedure Recover
+                                                         cameras (a fixed base camera and a wrist camera, both 512× 7:   scan T forward for the divergence onset dt > δ (Eq. 3–
+    4)                                                          512), and the state and action are the 7-dimensional joint-
+                                                                 plus-gripper vector. All backbones are fine-tuned jointly on 8:    refine the anchor within the crossing chunk via h∗
+                                                                 the same demonstrations.    (Eq. 5); apply phase-aware and clearance gates
+                                                     The nine switch pairs are listed in Table A1. Target colors 9:    roll out τB from the anchor on synthesized observa-                                                                 are sampled per episode from eight colors with a seed-keyed    tions (Eq. 6) until dprox; rejoin state c∗←latest pre-
+                                                                   generator. Re-grounding pairs draw two distinct colors for    contact frame
+                                                                 the same skill. For the push→pull and place→push conflicts10:    displaced set ←objects deviating from c∗beyond
+                                                                 the target color is kept and the spatial goal is inverted, so     (ϵpos, ϵrot); build forced set F
+                                                                 the state produced by the old task contradicts the new goal.11:    for candidate subsets S ⊇F in increasing size do
+                                                   The stack→stack conflict instead requests a pyramid with a12:     probe S from a hybrid seed; if darm(S) < ϵ (Eq. 7)
+                                                                       different top cube, so the partially built structure itself blocks    then S∗←S; break
+                                                                 the new goal. The stack→pick pair directs the new skill to the13:     if no subset passes then S∗←all displaced objects
+                                                                      leftover cube not used by the pyramid. Episodes are capped14:    restore S∗(top-first, verified to ϵverify, one retry); move
+                                                                          at 600 control steps, and 1,200 for stack→stack.   arm to q∗
+15:    truncate T to the anchor; restore policy RNG; return
+                                          LIBERO-Long with Perturbation    control to π
+                                        We use the official LIBERO-Long suite (Liu et al. 2023) of
+                                                     10 long-horizon tasks with the official demonstrations and
+                                                                  task definitions, and inject perturbations at evaluation time
+      Benchmark and Dataset Details                 only. No data is re-collected.
+LangSwitch
+An online language switch is only meaningful if the new                  Evaluation Metrics
+instruction is executable from the state the old one has already      Success.  Success is the simulator’s own task predicate,
+produced, which requires the skills to share one scene, one      read at every environment step. On LangSwitch  it is the
+object set, and one workspace layout rather than being drawn      ManiSkill success predicate of the post-switch task ℓ′. On
+from separate task suites with their own initial conditions.     LIBERO it is the official BDDL goal predicate, with a 600-
+Existing suites fix a single instruction per episode and place       step cap. Episodes where the switch never fires or where ℓ′
+each task in its own scene, so switching between two of        is already satisfied at switch time are invalid and replaced by
+them mid-episode either lands the policy in a scene the new       the next seed.
+instruction does not apply to or silently changes the initial
+                                             Number of restorations.  #Restored counts objects physi-conditions along with the instruction, confounding the switch
+                                                                     cally returned to their rejoin pose, summed over the recov-
+with a scene change. We therefore build LangSwitch around
+                                                                      eries of an episode. A held object that the probe releases in
+a single unified tabletop that admits all five skills at once,
+                                                               place is put down without being counted. A placement whose
+so any pair of them can be composed into a switch, the pre-
+                                                                      verification fails is not counted. For the full-restoration vari-
+switch and post-switch tasks are separated by the instruction
+                                                                        ants, which bypass the probe, the count is reconciled against
+alone, and the displaced state the first skill leaves behind is
+                                                                 the displaced set so that held-object bookkeeping matches
+exactly what the second must be recovered from.
+                                                                 the probe-based rows.
+  The five base skills share one tabletop ManiSkill (Tao et al.
+2025) environment with an xArm6, four colored cubes, two      Post-handoffsteps.  For each episode with at least one re-
+bins, and target markers. The training dataset contains 5,000      covery that ends in success, we count the control steps after
+scripted demonstrations totalling 798,571 frames at 20 fps,       the first trigger, excluding the physical steps of the recoveries
+1,000 episodes per skill, with 401 distinct instruction strings      themselves, then average within each pair and timing cell and
+covering color and slot variants. Observations are two RGB      macro-average over cells.
+
+=== PDF PAGE 9 ===
+        Object             Upright  Tipped / Inverted                   Backbone      pick   push   pull   place   stack
+
+         alphabet soup       100         100                        π0            59    61    63    102    285
+        tomato sauce        100         100                             π0.5           63    55    62    108    299
+          butter              100         100                    GR00T N1.7   60    42    61    89    292
+         chocolate pudding   100         100
+        cream cheese        98         100                   Table A3: Per-backbone minimum completion times                                                              MA         black book         100          0                                                                   (control steps) used for switch timing.
+          akita black bowl     100       100 / 0
+         porcelain mug       98          64
+        white–yellow mug   100         64
+       moka pot           58          36                     versions were recorded at evaluation time and are shipped
+                                                            with the code release. The real-robot experiments ran on a
+                                                                 separate Linux workstation with two NVIDIA RTX 4090Table A2: Oracle grasp success rates (%) per object and ori-
+                                                            (24 GB) cards, one of which serves policy inference whileentation, exactly as consumed by the Arm-Only weighting.
+                                                                 the other hosts the detection and synthesis workers.Rates come from 50 motion-planned trials per tested object–
+orientation pair, 900 trials in total. Non-upright poses share
+one tested rate per object. The bowl entry lists its side and          Perturbation Injection and Timing
+upside-down rates separately, and its side rate is carried over      Both benchmarks inject at a shallow, mid, or deep point of
+from the upright grasp rather than measured. The zero en-      a per-backbone calibrated phase, at fractions 0.30, 0.55, and
+tries are orientations whose required grasp width exceeds the      0.75 of the phase length.
+gripper aperture and are geometrically infeasible.
+                                                LangSwitch
+                                                   The switch tick is max(8, ⌊f · MA⌋), where f is the timing
+Endpoint TCP divergence.  For a synthesized rollout and       fraction and      is the backbone’s minimum completion time                                        MAa ground-truth rollout launched from the same anchor, frames                                                                of the pre-switch skill A, measured as the earliest success step
+are aligned up to the shorter length and the divergence is the                                                              over 20 clean rollouts per skill (Table A3). Evaluation collects
+Euclidean distance between tool-center-point positions at the                                                     100 valid episodes per cell by scanning seeds upward from
+last aligned tick. The same statistic between two independent                                                     0 within a test band of seeds 0 to 400. An episode is invalid
+ground-truth rollouts gives the sampling-variability floor.                                                 when scene construction fails, when the switch never fires, or
+                                                 when the post-switch goal is already satisfied at switch time,
+Arm-Only weighting.  The Arm-Only  variant weights                                                       and invalid seeds are skipped for every method identically.each successful episode by the probability that the arm could
+                                                        Bare and CoRe rows share the same seeds.have executed its restorations. Each restored object is as-
+signed an orientation bucket from its perturbed pose, upright,
+tipped, or inverted, and the bucket is mapped to that object’s    LIBERO-Long with Perturbation
+grasp success rate from an oracle suite of 900 motion-planned      Phase boundaries are calibrated per backbone from 20 clean
+grasp trials, with 50 seeds per tested object–orientation pair,       rollouts per task, taking the minimum success step (full
+and orientations whose required grasp width exceeds the       episode), the earliest step at which the target object first
+gripper aperture are assigned zero as geometrically infeasi-     moves (pre-grasp phase), and the shortest carrying duration
+ble. Table A2 lists the full rate table. The per-episode weight       after lift-off(carry phase). Only successful rollouts enter the
+is the product over restored objects, and failed episodes con-       calibration. Injection parameters follow.
+tribute zero.
+                                        Arm Collision. A random torque impulse is applied to all
+                                                            seven arm joints for 5 environment steps, drawn as a standard
+        Computing Infrastructure                 normal direction scaled to magnitude 50. An injection is
+All checkpoints that we fine-tuned ourselves, covering the      accepted only if no movable object drifts more than 0.15 m
+three LangSwitch backbones, the LIBERO backbones with-       in the plane or rotates more than 20◦, with up to 8 redraws
+out official releases, and the real-robot π0.5, were trained on      from a state snapshot.
+NVIDIA H200 (141 GB) GPUs. Officially released LIBERO
+                                                       Object Tip. A horizontal-axis torque wrench acts on thecheckpoints were used where available, including the openpi
+                                                                       target for 4 steps. The magnitude is 0.05 N·m scaled by the
+π0.5 LIBERO checkpoint and the OpenVLA and OpenVLA-      square root of the object’s relative mass, with per-object at-
+OFT releases. All simulation evaluations ran on two Ubuntu                                                                tenuation for four light objects tuned from visual inspection.
+22.04.3 LTS servers, each with 4×NVIDIA RTX A6000     The injection is rejected if any neighbor moves more than
+(48 GB), one GPU per evaluation shard. LangSwitch used                                                             0.05 m or 20◦. After a 20-step settle, episodes whose target
+ManiSkill 3.0.1 (Tao et al. 2025) on SAPIEN 3.0.3 (Xiang                                                                  leaves a 0.75 m workspace radius are invalid.
+et al. 2020), and LIBERO used robosuite 1.4.0 (Zhu et al.
+2020) on MuJoCo 3.3.3 (Todorov, Erez, and Tassa 2012) with      Object Displace.  The target is relocated 0.12 m from its
+the official LIBERO task suite (Liu et al. 2023). Policies ran       current position along a uniformly sampled planar direction,
+in their own environments, Python 3.10–3.11 with PyTorch      with up to 64 angle attempts. A candidate is rejected if it
+2.2–2.7 or JAX 0.5–0.6 depending on the backbone. Library       contacts any non-table geometry or leaves the 0.75 m reach
+
+=== PDF PAGE 10 ===
+radius. If the target is in the gripper the injection is deferred           Parameter             Value       Notes
+to the next tick.
+                                                                         Detection samples K   8           mean-pooled
+Grasp Failure.  The first environment step at which the           Trigger nconsec         3            3-of-3 raw scores
+target rises 1 cm above its spawn height anchors the carry           Plateau backup        5 @ 0.9τk   sustained scores
+                                                                         Refractory period      16 queries   between triggersphase, and at the scheduled tick both gripper fingers are
+opened in place, dropping the object. Episodes where the           τk quantile             0.95         held-out successes
+                                                           Bank size (LS)        50 eps/task  successes only
+open gripper still penetrates the target are invalid.
+                                                                     Covariance ridge      10−2        Eq. 2
+Guards.  For the two pre-contact families,  if the tool-          Anchor δ (LS)          0.09        normalized actions
+center-point closes within 6 cm of the target surface before          Anchor δ (LB)         0.08 m     TCP deviation
+                                                                          Rollout dprox (LS)       0.02 m       object surfacethe scheduled tick, the injection fires immediately so that
+                                                                          Rollout dprox (LB)      0.08 m    OBB surfacethe perturbation always precedes contact. Each cell collects
+                                                                          Rollout cap           15 ticks      wall-clock 10 s
+20 valid episodes by scanning seeds from 0, with invalid                                                               Anchor clearance (LB)  0.08 m     TCP to objects
+episodes replaced by the next seed.                           X-VLA standoff       0.15 m       rejoin clearance
+                                                                       Displaced ϵpos (xy)      0.03 m        vs. rejoin pose
+         Backbone-Specific Handoff                      Displaced ϵpos (z)       0.005 m      vs. rejoin pose
+Common  steps.  The  rejoin frame  is  the  latest  pre-           Displaced ϵrot          0.30 rad     quaternion angle
+                                                                           Forced-set rveto         0.08 m       task entitiesinteraction frame of    and the gripper target is taken from                  τB,                                               Goal-region radius      0.06 m        target area
+that frame. After restoration and the arm move, the pend-
+                                                                       Subset ϵ               0.050      mean joint L2ing instruction is consumed, observations are refreshed, the                                                                          Verify ϵverify            0.03 m      one retry
+policy’s sampling RNG is restored to its value at recovery           Restore cap           1 per object  per episode
+entry, and the trace is truncated to the anchor so that later
+recoveries chain from the current one.                                                             Table A4: CoRe hyperparameters. LS denotes LangSwitch
+Chunked delta backbones.  π0, π0.5, and GR00T predict      and LB denotes LIBERO-Long.
+delta actions from stateless adapters, so no proprioceptive
+state needs re-anchoring. When the imagined rollout trun-
+cates mid-chunk after h∗safe control steps, only the unexe-     arm there is kinematically redundant, the configuration de-
+cuted remainder of that chunk is handed back for execution,       viation of Eq. 4 of the main paper is operationalized in task
+which prevents the first h∗steps from running twice.             space: the clean and recorded arm configurations are mapped
+                                                            through forward kinematics and dt is the Euclidean distance
+X-VLA.  X-VLA  emits  30-step  absolute  end-effector      between the induced tool-center-point positions, so δ car-chunks and maintains an open-loop proprioceptive state,                                                                         ries meters. The task-space form is used because nullspace
+which CoRe saves and re-anchors at every boundary be-                                                                            drift of the redundant arm raises the joint-space noise floor
+tween real and imagined execution, and re-initializes from                                                                     to the same order as the perturbation signal, whereas the
+the controller pose after realignment. Because a full chunk                                                       two remain separable at the end effector. This operational-
+runs without re-observation, the rejoin frame must addition-                                                                     ization applies only to the unchanged-instruction LIBERO
+ally keep at least 0.15 m of surface clearance from every                                                                   case; LangSwitch instead uses the standardized action di-
+movable object. Before handoffthe retained chunk is cut at
+                                                            vergence defined for ℓ̸= ℓ′ in Eq. 4 of the main paper. Theits first gripper-close command, the realigned arm pose is
+                                                                subset threshold ϵ is a mean joint-space distance and transferspolished toward the first retained waypoint, and execution                                                                across the two arms unchanged.
+rejoins the chunk at the waypoint closest to the realigned
+tool-center-point.                                                       Threshold search.  Both swept thresholds were tuned on a
+                                                                   validation seed band, seeds 500 to 800, disjoint from the test
+Benchmark split.  On LangSwitch every restoration is ex-                                                             band, on three validation pairs covering the three switch fami-ecuted physically, with put-down for held objects whose
+                                                                             lies with 90 episodes per candidate. Candidates for δ were theposition the probe deems irrelevant, motion-planned pick-
+                                                               empirical q10 to q90 quantiles {0.05, 0.09, 0.14, 0.18, 0.24}and-place otherwise, and a three-segment arm move with a
+                                                                of scouted divergence values. Candidates for ϵ were nine20-step gripper ramp. On LIBERO restorations are applied
+                                                                   deciles {0.008 to 0.060} of the arm-divergence distribu-by direct state writes to object poses, articulated joints, and
+                                                                     tion scouted with an accept-everything probe. Selection usedthe arm configuration, and the retained chunk remainder is
+                                                                 the same rule for both. Candidates whose success rate liesthen executed normally.
+                                                               within 3 points of the best form the admissible set, and within
+                                                                                                it the candidate minimizing physical cost is chosen, giving
+  CoRe Hyperparameters and Calibration                                        δ∗= 0.09 and ϵ∗= 0.050 (Figs. A2 and A3).
+Table A4 lists every CoRe hyperparameter with the value
+used in all reported experiments. The anchor threshold δ      Seeds.  Test episodes scan seeds 0 to 400. Manifest-based
+differs between benchmarks because the divergence lives in      runs additionally seed the policy RNG per episode as 106
+different spaces. On LangSwitch the instruction changes, so       plus the environment seed. Detection banks are collected
+dt compares std-normalized actions and δ is dimensionless.      from seeds 0 to 500 with a fixed 70/30 train and calibration
+On LIBERO the instruction is unchanged, and because the        split.
+
+=== PDF PAGE 11 ===
+        Observation Synthesis Details             On LangSwitch the frame is taken from an imagined con-
+                                                                   tinuation τB. The target cube is splatted in mid-air becauseVoxel stores.  Per-object stores use 2 mm voxels in each
+                                                                 the counterfactual has already lifted it: object poses in anobject’s local frame, accumulated incrementally from seg-
+                                                         imagined rollout follow the imagined arm, so a grasped ob-mented RGB-D frames with first-seen colors, using the sim-
+                                                                          ject is rendered where the imagined gripper holds it ratherulator’s instance segmentation to separate arm, objects, and
+                                                              than where it still rests in the recorded scene. The egocentricbackground. Capture runs asynchronously so that fusion
+                                                        view shows the same state from the moving wrist camera,never blocks the control loop. A world-frame background
+                                                            with the arm composited last from the forward-kinematicstore accumulates all non-arm non-object pixels, and pixels
+                                                                    render.with invalid depth are kept on a zero-parallax plate that fills
+regions the background store cannot cover.                 On LIBERO the pair illustrates the dual-view case: the
+                                                                 exocentric and the egocentric stream are both re-synthesized
+Exocentric view.  The anchor frame is edited in place. The       for the same imagined state. LIBERO recoveries are dom-
+removal mask is the union of the arm silhouette and the                                                                 inated by re-approach rather than by scene restoration, so
+anchor-pose voxel footprints of displaced objects, which also                                                                 these frames exercise the synthesis path alone, without a
+covers pixels the segmentation misses under arm occlusion.                                                                subset probe.
+Vacated pixels are filled by projecting the background store,                                             On the real robot the frame is the repaint that a subset
+then the plate, and residual holes are inpainted. Pixels of                                                           probe consumes. The candidate objects are removed from
+undisplaced objects that the fill overwrote are repaired by                                                                 the anchor frame, the background store and the zero-parallax
+reprojecting their stores at the anchor pose. Displaced objects                                                                     plate fill the vacated pixels, and the remaining objects are
+are then splatted at their imagined poses with z-buffering,                                                                 reprojected at their anchor poses, so the policy is asked what
+and the arm is composited last from the forward-kinematic                                                                                                it would do if that subset had been restored. Residual speckle
+render.                                                                          at object boundaries is the visible cost of a real depth sensor,
+Egocentric view.  The wrist viewpoint moves with the      and it is the input on which the probe decision is actually
+imagined arm, so the entire image is reprojected from the      made.
+stores at the forward-kinematic camera pose, background first         Lighting is the one part of the composite that must be
+with caching, then objects with z-buffered layering, followed       calibrated per domain, because the arm is rendered by an
+by despeckling of sparse pixels, plate filling, and inpainting.       external forward-kinematic renderer rather than by the simu-
+                                                                         lator that produced the background. On LIBERO the render
+Inpainting.  Holes covering at least 10% of the image use        is matched to the MuJoCo headlight with a 0.03 ambientLaMa when available, and all other holes use OpenCV Telea                                                          term plus a camera-following directional light; without this
+inpainting. Splatting uses a deterministic GPU z-buffer that
+                                                                 correction the composited arm is 2 to 3 times brighter thanresolves duplicate writes by depth ordering, so repeated syn-                                                                 the ground-truth frames, and that mismatch alone is a dis-
+thesis of the same state is bit-stable.                                                                     tribution shift the policy can key on. On LangSwitch the
+Arm rendering.  The arm  is rendered by a pinocchio      rendered arm already agrees with the SAPIEN ground truth,
+forward-kinematics chain and pyrender in a worker process.      so no correction is applied. On the real robot no synthetic
+On LIBERO the render lighting is calibrated to the MuJoCo     arm is composited at all, and the room illumination in the
+headlight, a 0.03 ambient term plus a camera-following di-       retained pixels is whatever the scene had, so the question
+rectional light, since the uncalibrated render composited the      does not arise. The figure is deliberately shown without any
+arm 2 to 3 times brighter than the ground-truth frames. On       per-panel exposure adjustment, so the brightness agreement
+LangSwitch the rendered arm already matches the SAPIEN      between the rendered arm and its surrounding scene is what
+ground truth closely, so no lighting calibration is applied.       the policy actually sees.
+Imagined proprioception is kept consistent with the imagined
+pose by overriding joint positions from forward kinematics
+                                                             Ablation Protocolswith zero velocities, together with the derived end-effector
+pose on LIBERO.                                           Fidelity of Synthesized Rollouts
+Failure handling. A synthesis failure inside a probe aborts    On LangSwitch the protocol covers all 9 pairs at 3 timings
+that probe rather than silently substituting ground truth. If      with 10 episodes each per backbone, yielding 278, 281, and
+all probes fail, CoRe falls back to restoring every displaced     305 recovery anchors for π0, π0.5, and GR00T. On LIBERO
+object, so synthesis failures can only reduce restoration effi-          it covers all 10 tasks, 4 perturbation types, and 3 timings
+ciency rather than cause the probe to accept an insufficient      with one episode each, yielding 137, 96, and 130 anchors for
+restoration subset.                                                   π0.5, X-VLA, and GR00T. At every anchor three indepen-
+                                                              dent closed-loop rollouts are launched, one on synthesized
+Qualitative Examples                                        observations and two on ground-truth renders, all sharing the
+Figure A1 shows synthesized observations exactly as the      benchmark’s contact-boundary threshold. The synth-to-GT
+frozen policy receives them, for the three domains and both      endpoint divergence is reported against the GT-to-GT di-
+viewpoints. Each column comes from the same pipeline;      vergence as the sampling-variability floor. On LIBERO this
+only the calibration, the segmentation source, and the render       floor is structurally near zero, so absolute values are reported
+lighting differ.                                                        there.
+
+=== PDF PAGE 12 ===
+                                                              Figure A2: Anchor-divergence threshold sweep on the val-
+Figure A1: Synthesized observations, as consumed by the       idation pairs. Success peaks at δ = 0.09 and collapses for
+frozen policy. Columns are the three domains, rows are the        later anchors.
+two viewpoints. LangSwitch shows a frame of an imagined
+continuation, in which the target is rendered in mid-air be-
+cause the counterfactual has already grasped  it. LIBERO      episodes of Table A7 contain the zero false triggers reported
+shows the dual-view synthesis of a single imagined state.       in the main paper. The No-Switch rows share the same envi-
+The real-robot column shows the repaint a subset probe is      ronment seed sets, while policy sampling remains stochastic
+evaluated on, with the candidate objects removed and the      and the detector draws K samples at every query, so the
+vacated pixels filled from the background store.                wrapped execution is not bit-identical to a bare rollout. The
+                                                             small per-skill differences in Table A7 therefore reflect sam-
+                                                                 pling noise rather than any intervention, as no recovery is
+Recovery Mechanism Ablation                              ever triggered.
+All four variants replay one fixed manifest of 270 episodes, 9
+pairs at 3 timings with 10 episodes, on π0.5 with identical en-             Real-World System Details
+vironment seeds, policy seeds, and switch ticks. The variants                                                 Rig and Perception
+differ only in the realignment target. Episode Reset restores
+                                                   The platform is a 6-DoF UFACTORY xArm6 with a parallel-
+the initial state, Anchor Rollback restores everything at the
+                                                         jaw gripper on a fixed tabletop, commanded in joint space
+recovery anchor, CoRe w/o Sub follows the counterfactual
+                                                                          at 10 Hz, which matches the demonstration recording ratecontinuation with full restoration, and CoRe uses the probe-
+                                                       and the LeRobot dataset frame rate, so training and deploy-
+selected subset with ϵ = 0.050. The three full-restoration                                                     ment share one cadence. Two Intel RealSense D435i cameras
+variants do not consume ϵ.                                                              provide RGB-D: one fixed third-person camera viewing the
+                                                         workspace from the front-left and one wrist camera rigidly
+Threshold Sensitivity                                                     mounted on the gripper flange. Both streams are captured at
+Figure A2 shows the δ sweep on the validation pairs, 90                                                     640 × 480 at 30 fps and center-cropped to 512 × 512 for the
+episodes per candidate. Success peaks at δ = 0.09 with       policy, with the intrinsics shifted by the crop at the source
+91.1% and degrades monotonically for later anchors, reach-                                                            so that every downstream consumer uses one camera ma-
+ing 36.7% at δ = 0.24, since an anchor placed too deep        trix. Depth is aligned to color in hardware; readings outside
+resumes the policy inside the lock-in regime discussed in the                                                                     (0, 3] m are treated as invalid.
+main paper. Figure A3 shows the ϵ sweep. Overly tight thresh-       Two extrinsics are calibrated offline and then frozen: the
+olds force near-full restoration and lose 4 to 5 points to the                                                                 third-person camera-to-base transform and the wrist cam-
+added physical failure surface, a broad plateau spans 0.016 to                                                                 era hand-eye transform. The third-person calibration is ver-
+0.050, and the loosest setting begins to skip required restora-                                                                           ified by commanding the tool to a set of known poses and
+tions. Within the plateau the largest ϵ minimizes restorations       reprojecting, with a residual of 4.3 mm at the tool center
+at 0.16 objects per episode.                                                                     point. A table-height calibration fixes the support plane at
+                                                         z = −0.183 m in the base frame; all vertical safety rails are
+             Additional Results                       expressed relative to it.
+Tables A5 and A6 report the per-cell success rates behind the         Perception replaces the simulator’s privileged state with
+switch columns of Table 1 and behind Table 2 of the main       three components. Object detection uses an open-vocabulary
+paper, and Table A7 reports the per-skill No-Switch suc-       detector (Grounding-DINO) with a per-object text prompt,
+cess rates behind the No-Switch and All columns of Table      guarded  against cross-prompt ambiguity so  that a box
+1. Every LangSwitch cell aggregates 100 episodes and ev-      claimed with higher confidence by another object’s prompt is
+ery LIBERO entry aggregates 200 episodes, with cell counts       rejected. Instance masks come from a promptable segmenta-
+verified against the raw logs. The 1,500 unswitched CoRe       tion model (SAM2) seeded by those boxes, with an HSV-band
+
+=== PDF PAGE 13 ===
+                                                                              Bare              +CoRe
+
+                                           Family           Pair            S   M   D      S   M    D
+
+                                  π0
+                                           Re-grounding   pick→pick      24.0     1.0     0.0    99.0   97.0   100.0
+                                           Re-grounding   push→push       1.0     0.0     1.0    86.0   89.0    88.0
+                                           Re-grounding   place→place      0.0     0.0     0.0    74.0   75.0    70.0
+                                                 Re-skilling     pick→push      18.0     2.0     3.0    96.0   96.0    95.0
+                                                 Re-skilling     place→pull       5.0   12.0   20.0    87.0   87.0    92.0
+                                                 Re-skilling     stack→pick      41.0     3.0   37.0    97.0   99.0    90.0
+                                                 Conflict       push→pull        2.0     0.0     0.0    74.0   89.0    87.0
+                                                 Conflict       place→push    100.0   89.0   84.0    97.0   99.0    95.0
+                                                 Conflict        stack→stack     31.0   10.0   10.0    77.0   62.0    65.0
+                                   Mean (per timing)                24.7   13.0   17.2    87.4   88.1    86.9
+
+                                        π0.5
+                                           Re-grounding   pick→pick      87.0     0.0     0.0    98.0   98.0    97.0
+                                           Re-grounding   push→push     64.0     0.0     0.0   100.0   97.0    98.0
+                                           Re-grounding   place→place      0.0     0.0     0.0    88.0   86.0    87.0
+                                                 Re-skilling     pick→push      79.0     9.0   11.0   100.0   99.0   100.0
+                                                 Re-skilling     place→pull      51.0   62.0   56.0    97.0   96.0    95.0
+                                                 Re-skilling     stack→pick      98.0     0.0   99.0    93.0   94.0    91.0
+                                                 Conflict       push→pull      21.0     0.0     0.0    84.0   98.0    95.0
+                                                 Conflict       place→push     94.0   89.0   72.0   100.0   99.0    97.0
+                                                 Conflict        stack→stack     42.0   11.0   14.0    85.0   69.0    62.0
+                                   Mean (per timing)                59.6   19.0   28.0    93.9   92.9    91.3
+
+                                 GR00T N1.7
+                                           Re-grounding   pick→pick        6.0     7.0     2.0    97.0   94.0    90.0
+                                           Re-grounding   push→push     10.0     2.0     0.0    80.0   71.0    77.0
+                                           Re-grounding   place→place      0.0     0.0     0.0    78.0   73.0    73.0
+                                                 Re-skilling     pick→push      11.0     3.0     0.0    85.0   95.0    89.0
+                                                 Re-skilling     place→pull      27.0   29.0   27.0    91.0   91.0    86.0
+                                                 Re-skilling     stack→pick      19.0     0.0   19.0    92.0   94.0    77.0
+                                                 Conflict       push→pull      22.0     1.0     0.0    85.0   82.0    83.0
+                                                 Conflict       place→push     85.0   93.0   88.0    89.0   94.0    92.0
+                                                 Conflict        stack→stack     35.0     8.0     8.0    64.0   53.0    56.0
+                                   Mean (per timing)                23.9   15.9   16.0    84.6   83.0    80.3
+
+ Table A5: LangSwitch per-cell success rates (%). Each cell is 100 episodes. S/M/D denote shallow/mid/deep switch timing.
+
+
+
+                                      Arm collision      Grasp failure      Object displace       Object tip
+
+                         Method              S  M   D    S  M   D    S  M   D    S  M   D  Avg
+
+                     OpenVLA              1.0    3.0    6.0  42.5  42.0  39.5    4.0    3.5    2.0    3.0    4.0    3.0  12.8±0.3
+                        RobustVLA           10.0  10.5  19.0  34.0  50.5  57.0    3.0    1.5    3.5    2.5    3.5    4.0  16.6±4.3
+                      GR00T N1.7            8.5  18.0  20.5  40.5  49.5  48.0  19.5  17.0  12.5  13.5  14.5  18.5  23.4±2.5
+                      OpenVLA-OFT       15.5  17.0  23.5  54.5  67.5  73.0  20.5  12.0    8.0  13.5    6.0  11.5  26.9±1.8
+                          VLA-Adapter         15.0  22.5  26.5  60.5  65.0  69.5  13.0  10.0    9.5  11.0    7.5  13.0  26.9±2.4
+                      X-VLA               57.0  66.5  58.0  44.5  59.0  50.0    6.5    5.5    6.5  10.5    9.0    9.5  31.9±2.8
+                          π0.5                 35.0  29.5  46.5  66.0  66.0  63.0  51.0  43.5  37.0  30.5  25.0  28.5  43.5±2.3
+
+                      GR00T N1.7 + CoRe  80.0  78.5  64.5  71.0  72.0  71.5  68.5  77.0  71.0  46.5  64.5  72.5  69.8±3.3
+                      X-VLA + CoRe       85.0  88.5  81.0  80.5  83.0  81.5  91.5  90.0  83.5  89.0  80.0  80.0  84.5±2.6
+                          π0.5 + CoRe          92.0  86.5  88.5  87.0  93.0  90.5  86.5  88.5  87.5  84.0  88.0  87.0  88.2±0.8
+
+Table A6: LIBERO-Long per-family per-timing success rates (%). Each entry aggregates 200 episodes. S/M/D denote shal-
+low/mid/deep perturbation timing, and Avg reports mean and sample standard deviation across the three timings.
+
+
+segmenter as a fallback. The arm mask, which the simulator       try for the sphere and cylinder, whose curved tops lose stereo
+supplies for free, is produced by rendering the arm from the      depth at this grazing viewing angle.
+measured joint configuration through a forward-kinematics        Observation synthesis reuses the simulator pipeline un-
+chain and dilating the silhouette by 9 px to absorb calibration      changed in structure: 2 mm voxels, first-seen colors, a world-
+slop. Object poses use shape-specific estimators: yaw-only      frame background store and per-object stores in object-local
+pose from the depth footprint for boxes, and analytic geome-      frames, a zero-parallax plate for depth-invalid pixels, and in-
+
+=== PDF PAGE 14 ===
+                                                               serving as placement targets.
+                                          We fine-tune π0.5 on this data with the  official JAX
+                                                                     pipeline. The dataset is converted to LeRobot v2.1 with the
+                                                               standard image, wrist image, state, and action features, and
+                                                              normalization statistics are computed on the converted set.
+                                                             Actions are absolute joint positions with a delta transform;
+                                                                 the model emits 10-step chunks of which 8 are executed be-
+                                                                    fore the next query, matching the deployed control cadence.
+                                                   The model is fully fine-tuned, all parameters included, on a
+                                                                   single NVIDIA H200 GPU, and the workstation’s RTX 4090
+                                                               cards serve inference only at deployment. Only static, unper-
+                                                               turbed demonstrations enter training. The policy never sees
+                                                            a language switch, a collision, or a displaced object during
+                                                                     fine-tuning, so every real-robot result is out of the training
+                                                                     distribution by construction.
+
+                                                     Perturbation Execution
+                                                           Real evaluation covers five conditions: the three LangSwitch
+                                                                   families instantiated on this rig, an Arm Collision family, and
+                                                            a Scene Rearrangement family. Each condition contributes 20
+Figure A3: Trajectory-equivalence threshold sweep on the      episodes split across shallow, mid, and deep injection timings
+validation pairs. The shaded band is the admissible plateau,       in the same 0.30/0.55/0.75 proportions used in simulation.
+and ϵ∗= 0.050 minimizes restorations within it.              The phase boundaries are recalibrated on the real robot rather
+                                                              than inherited: for each base skill we take the earliest step
+                                                                          at which the nominal policy satisfies the task over clean
+               π0             π0.5     GR00T N1.7                                                                      rollouts on this rig, and derive the three injection ticks from
+     Skill   Bare  +CoRe  Bare  +CoRe  Bare  +CoRe            that minimum completion time. Timings are stratified over
+     pick   100.0   100.0   98.0   100.0   99.0   100.0           seeds so that no timing cell is confounded with a particular
+    push   94.0    97.0   100.0   100.0   91.0   92.0             layout.
+     place   90.0    91.0    97.0    93.0   81.0   89.0
+     pull    93.0    91.0    98.0    99.0   95.0   94.0        Arm Collision.  The collision is applied in joint space
+     stack   76.0    71.0    96.0    94.0   76.0   76.0            as a twist injected at the scheduled tick. Every joint par-
+    Mean   90.6    90.0    97.8    97.2   88.4   90.2              ticipates: each joint’s magnitude is drawn uniformly from
+                                                                     [0.12, 0.32] rad with a random sign, then scaled by fixed per-
+Table  A7:  No-Switch  per-skill  success  rates  (%)  on       joint weights that down-weight the base joint, whose sweep
+LangSwitch. Each cell aggregates 100 episodes.                dominates tool swing and would push the arm out of the
+                                                           workspace, and the two wrist joints, which sit near singular-
+                                                                                       ity. A candidate twist is accepted only if forward kinematics
+                                                                places the resulting tool pose at least 0.10 m above the table,painting that switches to LaMa when a hole covers at least
+                                                                   inside the workspace bounds with a 30 mm margin, and clear10% of the frame. Three differences from simulation are
+                                                                of joint limits; rejected draws are re-sampled with a gentleforced by real sensing. Voxel capture runs asynchronously
+                                                         magnitude shrink. Because the impulse is a sampled quan-offthe control path, since a real RGB-D fusion step cannot
+                                                                                        tity, it is recorded per episode and replayed verbatim on theblock a 10 Hz loop. Per-voxel view directions are retained
+                                                                paired baseline episode, so the two arms of a pair experienceso that render-time backface culling can suppress voxels ob-
+                                                                 the same physical disturbance.served only from grazing angles. Synthesis renders at the
+policy input resolution rather than the native camera resolu-
+                                                       Scene Rearrangement.  This condition is executed by the
+tion, because the backbone resizes to 224 × 224 regardless.       operator rather than by code, and it is deliberately harder than
+As in simulation, a synthesis failure aborts the affected probe                                                                                     its simulated counterpart. At the scheduled tick the controller
+rather than silently substituting a live observation.                                                                  freezes the arm on its last commanded target and prompts
+                                                                 the operator, who displaces all three objects on the table, not
+Data Collection and Fine-Tuning                          only the instruction target, and then releases the gate. The
+We collect 100 demonstrations for each of the three skills,       controller drops any stale internal object registry, re-observes
+pick, place, and push. Episodes that fail a quality gate are       the scene, and returns control to the policy. Restoring every-
+discarded, and recording is restricted to the manipulation       thing is therefore never the cheap answer: the recovery has
+segment to exclude idle motion and trailing holds, so the       to decide which of the moved objects actually matter for the
+resulting dataset contains only clean, unperturbed executions.       task. Object identities and coarse layout are held fixed within
+Episodes cycle round-robin over three household objects, a      a pair so that the baseline and CoRe episodes face the same
+tennis ball, a red box, and a blue gum bottle, with two plates      rearrangement.
+
+=== PDF PAGE 15 ===
+Pairing.  Baseline and CoRe episodes are paired by initial
+layout, instruction, and, for Arm Collision, by the replayed
+impulse. Pairs are run back to back so that lighting and cali-
+bration drift cannot separate the two arms.
+
+Recovery Execution and Measurement
+Physical restoration.  Unlike the simulator, which can
+write object poses directly, every real restoration is executed
+physically. A held object whose position the probe deems
+irrelevant is put down in place rather than carried. Objects
+that must be restored are picked and placed by a motion-
+planned three-segment move, approach, transport at a fixed
+carry height, and descent, with a ramped gripper close and
+a per-object closing target taken from the object registry.
+Placement is verified by re-observing the object after release;
+a placement whose verification fails is retried once and, if
+it fails again, is not counted as restored. The arm is then
+                                                              Figure A4: Real-robot success rate per condition, 20 episodesmoved to the rejoin configuration, the pending instruction is
+                                                                each, for the bare policy and for the same frozen policyconsumed, observations are refreshed, and the policy’s sam-
+                                                      wrapped in CoRe.pling RNG is restored to its value at recovery entry, exactly
+as in simulation.
+
+Safety rails.  Every commanded step passes through the
+same rails in both arms: a tool-center-point floor 3 mm above
+the calibrated table, a per-step joint delta clamp, a workspace
+bound check, and a Cartesian speed cap. A controller-side
+speed fault aborts the episode rather than being retried
+silently. These rails are identical for the baseline and for
+CoRe, so they cannot advantage either arm.
+                                                              Figure A5: Recovery composition under Scene Rearrange-
+Timing.  Two clocks are recorded per recovery. Planning      ment: of the objects displaced above tolerance, the share the
+time runs from the moment the trigger is adjudicated to the      probe restores and the share it declines to touch.
+moment the realignment target is committed, and therefore
+contains the anchor scan, the imagined rollout, and the subset
+                                                                                          Bare         +CoRe
+probes. Execution time runs from that commit to the end of
+the physical realignment, and therefore contains only arm and        Condition                         all      S   M    D
+object motion. The reported medians are 9.7 s of planning        Re-grounding pick→pick    6/20     7/7     5/7     6/6
+and 8.8 s of physical motion per recovery over 165 recover-         Re-skilling pick→push      1/20     6/7     6/7     6/6
+ies in 100 layout-paired episodes. The two are dominated by         Conflict place→push        1/20     6/7     7/7     5/6
+different regimes: planning is essentially the imagined roll-      Arm collision               9/20     6/7     5/7     6/6
+out, about 1.2 s per imagined chunk at a median of 8 chunks,        Scene rearrangement        4/20     7/7     6/7     6/6
+while the median recovery restores no object at all and spends         Total                     21/100   32/35   29/35   29/30
+its physical budget realigning the arm alone. Recoveries that
+do carry an object are far more expensive, which is why a                                                             Table A8: Real-robot success by injection timing. S/M/D de-
+single manipulation is reported separately at 20.5 s of motion      note shallow/mid/deep, at the same 0.30/0.55/0.75 fractions
+and 46.6 s of wall clock.                                         of the recalibrated real phase.
+Safety adjudication.  Collisions and emergency stops are
+logged by the controller with the stop reason attached to the
+episode record and are confirmed by the operator at episode      succeeds on 21 of 100 perturbed episodes, and the same pol-
+end, so a physically unsafe episode cannot be scored as a       icy wrapped in CoRe succeeds on 90, with the largest margins
+success by a kinematic heuristic. Under this accounting 21 of     on the two conditions whose pre-perturbation behaviour is
+the 100 baseline episodes end in a collision or an emergency       furthest from the post-perturbation goal.
+stop, which is 27% of all baseline failures, against 5 for         Figure A5 shows what the subset probe buys. In a typical
+CoRe, one of which is the injected impulse itself striking      Scene Rearrangement recovery 2.77 objects sit beyond tol-
+clutter before any recovery could be triggered.                    erance, yet only 1.15 are physically restored: 58% of the dis-
+                                                             placed objects are deliberately left where the operator moved
+Real-Robot Results in Detail                              them, because the probe finds their displacement irrelevant
+Figure A4 gives the per-condition success rates behind the       to the pending task.
+real-robot table of the main paper: the frozen policy alone        Table A8 breaks the CoRe column down by injection tim-
+
+=== PDF PAGE 16 ===
+                                    Bare   +CoRe               Fei, S.; Wang, S.; Shi,  J.; Dai, Z.; Cai,  J.; Qian, P.;  Ji,
+                                                                      L.; He, X.; Zhang, S.; Fei, Z.; Fu, J.; Gong, J.; and Qiu,
+        Collisions or emergency stops   21/100    5/100
+                                                       X. 2026. LIBERO-Plus: A Progressive Robustness Bench-
+                                                    mark for Visual-Language-Action Models. In Proceedings ofTable A9:  Physical  safety  over  the 100  layout-paired
+                                                                  the IEEE/CVF Conference on Computer Vision and Patternepisodes. CoRe removes three quarters of the unsafe ter-
+                                                             Recognition (CVPR), 38574–38583.minations in absolute count.
+                                                      Gu, Q.; Ju, Y.; Sun, S.; Gilitschenski,  I.; Nishimura, H.;
+                                                                        Itkina, M.; and Shkurti, F. 2026.  Safe: Multitask failure
+            Skill               pick    place   push                 detection for vision-language-action models.  Advances in
+         Nominal success   19/20   19/20   20/20               Neural Information Processing Systems, 38: 40041–40076.
+                                                      Guo, J.; Wu, Z.; Tu, C.; Ma, Y.; Kong, X.; Liu, Z.; Ji, J.;
+Table A10: Unperturbed control condition, frozen check-      Zhang, S.; Chen, Y.; Chen, K.; Dou, Q.; Yang, Y.; Liu, X.;
+point, 20 episodes per skill.                                  Zhao, H.; Lv, W.; and Li, S. 2026. On Robustness of Vision-
+                                                          Language-Action Model against Multi-Modal Perturbations.
+                                                                In The Fourteenth International Conference on Learning
+ing. Success does not decay as the perturbation is injected       Representations.
+deeper into the skill, which is the behaviour the anchor search      Hu, H.; Huang, C.-T.; Liu, J.; Wang, Y.; Suzuki, K.; Brand,
+is designed to produce: a later perturbation moves the anchor      M.;andKoike-Akino, T.2026. ReCoVLA:VLM-GuidedRe-
+later as well, so the imagined continuation still starts before     ward Compilation for Failure Recovery in Vision-Language-
+the policy commits to the stale plan.                           Action Policies. arXiv:2606.09630.
+  Table A9 reports the physical-safety accounting, which       Intelligence, P.; Black, K.; Brown, N.; Darpinian, J.; Dha-
+is the reading a deployment cares about most. A stale plan       balia, K.; Driess, D.; Esmail, A.; Equi, M.; Finn, C.; Fusai,
+executed after a perturbation does not merely fail the task:       N.; Galliker, M. Y.; Ghosh, D.; Groom, L.; Hausman, K.;
+on this rig it drives the arm into the table or into an object,        Ichter, B.; Jakubczak, S.; Jones, T.; Ke, L.; LeBlanc, D.;
+and 21 of the 100 baseline episodes end in a collision or an      Levine, S.; Li-Bell, A.; Mothukuri, M.; Nair, S.; Pertsch, K.;
+operator emergency stop, 27% of all baseline failures. Under      Ren, A. Z.; Shi, L. X.; Smith, L.; Springenberg, J. T.; Sta-
+CoRe the count falls to 5, one of which is the injected impulse      chowicz, K.; Tanner, J.; Vuong, Q.; Walke, H. R.; Walling, A.;
+itself striking clutter before any recovery could be triggered.     Wang, H.; Yu, L.; and Zhilinsky, U. 2025. π0.5: a Vision-
+   Finally, Table A10 gives the unperturbed control condi-      Language-Action Model with Open-World Generalization.
+tion on the same rig and the same frozen checkpoint. The      ArXiv, abs/2504.16054.
+fine-tuned policy is competent when nothing is injected, so                                                                      Karli, U. B.; and Fitzgerald, T. 2026. RECALL: Recov-
+the baseline collapse in Figure A4 is attributable to the per-                                                              ery Experience Collection for Active Lifelong Learning in
+turbation rather than to a weak backbone.                                                           Vision-Language-Action Models. arXiv:2606.23617.
+                                                     Kim, M. J.; Finn, C.; and Liang, P. 2025. Fine-Tuning Vision-
+                 References                          Language-Action Models: Optimizing Speed and Success.
+Belkhale, S.; Cui, Y.; and Sadigh, D. 2023. HYDRA: Hybrid                                                            arXiv preprint arXiv:2502.19645.
+Robot Actions for Imitation Learning. In Tan, J.; Toussaint,                                                     Kim, M. J.; Pertsch, K.; Karamcheti, S.; Xiao, T.; Balakr-
+M.; and Darvish, K., eds., Proceedings of The 7th Conference       ishna, A.; Nair, S.; Rafailov, R.; Foster, E. P.; Sanketi, P. R.;
+on Robot Learning, volume 229 of Proceedings of Machine      Vuong, Q.; Kollar, T.; Burchfiel, B.; Tedrake, R.; Sadigh, D.;
+Learning Research, 2113–2133. PMLR.                         Levine, S.; Liang, P.; and Finn, C. 2024. OpenVLA: An
+Black, K.; Brown, N.; Driess, D.; Esmail, A.; Equi, M.; Finn,      Open-Source Vision-Language-Action Model. In Agrawal,
+C.; Fusai, N.; Groom, L.; Hausman, K.; Ichter, B.; Jakubczak,        P.; Kroemer, O.; and Burgard, W., eds., Conference on Robot
+S.; Jones, T.; Ke, L.; Levine, S.; Li-Bell, A.; Mothukuri,      Learning, 6-9 November 2024, Munich, Germany, volume
+M.; Nair, S.; Pertsch, K.; Shi, L. X.; Tanner, J.; Vuong, Q.;     270 of Proceedings of Machine Learning Research, 2679–
+Walling, A.; Wang, H.; and Zhilinsky, U. 2024. π0: A Vision-      2713. PMLR.
+Language-Action Flow Model for General Robot Control.       Li, D.; Lei, J.; Wang, H.; Liu, L.; Yang, Y.; Wang, Z.; Liu, B.;
+ArXiv, abs/2410.24164.                                     Zheng, M.; and Fan, Z. 2026. Learning actionable manip-
+Dai, Y.; Lee, J.; Fazeli, N.; and Chai, J. 2025. RACER:       ulation recovery via counterfactual failure synthesis. arXiv
+Rich Language-Guided Failure Recovery Policies for Imita-       preprint arXiv:2603.13528.
+tion Learning. In 2025 IEEE International Conference on       Lin, Z.; Duan, J.; Fang, H.; Fox, D.; Krishna, R.; Tan, C.;
+Robotics and Automation (ICRA), 15657–15664.               and Wen, B. 2025.  Failsafe: Reasoning and recovery from
+Duan, J.; Pumacay, W.; Kumar, N.; Wang, Y. R.; Tian, S.;       failures in vision-language-action models.  arXiv preprint
+Yuan, W.; Krishna, R.; Fox, D.; Mandlekar, A.; and Guo, Y.      arXiv:2510.01642.
+2025. AHA: A Vision-Language-Model for Detecting and       Liu, B.; Zhu, Y.; Gao, C.; Feng, Y.; Liu, Q.; Zhu, Y.;
+Reasoning Over Failures in Robotic Manipulation. In The      and Stone,  P. 2023.  LIBERO: Benchmarking Knowl-
+Thirteenth International Conference on Learning Represen-      edge Transfer for Lifelong Robot Learning. arXiv preprint
+tations.                                                      arXiv:2306.03310.
+
+=== PDF PAGE 17 ===
+Liu, J.; Gao, F.; Wei, B.; Chen, X.; Liao, Q.; Wu, Y.; Yu,      W.; Zhang, R.; Liu, J.; and Wang, D. 2026. VLA-Adapter:
+C.; and Wang, Y. 2025. What Can RL Bring to VLA Gener-    An effective paradigm for tiny-scale vision-language-action
+alization? An Empirical Study. In The Thirty-ninth Annual      model.  Proceedings of the AAAI Conference on Artificial
+Conference on Neural Information Processing Systems.            Intelligence, 40(22): 18638–18646.
+Liu, S.; Wu, L.; Li, B.; Tan, H.; Chen, H.; Wang, Z.; Xu,     Wu, Y.; Zhang, H.; Tan, J.; Wang, X.; and Zhang, Z. 2026.
+K.; Su, H.; and Zhu, J. 2024. RDT-1B: a Diffusion Foun-     FlowPRO: Reward-Free Reinforced Fine-Tuning of Flow-
+dation Model for Bimanual Manipulation.  arXiv preprint      Matching VLAs via Proximalized Preference Optimization.
+arXiv:2410.07864.                                           arXiv preprint arXiv:2606.05468.
+Liu, Z.; Bahety, A.; and Song, S. 2023. Reflect: Summariz-      Xiang, F.; Qin, Y.; Mo, K.; Xia, Y.; Zhu, H.; Liu, F.; Liu,
+ing robot experiences for failure explanation and correction.      M.; Jiang, H.; Yuan, Y.; Wang, H.; Yi, L.; Chang, A. X.;
+arXiv preprint arXiv:2306.15724.                              Guibas, L. J.; and Su, H. 2020. SAPIEN: A SimulAted Part-
+Liufu, W.; Guo, X.; Chen, R.; Liu, J.; Zhang, K.; Liang, X.;      based Interactive ENvironment. In The IEEE Conference on
+Lin, J.; Sun, D.; Wang, Y.; Xu, R.; et al. 2026. RePO-VLA:     Computer Vision and Pattern Recognition (CVPR).
+Recovery-Driven Policy Optimization for Vision-Language-      Xiao, W.; Lin, H.; Peng, A.; Xue, H.; He, T.; Luo, Z.; Xie, Y.;
+Action Models. arXiv preprint arXiv:2605.09410.              Hu, F.; Fan, L.; Shi, G.; and Zhu, Y. 2026. Self-Improving
+Ma, C.; Yang, G.; Lu, K.; Xu, S.; Byrne, B.; Trigoni, N.; and      Vision-Language-Action Models with Data Generation via
+Markham, A. 2026a. CycleVLA: Proactive Self-Correcting      Residual RL.  In The Fourteenth International Conference
+Vision-Language-Action Models via Subtask Backtrack-     on Learning Representations.
+ing and Minimum Bayes Risk Decoding.  arXiv preprint      Xu, C.; Nguyen, T. K.; Dixon, E.; Rodriguez, C.; Miller,
+arXiv:2601.02295.                                                          P.; Lee, R.; Shah, P.; Ambrus, R. A.; Nishimura, H.; and
+Ma, Y.; Song, Z.; Zhuang, Y.; Hao, J.; and King, I. 2026b. A       Itkina, M. 2025.  Can we detect failures without failure
+Survey on Vision–Language–Action Models for Embodied      data? uncertainty-aware runtime failure detection for imi-
+AI. IEEE Transactions on Neural Networks and Learning       tation learning policies.  In Robot Evaluation for the Real
+Systems, 37(7): 3031–3051.                                   World.
+NVIDIA.   2026.     NVIDIA   Isaac  GR00T  N1.7      Ye, Z.; Lu, W.; Ye, M.; Lin, T.; Yang, S.; Yan, J.; and Zhao, B.
+-  A   Foundation  Model   for   Generalist   Robots.      2026. RoboFAC: A Comprehensive Framework for Robotic
+https://github.com/NVIDIA/Isaac-GR00T.                        Failure Analysis and Correction.
+Pumacay, W.; Singh, I.; Duan, J.; Krishna, R.; Thomason, J.;      Zeng, X.; Zhou, X.; Li, Y.; Shi, J.; Li, T.; Chen, L.; Ren,
+and Fox, D. 2024. THE COLOSSEUM: A Benchmark for       L.; and Li, Y.-L. 2025. Diagnose, Correct, and Learn from
+Evaluating Generalization for Robotic Manipulation.            Manipulation Failures via Visual Symbols. arXiv preprint
+Shi, L. X.; Ichter, B.; Equi, M. R.; Ke, L.; Pertsch, K.; Vuong,      arXiv:2512.02787.
+Q.; Tanner, J.; Walling, A.; Wang, H.; Fusai, N.; Li-Bell, A.;      Zhao, G.; Tang, Z.; Chen, X.; Kuang, Z.; Tian, Y.; and
+Driess, D.; Groom, L.; Levine, S.; and Finn, C. 2025. Hi       Li, G. 2026a.  FLARE: A Failure-Aware Framework for
+Robot: Open-Ended Instruction Following with Hierarchical     Autonomous Correction and Recovery in Visual-Language
+Vision-Language-Action Models. In Singh, A.; Fazel, M.;      Robotic Manipulation.  In Proceedings of the IEEE/CVF
+Hsu, D.; Lacoste-Julien, S.; Berkenkamp, F.; Maharaj, T.;      Conference on Computer Vision and Pattern Recognition
+Wagstaff, K.; and Zhu, J., eds., Proceedings of the 42nd In-      (CVPR), 22391–22401.
+ternational Conference on Machine Learning, volume 267 of      Zhao, J.; Yang, H.; Hu, Y.; Gao, Y.; Ou, Q.; Wan, C.; Dong,
+Proceedings of Machine Learning Research, 54919–54933.        S.; Ma, Z.; and Gong, Y. 2026b. Retrieve-then-Steer: Online
+PMLR.                                                    Success Memory for Test-Time Adaptation of Generative
+Shin, S.; Kim, J.; Park, H.; Kim, H.; Lee, H.; Kim, H.-S.;     VLAs. arXiv preprint arXiv:2605.10094.
+and Zhang, B.-T. 2026. Back to the Familiar Future: Fail-      Zheng,  J.; Li,  J.; Wang, Z.; Liu, D.; Kang, X.; Feng,
+ure Recovery for VLA Policies via Pre-Imagined Milestone       Y.; Zheng, Y.; Zou,  J.; Chen, Y.; Zeng,  J.; Wang,  T.;
+Selection. arXiv:2606.09258.                                Zhang,  Y.-Q.;  Liu,  J.; and Zhan, X. 2026.  X-VLA:
+Tao, S.; Xiang, F.; Shukla, A.; Qin, Y.; Hinrichsen, X.; Yuan,      Soft-Prompted Transformer as Scalable Cross-Embodiment
+X.; Bao, C.; Lin, X.; Liu, Y.; kai Chan, T.; Gao, Y.; Li, X.;      Vision-Language-Action Model. In The Fourteenth Interna-
+Mu, T.; Xiao, N.; Gurha, A.; Rajesh, V. N.; Choi, Y. W.;       tional Conference on Learning Representations.
+Chen, Y.-R.; Huang, Z.; Calandra, R.; Chen, R.; Luo, S.;      Zhu, Y.; Wong, J.; Mandlekar, A.; Martín-Martín, R.; Joshi,
+and Su, H. 2025.  ManiSkill3: GPU Parallelized Robotics       A.; Nasiriany, S.; Zhu, Y.; and Lin, K. 2020. robosuite: A
+Simulation and Rendering for Generalizable Embodied AI.      Modular Simulation Framework and Benchmark for Robot
+Robotics: Science and Systems.                                 Learning. In arXiv preprint arXiv:2009.12293.
+Todorov, E.; Erez, T.; and Tassa, Y. 2012. MuJoCo: A physics       Zitkovich, B.; Yu, T.; Xu, S.; Xu, P.; Xiao, T.; Xia, F.; Wu, J.;
+engine for model-based control. In 2012 IEEE/RSJ Interna-      Wohlhart, P.; Welker, S.; Wahid, A.; Vuong, Q.; Vanhoucke,
+tional Conference on Intelligent Robots and Systems, 5026–       V.; Tran, H.; Soricut, R.; Singh, A.; Singh, J.; Sermanet,
+5033. IEEE.                                                                  P.; Sanketi, P. R.; Salazar, G.; Ryoo, M. S.; Reymann, K.;
+Wang, Y.; Ding, P.; Li, L.; Cui, C.; Ge, Z.; Tong, X.; Song,      Rao, K.; Pertsch, K.; Mordatch,  I.; Michalewski, H.; Lu,
+W.; Zhao, H.; Zhao, W.; Hou, P.; Huang, S.; Tang, Y.; Wang,       Y.; Levine, S.; Lee, L.; Lee, T.-W. E.; Leal, I.; Kuang, Y.;
+
+=== PDF PAGE 18 ===
+Kalashnikov, D.; Julian, R.; Joshi, N. J.; Irpan, A.; Ichter,
+B.; Hsu, J.; Herzog, A.; Hausman, K.; Gopalakrishnan, K.;
+Fu, C.; Florence, P.; Finn, C.; Dubey, K. A.; Driess, D.;
+Ding, T.; Choromanski, K. M.; Chen, X.; Chebotar, Y.; Car-
+bajal, J.; Brown, N.; Brohan, A.; Arenas, M. G.; and Han, K.
+2023. RT-2: Vision-Language-Action Models Transfer Web
+Knowledge to Robotic Control.  In Tan, J.; Toussaint, M.;
+and Darvish, K., eds., Proceedings of The 7th Conference
+on Robot Learning, volume 229 of Proceedings of Machine
+Learning Research, 2165–2183. PMLR.

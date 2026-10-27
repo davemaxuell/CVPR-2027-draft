@@ -1,0 +1,1366 @@
+===== PDF PAGE 1 =====
+          A Distributional Analogue to the Successor Representation
+
+
+
+          Harley Wiltzer * 1 2  Jesse Farebrother * 1 2 3 Arthur Gretton 3 4 Yunhao Tang 3 André Barreto 3 Will Dabney 3
+                                   Marc G. Bellemare 1 2 5 Mark Rowland 3
+
+
+                         Abstract                        be available at training time in order to predict the return
+                                                                              distribution. For example, if we wish to evaluate a trained
+              This paper contributes a new approach for distri-
+                                                                      policy on a new task with regard to various performance
+                butional reinforcement learning which elucidates
+                                                                                         criteria, these predictions of the return distributions must be
+              a clean separation of transition structure and re-2024                                                                   trained from scratch. This paper contributes a method that
+             ward in the learning process. Analogous to how
+                                                               overcomes this drawback, allowing for zero-shot evaluation
+                the successor representation (SR) describes the ex-
+                                                                         of novel reward functions without requiring further learning.
+               pected consequences of behaving according to aMay         given policy, our distributional successor measure         In the case of predicting just the expected return, such zero-
+24       (SM)this behaviour.describes theWedistributionalformulate theconsequencesdistributionalof         shotrepresentationevaluation(SR;is madeDayan,possible1993).by learningThis approachthe successorhas re-
+         SM as a distribution over distributions and pro-         cently been extended to continuous state spaces (Blier et al.,
+               vide theory connecting it with distributional and        2021; Blier, 2022), and the introduction of a variety of den-
+              model-based reinforcement learning. Moreover,          sity modelling and generative modelling techniques mean
+           we propose an algorithm that learns the distribu-          that such zero-shot transfer is now possible at scale (Janner
+                 tional SM from data by minimizing a two-level           et al., 2020; Touati & Ollivier, 2021; Touati et al., 2023).[cs.LG]       maximum mean discrepancy. Key to our method
+                                                                   This paper extends the idea of the successor representation
+                are a number of algorithmic techniques that are
+                                                                           to distributional RL, by defining the distributional succes-
+               independently valuable for learning generative
+                                                                    sor measure (DSM). We show that the DSM is a reward-
+             models of state. As an illustration of the useful-
+                                                                         agnostic object that can by combined with any deterministic
+               ness of the distributional SM, we show that it
+                                                                 reward function to obtain the corresponding distribution of
+               enables zero-shot risk-sensitive policy evaluation
+                                                                             returns, extending zero-shot transfer to the entire distribu-
+                 in a way that was not previously possible.
+                                                                             tion of returns. Our primary algorithmic contribution is the
+                                                                    δ-model, a tractable approximation to the distributional suc-
+                                                                      cessor measure based on ensembles of diverse generative
+          1. Introduction                                                                    models, along with practical implementation techniques that
+           Distributional reinforcement learning (Morimura et  al.,    are crucial for success. We exhibit the power of δ-models by
+          2010; Bellemare et al., 2017a; 2023) is an approach to    demonstrating their unique ability generalize across tasks
+          reinforcement learning (RL) that focuses on learning the    and risk-sensitive criteria without necessitating any further
+            entire probability distribution of an agent’s return, not just    data collection or training, which could be expensive or
+                                                                 dangerous – a feat that no other method can accomplish.arXiv:2402.08530v2      its expected value. Distributional RL has been shown to
+         improve deep RL agent performance (Yang et al., 2019;
+         Nguyen-Tang et al., 2021), and provides a flexible approach    2. Background
+            to risk-aware decision-making (Dabney et al., 2018a; Zhang
+      & Weng, 2021; Fawzi et al., 2022). A notable drawback of    In the sequel, Law(X) denotes the probability measure gov-
+            existing approaches to distributional RL is that rewards must    erning a random variable X, and X L= Y (read equal in
+                                                                               distribution) is written to indicate that Law(X) = Law(Y ).
+             *Equal contribution  1McGill University 2Mila  - Québec
+                                                        The notation P(A) defines the space of probability mea-         AI Institute 3Google DeepMind 4Gatsby Unit, University Col-
+            lege London 5CIFAR AI Chair.  Correspondence to:  Harley    sures over a set A. We also write (X, Y ) ∼µ ⊗ν to refer
+            Wiltzer <harley.wiltzer@mail.mcgill.ca>, Jesse Farebrother <jfare-    to the pair of independent samples X ∼µ, Y ∼ν.           bro@cs.mcgill.ca>.
+                                            We consider a Markov decision process (MDP) with state
+           Proceedings of the 41 st International Conference on Machine    space X, finite action space A, transition kernel p : X ×           Learning,                     Vienna, Austria. PMLR 235, 2024. Copyright 2024 by  A →P(X), bounded and measurable reward function            the author(s).
+
+
+                                                         1
+
+===== PDF PAGE 2 =====
+                    A Distributional Analogue to the Successor Representation
+
+r  : X →R, and discount factor γ ∈[0, 1). We assume   Ψπ, and value function V π satisfy the following identity,
+henceforth that X is a complete and separable metric space,         V rπ (x) = (1                                         ,      (2)which allows for finite state spaces, as well as many continu-                     −γ)−1EX′∼Ψπ(·|x)[r(X′)]
+ous state spaces of interest. Given a policy π : X →P(A)    as leveraged in the recent work of Janner et al. (2020) and
+and initial state x0 ∈X drawn from µ0 ∈P(X), an agent    Blier et al. (2021).  In words, the value function can begenerates a random trajectory (Xt, At, Rt)∞t=0 of states, ac-    expressed as an expectation of the reward, with respect to
+tions, and rewards, with distributions specified by X0 = x,    the successor measure Ψπ(·|x); this expression cleanly fac-
+At ∼π(·|Xt), Rt = r(Xt), and Xt+1 ∼p(·|Xt, At)     torises the value function into components comprising tran-
+for all t ≥0. For a fixed policy π, we will denote the     sition information and reward information, and generalisestransition kernel governing state evolution by pπ, where    the result in the tabular case by Dayan (1993). A central
+
+           a∈Apπ(· | x) = P                    p(· | x, a)π(a | x).                     consequence is that learning Ψπ allows for the evaluation                                                            of π on unseen reward functions, without further learning;
+The (random) return summarises the performance of the
+                                                                      this is known as zero-shot policy evaluation.
+agent along its trajectory, and for each possible initial state
+                                     r (x) := P∞t=0 γtr(Xt).X0 = x ∈X, it is defined as Gπ                                                                    2.2. Distributional Policy EvaluationWhen there is no ambiguity about the reward function, we
+will write Gπ in place of Gπr . For a given policy π, the    In distributional reinforcement learning (Morimura et al.,
+problem of policy evaluation is to find the expected re-    2010; Bellemare et al., 2017a; 2023), the problem of distri-
+turn for each initial state. Mathematically, this can be ex-    butional policy evaluation is concerned with finding not just
+pressed        as           learning                    the                       function                                            by                       V rπ                                                               the                                                                 expectation                                                                             of the random                                                                                                    return,                                                                                                 but its                                                                                                                             full                                                                                                                 probability                                                      : X                      →R, defined       E                         this                          describes                                    the                                         quality                                              of π in                                                                      itsV rπ (x) :=          [Gπr (x)],                                                                    distribution.                                                                Analogous                                                                                          to our                                                                                              description                                                                                                      of                                                                                                         policy                                                                                                                evalua-
+own right, and may also be used to obtain improved policies,    tion above, this can be mathematically expressed as aiming
+for example by acting greedily (Puterman, 2014).              to learn the return-distribution function ηπr  : X →P(R),                                                         with ηπr (x) equal to the distribution of Gπr (x).
+2.1. Successor Measure
+                                          An added complication in the distributional setting is that the
+The normalized successor measure Ψπ : X →P(X) asso-    return distributions are infinite-dimensional, in contrast withciated with a policy π is defined by                           the scalar mean returns learned in classical reinforcement
+                                                                 learning. This requires careful consideration of how proba-
+         ∞                                                   bility distributions will be represented algorithmically, with
+ Ψπ(S  x) := X(1      Pr(Xt     X0 = x) ,  (1)                                           common choices including categorical (Bellemare et al.,             |          −γ)γt    ∈S |
+               t=0                                      2017a) and quantile (Dabney et al., 2018b) approaches; see
+                                    1                           Bellemare et al. (2023, Chapter 5) for a summary.
+for any (measurable) set S ⊆X  and initial state x ∈X. Inthe     literature,                            often referred                                             to as the                                                          (dis-            Ψπ(·                               | x) is                                 Ψπcounted)           state             occupancy                       measure                                           2 The object                                                    de-    3. The Distributional SM
+scribed above is a normalised version of the successor repre-
+                                              One of the core contributions of this paper is to introduce a
+sentation (SR; Dayan, 1993) in the tabular case and the suc-
+                                                          mathematical object that plays the role of the successor mea-
+cessor measure (SM; Blier et al., 2021; Touati & Ollivier,
+                                                             sure in distributional reinforcement learning. Analogous to
+2021) for continuous state spaces. Blier et al. (2021) shows
+                                             how distributional RL models the distribution of the return,
+that, without the (1 −γ) factor in Equation 1, Ψπ(· | x) is   we study the distribution over future state occupancies.
+a measure for each x ∈X with total mass (1 −γ)−1. We
+include the (1−γ) normalizing factor so that Ψπ(· | x) is in     3.1. Random Occupancy Measuresfact a probability distribution – this allows for one to sample
+from the successor measure, as in the work of Janner et al.   To begin, we contribute a new form for the normalised
+                                                             successor measure (SM), which shows that it can be written(2020). Intuitively, Ψπ(S | x) describes the proportion of
+time spent in the region S ⊆X, in expectation, weighted    as an expectation of the discounted visitation distribution
+by the discount factor according to the time of visitation.       for the random state sequence (Xt)t≥0 generated by π:
+
+                                           ∞           xSince      for each                                      is a probability                                                 distribution                                                         "                                                                                 #          ∈X,                    Ψπ(·|x)                        X                                                                                (1            X0 = xover states,        we             can                compute                            expectations                                     under                                                     this distri-     Ψπ(S  x) = Eπ                                                                                                         |             −γ)γkδXk(S)
+bution. Notably, the reward function r, successor measure                      k=0
+                                                                for all measurable S        Here, δXk is the probability   1This covers discounted occupancies over Polish state spaces,              ⊂X.
+including compact Euclidean space.                                distribution over X that puts all its mass on Xk, so that
+   2Here, occupancy measure is conditional on a source state; the    δXk(S) = 1{Xk ∈S}. We obtain a distributional version
+usual occupancy is given by µπ(S) = R X Ψπ(S | x) µ0(dx).       of this object by “removing the expectation".
+
+                                                2
+
+===== PDF PAGE 3 =====
+                    A Distributional Analogue to the Successor Representation
+
+      ?                                                        -     +
+
+
+
+
+
+                                                               -     +
+
+
+
+
+
+Figure 1: Illustration of the standard and distributional successor measure (SM) in a T-Maze MDP, for a policy that moves
+to the fork and goes backwards, right, or left, with probabilities 16, 12, 13. Left: The distributional SM ℸπ (top) consisting
+of atoms θ1, θ2, θ3 depicting the occupancy measures (probability distributions) corresponding to the distinct behaviors
+exhibited by the policy, and the SM Ψπ (bottom) Ψπ = θ16 + θ22 + θ33 . Right: Zero-shot distributional policy evaluation
+(top) with ℸπ and zero-shot policy evaluation (bottom) with Ψπ.
+
+
+Definition 3.1 (Random occupancy measure). For a given     distribution of M π (without any information about rewards),
+policy π, let (Xt)∞t=0 be a random sequence of states gen-   and then use Equation 4 to obtain an estimate of the corre-
+erated by interacting with the environment via π. The as-    sponding return distribution. This unlocks an ability that
+sociated random discounted state-occupancy measure M π    was not previously possible in distributional RL: zero-shot
+assigns to each initial state x ∈X a random probability     distributional policy evaluation. In particular, one can learn
+distribution M π(· | x) according to                            the distribution of the random occupancy measure, and then
+           ∞                                  approximate the return distribution associated with any re-
+  M π(S  x) := X (1           X0 = x .   (3)   ward function r without requiring further learning (see Fig-                   |                     −γ)γkδXk(S),                   ure 1). Once the return distribution is obtained, the benefits                 k=0
+                                                            of distributional RL, such as risk estimation, are immedi-
+It is worth pausing to consider the nature of the object we     ately available, something not possible using SR in isolation.
+have just defined. For each x ∈X, M π(· | x) is a random   Remark 3.3. Perhaps surprisingly, our assumption of a de-
+variable, and each realisation of M π(· | x) is a probabil-    terministic reward function made in Proposition 3.2 is neces-
+ity distribution over X. So, for any measurable Y ⊂X,    sary for a linear factorization between reward functions and
+M π(Y |x) is also a random variable, which gives the dis-    return distributions. This is due to the statistical dependencecounted proportion of time spent in Y across different possi-   between random rewards observed along trajectories and
+ble sampled trajectories. Thus, the distribution of M π(· | x)   random trajectories themselves. We explore this in moreis a distribution over probability distributions; see Figure 1.    depth in Appendix C.
+
+As described in Section 2, an important property of the   As in distributional RL, where we distinguish between the
+successor representation is that it is a linear operator that   random return Gπ(x) and its distribution ηπ(x), we intro-
+maps reward functions to value functions. The next result    duce notation for expressing the distribution of M     x).shows that M π can be used to map reward functions to                                                       π(· |
+random returns; all proofs are given in Appendix B.
+                                                             Definition 3.4 (Distributional successor measure). The dis-
+Proposition 3.2. Let M π denote a random discounted state-                                                                tributional successor measure (distributional SM) ℸπ   :
+occupancy measure for a given policy π. For any determin-                                                                                                  is defined by ℸπ(x) = Law(M     x)).istic reward function r :       we have            X →P(P(X))                                π(· |              X →R,
+                                                              Prior to this work, the only conceivable method for zero-
+                                          π(·|x) [r(X′)] .      (4)                                                            shot distributional policy evaluation involved learning pπ     Gπr (x) L=(1 −γ)−1EX′∼M
+Note that the right-hand side is a random variable, since    and estimating return distributions by sampling rollouts and
+M π(· | x) itself is a random distribution.                       returnsdistributionalfrom theSMlearned(and thusmodel.the SMIndeed,itself)weis observemathematicallythat the
+Proposition 3.2 suggests a novel approach to distributional    determined by pπ; see Proposition F.1 in Appendix F for
+RL. To obtain return distributions, one can first learn the    a precise statement and proof of this result. Despite this,
+
+                                                3
+
+===== PDF PAGE 4 =====
+                    A Distributional Analogue to the Successor Representation
+
+recovering the distributional SM or the SM from pπ in large    where W   is  the  “supremal" W  metric  given  by
+MDPs is intractable, and SM-like models are known to be   W(ℸ1, ℸ2) = supx∈X W(ℸ1(x), ℸ2(x)).
+more robust to estimation error for long-horizon prediction
+in continuous MDPs (Janner et al., 2020; Thakoor et al.,    Corollary 3.7 (Convergent Dynamic Programming). Under
+2022; Touati et al., 2023). Crucially, unlike an approach    the conditions of Proposition 3.6, if the metric space (X, d)to zero-shot distributional evaluation that estimates return     is compact, then the iterates (ℸk)∞k=0 given by ℸk+1 =
+distributions by sampling rollouts from a learned pπ and   T πℸk converge in W to ℸπ, for any ℸ0 ∈P(P(X))X .computing MC returns, the distributional SM is not prone to
+accumulation of model error, which results in substantially   The proofs of Proposition 3.6 and Corollary 3.7 rely on a
+more accurate estimation, as we show in Section 6.           novel coupling technique on the doubly-infinite-dimensional
+                                                         space           which can be found in Appendix B.1.Proposition 3.2 is the core mathematical insight of the paper;                                              P(P(X)),
+we now develop an algorithmic framework for translating
+these theoretical ideas into concrete implementations.         4. Representing and Learning the DSM
+
+                                                The distributional SM provides an alternative perspective3.2. Distributional SM Bellman Equations
+                                                   on distributional reinforcement learning, and opens up pos-
+A central result in developing temporal-difference methods     sibilities such as zero-shot distributional policy evaluation,
+for learning ℸπ is that M π satisfies a distributional Bellman    which is not achievable with existing approaches to distribu-
+equation (Morimura et al., 2010; Bellemare et al., 2017a).      tional RL. However, to turn these mathematical observations
+Proposition 3.5. Let M π denote the random discounted     into practical algorithms, we need methods for efficiently
+state-occupancy measure induced by a policy π. Then M π     representing and learning the distributional SM.
+can be expressed recursively via a distributional Bellman
+equation: for all measurable S ⊂X, and X′ ∼pπ(· | x),      4.1. Representation by δ-models
+                                             As in standard distributional RL, we cannot represent ℸπ   M π(S  x) L=(1      + γM π(S  X′).    (5)                     |      −γ)δx(S)                 |               within an algorithm exactly, as it is comprised of probabil-
+                                                                       ity distributions, which are objects having infinitely-many
+This provides a novel reward-agnostic distributional Bell-    degrees of freedom. To make matters more complicated
+man equation for random occupancy measures. Note that      still, these are distributions not over the real numbers (as in
+the    multi-dimensional                    reward                                distributional                                     Bellman                                                equa-    standard                                                                            distributional                                                                          RL),                                                                                       but over                                                                                         which                                                                                may it-                                                                    P(X),tion     studied by Freirich                           et al. (2019);                              Zhang                                                  et al. (2021b)                                                                        self have                                                                        infinitely-many                                                                                   degrees                                                                                               of freedom                                                                                                                                                if                                                                                                                                          is infinite.                                                              Xcan be framed as an instance of Equation 5 when    is finite.   Thus, a tractable approximate representation is                           X                                                           necessary.
+                                       We propose the equally-weighted particle (EWP) represen-We can also express the distributional SM recursively,
+                                                                   tation, which is inspired by the quantile representation of
+        ℸπ(x) = EX′∼pπ(·|x) [(bx,γ)♯ℸπ(X′)]       (6)    return distributions in standard distributional RL algorithms
+                                                   (Dabney et al., 2018b; Nguyen-Tang et al., 2021). Under
+                                                                        this representation, the approximation ℸ(x) of ℸπ(x) is rep-where bx,γ  : P(X) →P(X) is given by −1bx,γ(µ) =
+                                                             resented as a sum of equally-weighted Dirac masses on the(1 −γ)δx + γµ. The notation f♯ν = ν ◦f    denotesthe pushforward of a measure ν through a measurable                                                                   set       ℸ(x) = m1 Pmi=1 δθi(x), with θi(x)function f. This motivates the following operator on the     P(X):                       ∈P(X).                                                 The approximation problem now reduces to learning appro-
+space of distributional SMs having ℸπ as a fixed point,                                                                  priate values ((θi(x))mi=1 : x       of these Dirac masses.which we refer to as the distributional Bellman operator                  ∈X)                                                                                  It is important to note that these Dirac masses inhabit the
+  π :                                                  ,                                                        space       – each Dirac is located on a distribution ofT   P(P(X))X →P(P(X))X                                         P(X)                                                                        state. We must find a set of m state distributions such that
+       (T πℸ)(x) = EX′∼pπ(·|x) [(bx,γ)♯ℸ(X′)] .      (7)    the collection of the learned distributions is optimal with
+The proceeding statements outline a convergent approach for    respect to a metric on P(P(X)).
+computing the distributional SM by dynamic programming.                                                        Since each atom θi(x) is a distribution over a potentially
+Proposition 3.6 (Contractivity of T π). Let d be a metric     large space X, we propose to represent the atoms as genera-
+on X such that (X, d) is a Polish space, and let wd denote     tive models, in the spirit of γ-models (Janner et al., 2020).
+the Wasserstein distance on P(X) with base distance d.    In practice, the generative models can be implemented with
+If W  : P(P(X)) × P(P(X)) →R is the Wasserstein    function approximators that take as input noise variables
+distance on P(P(X)) with base distance wd, then            similar to the generator of a generative adversarial network
+                                              (GAN; Goodfellow et al., 2014). We refer to such an EWP
+                                                   model as a δ-model; Figure 2 illustrates its components.       W(T πℸ1, T πℸ2) ≤γW(ℸ1, ℸ2),
+
+                                                4
+
+===== PDF PAGE 5 =====
+                    A Distributional Analogue to the Successor Representation
+
+                                                                                                               θ, θ′                                                           State                                                                   kernel.                                                             To compare                                                                                                   state                                                                                                    distributions
+                                                              κ :                                                                           kernel                                            we                                                                      will                                                                      take a state                                                                                           and                                                                                          aim∈P(X),to com-                                                    Xδ-models×X →R,we represent state                                                          pute MMDκ(θ, θ′). Since in
+                                                                   distributions θ, θ′ as generative models, we approximate the
+                                                              exact MMD in Equation 9 by instead using samples from the
+                                                            generative models (Gretton et al., 2012, Eq. 3). If we take
+                                                                                                                   i.i.d.                             i.i.d.
+                                                 X1, . . . , Xn1 ∼θ, and Y1, . . . , Yn2 ∼θ′ independently,                                           we obtain the following estimator for MMD2κ(θi, θj):
+
+            \ 2                                 MMDκ(X1:n1, Y1:n2) :=                               (10)
+                                                                   n1                n2                n1  n2
+                                                               κ(Xi, Xj)        κ(Yi, Yj)           κ(Xi, Yj)                    X                                                                          n1   + X    n2  −2 X X                .                                                                                              n1n2
+                                                                          i,j=1      2         i,j=1     2         i=1 j=1
+                                                                     i<j                i<j
+
+                                              Model kernel. Equation 10 uses the state kernel to de-Figure 2: The components of a δ-model (Section 4.1), and
+                                                                  fine a metric between generative models.  However, ul-the kernels and distances involved in training them (Sec-
+                                                             timately we need a loss function defined at the level oftion 4.2).
+                                                   model distributions ℸ(x), so that we can define gradient
+                                                           updates that move these quantities towards their correspond-
+Terminology. We have introduced two levels of probabil-    ing Bellman targets (Equation 8). We now use our notion
+ity distributions: ℸ(x) is a distribution over the generative    of distance between state distributions to define a kernel
+models {θi(x)}mi=1; and each θi(x) is a distribution over    on P(X) itself, which will allow us to define an MMD
+the state space. To keep track of these two levels, we re-    over P(P(X)), the space of model distributions. To do so,fer to ℸ(x) as a model distribution (that is, a distribution   we follow the approach of Christmann & Steinwart (2010,
+over generative models), and the generative models θi(x)    Eq. 6) and Szabo et al. (2015) by defining a model kernel
+as state distributions or model atoms. A generative model    kκ  : P(X) × P(X) →R as a function of MMDκ. In
+θ ∼ℸ(x) distributed according to ℸ(x) is a model sample,                                                                     particular, for each θ, θ′ ∈P(X), we set          X′while      a state                  sampled from a generative model is         ∼θ                                                                    kκ(θ, θ′; σ) = ρ (MMDκ(θ, θ′)/σ)       (11)referred         to as             a state                  sample.
+                                                                for σ > 0, where ρ  : y 7→(1 + y2)−1/2 is the inverse4.2. Learning from Samples                                                             multiquadric radial basis function. Szabo et al. (2015, Table
+Our goal is to construct an algorithm for learning approxima-    1) shows that kκ is characteristic for this choice of ρ.
+tions of the distributions ℸπ(x), parameterized as δ-models,                                  DSM MMD loss. We now specify a loss that will allow us
+from data. We construct a temporal-difference learning                                                                to update ℸtowards the Bellman target in Equation 8, by
+scheme (Sutton, 1984; Dayan, 1993) to approximately solve                                                     employing the MMD under the model kernel kκ:
+the distributional Bellman Equation 5 in this metric space,
+by updating our δ-model ℸ(x) to be closer to the transfor-             ℓ(ℸ, eℸ; x) = MMD2kκ(ℸ(x), eℸ(x)) .       (12)
+mation described by the right-hand side of the distributional
+                                                To build a sample-based estimator of this loss, we take aBellman equation in Proposition 3.5, that is
+                                                    sampled state transition (x, x′) generated by the policy π,
+                 "                 m            #          and expand the MMD above in terms of evaluations of the                      1
+   eℸ(x) := EX′∼pπ(·|x) m X δ(1−γ)x+γθi(X′)   .   (8)    kernel kκ; writing θi(x) = (1    + θi(x′), this leads to                            i=1                                          −γ)δx                                                              the following loss for the δ-model representation,
+To define an update that achieves this, we will specify a          m
+loss function over the space occupied by ℸ(x) (namely          1 X                                                                               kκ(θi(x), θj(x)) −2kκ(θi(x), ¯θj(¯x))   .
+                                                                                   i,j=1P(P(X))), distributions over distributions of state); this       m2requires care, since this space has such complex structure
+                                                                    Finally, to obtain a loss on which we can compute gradientsrelative to standard distributional RL problems. We propose
+                                                                in practice, each model kernel evaluation above be can beto use the maximum mean discrepancy (MMD; Gretton et al.,
+                                                        approximated via Equation 11, with the resulting state kernel2012) to construct such a loss. We begin by recalling that
+                              MMD estimated via Equation 10. Note that we can sample
+for probability distributions p, q over a set Y, the MMD    from distributions of the form (1    + γθi(x′) by firstcorresponding to the kernel κ :                 is defined as                            −γ)δx                   Y × Y →R                 sampling Y                      returning x if Y = 1, and                                                                ∼Bernoulli(1                                                                  −γ),  MMD2κ(p, q) = E κ(X, X′) + κ(Y, Y ′) −2κ(X, Y )          otherwise returning                                                                        an independent                                                                                     sample from θi(x′). See
+                                                                (9)
+                  (X, X′) ∼p ⊗p, (Y, Y ′) ∼q ⊗q .         Figure 2 for an illustration of how the loss is constructed.
+
+                                                5
+
+===== PDF PAGE 6 =====
+                    A Distributional Analogue to the Successor Representation
+
+5. Practical Training of δ-models                     learning a kernel over a space of parameterized functions.
+                                                The MMD-GAN (Li et al., 2017; Binkowski et al., 2018)
+Heretofore, we introduced a tractable representation and                                                         demonstrates how to parameterize characteristic kernels
+learning rule for estimating the distributional SM from data.                                                        with deep neural networks. Li et al. (2017) shows that for
+This section highlights two techniques that are crucial for
+                                                    any characteristic kernel κ : Y × Y →R+, the functionstable learning; pseudocode is provided in Appendix A.
+                                            κ ◦f  : (x, y) 7→κ(f(x), f(y)) is itself a characteristic
+                                                            kernel when f  : X →Y is injective. In their work, f is5.1. n-step Bootstrapping                                                         parameterized as the encoder of an autoencoder network,
+                                                     where the autoencoder training encourages f to be injective.The procedure outlined in Section 4.2 computes δ-model
+targets via one-step bootstrapping. In accordance with Equa-    In the case of the distributional SM, parameterizing the
+tion 5, the probability mass of the targets due to bootstrap-   model kernel as an injection on the space of probability
+ping is γ, which can be large when we are concerned with    measures is a major challenge. Rather, we parameterize
+long horizons. Consequently, the signal-to-noise ratio in the    an adversarial state kernel following the model of Li et al.
+targets is low, which dramatically impedes learning.           (2017), using an invertible neural network based on iRes-
+                                                    Net (Behrmann et al., 2019). Unlike an autoencoder, thisInspired by efforts to reduce the bias of bootstrapping in RL
+                                                           enforces injectivity, and to our knowledge, no other work(Watkins, 1989; Sutton & Barto, 2018), we compute n-step
+                                                        has employed invertible neural networks for modeling antargets of the distributional SM. By Equation 5, we have
+                                                                 adversarial kernel. It should be noted that the state kernel is
+                   n−1                                            itself defined as a parameter of the model kernel used in the
+                                                      comparison of δ-models – thus, by adaptively learning the M π(· | x) L=(1 −γ) X γiδXi                  + γnM π(· | Xn)   (13)
+                      i=0                                       state kernel, our model kernel is itself adaptive.
+where Xk+1 ∼pπ(·   | Xk) and X0 =  x.  An n-  We also found that further adaptation of the model kernelstep version of the DSM MMD loss can then be ob-                                                         through the bandwidth σ improved training. Our approach
+tained by replacing the sampled one-step Bellman targets                                                                             is based on the median heuristic for bandwidth selection in
+(1 −γ)δx + γℸ(x′) in Equation 12 with the n-step target    kernel methods (Takeuchi et al., 2006; Gretton et al., 2012).
+                                                                 Prior to computing the model MMD, we choose σ2 to be thePn−1k=0(1 −γ)γkδxk + γnθi(xn). In analogy with the one-step case, we can sample from this distribution by first sam-                                                   median of the pairwise MMD2κ between the model atoms
+                                                              of ℸ(x) and those of the bootstrap target ˜ℸ(x). Appendix Epling Y from a Geometric(1−γ) distribution, returning xk if
+Y = k < n, and returning a sample from θi(xn) otherwise.    ablates on our choice of adaptive kernels.
+By increasing n, we decrease the influence of bootstrap
+samples on the targets, leading to a stronger learning signal
+                                                        6. Experimental Resultsgrounded in samples from the trajectory.
+We found that training stability tends to improve substan-  We evaluate our implementation of the distributional SM
+tially when bootstrap samples account for roughly 80% of    on two domains, namely a stochastic “Windy Gridworld"
+the samples in the procedure above. Appendix E includes    environment, where a pointmass navigates 2D continuous
+a more detailed ablation on the choice of n. Notably, this    grid subject to random wind force that pushes it towards
+procedure for computing TD targets for generative modeling    the corners, and the Pendulum environment (Atkeson &
+of occupancy measures is not specific to the distributional    Schaal, 1997). As a baseline, we compare our method to an
+SM or δ-models. We anticipate that this technique would    ensemble of γ-models (Janner et al., 2020), which is almost
+generally be useful for training geometric horizon models    equivalent to a δ-model, with the difference being that the
+with longer horizons, which was reported to be a major    individual γ-models of the ensemble are trained indepen-
+challenge (Janner et al., 2020; Thakoor et al., 2022).          dently rather than coupled through the model MMD loss.
+                                       We implement the γ-models with MMD-GAN, similarly to
+                                                                the individual model atoms of a δ-model. We train an ensem-5.2. Kernel Selection
+                                                               ble of m γ-models, where m is the number of model atoms
+When training a δ-model with bootstrapped targets, naturally     in the comparable δ-model implementation of the distribu-
+the model/state distributions comprising ℸπ are continually     tional SM. Conceptually, the γ-model ensemble is expected
+evolving. This poses a challenge when selecting the kernels     to capture the epistemic uncertainty over the SM, while the
+we use in practice, since this non-stationarity prevents us     distributional SM estimates the aleatoric uncertainty due to
+from identifying an appropriate similarity measure a priori.   randomness of the MDP dynamics and the policy. Alterna-
+As such, we found it necessary to employ adaptive kernels     tively, one can learn a model of the transition kernel pπ and
+that evolve with the distributions being modeled.              estimate return distributions by rolling out trajectories from
+                                                               the learned model and computing the discounted returns forPowerful methods in the literature involve adversarially
+
+                                                 6
+
+===== PDF PAGE 7 =====
+                    A Distributional Analogue to the Successor Representation
+
+
+                   DSM Returns
+
+
+
+
+
+         Figure 3a: Return distribution predictions by DSM.                 Figure 3b: Quality of return distribution estimates.
+
+
+those trajectories. Thus, for the purpose of quantitative eval-    Figure 3b reports the quality of the return distribution pre-
+uation, we additionally train a model of pπ (training details    dictions by their dissimilarity to the return distributions
+are discussed in Appendix D.1) and compare the accuracy of    estimated by Monte Carlo according to the Cramér dis-
+zero-shot return distribution prediction by the distributional    tance (Székely & Rizzo, 2013; Bellemare et al., 2017b).
+SM to those estimated by rolling out trajectories from the   We compare the DSM predictions to those computed by
+forward model as described. Note, however, that beyond    three baselines: return distributions estimated by sampling
+any difference in estimation quality, the distributional SM     rollouts from a learned transition kernel (labeled Rollout),
+presents a major computational advantage over estimation     return distributions imputed from value function predictions
+via pπ: with the distributional successor measure, it is not   among an ensemble of γ-models, and return distributions
+necessary to sample long episode trajectories.                constructed by placing a Dirac mass at the MC expected
+                                                              return (labeled Mean). Among these baselines and exist-
+Visualizing model atoms. In Figure 4a, we examine the
+                                                          ing methods in the literature, only Rollout can produce
+model atoms predicted by our implementation of the δ-
+                                                          proper return distribution estimates in principal. However,
+model trained on data from a uniform random policy in
+                                           we find that accumulation of error throughout sampled tra-
+the Windy Gridworld. Due to the nature of the wind in
+                                                                  jectories prevents this model from achieving reasonable
+this domain, which always forces the agent to the corner of
+                                                              return distributions, which is consistent with the difficul-
+the quadrant where it is located, a uniform random policy
+                                                                         ties of accurately rolling out long trajectories from learned
+exhibits a multimodal distribution of model atoms, as shown
+                                                       forward models (Jafferjee et al., 2020; Abbas et al., 2020;
+by the colored densities in the top-left. Alternatively, when
+                                                   Lambert et al., 2022). While the ensemble of γ-models is
+examining an ensemble of γ-models trained on the same
+                                                          not modeling the aleatoric uncertainty of occupancy mea-
+data, we see that the models in the ensemble all predict
+                                                                   sures, we find that its superior ability to model long-horizon
+similar state occupancies which align closely with the SM –
+                                                           behavior enables it to estimate return distributions more ac-
+crucially, only the distributional SM captures the diversity
+                                                                   curately, achieving similar quality to a Dirac mass centered
+of “futures" that the agent can experience.
+                                                                      at the ground truth mean return. The DSM predictions sub-
+Zero-shot policy evaluation. A unique feature of the dis-    stantially outperform all baselines, demonstrating that the
+tributional SM is that it acts as an operator that transforms    proposed δ-model retains the long-horizon consistency of
+reward functions into return distribution functions. We ex-    γ-models, while additionally providing aleatoric uncertainty
+plore the distributions over returns predicted by the dis-    estimates far beyond the capabilities of the learned pπ.
+tributional SM for several held-out reward functions and
+                                                           Risk-sensitive policy selection. Finally, we demonstrate
+analyze their similarity with return distributions estimated
+                                                                    that distributional SMs can be used to effectively rank poli-
+by Monte Carlo. Figure 3a showcases return distributions
+                                                                cies by various risk-sensitive criteria on held-out reward
+predicted by the distributional SM on four tasks in the Pen-
+                                                                 functions. In Figure 4b, we train distributional SMs for two
+dulum environment meant to model constraints that may
+                                                                 different policies, and use them to predict return distribu-
+be imposed on the system (Default, Above Horizon,
+                                                                  tions for two reward functions. We focus on two functionals
+Stay Left, Counterclockwise Penalty; details
+                                                            of these return distributions, namely the mean and the con-
+in Appendix D.3.2). We can see that these predictions cap-
+                                                                 ditional value at risk at level 0.4 (Rockafellar & Uryasev,
+ture important statistics, such as the mode and the support
+                                                         2002, 0.4-CVaR). We see that for both reward functions, the
+of the distributions, which could not be captured by point
+                                                                    distributional SM accurately estimates both functionals, and
+estimates of the return. Similar results in Windy Gridworld
+                                                                            is able to correctly identify the superior policy for each cri-
+are shown in Appendix D.3.1. For quantitative evaluation,
+                                                                     terion. Particularly, for the Lopsided Checkerboard
+
+
+                                                7
+
+===== PDF PAGE 8 =====
+                    A Distributional Analogue to the Successor Representation
+
+       ℸ( ⋅∣x0)        𝔼M ∼ℸ[M( ⋅∣x0)]                 Mean (MC)       Mean (DSM)       CVaR (MC)       CVaR (DSM)
+
+
+                                                        Reward: Hopscotch              Reward: Lopsided Checkerboard
+
+
+
+                                                       π1
+
+
+ 𝛾−Model Ensemble        Ψ𝜋( ⋅∣x0)
+
+                                                       π2
+
+
+
+                                                        −40    −20      0       20      40      60      80        −200          0           200          400
+                                                                                            Return
+
+                       (a)                                                                     (b)
+
+
+Figure 4: Distributional successor measure predictions in Windy Gridworld. (4a): Figures in the left column show the model
+atoms predicted by the distributional SM (distinguished by color) and by an ensemble of γ-models. Figures in the right
+column show the mean over distributional SM model atoms and the SM itself. (4b): Distributional SM predictions of return
+statistics on held-out reward functions for two policies, π1, π2. For each reward function, the distributional SM correctly
+ranks policies with respect to both mean and CVaR.
+
+
+reward, the distributional SM identifies π1 as superior with    did not account for their joint distribution. Gimelfarb et al.
+respect to mean reward (identified by locations of solid    (2021) uses these distributions to optimize an entropic risk
+blue lines), and alternatively identifies π2 as superior with     objective. These approaches also bears a close relationship
+respect to 0.4-CVaR of the return (identified by locations    with the emerging field of multivariate distributional RL
+of the solid pink lines). These rankings are validated by    (Freirich et al., 2019; Zhang et al., 2021b), which does
+the locations of the dashed lines, which are computed by    learn joint distributions over finite dimensional features. In
+Monte Carlo. We note that, to our knowledge, no other     particular Zhang et al. (2021b) make use of an MMD loss
+method can accomplish this feat. On the one hand, existing     for learning multivariate return distributions, building on
+distributional RL algorithms could not evaluate the return    the scalar approach of Nguyen-Tang et al. (2021). Finally,
+distributions for held-out reward functions. On the other    Vértes & Sahani (2019) consider the task of learning the SR
+hand, any algorithm rooted in the SM for zero-shot evalu-    in POMDPs, which they referred to as a distributional SR.
+ation can only rank policies by their mean returns, so they
+                                                 Beyond transferring knowledge across tasks, learning long-
+must fail to rank π1, π2 by at least one of the objectives.
+                                                      term temporal structure can enhance the representation
+                                                               quality of function approximators for individual sequen-
+7. Related Work                                                    tial decision-making problems (Le Lan et al., 2023a; Fare-
+                                                               brother et al., 2023; Ghosh et al., 2023), guiding exploration
+The successor representation (SR; Dayan, 1993), originally
+                                                                 (Jinnai et al., 2019; Machado et al., 2020; Jain et al., 2023),
+proposed for finite-state MDPs, has recently been expanded
+                                                       modeling temporal abstraction (Machado et al., 2018; 2023),
+to continuous spaces by leveraging both generative models
+                                                      improving off-policy estimation (Nachum & Dai, 2020;
+(Janner et al., 2020; Thakoor et al., 2022) and density models
+                                                      Fujimoto et al., 2021), imitation learning (Sikchi et al.,
+(Blier et al., 2021; Blier, 2022). Successor features (SFs;
+                                                       2023; Pirotta et al., 2024), and amortizing planning (Ey-
+Barreto et al., 2017; 2020) generalize the SR by modelling a
+                                                      senbach et al., 2021; 2022; Thakoor et al., 2022), as well
+discounted sum of state features. These models are notable
+                                                            as other forms of risk-sensitive decision making (Zhang
+for their ability to perform both zero-shot policy evaluation
+                                                                     et al., 2021a). The successor representation also plays a
+(Dayan, 1993; Barreto et al., 2017) and optimization (Borsa
+                                                      key explanatory role in understanding generalization in RL
+et al., 2018; Touati & Ollivier, 2021; Touati et al., 2023).
+                                                      (Le Lan et al., 2022; 2023b). Additionally, both distribu-
+Closely related to our work is that of Gimelfarb et al. (2021)    tional RL (Dabney et al., 2020; Lowet et al., 2020) and
+and Carvalho et al. (2023), which applied the distributional    successor representations (Stachenfeld et al., 2014; 2017;
+RL techniques of Bellemare et al. (2017a) and Achab et al.   Momennejad et al., 2017) have been shown to provide plau-
+(2023) to learn categorical distributions over features, but     sible models for biological phenomena in the brain.
+
+
+                                                8
+
+===== PDF PAGE 9 =====
+                    A Distributional Analogue to the Successor Representation
+
+8. Conclusion                                         ence on Artificial Intelligence and Statistics (AISTATS),
+                                                           2020.
+This paper presents a fundamentally new approach to dis-
+tributional RL, which factorizes return distributions into    Atkeson, C. G. and Schaal, S. Robot learning from demon-
+components comprising the immediate reward function and        stration. In International Conference on Machine Learn-
+the distributional successor measure. This factorisation       ing (ICML), 1997.
+reveals the prospect of zero-shot distributional policy evalu-
+ation. Notably, this enables efficient comparisons between    Babuschkin, I., Baumli, K., Bell, A., Bhupatiraju, S., Bruce,
+policies on unseen tasks with respect to arbitrary risk crite-         J., Buchlovsky, P., Budden, D., Cai, T., Clark, A., Dani-
+ria, which no other existing methods have demonstrated. We       helka,  I., Fantacci, C., Godwin,  J., Jones, C., Hem-
+have also presented a tractable algorithmic framework for        sley, R., Hennigan, T., Hessel, M., Hou, S., Kaptur-
+training δ-models, which approximate the distributional SM      owski, S., Keck, T., Kemaev,  I., King, M., Kunesch,
+with diverse generative models, and have identified crucial      M., Martens, L., Merzic, H., Mikulik, V., Norman, T.,
+techniques for large-scale training of δ-models in practice.      Quan, J., Papamakarios, G., Ring, R., Ruiz, F., Sanchez,
+                                                               A., Schneider, R., Sezener, E., Spencer, S., Srinivasan,
+                                                                         S., Wang, L., Stokowiec, W., and Viola, F. The Deep-
+Acknowledgements
+                                                  Mind JAX Ecosystem, 2020. URL https://github.
+The authors would like to thank Eric Zimmermann, Diana     com/google-deepmind.
+Borsa, Marek Petrik, Erick Delage, Nathan U. Rahn, Pier-
+                                                              Barreto, A., Dabney, W., Munos, R., Hunt, J. J., Schaul, T.,luca D’Oro, Arnav Jain, Max Schwarzer, Igor Mordatch,
+                                                       van Hasselt, H. P., and Silver, D. Successor features forand Pablo Samuel Castro for their invaluable discussions
+                                                                      transfer in reinforcement learning. In Neural Informationand feedback on this work. This work was supported by the
+                                                            Processing Systems (NeurIPS), 2017.Fonds de Recherche du Québec, the National Sciences and
+Engineering Research Council of Canada (NSERC), Calcul                                                             Barreto, A., Hou, S., Borsa, D., Silver, D., and Precup, D.
+Québec, the Digital Research Alliance of Canada, and the                                                               Fast reinforcement learning with generalized policy up-
+Canada CIFAR AI Chair program.                                                                     dates. Proceedings of the National Academy of Sciences
+We would also like to thank the Python community whose      (PNAS), 117(48):30079–30087, 2020.
+contributions made this work possible. In particular, this
+                                                   Behrmann, J., Grathwohl, W., Chen, R. T. Q., Duvenaud,work made extensive use of Jax (Bradbury et al., 2018), Flax
+                                                               D., and Jacobsen, J.  Invertible residual networks.  In(Heek et al., 2023), Optax (Babuschkin et al., 2020), EinOps
+                                                                 International Conference on Machine Learning (ICML),(Rogozhnikov, 2022), and Seaborn (Waskom, 2021).
+                                                           2019.
+
+Impact Statement                                    Bellemare, M. G., Dabney, W., and Munos, R. A distri-
+                                                               butional perspective on reinforcement learning.  In In-
+This paper presents work whose goal is to advance the field
+                                                                ternational Conference on Machine Learning (ICML),
+of Machine Learning. There are many potential societal
+                                                           2017a.
+consequences of our work, none which we feel must be
+specifically highlighted here.                                Bellemare, M. G., Danihelka, I., Dabney, W., Mohamed, S.,
+                                                        Lakshminarayanan, B., Hoyer, S., and Munos, R. The
+References                                             cramer distance as a solution to biased wasserstein gradi-
+                                                                       ents. arXiv:1705.10743, 2017b.
+Abbas, Z., Sokota, S., Talvitie, E., and White, M. Selective
+  dyna-style planning under limited model capacity.  In    Bellemare, M. G., Dabney, W., and Rowland, M. Distribu-
+   International Conference on Machine Learning (ICML),       tional Reinforcement Learning. MIT Press, 2023.
+  2020.
+                                                         Binkowski, M., Sutherland, D. J., Arbel, M., and Gretton, A.
+                                                          Demystifying MMD GANs. In International ConferenceAchab, M., Alamo, R., Djilali, Y. A. D., Fedyanin, K.,
+                                                     on Learning Representations (ICLR), 2018.  and Moulines, E. One-step distributional reinforcement
+   learning. Transactions on Machine Learning Research                                                                      Blier, L. Some Principled Methods for Deep Reinforcement
+  (TMLR), 2023.                                                            Learning. PhD thesis, Université Paris-Saclay, 2022.
+
+Amortila, P., Precup, D., Panangaden, P., and Bellemare,    Blier, L., Tallec, C., and Ollivier, Y.  Learning Succes-
+  M. G. A distributional analysis of sampling-based rein-      sor States and Goal-Dependent Values: A Mathematical
+  forcement learning algorithms. In International Confer-      Viewpoint. arXiv:2101.07123, 2021.
+
+                                                9
+
+===== PDF PAGE 10 =====
+                    A Distributional Analogue to the Successor Representation
+
+Borsa, D., Barreto, A., Quan, J., Mankowitz, D. J., van       Schrittwieser, J., Swirszcz, G., Silver, D., Hassabis, D.,
+  Hasselt, H., Munos, R., Silver, D., and Schaul, T. Uni-      and Kohli, P. Discovering faster matrix multiplication al-
+   versal successor features approximators. In International      gorithms with reinforcement learning. Nature, 610(7930):
+  Conference on Learning Representations (ICLR), 2018.       47–53, 2022.
+
+Bradbury, J., Frostig, R., Hawkins, P., Johnson, M. J., Leary,    Freirich, D., Shimkin, T., Meir, R., and Tamar, A. Distri-
+   C., Maclaurin, D., Necula, G., Paszke, A., VanderPlas, J.,      butional multivariate policy evaluation and exploration
+  Wanderman-Milne, S., and Zhang, Q. JAX: composable      with the Bellman GAN. In International Conference on
+  transformations of Python+NumPy programs, 2018. URL     Machine Learning (ICML), 2019.
+  https://github.com/google/jax.
+                                                         Fujimoto, S., Meger, D., and Precup, D. A deep reinforce-
+Carvalho, W., Saraiva, A., Filos, A., Lampinen, A. K.,     ment learning approach to marginalized importance sam-
+  Matthey, L., Lewis, R., Lee, H., Singh, S., Rezende, D. J.,       pling with the successor representation. In International
+  and Zoran, D. Combining behaviors with the successor      Conference on Machine Learning (ICML), 2021.
+  features keyboard.  In Neural Information Processing                                                    Ghosh, D., Bhateja, C. A., and Levine, S. Reinforcement
+  Systems (NeurIPS), 2023.                                                               learning from passive data via latent intentions. In In-
+                                                                ternational Conference on Machine Learning (ICML),Christmann, A. and Steinwart, I. Universal kernels on non-
+                                                          2023.  standard input spaces. In Neural Information Processing
+  Systems (NeurIPS), 2010.                                                           Gimelfarb, M., Barreto, A., Sanner, S., and Lee, C.-G. Risk-
+                                                       aware transfer in reinforcement learning using succes-Dabney, W., Ostrovski, G., Silver, D., and Munos, R. Im-
+                                                                sor features. In Neural Information Processing Systems   plicit quantile networks for distributional reinforcement
+                                                            (NeurIPS), 2021.   learning. In International Conference on Machine Learn-
+  ing (ICML), 2018a.                                    Goodfellow,  I., Pouget-Abadie,  J., Mirza, M., Xu, B.,
+                                                           Warde-Farley, D., Ozair, S., Courville, A., and Bengio,
+Dabney, W., Rowland, M., Bellemare, M. G., and Munos,
+                                                             Y. Generative adversarial nets. In Neural Information
+  R. Distributional reinforcement learning with quantile
+                                                            Processing Systems (NeurIPS), 2014.
+   regression. In AAAI Conference on Artificial Intelligence,
+  2018b.                                                     Gretton, A., Borgwardt, K. M., Rasch, M. J., Schölkopf, B.,
+                                                      and Smola, A. A kernel two-sample test. The Journal
+Dabney, W., Kurth-Nelson, Z., Uchida, N., Starkweather,
+                                                                   of Machine Learning Research (JMLR), 13(1):723–773,
+  C. K., Hassabis, D., Munos, R., and Botvinick, M. A
+                                                          2012.
+   distributional code for value in dopamine-based reinforce-
+  ment learning. Nature, 577(7792):671–675, 2020.         Heek, J., Levskaya, A., Oliver, A., Ritter, M., Rondepierre,
+                                                                   B., Steiner, A., and van Zee, M. Flax: A neural network
+Dayan, P. Improving generalization for temporal difference                                                                    library and ecosystem for JAX, 2023. URL https:
+   learning: The successor representation. Neural Computa-                                             //github.com/google/flax.
+   tion, 5(4):613–624, 1993.
+                                                                      Jafferjee, T., Imani, E., Talvitie, E., White, M., and Bowling,
+Eysenbach, B., Salakhutdinov, R., and Levine, S.  C-                                              M. Hallucinating value: A pitfall of dyna-style planning
+  learning: Learning to achieve goals via recursive clas-                                                          with imperfect environment models. arXiv:2006.04363,
+   sification. In International Conference on Learning Rep-                                                          2020.
+  resentations (ICLR), 2021.
+                                                                     Jain, A. K., Lehnert, L., Rish, I., and Berseth, G. Maximum
+Eysenbach, B., Zhang, T., Levine, S., and Salakhutdinov,       state entropy exploration using predecessor and succes-
+  R. Contrastive learning as goal-conditioned reinforce-      sor representations. In Neural Information Processing
+  ment learning. In Neural Information Processing Systems      Systems (NeurIPS), 2023.
+  (NeurIPS), 2022.
+                                                              Janner, M., Mordatch, I., and Levine, S. Gamma-models:
+Farebrother,  J., Greaves,  J., Agarwal, R., Le Lan, C.,      Generative temporal difference learning for  infinite-
+  Goroshin, R., Castro, P. S., and Bellemare, M. G. Proto-      horizon prediction. In Neural Information Processing
+  value networks: Scaling representation learning with aux-      Systems (NeurIPS), 2020.
+   iliary tasks.  In International Conference on Learning
+                                                                    Jinnai, Y., Park, J. W., Abel, D., and Konidaris, G. Discover-  Representations (ICLR), 2023.
+                                                              ing options for exploration by minimizing cover time. In
+Fawzi, A., Balog, M., Huang, A., Hubert, T., Romera-      International Conference on Machine Learning (ICML),
+  Paredes, B., Barekatain, M., Novikov, A., Ruiz, F. J. R.,      2019.
+
+                                                10
+
+===== PDF PAGE 11 =====
+                    A Distributional Analogue to the Successor Representation
+
+Lambert, N., Pister, K., and Calandra, R. Investigating com-   Nguyen-Tang, T., Gupta, S., and Venkatesh, S. Distribu-
+  pounding prediction errors in learned dynamics models.       tional reinforcement learning via moment matching. In
+  arXiv:2203.09637, 2022.                            AAAI Conference on Artificial Intelligence, 2021.
+
+Le Gall, J.-F. Brownian motion, martingales, and stochastic     Pirotta, M., Tirinzoni, A., Touati, A., Lazaric, A., and Ol-
+   calculus. Springer, 2016.                                              livier, Y. Fast imitation via behavior foundation models.
+                                                                In International Conference on Learning Representations
+Le Lan, C., Tu, S., Oberman, A., Agarwal, R., and Belle-
+                                                            (ICLR), 2024.
+  mare, M. G. On the generalization of representations in
+  reinforcement learning. In International Conference on    Puterman, M. L.  Markov decision processes: Discrete
+   Artificial Intelligence and Statistics (AISTATS), 2022.          stochastic dynamic programming. John Wiley & Sons,
+                                                          2014.Le Lan, C., Greaves, J., Farebrother, J., Rowland, M., Pe-
+  dregosa, F., Agarwal, R., and Bellemare, M. G. A novel                                                             Rockafellar, R. T. and Uryasev, S. Conditional value-at-
+   stochastic gradient descent algorithm for learning princi-                                                                      risk for general loss distributions. Journal of banking &
+  pal subspaces. In International Conference on Artificial                                                                   finance, 26(7):1443–1471, 2002.
+   Intelligence and Statistics (AISTATS), 2023a.
+                                                      Rogozhnikov, A.  Einops: Clear and reliable tensor ma-
+Le Lan, C., Tu, S., Rowland, M., Harutyunyan, A., Agarwal,
+                                                                 nipulations with Einstein-like notation. In International
+   R., Bellemare, M. G., and Dabney, W. Bootstrapped rep-
+                                                         Conference on Learning Representations (ICLR), 2022.
+  resentations in reinforcement learning. In International
+  Conference on Machine Learning (ICML), 2023b.           Sikchi, H., Zheng, Q., Zhang, A., and Niekum, S. Dual RL:
+                                                                Unification and new methods for reinforcement and imi-
+Li, C., Chang, W., Cheng, Y., Yang, Y., and Póczos, B.
+                                                                      tation learning. In International Conference on Learning
+ MMD GAN: towards deeper understanding of moment
+                                                             Representations (ICLR), 2023.
+  matching network.  In Neural Information Processing
+  Systems (NeurIPS), 2017.                                                            Stachenfeld, K. L., Botvinick, M. M., and Gershman, S. J.
+                                                       Design principles of the hippocampal cognitive map. InLowet, A. S., Zheng, Q., Matias, S., Drugowitsch, J., and
+                                                          Neural Information Processing Systems (NeurIPS), 2014.  Uchida, N. Distributional reinforcement learning in the
+   brain. Trends in neurosciences, 43(12):980–997, 2020.                                                            Stachenfeld, K. L., Botvinick, M. M., and Gershman, S. J.
+Machado, M. C., Rosenbaum, C., Guo, X., Liu, M., Tesauro,     The hippocampus as a predictive map. Nature neuro-
+                                                                  science, 20(11):1643–1653, 2017.   G., and Campbell, M. Eigenoption discovery through the
+  deep successor representation. In International Confer-
+                                                             Sutton, R. S.  Temporal credit assignment in reinforce-
+  ence on Learning Representations (ICLR), 2018.
+                                                      ment learning. PhD thesis, University of Massachusetts
+Machado, M. C., Bellemare, M. G., and Bowling, M. Count-      Amherst, 1984.
+  based exploration with the successor representation. In
+                                                              Sutton, R. S. and Barto, A. G. Reinforcement learning: An
+  AAAI Conference on Artificial Intelligence, 2020.
+                                                                  introduction. MIT Press, 2018.
+Machado, M. C., Barreto, A., Precup, D., and Bowling,
+                                                       Szabo, Z., Gretton, A., Poczos, B., and Sriperumbudur, B.  M. Temporal abstraction in reinforcement learning with
+                                                        Two-stage sampled learning theory on distributions. In  the successor representation. The Journal of Machine
+                                                               International Conference on Artificial Intelligence and  Learning Research (JMLR), 24(80):1–69, 2023.
+                                                                         Statistics (AISTATS), 2015.
+Momennejad, I., Russek, E. M., Cheong, J. H., Botvinick,
+  M. M., Daw, N. D., and Gershman, S. J. The successor    Székely, G. J. and Rizzo, M. L. Energy statistics: A class
+  representation in human reinforcement learning. Nature       of statistics based on distances.  Journal of statistical
+  human behaviour, 1(9):680–692, 2017.                      planning and inference, 143(8):1249–1272, 2013.
+
+Morimura, T., Sugiyama, M., Kashima, H., Hachiya, H.,    Takeuchi, I., Le, Q. V., Sears, T. D., and Smola, A. J. Non-
+  and Tanaka, T.  Nonparametric return distribution ap-      parametric quantile estimation. The Journal of Machine
+  proximation for reinforcement learning. In International      Learning Research (JMLR), 7:1231–1264, 2006.
+  Conference on Machine Learning (ICML), 2010.
+                                                        Thakoor, S., Rowland, M., Borsa, D., Dabney, W., Munos,
+Nachum,  O. and  Dai,  B.    Reinforcement  learning       R., and Barreto, A. Generalised policy improvement with
+  via  Fenchel-Rockafellar  duality.    arXiv  preprint      geometric policy composition. In International Confer-
+  arXiv:2001.01866, 2020.                                 ence on Machine Learning (ICML), 2022.
+
+                                                11
+
+===== PDF PAGE 12 =====
+                    A Distributional Analogue to the Successor Representation
+
+Touati, A. and Ollivier, Y. Learning One Representation to
+  Optimize All Rewards. In Neural Information Processing
+  Systems (NeurIPS), 2021.
+
+Touati, A., Rapin, J., and Ollivier, Y. Does zero-shot rein-
+  forcement learning exist? In International Conference on
+  Learning Representations (ICLR), 2023.
+
+Vértes, E. and Sahani, M. A neurally plausible model
+  learns successor representations in partially observable
+  environments. In Neural Information Processing Systems
+  (NeurIPS), 2019.
+
+Villani, C. Optimal transport: old and new, volume 338.
+  Springer Science & Business Media, 2008.
+
+Waskom, M. L. Seaborn: statistical data visualization. Jour-
+  nal of Open Source Software, 6(60):3021, 2021.
+
+Watkins, C. Learning from delayed rewards. PhD thesis,
+  King’s College, Cambridge, 1989.
+
+Yang, D., Zhao, L., Lin, Z., Qin, T., Bian, J., and Liu, T.-Y.
+  Fully parameterized quantile function for distributional
+  reinforcement learning. In Neural Information Processing
+  Systems (NeurIPS), 2019.
+
+Zhang, J. and Weng, P. Safe distributional reinforcement
+   learning. In Distributed Artificial Intelligence (DAI), vol-
+  ume 13170 of Lecture Notes in Computer Science, pp.
+  107–128. Springer, 2021.
+
+Zhang, J., Bedi, A. S., Wang, M., and Koppel, A. Cautious
+  reinforcement learning via distributional risk in the dual
+  domain. IEEE Journal on Selected Areas in Information
+  Theory, 2(2):611–626, 2021a.
+
+Zhang, P., Chen, X., Zhao, L., Xiong, W., Qin, T., and
+  Liu, T.-Y. Distributional reinforcement learning for multi-
+  dimensional reward functions.  In Neural Information
+  Processing Systems (NeurIPS), 2021b.
+
+
+
+
+
+                                                12
+
+===== PDF PAGE 13 =====
+                    A Distributional Analogue to the Successor Representation
+
+A. Algorithm
+
+In this section, we restate the core δ-model update derived in Section 4, including the n-step bootstrapping and adversarial
+kernel modifications described in Section 5. Source code is provided at https://github.com/jessefarebro/
+distributional-sr.
+
+
+
+Algorithm 1 δ-model update.
+                                                                                          i=1 and target parameters   Require: Policy π with stationary distribution dπ, GAN generator Φ, GAN parameters {ζi}m
+  {ζi}mi=1, discriminator function f, adversarial kernel parameters {ξi}mi=1, kernel κ, step sizes α, λ, number of state   samples s.
+   while training do
+     Set ξi ←ξi + α∇ξiℓ({ζj}mj=1, {¯ζj}mj=1, {ξj}mj=1) for i = 1, . . . , m      # Discriminator: maximize model MMD
+     Set ζi ←ζi −α∇ζiℓ({ζj}mj=1, {¯ζj}mj=1, {ξj}mj=1) for i = 1, . . . , m         # Generator: minimize model MMD
+     Set ¯ζi ←(1 −λ)¯ζi + λζi for i = 1, . . . , m                        # Generator: target parameter update  end while
+
+   function ℓ({ζi}mi=1, {¯ζi}mi=1, {ξi}mi=1)
+     Sample x1 ∼dπ, xk ∼P π(· | xk−1) for k = 2, . . . , n.     for i = 1, . . . , m do
+       Sample z1i , . . . , zsi i.i.d. from GAN noise distribution
+                               i ; x1, ζi) for j = 1, . . . , s        Set xji ←Φ(zj       Sample ω1i , . . . , ωsi i.i.d. from GAN noise distribution
+         and Yi1 , . . . , Yis i.i.d. from                                 Geometric(1 −γ)                                            j
+                                                                                   j , for j = 1, . . . , s                                                                           i        Set ¯xji ←Φ(ωj                                i ; xn, ¯ζi) if Yi ≥n, else set ¯xj                            ←xYi
+        Set yji ←f(xji, ξi) for j = 1, . . . s                            # Adversarial Kernel Transformations
+        Set ¯yji ←f(¯xji, ξi) for j = 1, . . . s    end for
+     for i = 1, . . . , m do                                     # MMDs Between Source Model Atoms
+        for i′ = 1, . . . , m do
+                              s                      s                      s
+                   1                1
+                            −2s2          Set dsi,i′ ←  2s  l,k=1X κ(yki , yli) +  2s  l,k=1X κ(yki′, yli′)  X κ(yki , yli′)               # Equation 10                                                                        l,k=1
+                         l<k                 l<k
+      end for
+    end for
+     for i = 1, . . . , m do                                     # MMDs Between Target Model Atoms
+        for i′ = 1, . . . , m do
+                              s                      s                      s
+                   1                1
+                            −2s2          Set dti,i′ ←  2s  l,k=1X κ(¯yki , ¯yli) +  2s  l,k=1X κ(¯yki′, ¯yli′)  X κ(¯yki , ¯yli′)                                                                        l,k=1
+                         l<k                 l<k
+      end for
+    end for
+     for i = 1, . . . , m do                               # MMDs Across Source and Target Model Atoms
+        for i′ = 1, . . . , m do
+                             s                     s                      s
+                                   1
+          Set dsti,i′  X κ(yki , ¯yli) + X κ(yki′, ¯yli′)  X κ(yki , ¯yli′)       ←1s2                 s2       −2s2
+                          l,k=1                l,k=1                 l,k=1
+      end for
+    end for
+     Set σ2 = Median                   Concat {dsi,i′}, {dti,i′}, {dsti,i′}                   # Adaptive Model Kernel Bandwidth            m
+             1
+     Set L      X  ρ(qdsi,j/σ2) + ρ(q dti,j/σ2)   qdsti,j/σ2)                       # Model MMD     ← m2                         −2ρ(
+                    i,j=1
+  end function
+
+                                                13
+
+===== PDF PAGE 14 =====
+                    A Distributional Analogue to the Successor Representation
+
+B. Proofs
+
+Proposition 3.2. Let M π denote a random discounted state-occupancy measure for a given policy π. For any deterministic
+reward function r : X →R, we have
+                                                                               π(·|x) [r(X′)] .                                      (4)                          Gπr (x) L=(1 −γ)−1EX′∼M
+Note that the right-hand side is a random variable, since M π(· | x) itself is a random distribution.
+
+Proof. This result can be verified by a direct calculation. Invoking Definition 3.1, we have
+
+                                  Z
+                    (M πr)(x) =                                        r(x′)M π(dx′ | x)                                  X
+
+              X                                             L= Z                                                 (1 −γ)γtr(x′)δXt(dx′)  X0 = x                                  X                                              t≥0
+
+                                          L=(1  X γtr(Xt)  X0 = x                              −γ)
+                                                 t≥0
+
+                                                            r (x)                                          L=(1 −γ)Gπ
+
+where the third step invokes Fubini’s theorem subject to the boundedness of r. The claimed result simply follows by dividing
+through by 1 −γ.
+Proposition 3.5. Let M π denote the random discounted state-occupancy measure induced by a policy π. Then M π can be
+expressed recursively via a distributional Bellman equation: for all measurable S ⊂X, and X′ ∼pπ(· | x),
+                M π(S  x) L=(1      + γM π(S  X′).                                     (5)                                                                  |      −γ)δx(S)                 |
+
+Proof. By Definition 3.1, we have
+
+                                ∞
+               M π(· | x) L=(1 −γ)δx                               + X(1 −γ)γtδXt
+                                                          t=1
+                                 ∞
+                                              L=(1    + γ X(1                                     −γ)δx         −γ)γtδXt+1
+                                                            t=0
+                                              L=(1    + γM    X′) ,                                     −γ)δx       π(· |
+
+with the final equality in distribution following from the Markov property.
+
+
+B.1. Distributional Dynamic Programming
+
+In this section, we demonstrate how the distributional SM can be computed by dynamic programming. Following familiar
+techniques in the analysis of dynamic programming algorithms, we will demonstrate that the distributional SM is the unique
+fixed point of a contractive operator, and appeal to the Banach fixed point theorem.
+To begin, we will define the operator of interest, which we refer to as the distributional Bellman operator T π   :
+P(P(X))X →P(P(X))X ,
+
+                                  (T πℸ)(x) = EX′∼pπ(·|x) [(bx,γ)♯ℸ(X′)] .
+It follows directly from Equation 6 that ℸπ = T πℸπ.
+
+                                                14
+
+===== PDF PAGE 15 =====
+                    A Distributional Analogue to the Successor Representation
+
+Proposition 3.6 (Contractivity of T π). Let d be a metric on X such that (X, d) is a Polish space, and let wd denote the
+Wasserstein distance on P(X) with base distance d. If W  : P(P(X)) × P(P(X)) →R is the Wasserstein distance on
+P(P(X)) with base distance wd, then
+                          W(T πℸ1, T πℸ2) ≤γW(ℸ1, ℸ2),
+where W is the “supremal" W metric given by W(ℸ1, ℸ2) = supx∈X W(ℸ1(x), ℸ2(x)).
+
+Proof. Our approach is inspired by the coupling approach proposed by Amortila et al. (2020). Denote by Π(p, q) the set of
+couplings between distributions p, q.
+Let Γ1,x′ ∈Π(ℸ1(x′), ℸ2(x′)) denote an ϵ-optimal coupling with respect to the Wasserstein distance W, in the sense that
+
+
+                     Z    Z
+                                     wd(p, q)Γ1,x′(dp × dq) ≤W(ℸ1(x′), ℸ2(x′)) + ϵ                      P(X) P(X)
+
+for arbitrary ϵ > 0. Firstly, we note that Γ1 ∈Π((T πℸ1)(x), (T πℸ2)(x)), where
+
+
+                                 Z
+                               Γ1 =                                           pπ(dx′ | x) [(bx,γ, bx,γ)♯Γ1,x′] .                                 X
+
+Here, (bx,γ, bx,γ)♯Γ1,x′(A × B) = Γ1,x′(b−1x,γ(A) × b−1x,γ(B)) for measurable A, B ⊂P(X). To see this, we note that for
+any measurable P ⊂P(X),
+
+
+                                     Z
+                        Γ1(P × P(X)) = X pπ(dx′ | x)Γ1,x′(b−1x,γ(P) × P(X))
+                                     Z
+                         =                                               pπ(dx′ | x)ℸ1(x′)(b−1x,γ(P))                                    X
+                                     Z
+                         =                                               pπ(dx′ | x) [(bx,γ)♯ℸ1(x′)] (P)                                    X
+                                  ≡[(T πℸ1)(x)] (P),
+so that the first marginal of Γ1 is (T πℸ1)(x). Likewise, the second marginal of Γ1 is (T πℸ2)(x), confirming that Γ1 is a
+coupling between (T πℸ1)(x) and (T πℸ2)(x). It follows that
+
+        W(T πℸ1, T πℸ2) = x∈Xsup W((T πℸ1)(x), (T πℸ2)(x))
+                             Z    Z
+                    ≤supx∈X  P(X) P(X) wd(p, q)Γ1(dp × dq)
+                             Z    Z    Z
+                 =                            sup                                                 wd(p, q)pπ(dx′ | x) [(bx,γ, bx,γ)♯Γ1,x′] (dp × dq)                           x∈X                               P(X) P(X) X
+                              Z    Z
+                 =                             sup                                                   wd(bx,γ(p), bx,γ(q))Γ1,x′(dp × dq).                                  x,x′∈X                                 P(X) P(X)
+
+We now claim that wd(bx,γ(p), bx,γ(q)) ≤γwd(p, q) for any p, q ∈P(X). To do so, let Γ2 ∈Π(p, q) be an optimal
+coupling with respect to wd, which is guaranteed to exist since (X, d) is a Polish space (Villani, 2008). Define Γ3 ∈
+P(X × X) such that
+
+                                                15
+
+===== PDF PAGE 16 =====
+                    A Distributional Analogue to the Successor Representation
+
+
+                                     Γ3 = (1 −γ)δ(x,x) + γΓ2.
+
+It follows that, for any measurable X ⊂X,
+                        Γ3(X × X) = (1 −γ)δ(x,x)(X × X) + γΓ2(X × X)
+                        = (1 −γ)δx(X) + γΓ2(X × X)
+                        = (1 −γ)δx(X) + γp(X)
+                        = bx,γ(p)(X)
+
+
+which confirms that bx,γ(p) is the first marginal of Γ3. An analogous argument for the second marginal shows that Γ3 is a
+coupling between bx,γ(p), bx,γ(q). So, we see that
+
+
+
+                                                 Z  Z
+                      wd(bx,γ(p), bx,γ(q)) =         inf               d(y, y′)Γ(dy   dy′)                                                    Γ∈Π(bx,γ(p),bx,γ(q)) X  X       ×
+                                   Z  Z
+                        ≤ X  X d(y, y′)Γ3(dy × dy′)
+                                                  Z  Z
+                        = (1 −γ)d(x, x) + γ X  X d(y, y′)Γ2(dy × dy′)
+                        = γwd(p, q).
+
+
+Now, continuing the bound from earlier, we have
+
+
+
+                                    Z    Z
+             W(T πℸ1, T πℸ2) ≤ x,x′∈Xsup  P(X) P(X) wd(bx,γ(p), bx,γ(q))Γ1,x′(dp × dq)
+                                   Z    Z
+                    ≤γ x∈Xsup P(X) P(X) wd(p, q)Γ1,x(dp × dq)
+                    ≤γ x∈Xsup [W(ℸ1(x), ℸ2(x)) + ϵ]
+                     = γW(ℸ1, ℸ2) + γϵ
+
+
+Thus, since ϵ > 0 was arbitrary, the claim follows.
+
+Corollary 3.7 (Convergent Dynamic Programming). Under the conditions of Proposition 3.6, if the metric space (X, d) is
+compact, then the iterates (ℸk)∞k=0 given by ℸk+1 = T πℸk converge in W to ℸπ, for any ℸ0 ∈P(P(X))X .
+Proof. Prior to applying the Banach fixed point theorem it is necessary to ensure that W is finite on P(P(X))X to ensure
+that a fixed point will be reached. Since X is compact and metrics are continuous, it follows that the metric d is bounded
+over X, that is,
+
+                                        sup d(x, y) ≤C < ∞                                            x,y∈X
+
+
+for some constant C. As such, the Wasserstein distance wd, as an expectation over distances measured by d, is also bounded
+by C, and following the same logic, the metrics W, W are bounded by C. Then, since it is clear from equation 6 and
+equation 7 that ℸπ = T πℸπ, we have
+
+                                                16
+
+===== PDF PAGE 17 =====
+                    A Distributional Analogue to the Successor Representation
+
+                              W(ℸk, ℸπ) = W(T πℸk−1, ℸπ)
+                             = W(T πℸk−1, T πℸπ)
+                                    ≤γW(ℸk−1, ℸπ)
+
+where the final step leverages the contraction provided by Proposition 3.6. Then, repeating k −1 times, we have
+
+                                W(ℸk, ℸπ) ≤γkW(ℸ0, ℸπ)
+                                 ≤γkC
+Since |γ| < 1 and C is finite, it follows that W(ℸk, ℸπ) →0, and since W is a metric, ℸk →ℸπ in W.
+
+C. Further Discussion and Extensions
+
+C.1. Examples of Distributional SMs in Finite-State-Space Environments
+
+In this section, we include several examples to illustrate the breadth of distributions on the simplex that can be obtained as
+distributional SMs for simple environments.
+
+Figure 5 illustrates a kernel density approximation to the distributional SM in a three-state MDP, with state-transition kernel
+given by
+
+                        0.5   0.5   0 
+                                           0    0    1 ,                       
+                                          1/3  1/3  1.3
+
+and a discount factor of γ = 0.7. The figure is specifically created by generating 1,000 trajectories of length 100, which are
+then converted into visitation distributions, serving as approximate samples of the distributional SM, and a kernel density
+estimator (KDE) is then fitted; we use Seaborn’s kdeplot method with default parameters (Waskom, 2021). Also included
+in the figure are corresponding return distribution estimates, obtained by using the identity in Equation 4 with the generated
+samples described above, and again using a KDE plot of the resulting return distribution estimator. Observe that since
+the second state transitions deterministically into the third state, the distributional SM for the second state is a scaling and
+translation of the distributional SM of the third state, as predicted by the distributional SM Bellman equation in Equation 5.
+
+In Figure 6, we plot a Monte Carlo approximation to the distributional SM in a three-state environment in which there is an
+equal probability of jumping to each state in every transition, and the discount factor is γ = 0.5. The distributions over
+the simplex in this case are instances of the Sierpi´nski triangle, a fractal distribution that is neither discrete nor absolutely
+continuous with respect to Lebesgue measure on the simplex. This can be viewed as a higher-dimensional analogue of the
+Cantor distribution described in the context of distributional reinforcement learning in Bellemare et al. (2023, Example 2.11).
+These plots were generated using 10,000 samples per state, with an episode length of 100.
+
+
+C.2. Stochastic reward functions
+
+In the main paper, we make a running assumption that the rewards encountered at each state are given by a deterministic
+assumption. In full generality, Markov decision processes allow for the state-conditioned reward to follow a non-trivial
+probability distribution. In this section, we briefly describe the main issue with extending our approach to dealing with
+stochastic rewards.
+
+The issue stems from the fact that the mapping from sequences of state (Xk)k≥0 to the corresponding occupancy distribution
+P∞k=0 γkδXk is often not injective. To see why, consider an environment with four states x0, x1, x2, x3 (including a terminal
+state x3, which always transitions to itself). Consider two state sequences:
+
+                                             (x0, x1, x2, x2, x3, x3, . . .) ,
+                                             (x0, x2, x1, x1, x3, x3, . . .) .
+
+
+                                                17
+
+===== PDF PAGE 18 =====
+                    A Distributional Analogue to the Successor Representation
+
+                x2                              x2                              x2
+
+
+
+
+
+   x0                          x1  x0                          x1  x0                          x1
+                                             1.0
+   0.6                                                                                 0.6
+
+   0.4                                                                                 0.4
+                                             0.5Density 0.2                                                                                                                    Density                                                                                                                                Density 0.2
+
+   0.0                                       0.0                                       0.0
+      4      2     0      2      4        4      2     0      2      4        4      2     0      2      4
+                   Density                                  Density                                  Density
+
+
+Figure 5: Top: Kernel density estimate of distributional SM. Red dot represents the standard SR. Bottom: Kernel density
+estimates of return distributions, obtained via distributional SM. Vertical lines represent expected return, obtained from
+standard SR.
+
+
+
+
+
+Figure 6: Monte Carlo estimation of the distributional SM at states x0, x1, and x2, in a three-state MDP. Each distribution is
+supported on a copy of the fractal Sierpi´nski triangle. Red dot represents the standard SR.
+
+
+These sequences give rise to the visitation distributions
+                            (1 −γ)δx0 + (1 −γ)γδx1 + (1 −γ)(γ2 + γ3)δx2 + γ4δx3 ,
+                            (1 −γ)δx0 + (1 −γ)(γ2 + γ3)δx1 + (1 −γ)γδx2 + γ4δx3 .
+Now suppose γ = γ2 + γ3; clearly there is a value of γ ∈(0, 1) satisfying this equation. But for this value of γ, the twovisitation distributions above are identical. In the case of deterministic state-conditioned rewards, the two corresponding
+returns are also identical in this case. However, in the case of non-deterministic returns, the corresponding distributions
+over return are distinct. To give a concrete case, consider the setting in which all rewards are deterministically 0, except at
+state x1, where they are given by the N(0, 1) distribution. Then under the first visitation distribution, the corresponding
+return distribution is the distribution of γZ (where Z ∼N(0, 1)), which has distribution N(0, γ2).i.i.d.In contrast, the return
+distribution for the second visitation distribution is the distribution of γ2Z + γ3Z′ (where Z, Z′ ∼N(0, 1)), which has
+distribution N(0, γ4 + γ6). However, γ2 ̸= γ4 + γ6, and hence these distributions are not equal.
+These observations mean that the framework can be extended to handle stochastic rewards in cycle-less environments; that
+is, environments where each state can be visited at most once in a given trajectory. This incorporates the important class of
+
+
+                                                18
+
+===== PDF PAGE 19 =====
+                    A Distributional Analogue to the Successor Representation
+
+finite-horizon environments.
+
+
+C.3. The successor measure as a linear operator
+
+Here, we recall a key notion from Blier et al. (2021) used in several proofs that follow. Successor measures act naturally as
+linear operators on the space B(X) of bounded measurable functions, much in the same way as Markov kernels act as linear
+operators (see e.g. Le Gall (2016)). Particularly, for any f ∈B(X), we write
+                                         Z
+                                  (Ψπf)(x) =                                                  f(x′)Ψπ(dx′ | x) ,                                     (14)                                        X
+noting that Ψπ(· | x) is a (probability) measure for each x π∈X. Through this linear operation, the successor measure
+                                                                 r  ,transforms reward functions r : X →R to value functions V
+                                                   
+                              (1 −γ)V rπ (x) = Eπ X(1 −γ)γtr(Xt)  | X0 = x
+                                                   t≥0
+                         = EX′∼Ψπ(·|x) [r(Xt)]
+                         = (Ψπr)(x) .
+
+
+D. Experimental Details
+
+In this section, we provide additional details relating to the experiments in the main paper.
+
+
+D.1. Baselines
+
+To avoid confounders in our comparative analysis, our baselines were built with largely the same neural architecture and
+loss as the δ-models that we train.
+
+γ-Model Ensemble  An ensemble of γ models is structurally equivalent to a δ-model: each member of the ensemble is an
+equally-weighted model atom. Thus, we train the γ-model ensemble in the same way as the δ-model, but we substitute the
+model MMD loss with an sum over state MMD losses corresponding to the model atoms.
+
+Transition Kernel  In our experiments involving the learned transition kernel P π, we again inherit the architecture from
+the δ-model. Note that P π is effectively equivalent to a δ-model trained with γ = 0 and with one model atom. One small
+adjustment is necessary: a δ-model with γ = 0 will model the distribution over the source state (that is, each model atom
+will represent a Dirac at the source state) as defined in Equation 5. To account for this, we can simply shift indices of target
+states by one timestep, in order to predict the distribution over next states.
+
+
+D.2. Hyperparameters
+
+Unless otherwise specified the default hyperparameters used for our implementation of δ-model are outlined in Table 1.
+Certain environment specific hyperparameters can be found in Appendix D.3.
+
+
+D.3. Environment Details
+
+Below we provide specifics of the environments utilized for the experimental results in the paper.
+
+D.3.1. WINDY GRIDWORLD
+
+When training a δ-model for the Windy Gridworld experiments, we use 4 model atoms and train for 1 million gradient steps.
+
+Our experiments in Section 5 involve two reward functions, namely Hopscotch and Lopsided Checkerboard.
+These reward functions have constant rewards in each quadrant, as shown in Figure 7.
+
+Moreover, we provide some additional visualizations on predicted return distributions from our distributional SM implemen-
+tation in Figure 8.
+
+                                                19
+
+===== PDF PAGE 20 =====
+                    A Distributional Analogue to the Successor Representation
+
+                                  Table 1: Default hyperparameters for δ-model.
+
+         Hyperparameter                          Value
+          Generator Network                        MLP(3-layers, 256 units, ReLU)
+          Generator Optimizer                   Adam(β1 = 0.9, β2 = 0.999)
+          Generator Learning Rate                   6.25e −5
+          Discriminator Network                  iResMLP(2 layers × 2 blocks, 256 units, ReLU)
+          Discriminator Optimizer                Adam(β1 = 0.9, β2 = 0.999)
+          Discriminator Learning Rate                6.25e −5
+          Discriminator Feature Dimensionality       8 output features
+        Model Kernel                              InverseMultiQuadric
+          Adaptive Model Kernel (Median Heuristic)   True
+           State Kernel                              RationalQuadricKernel(A = {0.2, 0.5, 1.0, 2.0, 5.0})
+          Adaptive State Kernel (Adversarial Kernel)   True
+         Horizon (n-step)                        5
+          Discount Factor (γ)                        0.95
+         Batch Size                            32
+        Number of State Samples                 32
+        Number of Model Samples               51
+          Target Parameter Step Size (λ)              0.01
+         Noise Distribution                  ω ∈R8 ∼N(0, I)
+        Number of Gradient Updates              3e6
+
+          Lopsided Checkerboard                         Hopscotch
+                     15   -10                                          3   -1
+                          -2   2                                                   -2   2
+
+                                 Figure 7: Reward functions for Windy Gridworld.
+
+
+Notably, Figure 8 demonstrates that the distributional SM correctly predict the fraction of futures that enter the red region,
+which demonstrates that the distributional SM is can detect when a policy will be likely to violate novel constraints.
+
+D.3.2. PENDULUM
+
+When training a δ-model for the Pendulum experiments, we use 51 model atoms and train for 3 million gradient steps.
+
+Our experiments on the Pendulum environment involve zero-shot policy evaluation for rewards that are held out
+during training. We considered four reward functions, namely Default, Above Horizon, Stay Left, and
+Counterclockwise Penalty, which we describe below.
+All reward functions are defined in terms of the pendulum angle θ ∈[−π, π], its angular velocity ˙θ, and the action a ∈R.The reward functions are given by
+
+                                       rDefault(θ, ˙θ, a) = −  θ2 + 0.1 ˙θ2 + 0.001a2
+                                rAbove Horizon(θ, ˙θ, a) = −(1{θ ≥π/2} + 0.1a2)
+                                    rStay Left(θ, ˙θ, a) = min(0, sin θ)
+                                  rCCW Penalty(θ, ˙θ, a) = 1{˙θ < 0}
+
+These reward functions (aside from Default) were chosen to model potential constraints that can be imposed on the
+system after a learning phase. The Above Horizon reward imposes extra penalty whenever the pendulum is below the
+horizon, which may model the presence of an obstacle under the horizon. The Stay Left reward reinforces the system
+
+                                                20
+
+===== PDF PAGE 21 =====
+                    A Distributional Analogue to the Successor Representation
+
+                             Bad Quadrant
+
+
+
+                              SM
+
+
+                                 Checkerboard
+
+
+
+                              SM
+
+
+
+                               -100                                       -50                                   0
+
+
+Figure 8: Return distribution predictions in Windy Gridworld under the uniform random policy where the source state is
+the origin. Each row represents a separate reward function depicted by the inset grids, with red regions denoting negative
+reward.
+
+
+
+when the pendulum points further to the left, which could, for instance, indicate a different desired target for the pendulum.
+Finally, the Counterclockwise Penalty (rCCW Penalty above) reinforces the system for rotating clockwise, which
+can model a constraint on the motor.
+
+E. Ablation Experiments
+
+As mentioned in Section 5 there are several practical considerations when learning δ-models. We further expand on three
+crucial details: n-step bootstrapping, adaptive kernels, and how the number of model atoms affects our approximation error.
+
+n-step bootstrapping. In order to allow δ-models to learn longer horizons than typically possible with γ-models (Janner
+et al., 2020) we employ the use of n-step bootstrapping when constructing our target distribution. The choice of n is critical;
+if n is too small, the update is over-reliant on bootstrapping, leading to instability. Conversely, for large n it becomes
+impractical to store long sequences.
+
+For these reasons it is worth understanding how δ-models interacts with the value of n, which can help guide the selection
+of this parameter for any type of geometric horizon model (e.g., Janner et al., 2020; Thakoor et al., 2022). To this end, we
+perform a sweep over n ∈{1, 2, . . . , 10} to understand how this affects the Wasserstein distance between the DSM-estimatedreturn compared to the empirical MC return distribution. We train a δ-model with γ = 0.95 for each n on the Pendulum
+environment with all other hyperparameters remaining fixed as in Appendix D.2. Figure 9 (left) shows the Wasserstein
+distance averaged over 9 source states for the four reward functions outlined in Appendix D.3.2.
+
+We can see that n-step bootstrapping does indeed help us to learn better approximations until around n = 5 where the
+benefits are less clear. This corresponding to the bootstrapped term accounting for ≈80% of the probability mass of thetarget distribution.
+
+Adversarial kernel. Given the non-stationary of our target distributions, we found it crucial to employ an adaptive kernel in
+the form of an adversarial kernel (Li et al., 2017) for the state kernel. Note that the model kernel is itself a function of the
+state kernel so by learning an adversarial state kernel we are able to adapt our model kernel as well.
+
+                                                21
+
+===== PDF PAGE 22 =====
+                    A Distributional Analogue to the Successor Representation
+
+
+                                                                                                                                               Adaptivity of the State Kernel
+
+                                                                                                                                    1.2
+               Pendulum n-step Horizons for = 0.95                             Varying Model Atoms on Pendulum
+    1.2                                                                                                                              1.0
+                                                                   1.0                                                                                                                                                                                                                                         Distance  0.8Distance                                                                                                                                                                                                                                                          Distance
+    1.0                                                                                                                              0.6
+                                                                   0.5
+                                                                                                                                    0.4                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            WassersteinWasserstein  0.8                                                                                                                                                                                                                                                                                                                              Wasserstein
+                                                                                                                                    0.2
+                                                                   0.0
+        1    2    3    4    5    6    7    8    9   10            5        11       21       31       51
+                                                                                                                                    0.0
+                                   Horizon                                            Number of Model Atoms                         Non-Adaptive    Adaptive
+
+Figure 9: Each subplot indicates the Wasserstein distance of the DSM versus the empirical MC return distributions on 9
+source states for 4 reward functions on Pendulum. Left: Varying the value of n in the δ-model multi-step bootstrapped
+target. Middle: varying the number of model atoms. Right: Selectively applying an adaptive (adversarial) or non-adaptive
+state kernel.
+
+
+To validate our decision to employ an adversarial kernel we train a δ-model with and without an adaptive kernel. The adaptive
+kernel is the one described in Appendix D.2. The non-adaptive kernel omits the application of the learned embedding
+network, that is, the kernel is a mixture of rational quadric kernels,
+
+                                                   d  −α
+                                         ρ(d) = X  1 +              ,
+                                              2α
+                                       α∈A
+
+for A = {0.2, 0.5, 1.0, 2.0, 5.0} as per Binkowski et al. (2018). Figure 9 (right) shows that the Wasserstein distance isnearly halved when applying the adversarial kernel.
+Number of model atoms. As the number of model atoms increases we expect to better approximate ℸπ. To get an idea
+of how our approximation is improving as we scale the number of atoms we compare the Wasserstein distance from our
+                                                             31,                                                                 41,δ-model         to the empirical             MC return                                      distributions                                                            model atoms.                                                                           These                                                                                                        results                                                                                                      are                                                                                                     presented                                                                                                                         in                                                   for {5, 11, 21,                                                          51}                                               ℸπFigure 9 (Middle).              As expected                      we obtain                                      a better approximation                                                                   to                                                     when                                                                            increasing                                                                                       the number                                                                                                 of                                                                                   model                                                                                                    atoms.                                                                                                                Further
+scaling the number of model atoms should continue to improve performance at the cost of compute. This is a desirable
+property for risk-sensitive applications where better approximations are required.
+
+F. Additional Results
+
+Proposition F.1. The distributional SM is determined by the standard SR. In other words, given Ψπ, one can mathematically
+derive ℸπ.
+
+
+Proof. To establish Proposition F.1, it suffices to show that the one-step transition kernel pπ for a given policy π can be
+recovered exactly from Ψπ. This is because pπ contains all possible structural information about the environment and the
+policy’s dynamics, so it contains all information necessary to construct the distributional SM. When X is finite, Lemma F.2
+shows that Ψπ encode pπ, and Lemma F.3 demonstrates this for the more general class of state space X considered in thispaper.
+
+Lemma F.2. Let X be finite, and let Ψπ denote the successor representation for a given policy π. Then pπ can be recoveredexactly from Ψπ.
+
+
+Proof. Consider
+        π                a policy π : X →P(A)π        with discounted visitation distributions Ψπ. We consider the state transitionmatrix     P  ∈R|X|×|X| where P                                        x,x′ = pπ(x′  | x). Recall that Ψπ = (1 −γ)(I −γP π)−1, so rearranging we have  πP  =      γ−1(I                               Therefore                                           the                                             one-step state-to-state                                                                           transition                                                                                    probabilities are determined by Ψπ, and         −(1 −γ)(Ψπ)−1).    ℸπsince            is a function                      of the one-step                                        transition                                                   probabilities,                                                             the conclusion                                                                            follows.
+
+Lemma F.3. Let X be a complete, separable metric space endowed with its Borel σ-field Σ, and let Ψπ denote the successormeasure for a given policy π. Then Ψπ encodes pπ, in the sense that pπ can be expressed as a function of Ψπ alone.
+
+
+                                                22
+
+===== PDF PAGE 23 =====
+                    A Distributional Analogue to the Successor Representation
+
+Proof. Recall the definition of the successor measure Ψπ : Σ →R+,
+                       Ψπ(A | x) = (1 −γ) X γt Pr(Xt ∈A | X0 = x) .
+                                                    t≥0
+
+As shown above                  in Appendix C.3, Ψπ acts as a linear operator on B(X) according to (Ψπf)(x) = EX′∼Ψπ(·|x) [f(X′)].              π
+We denote by P   : B(X) →B(X) the Markovπ  kernel corresponding to pπ, where B(X) denotes the space of bounded and
+measurable functions on X. The operator P  acts on a function f ∈B(X) according to
+                                Z
+                        (P πf)(x) =                                           f(x′)pπ(dx′ | x) = EX′∼pπ(·|x) [f(X′)] .                                X
+
+That is, (P πf)(x) computes the expected value of f over the distribution of next states, conditioned on a starting state.
+Returning to the definition of the successor measure, for any f ∈B(X), we have
+                                   Z
+                            (Ψπf)(x) =                                           f(x′)Ψπ(dx′ | x)                                   X
+                                         Z
+                        = (1 −γ) X f(x′) Xt≥0 γt(pπ)t(dx′ | x)
+                                              Z
+                                                       γt                        = (1 −γ) X                                                             f(x′)(pπ)t(dx′ | x)                                             X                                                   t≥0
+                        = (1 −γ) X γt((P π)tf)(x)
+                                                   t≥0
+
+where the third step invokes Fubini’s theorem, given the boundedness of f and pπ. We have shown that
+
+                              Ψπ = (1 −γ) X γt(P π)t ,
+                                                        t≥0
+
+where the correspondence is with respect to the interpretation of Ψπ as a linear operator on B(X). Blier et al. (2021,
+Theorem 2) show that Pt≥0 γt(P π)t = (id −γP π)−1 as linear operators on B(X), where id is the identity map on B(X).As a consequence, Ψπ is proportional to the inverse of a linear operator, so it is itself an invertible linear operator, where
+
+                                                 1
+                                    (Ψπ)−1 =       (id     π)                                               1     −γP                                −γ
+and hence
+
+                           P π = γ−1  id −(1 −γ)(Ψπ)−1   .
+Again, the correspondence is established for P π as a linear operator on B(X). However, we can now recover the measures
+pπ(· | x) according to
+                      Z
+             pπ(A | x) = A pπ(dx′ | x)
+                      Z
+              =                             χA(x′)pπ(dx′ | x)                        (χA(y) ≜1{y ∈A})                      X
+              = (P πχA)(x)
+              =  γ−1(id −(1 −γ)(Ψπ)−1)χA  (x)
+where χA ∈B(X) for any measurable set A. Thus, we have shown that pπ(· | x) can be reconstructed from Ψπ alone, asclaimed.
+
+
+
+
+
+                                                23

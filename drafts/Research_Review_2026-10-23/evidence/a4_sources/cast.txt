@@ -1,0 +1,773 @@
+CAST: Counterfactual Labels Improve Instruction Following in Vision-Language-Action Models
+Report GitHub Issue
+×
+Title:
+Content selection saved. Describe the issue below:
+Description:
+Submit without GitHub
+Submit in GitHub
+arXiv is now an independent nonprofit!
+Learn more
+×
+Back to arXiv
+Why HTML?
+Report Issue
+Back to Abstract
+Download PDF
+Abstract
+I Introduction
+II Related Work
+III Preliminaries and Problem Statement
+IV Counterfactual Label Augmentation
+IV-A How counterfactuals enable language following
+IV-B Generating the CAST dataset
+V Implementation
+V-A Navigation
+V-B Manipulation
+VI Experimental Evaluations
+VI-A Evaluating CAST label quality
+VI-B Evaluating language instruction following
+VI-C Comparing CounterfactualVLA to prior methods
+VI-D Ablating policy architecture for CAST
+VII Discussion
+References
+A Appendix
+A Atomic Discretization of Navigation Dataset
+B Description of Criteria for Label Quality
+C Description of Baselines
+D Description of navigation tasks
+E Description of manipulation tasks
+F Model Architecture and Training
+G Detailed Experimental Results
+H VLM Relabeling
+License: CC BY 4.0
+arXiv:2508.13446v2 [cs.RO] 08 Jun 2026
+CAST: Counterfactual Labels Improve Instruction
+Following in Vision-Language-Action Models
+Catherine Glossop
+††thanks: Correspondence to catherine_glossop@berkeley.edu
+William Chen
+Arjun Bhorkar
+Dhruv Shah
+Affiliation:  University of California Berkeley      Princeton Universityhttps://cast-vla.github.io
+Sergey Levine
+Abstract
+Generalist robots should be able to understand and follow user instructions. Despite providing a powerful architecture for mapping open-vocabulary language instructions to robot actions, current vision-language-action (VLA) models struggle to follow fine-grained commands. One cause for this is a lack of semantic diversity and language grounding in existing robot datasets and, specifically, a lack of fine-grained task diversity for similar observations. To address this, we present a novel method to augment existing robot datasets by leveraging vision-language models to create counterfactual labels. By augmenting existing datasets with these labels, we increase the diversity and granularity of language grounding for robot datasets, ultimately improving the language-following capabilities of VLAs.
+We evaluate the resulting model’s ability to follow language instructions, ranging from simple object-centric commands to complex referential tasks, by conducting vision-language navigation experiments in 3 different indoor and outdoor environments. Our experiments show that counterfactual relabeling (without additional data collection) significantly improves instruction-following in VLA policies, outperforming state-of-the-art methods and doubling the success rate compared to VLAs trained on unaugmented data. We also evaluate our method for manipulation VLAs and find a similar gain in performance on tasks with distractors.
+Fig. 1:
+CAST enables better language-following in VLA policies.  CAST generates counterfactual actions and language for uncurated robot trajectory datasets using off-the-shelf VLMs. We use this augmented dataset to train CounterfactualVLAs: policies for navigation and manipulation that can follow complex language instructions in the real world.
+I Introduction
+A core goal of robotic learning is to enable generalist systems that can perform a diverse set of behaviors in varying scenarios. A major challenge in this effort is training steerable policies – just as fine-grained instruction-following has been critical in the adoption of image generators [1] and language models [2], robots should be able to flexibly follow diverse language commands. Vision-language-action models (VLAs) offer one path toward this goal [3]. Fine-tuned from powerful pre-trained VLMs, VLAs can map open-vocabulary instructions to corresponding robot actions.
+However, their instruction-following abilities are limited by the range of labels in their training corpora. Enabling VLAs to follow more diverse instructions involves scaling up expensive, tedious data curation efforts.
+Additionally, when language is vague or not diverse, there is often a stronger correlation between observations and actions (e.g., for an image of a chest of drawers, the most likely task is “open the drawer”). This leads to posterior collapse [4, 5], wherein the policy learns to ignore language, instead inferring the task and actions purely from observations. Some datasets, such as those used for navigation [6], lack language labels entirely. As such data tends toward generic navigation behaviors, naïvely attaching language labels makes downstream policies especially susceptible to posterior collapse.
+In this paper, we address the problem of training steerable language-conditioned robot policies. We propose a method to augment existing robot datasets with synthetic counterfactual language labels and behaviors. We first use a VLM to propose alternative instructions a robot could follow at various states in the existing dataset. For example, given a trajectory of a robot going straight down a walkway, as in CAST: Counterfactual Labels Improve Instruction
+Following in Vision-Language-Action Models, our method can generate counterfactual labels such as “turn right at the orange table” or “drive along the tables on the left.”
+We then synthesize plausible actions that would have been taken in these states to follow these hypothetical instructions, thereby expanding the training language and behavior distribution beyond the original dataset. As generating such actions directly is difficult, we use a VLM to propose atomic commands that correspond to the new instructions (e.g., “move left” or “go straight”). These commands are mapped to actual robot actions by an atomic policy, which generates action chunks that exhibit the desired atomic behavior and branch off from the existing trajectory as counterfactual endings. Finally, the counterfactual language and action data are used to train VLA policies that understand and respond to a broader range of user instructions at test time.
+We propose Counterfactual Augmentation with Synthetic Trajectories (CAST): a novel data augmentation scheme for improving instruction-following in VLA models. We first instantiate CAST for the task of last-mile vision-language navigation (VLN), focusing on following nuanced short-horizon prompts (lasting a few seconds or minutes) in unseen environments (e.g., “Move along the wall on the left”).
+We fine-tune an open-source VLM [7] with our augmented dataset, which we call CounterfactualVLA, and evaluate performance in 3 environments on 27 prompts. We also compare CounterfactualVLA to prior methods and find that it outperforms VLAs trained without CAST by 27%. We also instantiate CAST for manipulation, focusing on pick-and-place tasks. We train a VLA using the same VLM backbone as for navigation and evaluate on a focused set of tasks with distractors. We find a 27% performance improvement over a VLA trained with standard data.
+We open-source the CAST augmentation code, data, and CounterfactualVLA training code and checkpoints. We believe that our work is a first step toward truly open-set robotic language following. Code is available here: https://github.com/catglossop/CAST
+II Related Work
+Task-conditioned policies. Robot policies often use image-goal conditioning [8, 9, 10, 11, 12].
+However, this requires prior access to the environment or domain-specific image generation models [13] to produce goals. Language is a more user-friendly way to specify navigation tasks [14, 15, 16, 17]. While some methods use only language encoders to obtain language embeddings [18, 19, 20, 21], VLMs can provide strong language and vision priors. Vision-language-action (VLA) policies are fine-tuned on robot data [3, 22, 23, 24, 25] to inherit these priors.
+Our goal is to improve VLAs’ language-following by training on more diverse synthetic labels. This is complementary to architectural and training strategy changes.
+Zero-shot robot control with VLMs. An alternative approach is to directly control a robot with a VLM zero-shot [26, 27, 28, 29, 15, 30, 31], thereby obviating the need for language labels during training. However, such methods do not incorporate embodied robot experience during training, relying instead on VLM priors from pre-training tasks such as static image understanding, visual question answering (VQA), object detection, and captioning [32, 33, 7]. VLMs thus often struggle to translate language prompts into robot actions. CAST instead leverages VLM priors by casting counterfactual instruction generation as a captioning task. We query for both counterfactual language and atomic commands, which are translated into action chunks with a policy trained purely on real robot data. As a result, we can effectively ground these synthetic trajectories in realistic behaviors.
+Robot data augmentation and reasoning. CAST is closely related to recent advances in improving steerability of language-conditioned robot policies in manipulation and navigation, by using dense hindsight labeling guided by vision foundation models [24, 34, 35, 36] or by using simpler low-level policies in conjunction with foundation models to augment the dataset [37, 38]. Most related to our work, NaVILA [24] proposes to train VLAs on synthetic language labels obtained by labeling robot navigation data with VLMs. Our approach differs in that we use a novel counterfactual labeling scheme that produces new labels for behaviors that are possible in observed scenes, but were not actually executed. While recent work [39, 40, 41] also leverages counterfactual data or reasoning to improve obstacle avoidance or path planning, CAST introduces a scalable pipeline for improving general language-following in language-conditioned policies.
+Figure 2: An overview of CAST. CAST determines decision points in existing trajectories by segmenting them into atomic chunks, forming 𝒟a\mathcal{D}_{a}. Then, a VLM is queried with 𝐨t,i\mathbf{o}_{t,i} at the decision point and the existing language labels ℓ¯i,j\bar{\ell}_{i,j} to generate counterfactual instructions ℓic​f\ell^{cf}_{i} and atomic commands ℓia,c​f\ell^{a,cf}_{i}. The corresponding counterfactual action chunks are sampled from πa(𝐚t:t+H,ic​f|ℓia,c​f,𝐨t,i)\pi_{a}(\mathbf{a}^{cf}_{t:t+H,i}|\ell^{a,cf}_{i},\mathbf{o}_{t,i}) and are appended to the existing trajectories as counterfactual endings.
+III Preliminaries and Problem Statement
+Our goal is to train a robot policy to follow complex commands from an unlabeled (or sparsely-labeled) dataset, 𝒟u={𝐨t,i,𝐚t,i}\mathcal{D}_{u}=\{\mathbf{o}_{t,i},\mathbf{a}_{t,i}\}, where 𝐚t\mathbf{a}_{t} denotes the action at time tt, 𝐨t\mathbf{o}_{t} denotes the observation (e.g., an image from the robot’s camera), and ii denotes ithi^{\text{th}} trajectory. To do this, we propose a way to construct a new densely-labeled dataset 𝒟l={𝐨t,i,ℓi,𝐚t,i}\mathcal{D}_{l}=\{\mathbf{o}_{t,i},\ell_{i},\mathbf{a}_{t,i}\}, where ℓ\ell denotes a language instruction, e.g., “move along the white wall.”
+However, if these language labels ℓi\ell_{i} are not necessary for the model to predict the correct action, then the model will ignore them — a phenomenon known as posterior collapse [4, 5]. We aim to attach dense labels such that the policy will listen to them when trained with imitation learning (IL), where the model learns to copy the action distributions of experts.
+As we will argue, diverse counterfactual behaviors, consisting of language labels ℓic​f\ell^{cf}_{i} and actions 𝐚t,ic​f\mathbf{a}^{cf}_{t,i}, are an appropriate way to induce this.
+We train our policy πθ(𝐚t:t+H|ℓ,𝐨t)\pi_{\theta}(\mathbf{a}_{t:t+H}|\ell,\mathbf{o}_{t}) with parameters θ\theta to predict action chunks, that is short “trajectory snippets” over a horizon HH, which makes it easier to produce temporally-consistent actions and
+reduces compounding error [42, 43].
+IV Counterfactual Label Augmentation
+In order for policies to be steerable, they must pay attention to user-specified language instructions, avoiding posterior collapse. The policy must learn that different instructions must lead to different actions, even when the observations are otherwise similar. The language we attach to trajectories must correlate with the action even when conditioning on the observation, otherwise the model may ignore the instruction and still achieve high training accuracy. In practice, this is difficult to ensure, as the correlation between the observation and the task is often high – e.g., the robot might only be asked to navigate to a door when a door is visible.
+CAST’s goal is to attach multiple action-language pairs for each observation 𝐨t,i∈𝒟u\mathbf{o}_{t,i}\in\mathcal{D}_{u}, such that policies must attend to the instruction in order to produce the right action. To do this, we generate potential synthetic language commands ℓic​f\ell^{cf}_{i} that are feasible from the observations 𝐨t,i\mathbf{o}_{t,i}, but are counterfactual to the existing trajectories and labels, ℓi\ell_{i}, as shown in Step 2 in Fig. 2. 𝒟u\mathcal{D}_{u} may lack language labels, in which case we synthetically obtain them as described in Section V (but they could be annotated by humans too).
+Our key insight is that synthetic counterfactual action chunks
+can be obtained from a simpler atomic policy, which is much easier to train than a general instruction-following policy and can be reliable over short horizons. This atomic policy πa(𝐚t:t+H,i|ℓa,𝐨t,i)\pi_{a}(\mathbf{a}_{t:t+H,i}|\ell^{a},\mathbf{o}_{t,i}) follows simple atomic language commands ℓa\ell^{a}, such as “turn left” or “turn right”. Intuitively, such a policy is less susceptible to posterior collapse, as these atomic commands strongly correlate to the corresponding actions, no matter the observation. Still, the atomic policy must attend to observations to ensure the commands are reasonable – if the command is “turn left,” the action should move left while avoiding collisions (see Section V).
+To connect the synthetic instruction ℓic​f\ell^{cf}_{i} to this atomic policy, we prompt a VLM to generate both the counterfactual instruction ℓic​f\ell^{cf}_{i} and a corresponding atomic command ℓia,c​f\ell^{a,cf}_{i} at a particular state 𝐨t,i\mathbf{o}_{t,i}. Then, we use the atomic policy πa(𝐚t:t+H,i|ℓt,ia,c​f,𝐨t,i)\pi_{a}(\mathbf{a}_{t:t+H,i}|\ell^{a,cf}_{t,i},\mathbf{o}_{t,i}) to generate a suitable action 𝐚t,ic​f\mathbf{a}^{cf}_{t,i}. This constructs an expanded dataset where, for every trajectory, several counterfactual actions are generated that branch off the original data. When training on this expanded dataset, the policy will encounter several instructions that produce distinct actions, but are associated with the same observation.
+We avoid requiring counterfactual observations by using action chunking, which allows the policy to be perturbed from states covered in the existing data toward states aligned with the counterfactual task. While we do not provide explicit supervision in these states, we find that these perturbations can effectively expand the language-following capabilities of the policy to novel fine-grained tasks.
+IV-A How counterfactuals enable language following
+We motivate our approach by presenting a simple conceptual model for how well labels induce language following. For readability, we drop step and sample subscripts tt and ii, denote the language label as ℓ\ell, the atomic language label as ℓa\ell^{a}, the action as 𝐚\mathbf{a}, and the observation as 𝐨\mathbf{o}. ℓ\ell, ℓa\ell^{a}, and 𝐚\mathbf{a} could correspond to an original or counterfactual label.
+We expect a model to attend to language input when it adds information about the action 𝐚\mathbf{a} that cannot be inferred from the observation 𝐨\mathbf{o}. This can be captured by the observation-conditioned mutual information between the label and the action I⁡(𝐚;ℓ|𝐨)I(\mathbf{a};\ell|\mathbf{o}). We assume that language-following can be improved by maximizing this quantity, which we argue is a simple and reasonable conceptual model of language following. We will show that by increasing the number of different ℓa\ell^{a} executed at each 𝐨\mathbf{o}, while ensuring that each atomic command corresponds to a unique ℓ\ell, we effectively maximize a lower bound on I⁡(𝐚;ℓ|𝐨)I(\mathbf{a};\ell|\mathbf{o}). This motivates our method as a principled way to improve language following, albeit under this mutual information assumption.
+At a given observation 𝐨\mathbf{o} in a trajectory, we have several branching action chunks – one from the original dataset, the others counterfactually generated. Each chunk has an instruction, ℓ\ell, which describes the actions, 𝐚\mathbf{a}, taken by the robot at 𝐨\mathbf{o}. From 𝐚\mathbf{a}, we can determine an atomic command ℓa\ell^{a}, using the heuristics from Section V. 𝐚\mathbf{a} can also be determined from ℓ\ell (this is the mapping learned via imitation learning). We can thus describe this process with the Markov chain ℓ→𝐚→ℓa\ell\rightarrow\mathbf{a}\rightarrow\ell^{a}. Applying the data processing inequality yields:
+I⁡(𝐚;ℓ|𝐨)≥I⁡(ℓa;ℓ|𝐨)I(\mathbf{a};\ell|\mathbf{o})\geq I(\ell^{a};\ell|\mathbf{o})
+(1)
+Expanding the right side, we get
+I⁡(ℓa;ℓ|𝐨)=H⁡(ℓa|𝐨)−H⁡(ℓa|ℓ,𝐨)\begin{split}I(\ell^{a};\ell|\mathbf{o})&=H(\ell^{a}|\mathbf{o})-H(\ell^{a}|\ell,\mathbf{o})\\
+\end{split}
+(2)
+Lemma IV.1
+Given a language label ℓ\ell, an atomic command ℓa\ell^{a}, and an observation 𝐨\mathbf{o}, the mutual information I⁡(𝐚;ℓ|𝐨)I(\mathbf{a};\ell|\mathbf{o}) is lower bounded by H⁡(ℓa|𝐨)−H⁡(ℓa|ℓ,𝐨)H(\ell^{a}|\mathbf{o})-H(\ell^{a}|\ell,\mathbf{o}).
+From Lemma IV.1, maximizing H⁡(ℓa|𝐨)−H⁡(ℓa|ℓ,𝐨)H(\ell^{a}|\mathbf{o})-H(\ell^{a}|\ell,\mathbf{o}) optimizes a lower bound on the mutual information between language and action, thereby improving language following.
+Thus, an effective way to improve language following is to produce a high-entropy distribution over atomic labels ℓa\ell^{a}, while ensuring that the atomic labels are easy to predict given the full language command ℓ\ell. CAST approximates just this: each observation gets multiple counterfactual commands, and thus diverse atomic commands (increasing H⁡(ℓa|𝐨)H(\ell^{a}|\mathbf{o})), but each counterfactual label has a unique atomic command (decreasing H⁡(ℓa|ℓ,𝐨)H(\ell^{a}|\ell,\mathbf{o})). This pushes up on the bound on the mutual information between language and actions, thus improving language following. While the precise relationship between CAST and these quantities is heuristic, this formulation provides a degree of conceptual grounding for our approach, motivating relabeling each observation with diverse atomic labels ℓa,c​f\ell^{a,cf} that are predictable from the corresponding counterfactual labels ℓc​f\ell^{cf}.
+IV-B Generating the CAST dataset
+To generate counterfactual language and actions, we require labels associated with the trajectories actually executed by the robot as a reference. We construct an atomic decomposition of our target dataset, 𝒟a={𝐨t,i,ℓt,ia,𝐚t,i}\mathcal{D}_{a}=\{\mathbf{o}_{t,i},\ell^{a}_{t,i},\mathbf{a}_{t,i}\}, as shown in Step 1 of Fig. 2, and synthetically generate the instructions associated with the trajectories actually executed by the robot, ℓ¯i\bar{\ell}_{i}. These components are domain-specific and dataset-specific. We provide instantiations of the atomic decomposition and a method to synthetically post-hoc label data with language in Section V.
+Generating counterfactual instructions. At a given observation 𝐨t,i∈𝒟u\mathbf{o}_{t,i}\in\mathcal{D}_{u}, we have language that describes the instruction the robot was following (ℓ¯i\bar{\ell}_{i}) and the short-horizon atomic robot behaviors in the original trajectory (ℓt,ia\ell^{a}_{t,i}).
+We use this data as a reference to generate plausible alternative language commands ℓic​f\ell^{cf}_{i} that the robot could have executed, which will correspond to the existing trajectory up to 𝐨t,i\mathbf{o}_{t,i} followed by a new ending. We select decision points – the boundaries of atomic segments in 𝒟a\mathcal{D}_{a} – where we query a large, API-based VLM for alternative instructions via a relabeling prompt. This prompt is constructed using image and atomic label tuples (𝐨ti,i,ℓti,ia)(\mathbf{o}_{t_{i},i},\ell^{a}_{t_{i},i}) at each decision point, as well as the instruction labels {ℓ¯i}\{\bar{\ell}_{i}\} (step 2 of Fig. 2). It instructs the VLM to describe both the counterfactual behavior that could be executed at the decision point and the atomic instruction aligned with this behavior. E.g., at a point where the robot previously turned right toward a hallway, it may be possible for it to instead turn left, corresponding to going toward a door. This yields both an alternative instruction ℓic​f\ell^{cf}_{i} and an associated atomic command ℓia,c​f\ell^{a,cf}_{i} for observation 𝐨t,i\mathbf{o}_{t,i}. Multiple such counterfactuals are generated, potentially for the same observation, approximately raising H⁡(ℓa|𝐨)H(\ell^{a}|\mathbf{o}). By ensuring each ℓt,ia,c​f\ell^{a,cf}_{t,i} is associated with a distinct language command, we decrease H⁡(ℓa|ℓ,𝐨)H(\ell^{a}|\ell,\mathbf{o}). Thus, we push up on the lower bound on I⁡(𝐚;ℓ|𝐨)I(\mathbf{a};\ell|\mathbf{o}) from Lemma IV.1. The last piece is then to obtain the associated counterfactual actions, 𝐚t,ic​f\mathbf{a}^{cf}_{t,i}.
+Generating counterfactual actions. Given counterfactual instructions ℓic​f\ell^{cf}_{i} and their atomic commands ℓia,c​f\ell^{a,cf}_{i}, we now generate the underlying counterfactual actions. Using 𝒟a\mathcal{D}_{a}, we train an atomic policy πa(𝐚t:t+H,i|ℓt,ia,𝐨t,i)\pi_{a}(\mathbf{a}_{t:t+H,i}|\ell^{a}_{t,i},\mathbf{o}_{t,i}). We then sample an action chunk 𝐚t,ic​f∼πa(𝐚t:t+H,i|ℓia,𝐨t,i)\mathbf{a}^{cf}_{t,i}\sim\pi_{a}(\mathbf{a}_{t:t+H,i}|\ell^{a}_{i},\mathbf{o}_{t,i}) for each (𝐨t,i,ℓia,c​f)(\mathbf{o}_{t,i},\ell^{a,cf}_{i}), yielding a counterfactual ending associated with ℓic​f\ell^{cf}_{i} that branches from the existing trajectory. Thus, we have the training tuple (𝐨t,i,ℓic​f,𝐚t,ic​f)(\mathbf{o}_{t,i},\ell^{cf}_{i},\mathbf{a}^{cf}_{t,i}) (though 𝐨\mathbf{o} only exists up to T−hT-h, where TT is the total number of steps and hh is the action chunk horizon) that we can add to the labeled training set 𝒟l\mathcal{D}_{l}, where tt spans from the beginning of the original trajectory to the counterfactual ending. With this, we have the diverse actions 𝐚c​f\mathbf{a}^{cf} associated with diverse ℓc​f\ell^{cf} for each 𝐨\mathbf{o} that push up on the lower bound on I⁡(𝐚;ℓ|𝐨)I(\mathbf{a};\ell|\mathbf{o}) described in Lemma IV.1.
+V Implementation
+We instantiate CAST for (1) navigation with a ground robot and (2) manipulation with a low-cost robotic arm. This allows us to evaluate the generality of the overall approach. While the core design of CAST is the same in both domains, the distinct properties of navigation and manipulation require a few implementation changes. We first describe CAST for navigation, then cover the changes for manipulation.
+V-A Navigation
+We first instantiate CAST for vision-language navigation. CAST requires a decomposition of atomic behaviors and sparse language labels as reference points for generating counterfactuals. However, large real-world navigation datasets lack text labels. To address this, we create a hindsight relabeling pipeline and a heuristic decomposition of our dataset to determine decision points for generating counterfactuals and training our atomic policy.
+Atomic labeling and policy. For each observation 𝐨t,i∈𝒟u\mathbf{o}_{t,i}\in\mathcal{D}_{u}, we first compute an atomic label ℓia\ell^{a}_{i} in the set {turn right, turn left, adjust right, adjust left, go forward, stop}, to create the intermediate dataset 𝒟a={𝐨t,i,ℓia,𝐚t,i}\mathcal{D}_{a}=\{\mathbf{o}_{t,i},\ell^{a}_{i},\mathbf{a}_{t,i}\}. We use a simple heuristic to segment trajectories based on when the robot’s yaw rapidly changes, then attach appropriate corresponding language labels. If the robot does not turn significantly, the chunk is labeled as “go forward” or “stop” based on the distance traveled. More detail is provided in Appendix A.
+This gives us the training set for learning the atomic policy πa(𝐚t:t+H,i|ℓt,ia,𝐨t,i)\pi_{a}(\mathbf{a}_{t:t+H,i}|\ell^{a}_{t,i},\mathbf{o}_{t,i}) and the decision points for applying our relabeling prompt (step 2 in Fig. 2). Since the atomic labels ℓt,ia\ell^{a}_{t,i} are computed directly from the actions 𝐚t,i\mathbf{a}_{t,i}, they correlate strongly with the action, so πa(𝐚t:t+H,i|ℓt,ia,𝐨t,i)\pi_{a}(\mathbf{a}_{t:t+H,i}|\ell^{a}_{t,i},\mathbf{o}_{t,i}) follows these atomic language labels very well. The policy also inherits good navigation behavior, such as collision avoidance, from the real-world navigation data it is trained on.
+The observation is encoded with an EfficientNet-b2 [44] ConvNet, and the commands ℓa\ell^{a} are embedded with a T5 language encoder [45]. The image and language embeddings are concatenated and encoded into a context vector, which is used to train an action-chunked diffusion model to predict actions [9], resulting in the atomic policy πa\pi_{a}.
+Hindsight relabeling pipeline. We start with a diverse collection of existing visual navigation datasets [6]. We generate multiple possible language instructions ℓ¯j,i\bar{\ell}_{j,i} per robot trajectory (indexed by jj), each describing the entire trajectory. We leverage a VLM to generate these instructions, specifically Gemini 2.5 Pro [46]. We first prompt the VLM with a subsampled sequence of observations, 𝐨1:K:T,i\mathbf{o}_{1:K:T,i}, and query it to describe the objects, structures, and relative positions of those objects relative to each other and the robot. We query
+the VLM to summarize these descriptions and format the result as new descriptive instructions that could have served as the prompt when the robot executed the trajectory. We encourage the VLM to leverage a structured format to simplify this initial generation problem. These labels are generated without using the raw robot actions and capture the intent of the robot’s interaction with the environment.
+We found it useful to further filter this set of labels in a second labeling phase, where we provide the sequence of atomic labels along the trajectory. The VLM is then tasked with filtering ℓ¯j,i\bar{\ell}_{j,i} to a set of labels that is consistent with the robot’s actions, removing instructions that clearly do not align with the trajectory (e.g., “Move down the hallway on the right” would be filtered out if the atomic action sequence indicates the robot turns left). This results in a set of labels {ℓ¯j,i}\{\bar{\ell}_{j,i}\} for each trajectory, grounded in robot behaviors. More information is provided in Appendix H.
+Training a policy.
+We use CAST to generate synthetic data for training a navigation VLA. We run our synthetic annotation pipeline on the GNM dataset mixture [6], which contains indoor and outdoor robot trajectories from several different embodiments, using Gemini 2.5 Pro [46] as the VLM. In total, we generate hindsight labels for 65k trajectories with 320k labels, which we filter to 16k trajectories with 65k labels and 86k counterfactual action chunks. We follow ViNT [8] and normalize the action spaces across our datasets, transforming them into Cartesian deltas. A key aspect to note is that the counterfactual actions are predicted by the atomic policy with a horizon of 8 steps. As no new observations are generated for these actions, we only train on chunks of the trajectory for which the observation at the start of the chunk is available. These chunks are encoded as 16 tokens. At test time, a separate PD controller converts these deltas into low-level velocities, which we run at 4 Hz.
+With these post-processing steps in place, we train a VLA on the CAST dataset. We fine-tune the 3B PaliGemma VLM [7] (described in Appendix F) for 40k steps on a v4-16 TPU pod with a batch size of 384 and a learning rate of 1e-4. We add 128 tokens to its tokenizer to represent the binned actions.
+V-B Manipulation
+To implement CAST for manipulation, we only modify the counterfactual atomic command proposer and the atomic policy, πa\pi_{a}. We use the Bridge dataset [47], which already has task-level labels (e.g. “put the corn in the pot”). Then, we use the subtask decompositions open-sourced by Steerable Policies [48], which serve as atomic commands for manipulation (e.g., “pick up the corn” or “move the corn to the pot”). We use the pipeline from Section IV-B with a modified prompt to generate counterfactual tasks, ℓic​f\ell^{cf}_{i}, e.g., if the task is “put the corn in the pot” and a plate is also present, then a counterfactual task can be “put the corn on the plate”. Information on the prompts used is provided in Appendix H.
+We also use two models from Steerable Policies [48] to procure counterfactual atomic commands and actions. The first model takes counterfactual tasks (“put the corn on the plate”) and observations to predict atomic subtask commands, ℓia,c​f\ell^{a,cf}_{i} (“move the corn to the plate”). The second model is a pre-trained Steerable Policy which serves as our atomic policy. It predicts actions, 𝐚ic​f\mathbf{a}^{cf}_{i}, based on counterfactual atomic commands. Both models are initialized from Prismatic VLMs [23].
+We run our pipeline on all 60k Bridge trajectories and use Gemini 2.5 Pro [46] as the VLM to generate 500k counterfactual instructions and actions. Following past works [48, 23], the atomic policy produces non-chunked Cartesian delta actions.
+We train our manipulation VLA on this augmented dataset, using the same VLM [7] as the VLN policy in the previous section. We train it end-to-end
+for 60k steps on 8×8\timesH200 GPUs with a batch size of 512 and a learning rate of 1e-4. We add 512 tokens to the VLM’s tokenizer to represent the action bins.
+We call these models CounterfactualVLA s, which we experimentally validate in Section VI-B.
+VI Experimental Evaluations
+Our experiments evaluate the CAST dataset and the downstream VLA policy, CounterfactualVLA, aiming to answer:
+Q1
+Does CAST produce accurate language labels?
+Q2
+Does CAST enable more effective language-conditioned policies for navigation and manipulation?
+Q3
+How does CounterfactualVLA trained with CAST compare to state-of-the-art methods?
+Q4
+Which policy architecture best leverages CAST?
+CAST dataset evaluation setup. To evaluate the label quality of CAST for Q1, we have 11 human judges evaluate 20 hindsight (ℓ¯j,i\bar{\ell}_{j,i}) and 20 counterfactual labels (ℓic​f\ell^{cf}_{i}) each, resulting in a total of 440 labels, from the augmented GNM dataset. We evaluate three label aspects: accuracy of the object(s)/structure(s), motion, and grounding of the motion in the scene. A label is deemed correct if it is accurate with respect to these three aspects, and incorrect otherwise. More detail is provided in Appendix B.
+CounterfactualVLA evaluation setup. For Q2, we evaluate CounterfactualVLA on 27 challenging instruction-following navigation tasks across 3 real-world environments, spanning office hallways, a kitchen, and an outdoor public park (see Fig. 5).
+The instructions fall into three categories: Object Navigation, where the policy must navigate to within 0.5 m of a target object, Referential Navigation, where it must move relative to an object/structure, requiring spatial understanding (e.g. “Go to the left of…”), and Continuous Navigation, where it must perform a continuous behavior relative to objects/structures in the environment, staying within 1 m of them for at least 2 m (e.g. “Move along the …”). Except for object reaching, collision fails the trial. See Appendix D for more details and examples.
+These instructions cover a wider range of behaviors than commonly studied in object navigation [49, 15, 34] and atomic instruction-following literature [24], and focus on steerability rather than long-horizon navigation. Steerability is not typically measured in simulation benchmarks because it requires programmatic detectors for sophisticated behaviors, making real-world evaluation more suitable. We use a Kobuki robot base with a front-facing monocular camera mounted 40 cm above the base. We also mount a LiDAR, which is only used for CoNVOI [24] evaluations. We perform 5 trials, similar to other works [24], totaling over 600 trials and 21 hours of real-world evaluation across all trials.
+We also evaluate the robustness of CounterfactualVLA with six tasks (two per category) in the hallway setting while varying lighting (morning vs. night) and the presence of dynamic obstacles. This setting has windows, so lighting changes depending on time of day. For the dynamic obstacles, a person walks in front of the robot during each trial.
+To evaluate CounterfactualVLA for manipulation, we run 10 trials on 6 manipulation tasks on the real-world Bridge WidowX setup [47]. Half are simple “pick” tasks (e.g., “pick up the mushroom”) while the others are more complex (e.g., “put the mushroom in the pot”). All tasks include distractor objects, allowing us to specifically evaluate whether CAST improves language following. Without distractors, tasks can be inferred from observations alone, making instruction-conditioning unnecessary. We perform 120 trials across the standard VLA and CounterfactualVLA. See Appendix E for more details and examples.
+VI-A Evaluating CAST label quality
+Figure 3: Label Quality. CAST can generate reasonable labels for unlabeled navigation data with an accuracy of 60% for hindsight (left) and 70% for counterfactual (right) labels.
+Toward answering Q1, we find CAST generates hindsight and counterfactual labels with approximately 60% and 70% accuracy, respectively, as shown in Fig. 3. CAST is especially good at recognizing landmark structures or objects in the scene and describing the robot’s behavior. The main source of error is grounding of the robot’s motion in the scene. For hindsight labels, the VLM often hallucinates the relationship between the motion and the scene (e.g., “Move along the pathway toward the building” but the robot leaves the path to go toward the building). For counterfactual trajectories, this manifests as counterfactual endings that would likely result in a collision.
+Still, as shown by our real-world navigation results, CounterfactualVLA retains strong collision avoidance behavior when trained with both hindsight and counterfactual labels. Although these labels are noisy under a strict binary evaluation protocol, they still provide sufficient language-action diversity to improve downstream policy learning.
+(a) Navigation performance. CAST shows strong performance across a diverse set of tasks, outperforming prior methods.
+(b) Manipulation performance. CounterfactualVLA doubles the performance of a VLA trained without CAST with distractors.
+Figure 4: Real-world navigation and manipulation evaluations. CounterfactualVLA trained with CAST exhibits strong performance across diverse navigation and manipulation tasks. Error bars are ±\pmStdErr.
+Figure 5: Qualitative examples of CounterfactualVLA. CounterfactualVLA can successfully follow complex navigation (left) and manipulation (right) instructions.
+VI-B Evaluating language instruction following
+Our main hypothesis for Q2 is that counterfactual labels promote better language following than just the standard labels attached to actions in the original dataset. We test this by comparing CounterfactualVLA to a “standard VLA”, trained with the hindsight task labels alone (without counterfactual labels). These two VLAs are otherwise identical.
+As shown in  Fig. 4(a), CounterfactualVLA achieves a 27% improvement over the standard VLA. Although both policies demonstrate strong navigation capabilities, the standard VLA tends toward more generic navigation behaviors, largely ignoring language. This baseline can succeed where collision avoidance can compensate for a lack of language-following, such as “move between the rows of chairs”, but struggles in object navigation tasks where collision avoidance can cause failure. The CAST dataset uses counterfactual labels to break the bias toward generic behaviors, significantly improving VLAs’ ability to follow complex language instructions.
+We also find that CAST significantly improves instruction following for manipulation (Fig. 4(b)). Without distractors,
+both VLAs perform similarly. However, when distractors are introduced, the task is no longer inferable from images alone, necessitating more attention to language. Thus, when the standard VLA sees several plausible behaviors (e.g., placing something in the pot or on the cloth), it often oscillates between modes, while CounterfactualVLA consistently performs the correct action, achieving 2×\times higher success rate.
+VI-C Comparing CounterfactualVLA to prior methods
+Toward answering Q3, we compare CounterfactualVLA against two baselines. First, πa\pi_{a} + planning, which follows prior hierarchical frameworks [24]. We use an off-the-shelf VLM to infer suitable atomic navigation commands for achieving the given language goals, and use the atomic policy πa\pi_{a} to execute them. This investigates whether it is important to distill counterfactual behaviors into our policy or if a VLM can select correct atomic skills at test time.
+Second, CoNVOI, which turns instructions into robot plans by annotating image observations with a grid of numbers, prompting a VLM to select a trajectory through this grid, and grounding this plan into the scene geometry with a LiDAR-based occupancy map [29]. This requires API calls to a VLM [32], assumes that the VLM can express task behaviors with a trajectory of this form, and requires LiDAR for grounding (whereas our VLAs only require images). CoNVOI can accept open-set language, unlike other similar works [24], making it the most appropriate baseline for our method. We could not evaluate CoNVOI outside due to infrastructure challenges. More detail on these baselines is provided in Appendix C.
+CounterfactualVLA outperforms prior methods by 19% on aggregate (Fig. 4(a)). The best baseline, CoNVOI, achieved similar performance in object and referential navigation. However, it struggled with continuous navigation, where spatial understanding is crucial for avoiding collision while staying close to structures or objects mentioned in the prompt. Since CoNVOI relies on disjoint sources for semantic (VLM) and geometric (LiDAR) information, it struggles to bridge the two, especially in continuous tasks. As CounterfactualVLA is trained with embodied robot data, it can better follow nuanced continuous navigation prompts.
+The πa\pi_{a} + planning baseline performs poorly on all tasks. The test-time decomposition may appear similar to CAST, but πa\pi_{a} + planning cannot know the impact of a particular command until it has been rolled out. Errors in the action chunks themselves are compounded with failures of the VLM to interpret the scene geometry and reason about the next atomic command, causing poor grounding of the robot in the scene and poor adherence to language instructions. By incorporating information across the trajectory, CAST achieves tighter alignment between language annotations and grounded robot experience, resulting in significantly stronger language-following capabilities in downstream policies.
+CounterfactualVLA is robust to lighting changes but is susceptible to dynamic obstacles, as shown in Table I. While lighting does not seem to impact performance, dynamic obstacles often cause the policy to fail to return to the task after avoiding the obstacle. This may be due to slow inference speed (4 Hz) or the lack of counterfactual observations.
+Method
+Time of day
+Dynamic obs.
+Success (%)
+CounterfactualVLA
+Morning
+No
+63 ±\pm 9
+Morning
+Yes
+37 ±\pm 9
+Night
+No
+63 ±\pm 9
+Night
+Yes
+43 ±\pm 9
+Table I: CounterfactualVLA is robust to ambient lighting changes but remains susceptible to dynamic obstacles.
+VI-D Ablating policy architecture for CAST
+For Q4, we train a policy using ResNet + FiLM (instead of PaliGemma) with CAST to analyze the impact of architecture on instruction-following. This architecture is representative of policies used in many prior works [50, 34]. Following LeLaN [34], the language encoder is a frozen CLIP model. CounterfactualVLA (using a VLM backbone) exhibits better performance in all tasks (Fig. 6). The ResNet + FiLM policy struggled with complex instructions, but was steerable in tasks that could be reduced to object navigation or atomic commands. As CAST generates diverse language, a high-capacity model is needed to make full use of it.
+Figure 6: Model architecture ablation. VLA backbones offer semantic priors, enabling better complex language following.
+VII Discussion
+We present CAST, a novel synthetic labeling method that uses VLMs to generate diverse counterfactual labels and robot actions. Even without additional human data, augmenting existing robot datasets with CAST enables VLAs that attend more closely to instructions. By assigning multiple language-action pairs to each observation, CAST encourages policies to learn the link between language and actions. Our method roughly doubles the success rate compared to equivalent standard VLAs trained without counterfactual labels in both navigation and manipulation.
+Limitations:
+CAST annotations remain imperfect, though VLMs will likely continue to improve their physical grounding, making our method more effective.
+Counterfactual observations would also likely aid our method, but generating robot images introduces new challenges, like ensuring visual consistency with real data or addressing compounding video generation error.
+CAST shows promise in using existing robot datasets to train steerable robot policies.
+References
+[1]
+M. Betker et al. (2023)
+Improving image generation with better captions.
+Cited by: §I.
+[2]
+L. Ouyang et al. (2022)
+Training language models to follow instructions with human feedback.
+Cited by: §I.
+[3]
+A. Brohan et al. (2023)
+Rt-2: vision-language-action models transfer web knowledge to robotic control.
+Cited by: §I,
+§II.
+[4]
+S. R. Bowman et al. (2016)
+Generating sentences from a continuous space.
+Cited by: §I,
+§III.
+[5]
+J. He et al. (2019)
+Lagging inference networks and posterior collapse in variational autoencoders.
+Cited by: §I,
+§III.
+[6]
+D. Shah et al. (2023)
+GNM: A General Navigation Model to Drive Any Robot.
+Cited by: §I,
+§V-A,
+§V-A.
+[7]
+L. Beyer et al. (2024)
+PaliGemma: a versatile 3b vlm for transfer.
+Cited by: §F,
+§I,
+§II,
+§V-A,
+§V-B.
+[8]
+D. Shah et al. (2023)
+ViNT: a foundation model for visual navigation.
+Cited by: §II,
+§V-A.
+[9]
+A. Sridhar et al. (2023)
+NoMaD: Goal Masked Diffusion Policies for Navigation and Exploration.
+Cited by: §II,
+§V-A.
+[10]
+Y. Zhu et al. (2016)
+Target-driven visual navigation in indoor scenes using deep reinforcement learning.
+Cited by: §II.
+[11]
+X. Meng et al. (2020)
+Scaling local control to large-scale topological navigation.
+Cited by: §II.
+[12]
+N. Hirose et al. (2019)
+Deep visual mpc-policy learning for navigation.
+Cited by: §II.
+[13]
+K. Black et al. (2023)
+Zero-shot robotic manipulation with pretrained image-editing diffusion models.
+Cited by: §II.
+[14]
+J. Gu et al. (2022)
+Vision-and-language navigation: a survey of tasks, methods, and future directions.
+Cited by: §II.
+[15]
+S. Y. Gadre et al. (2023)
+CoWs on pasture: baselines and benchmarks for language-driven zero-shot object navigation.
+Cited by: §II,
+§II,
+§VI.
+[16]
+D. Shah et al. (2022)
+LM-nav: robotic navigation with large pre-trained models of language, vision, and action.
+Cited by: §II.
+[17]
+C. Huang et al. (2023)
+Visual language maps for robot navigation.
+Cited by: §II.
+[18]
+O. Mees et al. (2022)
+What matters in language conditioned robotic imitation learning over unstructured data.
+Cited by: §II.
+[19]
+S. Y. Gadre et al.
+CLIP on wheels: zero-shot object navigation as object localization and exploration.
+Cited by: §II.
+[20]
+Y. Hong et al. (2021)
+A recurrent vision-and-language bert for navigation.
+Cited by: §II.
+[21]
+A. Pashevich et al. (2021)
+Episodic transformer for vision-and-language navigation.
+Cited by: §II.
+[22]
+O. X. Collaboration et al. (2023)
+Open X-Embodiment: robotic learning datasets and RT-X models.
+Cited by: §II.
+[23]
+M. J. Kim et al. (2024)
+OpenVLA: an open-source vision-language-action model.
+Cited by: §II,
+§V-B,
+§V-B.
+[24]
+A. Cheng et al. (2024)
+NaVILA: Legged Robot Vision-Language-Action Model for Navigation.
+Cited by: §C,
+§II,
+§II,
+§VI-C,
+§VI.
+[25]
+H. L. Chiang et al. (2024)
+Mobility vla: multimodal instruction navigation with long-context vlms and topological graphs.
+Cited by: §II.
+[26]
+W. Huang et al. (2023)
+VoxPoser: composable 3d value maps for robotic manipulation with language models.
+Cited by: §II.
+[27]
+S. Nasiriany et al. (2024)
+PIVOT: iterative visual prompting elicits actionable knowledge for vlms.
+Cited by: §II.
+[28]
+J. Liang et al. (2023)
+Code as policies: language model programs for embodied control.
+Cited by: §II.
+[29]
+A. J. Sathyamoorthy et al. (2024)
+CoNVOI: context-aware navigation using vision language models in outdoor and indoor environments.
+Cited by: §C,
+§II,
+§VI-C.
+[30]
+D. Shah et al. (2023)
+Navigation with large language models: semantic guesswork as a heuristic for planning.
+Cited by: §II.
+[31]
+V. S. Dorbala et al. (2023)
+Can an Embodied Agent Find Your "Cat-shaped Mug"? LLM-Based Zero-Shot Object Navigation.
+Cited by: §II.
+[32]
+OpenAI (2024)
+GPT-4 technical report.
+Cited by: §II,
+§VI-C.
+[33]
+G. Team (2024)
+Gemini 1.5: unlocking multimodal understanding across millions of tokens of context.
+Cited by: §C,
+§II.
+[34]
+N. Hirose et al. (2024)
+LeLaN: learning a language-conditioned navigation policy from in-the-wild video.
+Cited by: §II,
+§VI-D,
+§VI.
+[35]
+L. Smith et al. (2024)
+STEER: flexible robotic manipulation via dense language grounding.
+Cited by: §II.
+[36]
+N. Blank et al. (2024)
+Scaling robot policy learning via zero-shot labeling with foundation models.
+Cited by: §II.
+[37]
+J. Zhang et al. (2023)
+Bootstrap your own skills: learning to solve new tasks with large language model guidance.
+Cited by: §C,
+§II.
+[38]
+H. Ha et al. (2023)
+Scaling up and distilling down: language-guided robot skill acquisition.
+Cited by: §II.
+[39]
+G. Seneviratne et al. (2026)
+CHOP: counterfactual human preference labels improve obstacle avoidance in visuomotor navigation policies.
+Cited by: §II.
+[40]
+K. Zhou et al. (2026)
+CoINS: counterfactual interactive navigation via skill-aware vlm.
+Cited by: §II.
+[41]
+Z. ". Peng et al. (2025)
+Counterfactual vla: self-reflective vision-language-action model with adaptive reasoning.
+Cited by: §II.
+[42]
+T. Z. Zhao et al. (2023)
+Learning fine-grained bimanual manipulation with low-cost hardware.
+Cited by: §III.
+[43]
+K. Pertsch et al. (2025)
+FAST: efficient action tokenization for vision-language-action models.
+Cited by: §III.
+[44]
+M. Tan and Q. V. Le (2020)
+EfficientNet: rethinking model scaling for convolutional neural networks.
+Cited by: §V-A.
+[45]
+J. Ni et al. (2021)
+Sentence-t5: scalable sentence encoders from pre-trained text-to-text models.
+Cited by: §V-A.
+[46]
+G. Team (2025)
+Gemini 2.5: pushing the frontier with advanced reasoning, multimodality, long context, and next generation agentic capabilities.
+Cited by: §H,
+§V-A,
+§V-A,
+§V-B.
+[47]
+H. Walke et al. (2023)
+BridgeData v2: a dataset for robot learning at scale.
+Cited by: §A,
+§H,
+§V-B,
+§VI.
+[48]
+W. Chen et al. (2026)
+Steerable vision-language-action policies for embodied reasoning and hierarchical control.
+Cited by: §V-B,
+§V-B,
+§V-B.
+[49]
+T. Gervet et al. (2023)
+Navigating to objects in the real world.
+Cited by: §VI.
+[50]
+Octo Model Team et al. (2024)
+Octo: an open-source generalist robot policy.
+Cited by: §VI-D.
+[51]
+M. Zawalski et al. (2024)
+Robotic control via embodied chain-of-thought reasoning.
+Cited by: §A.
+[52]
+M. Ahn et al. (2022)
+Do as i can and not as i say: grounding language in robotic affordances.
+Cited by: §C.
+[53]
+G. Team (2024)
+Gemma: open models based on gemini research and technology.
+Cited by: §F.
+[54]
+X. Zhai et al. (2023)
+Sigmoid loss for language image pre-training.
+Cited by: §F.
+Appendix A Appendix
+A Atomic Discretization of Navigation Dataset
+We use Cartesian waypoint representations for our robotic navigation task, and since these labels are purely functions of the robot’s Cartesian-space trajectory, they can be computed with simple automated heuristics that discretize the trajectory into segments. Each segment is determined by chopping the trajectory at points where the change in yaw exceeds a manually selected threshold, indicating a turn has occurred and labeling it appropriately. If a significant change in yaw does not occur over a set number of steps, in this case 10, then the chunk is labeled as Go forward or Stop based on the distance traveled. This yields the atomic labels ℓt,ia\ell^{a}_{t,i}, along with lists of time steps {ti,ja}\{t^{a}_{i,j}\} indicating the start of each atomic segment (which we will use later in our method). These labels are generated independently of 𝐨t,i\mathbf{o}_{t,i}, meaning they are strongly correlated with 𝐚t,i\mathbf{a}_{t,i}.
+The Bridge manipulation dataset [47] is already decomposed into subtasks which we use as the atomic discretization of the dataset. These labels were originally produced in the Embodied Chain-of-Thought work [51].
+B Description of Criteria for Label Quality
+We use three criteria to determine the correctness of the labels generated by CAST:
+•
+Object(s)/structure(s): Are the object(s)/structure(s) referenced in the label in the scene?
+•
+Motion: Is the motion of the robot correctly described? (i.e. If the robot moved right to go toward an object, the label says “Move right to …” rather than “Move left to …”).
+•
+Grounding: If the motion and objects/structures described correctly, is their interaction described correctly (is the motion properly grounded?) (i.e. if the robot turns left away from an object, the label should be “Turn left away from <object>” rather than “Turn left toward <object>”). Note that for the counterfactual labels, this also includes if the trajectory generated would have led to collision or not.
+We ask 11 human judges to evaluate 20 hindsight and 20 counterfactual labels, resulting in a total of 440 labels, deeming a label correct if it is correct with respect to all these criteria and otherwise deem it incorrect.
+C Description of Baselines
+CoNVOI [29]: CoNVOI uses a VLM to process image observations with visual markers denoting future navigation plans. It uses a LiDAR point cloud to generate an occupancy grid, and plans a path through the environment using a combination of VLM guidance and classical planning. While our method does not use privileged observations from a LiDAR, we treat the comparison with CoNVOI as a state-of-the-art method that leverages off-the-shelf VLMs as well as classical planning.
+πa\pi_{a} + planning: This baseline uses an off-the-shelf VLM to orchestrate a low-level learned policy in a hierarchical control fashion [24, 37, 52]. This baseline is most similar to NaVILA [24], which fine-tunes a VLM to output low-level language commands that are executed by a learned policy. Our version uses a powerful base VLM [33] as the high-level policy and the same atomic policy used for CAST as the low-level policy.
+The following is the prompt used with the VLM
+VLM prompt for baseline.
+⬇
+"vlm_prompt = f’A robot is moving through an environment and has the task ’{prompt}’. Given the current observation, which action in the list {PRIMITIVES} should the robot take next? Return your response as the single action in the list of primitives with no additional information.’",
+D Description of navigation tasks
+Refer to Fig. 7 for visualizations of the tasks.
+Object navigation: The policy is instructed to go to a specific object in the environment. In each of the environments, the objects are placed on opposite sides of the robot’s starting position in front of the robot. The rollout is marked as successful if it reaches within 50 cm of the target object.
+Referential navigation: The policy is instructed to interact with an object or structure in the environment in a referential way that requires spatial understanding. For example, “move to the right of the chair.” or “move to the table next to the pillar”. The rollout is marked as successful if the policy moves in the correct way without collision or to the correct object.
+Continuous navigation: The policy is instructed to interact with an object or structure in the environment that requires a continuous behavior. For example, “move along the wall". The trial is considered successful if the policy moves the robot to within 1 m of the reference structure, for behaviors such as “move along …”, and/or continues the behavior for 2 m or more.
+(a) Object navigation tasks. The robot must move toward and reach within 50 cm of a specified object. A collision is okay if it is with the target object.
+(b) Referential navigation tasks. The robot must navigate relative to an object or structure in the environment, following instructions with directions such as “move left/right”.
+(c) Continuous navigation tasks. The robot must move along a specified structure(s) in the environment and must continue the behavior over a horizon of 2 m.
+Figure 7: Navigation tasks. CounterfactualVLA is evaluated in 3 different indoor and outdoor environments across three task types (object navigation, referential navigation, and continuous navigation). In total, CounterfactualVLA is evaluated on 27 different navigation tasks.
+E Description of manipulation tasks
+Refer to Fig. 8 for visualizations of the tasks.
+Simple manipulation: The policy is instructed to pick up a specific object. The policy must pick up and hold the object for the trial to be a success.
+Complex manipulation: The policy is instructed to pick up a specific object and put it on or in a specified vessel. For the trial to be successful, the episode must end with the object on or in the vessel.
+(a) Simple manipulation tasks. The robot must pick up and hold or reach for a specified object.
+(b) Complex manipulation tasks. The robot must pick up and place a specified object on or in a specified vessel.
+Figure 8: Manipulation tasks. CounterfactualVLA is evaluated on manipulation tasks with clutter. We show the same tasks without clutter/distractors on the left side and what the task looks like with distractors on the right. In total, we evaluate CounterfactualVLA on 6 different manipulation tasks.
+F Model Architecture and Training
+We provide a more detailed visualization of the CounterfactualVLA base VLM architecture in Fig. 9, PaliGemma [7]. PaliGemma is a 3 billion parameter model consisting of a 2B language model (Gemma [53]) and a 400M parameter SigLIP [54] vision-language model.
+Figure 9: Architecture diagram of the CounterfactualVLA, which is based on a PaliGemma VLM backbone. We introduce additional action tokens to ground the VLM in robot actions and fine-tune it with CAST data to follow language instructions in the real world.
+Figure 9 shows a schematic of our 3B parameter CounterfactualVLA model, which uses a PaliGemma VLM backbone. Our trained checkpoints are available here.
+G Detailed Experimental Results
+We conducted 645 real-world navigation trials and 120 real-world manipulation trials to evaluate the performance of CounterfactualVLA and baselines. The summarized results are available in Fig. 4(a) and Fig. 4(b). We provide the detailed experimental results for navigation (Table II) and manipulation (Table III). In the manipulation results, we additionally provide the performance of the policies on tasks without distractors, corresponding to an additional 120 trials, further demonstrating the performance delta that CAST provides for policies in cluttered environments. Additional visualizations of the policy are available on our website. Note that 6 tasks are missing for CoNVOI’s evaluation due to infrastructure challenges.
+Prompt
+Environment
+CounterfactualVLA
+Standard VLA
+πa\pi_{a} + planning
+CoNVOI
+ResNet + FiLM
+Object Navigation
+"Move to the orange chair"
+Office hallway
+3/5
+0/5
+0/5
+1/5
+2/5
+"Move to the person"
+Office hallway
+4/5
+1/5
+1/5
+4/5
+1/5
+"Move to the blue garbage bin"
+Office hallway
+4/5
+2/5
+1/5
+3/5
+3/5
+"Move to the stairs"
+Outdoors
+1/5
+0/5
+2/5
+-
+3/5
+"Move to the tree"
+Outdoors
+0/5
+1/5
+3/5
+-
+3/5
+"Move to the garbage cans"
+Outdoors
+2/5
+1/5
+0/5
+-
+3/5
+"Move to the green garbage can"
+Common area/Kitchen
+4/5
+0/5
+0/5
+4/5
+1/5
+"Move to the metal dishwasher"
+Common area/Kitchen
+3/5
+1/5
+0/5
+5/5
+0/5
+"Move to the purple cushion"
+Common area/Kitchen
+3/5
+1/5
+0/5
+3/5
+2/5
+Continuous Navigation
+"Move along the glass wall on the left"
+Office Hallway
+4/5
+0/5
+0/5
+0/5
+3/5
+"Move along the glass wall on the right"
+Office Hallway
+2/5
+0/5
+1/5
+0/5
+2/5
+"Move along the white wall"
+Office Hallway
+4/5
+0/5
+1/5
+1/5
+0/5
+"Move along the benches"
+Outdoors
+4/5
+0/5
+1/5
+-
+0/5
+"Move along the bushes"
+Outdoors
+2/5
+0/5
+2/5
+-
+1/5
+"Move along the windows"
+Outdoors
+2/5
+0/5
+1/5
+-
+1/5
+"Move between the pink couch and the tables"
+Common area/Kitchen
+2/5
+0/5
+1/5
+2/5
+1/5
+"Move between the rows of chairs"
+Common area/Kitchen
+3/5
+1/5
+1/5
+2/5
+0/5
+"Move along the windows"
+Common area/Kitchen
+4/5
+1/5
+0/5
+1/5
+0/5
+Referential Instructions
+"Move to the left of the chair"
+Office Hallway
+3/5
+1/5
+1/5
+0/5
+2/5
+"Move to the right of the chair"
+Office Hallway
+2/5
+0/5
+1/5
+0/5
+1/5
+"Move to the door on the right"
+Office Hallway
+2/5
+0/5
+1/5
+0/5
+3/5
+"Move to the left of the pole"
+Outdoors
+4/5
+0/5
+2/5
+0/5
+3/5
+"Move to the right of the pole"
+Outdoors
+2/5
+1/5
+3/5
+1/5
+2/5
+"Move to the far tree"
+Outdoors
+0/5
+1/5
+0/5
+1/5
+1/5
+"Move to the left of the pillar"
+Common area/Kitchen
+1/5
+5/5
+1/5
+4/5
+2/5
+"Move to the right of the pillar"
+Common area/Kitchen
+1/5
+5/5
+1/5
+4/5
+1/5
+"Move to the table next to the pillar"
+Common area/Kitchen
+2/5
+1/5
+1/5
+4/5
+3/5
+Table II: Detailed navigation results
+Prompt
+CounterfactualVLA
+Standard VLA
+w/o distractors
+w/ distractors
+w/o distractors
+w/ distractors
+“Pick up the mushroom”
+8/10
+5/10
+8/10
+3/10
+“Reach for the carrot”
+10/10
+9/10
+8/10
+8/10
+“Pick up the frog”
+6/10
+4/10
+3/10
+0/10
+“Put the mushroom in the pot”
+3/10
+8/10
+8/10
+0/10
+“Put the mushroom on the cloth”
+3/10
+2/10
+2/10
+0/10
+“Put the mushroom on the plate”
+5/10
+4/10
+3/10
+8/10
+Total
+35/60
+35/60
+32/60
+19/60
+Table III: Detailed manipulation results
+H VLM Relabeling
+We use state-of-the-art VLMs with commercially available APIs in various stages of our pipeline. For all the counterfactual relabeling and filtering, we use Gemini 2.5 Pro [46]. Since we do not make any assumptions on the specific capabilities of these models, our proposed method is compatible with any similar VLM and will benefit from any future improvements. We provide the exact prompts used by our method during various stages of the relabeling and filtering process.
+The exact prompts we use for labeling navigation data are provided in our repo.
+To apply CAST to the Bridge manipulation dataset [47], we do not need to perform the initial generation of language labels as the data is already labeled with task instructions. We modify the counterfactual generation step to be applied to this data with the following prompt:
+Counterfactual generation prompt for manipulation data.
+⬇
+"A robot arm is performing a task described by any of the original instructions {filtered_language}. So far, it has executed the subtasks {subtasks}. Provided is the current observation of the robot and the scene. Propose a list of new instructions, different from the original instructions that the robot could have done instead given the provided image. This may include interacting with a different object, placing an object in a different way, moving relative to a different object and so on. Each instruction should be concise (1 sentence, 5-15 words) and should be similar in style to the original instructions.",
+Experimental support, please
+view the build logs
+for errors. Generated by
+L
+A
+T
+E
+xml
+.
+Instructions for reporting errors
+We are continuing to improve HTML versions of papers, and your feedback helps enhance accessibility and mobile
+support. To report errors in the HTML that will help us improve conversion and rendering, choose any of the
+methods listed below:
+Click the "Report Issue" (
+) button, located in the page header.
+Tip: You can select the relevant text first, to include it in your report.
+Our team has already identified the following issues. We appreciate your time reviewing and reporting rendering errors we
+may not have found yet. Your efforts will help us improve the HTML versions for all readers, because disability
+should not be a barrier to accessing research. Thank you for your continued support in championing open access for
+all.
+Have a free development cycle? Help support accessibility at arXiv! Our collaborators at LaTeXML maintain a list of packages that need conversion, and welcome developer contributions.
+We gratefully acknowledge support from
+our major funders,
+member institutions, ,
+and all contributors.
+About
+·
+Help
+·
+Contact
+·
+Subscribe
+·
+Copyright
+·
+Privacy
+·
+Accessibility
+·
+Operational Status (opens in new tab)
+Major funding support from

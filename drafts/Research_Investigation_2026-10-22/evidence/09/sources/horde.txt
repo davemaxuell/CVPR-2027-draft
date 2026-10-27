@@ -1,0 +1,884 @@
+===== PDF PAGE 1 =====
+Horde: A Scalable Real-time Architecture for Learning
+Knowledge from Unsupervised Sensorimotor Interaction
+Richard S. Sutton, Joseph Modayil, Michael Delp
+Thomas Degris, Patrick M. Pilarski, Adam White
+Reinforcement Learning and Artiﬁcial Intelligence Laboratory
+Department of Computing Science, University of Alberta, Canada
+Doina Precup
+School of Computer Science, McGill University, Montreal, Canada
+ABSTRACT
+Maintaining accurate world knowledge in a complex and
+changing environment is a perennial problem for robots and
+other artiﬁcial intelligence systems.
+Our architecture for
+addressing this problem, called Horde, consists of a large
+number of independent reinforcement learning sub-agents,
+or demons. Each demon is responsible for answering a sin-
+gle predictive or goal-oriented question about the world,
+thereby contributing in a factored, modular way to the sys-
+tem’s overall knowledge. The questions are in the form of
+a value function, but each demon has its own policy, re-
+ward function, termination function, and terminal-reward
+function unrelated to those of the base problem. Learning
+proceeds in parallel by all demons simultaneously so as to
+extract the maximal training information from whatever ac-
+tions are taken by the system as a whole. Gradient-based
+temporal-diﬀerence learning methods are used to learn ef-
+ﬁciently and reliably with function approximation in this
+oﬀ-policy setting. Horde runs in constant time and memory
+per time step, and is thus suitable for learning online in real-
+time applications such as robotics. We present results using
+Horde on a multi-sensored mobile robot to successfully learn
+goal-oriented behaviors and long-term predictions from oﬀ-
+policy experience. Horde is a signiﬁcant incremental step
+towards a real-time architecture for eﬃcient learning of gen-
+eral knowledge from unsupervised sensorimotor interaction.
+Categories and Subject Descriptors
+I.2.9 [Artiﬁcial Intelligence]: Robotics
+General Terms
+Algorithms, Experimentation
+Keywords
+artiﬁcial intelligence, knowledge representation, robotics, re-
+inforcement learning, oﬀ-policy learning, real-time, temporal-
+diﬀerence learning, value function approximation
+Cite as: Horde: A scalable real-time architecture for learning knowledge
+from unsupervised sensorimotor interaction, Richard S. Sutton, Joseph Mo-
+dayil, Michael Delp, Thomas Degris, Patrick M. Pilarski, Adam White, and
+Doina Precup, Proc. of 10th Int. Conf. on Autonomous Agents
+and Multiagent Systems (AAMAS 2011), Tumer, Yolum, Sonen-
+berg and Stone (eds.), May, 2–6, 2011, Taipei, Taiwan, pp. XXX-XXX.
+Copyright c⃝2011, International Foundation for Autonomous Agents and
+Multiagent Systems (www.ifaamas.org). All rights reserved.
+1.
+THE PROBLEM OF EXPRESSIVE AND
+LEARNABLE KNOWLEDGE
+How to learn, represent, and use knowledge of the world in
+a general sense remains a key open problem in artiﬁcial intel-
+ligence (AI). There are high-level representation languages
+based on ﬁrst-order predicate logic and Bayes networks that
+are very expressive, but in these languages knowledge is dif-
+ﬁcult to learn and computationally expensive to use. There
+are also low-level languages such as diﬀerential equations
+and state-transition matrices that can be learned from data
+without supervision, but these are much less expressive.
+Knowledge that is even slightly forward looking, such as
+‘If I keep moving, I will bump into something within a few
+seconds’ cannot be expressed directly with diﬀerential equa-
+tions and may be expensive to compute from them. There
+remains room for exploring alternate formats for knowledge
+that are expressive yet learnable from unsupervised sensori-
+motor data.
+In this paper we pursue a novel approach to knowledge
+representation based on the notion of value functions and
+on other ideas and algorithms from reinforcement learning.
+In our approach, knowledge is represented as a large number
+of approximate value functions learned in parallel, each with
+its own policy, pseudo-reward function, pseudo-termination
+function, and pseudo-terminal-reward function.
+Learning
+systems using multiple approximate value functions of this
+type have previously been explored as temporal-diﬀerence
+networks with options (Sutton, Rafols & Koop 2006; Sutton,
+Precup & Singh 1999). Our architecture, called Horde, dif-
+fers from temporal-diﬀerence networks in its more straight-
+forward handling of state and function approximation (no
+predictive state representations) and in its use of more eﬃ-
+cient algorithms for oﬀ-policy learning (Maei & Sutton 2010;
+Sutton et al. 2009). The current paper also extends prior
+work in that we demonstrate real-time learning on a physi-
+cal robot.
+Previous work on the problem of representing a general
+sense of knowledge while being grounded in and learnable
+from sensorimotor data goes back at least to Cunningham
+(1972) and Becker (1973). Drescher (1991) considered a sim-
+ulated robot baby learning conditional probability tables for
+boolean events. Ring (1997) explored continual learning of a
+hierarchical representation of sequences. Cohen et al. (1997)
+explored the formation of symbolic ﬂuents from simulated
+experience. Kaelbling et al. (2001) and Pasula et al. (2007)
+
+
+===== PDF PAGE 2 =====
+explored the learning of relational rule representations in
+stochastic domains. All these systems involved learning sig-
+niﬁcant knowledge but remained far from learning from sen-
+sorimotor data.
+Previous researchers who did learn from
+sensorimotor data include Pierce and Kuipers (1997), who
+learned spatial models and control laws, Oates et al. (2000),
+who learned clusters of robot trajectories, Yu and Ballard
+(2004), who learned word meanings, and Natale (2005), who
+learned goal-directed physical actions.
+All of these works
+learned signiﬁcant knowledge but specialized on knowledge
+of a particular kind; the knowledge representation they used
+is not as general as that of multiple approximate value func-
+tions.
+2.
+VALUE FUNCTIONS AS SEMANTICS
+A distinctive, appealing feature of approximate value func-
+tions as a knowledge representation language is that they
+have an explicit semantics, a clear notion of truth grounded
+in sensorimotor interaction. A bit of knowledge expressed
+as an approximate value function is said to be true, or more
+precisely, accurate, to the extent that its numerical values
+match those of the mathematically deﬁned value function
+that it is approximating. A value function asks a question—
+what will the cumulative future reward be?—and an approx-
+imate value function provides an answer to that question.
+The approximate value function is the knowledge, and its
+match to the value function—to the actual future reward—
+deﬁnes what it means for the knowledge to be accurate. The
+idea of the present work is that the value-function approach
+to grounding semantics can be extended beyond reward to
+a theory of all world knowledge. In this section we deﬁne
+these ideas formally for the case of reward and conventional
+value functions (and thereby introduce our notation), and in
+the next section we extend them to knowledge and general
+value functions.
+In the standard reinforcement learning framework (Sutton
+& Barto 1998), the interaction between the AI agent and
+its world is divided into a sequence of discrete time steps,
+t = 1, 2, 3, . . ., each corresponding perhaps to a fraction of a
+second. The state of the world at each step, denoted St ∈S,
+is sensed by the agent, perhaps incompletely, and used to
+select an action At ∈A in response. One time step later
+the agent receives a real-valued reward Rt+1 ∈R and a
+next state St+1 ∈S, and the cycle repeats. Without loss
+of signiﬁcant generality, we can consider the rewards to be
+generated according to a deterministic reward function r :
+S →R, with Rt = r(St).
+The focus in conventional reinforcement learning is on
+learning a stochastic action-selection policy π : S×A →[0, 1]
+that gives the probability of selecting each action in each
+state, π(s, a) = P(At = a|St = s). Informally, a good pol-
+icy is one that results in the agent receiving a lot of reward
+summed over time steps. For example, in game playing the
+reward might correspond to points won or lost on each turn,
+and in a race the reward might be −1 on each time step.
+In episodic problems, the agent–world interaction consists
+of multiple ﬁnite trajectories (episodes) that can terminate
+in better or worse ways. For example, playing a game may
+generate a sequence of moves that eventually ends with a
+win, loss, or draw, with each outcome having a diﬀerent
+numerical value, perhaps +1, −1 and 0.
+A race may be
+completed successfully or end in disqualiﬁcation, two very
+diﬀerent outcomes even if the number of seconds elapsed is
+the same. Another example is optimal control, in which it is
+common to have costs for each step (e.g., related to energy
+expenditure) plus a terminal cost (e.g., relating to how far
+the ﬁnal state is from a goal state). In general, a problem
+may have both a reward function as already formulated and
+also a terminal-reward function, z : S →R, where z(s) is the
+terminal reward received if termination occurs upon arrival
+in state s.
+We turn now to formalizing the process of termination.
+In many reinforcement learning problems, particularly non-
+episodic ones, it is common to give less weight to delayed
+rewards, in particular, to discount them by a factor of γ ∈
+[0, 1) for each step of delay. One way to think about dis-
+counting is as a constant probability of termination, of 1−γ,
+together with a terminal reward that is always zero. More
+generally, we can consider there to be an arbitrary termina-
+tion function, γ : S →[0, 1], with 1 −γ(s) representing the
+probability of terminating upon arrival in state s, at which
+time a corresponding terminal reward of z(s) would be reg-
+istered. The overall return, a random variable denoted Gt
+for the trajectory starting at time t, is then the sum of the
+per-step rewards received up until termination occurs, say
+at time T, plus the ﬁnal terminal reward received in ST :
+Gt
+=
+T
+X
+k=t+1
+r(Sk)
++
+z(ST ).
+(1)
+The conventional action-value function Qπ : S × A →R is
+then deﬁned as the expected return for a trajectory start-
+ing from the given state and action and selecting actions
+according to policy π until terminating according to γ (thus
+determining the time of termination, T):
+Qπ(s, a) = E[Gt | St =s, At =a, At+1:T −1 ∼π, T ∼γ] .
+This expectation is well deﬁned given a particular state-
+transition structure for the world (say as a Markov deci-
+sion process).
+If an AI agent were to possess an approx-
+imate value function, ˆQ : S × A →R, then it could be
+assessed for accuracy according to its closeness to Qπ, for
+example, according to the expectation of its squared error,
+(Qπ(s, a) −ˆQ(s, a))2, over some distribution of state–action
+pairs. In practice it is rarely possible to measure this er-
+ror exactly, but the value function Qπ still provides a useful
+theoretical semantics and ground truth for the knowledge
+ˆQ. The value function is the exact numerical answer to the
+precise, grounded question ‘What would the return be from
+each state–action pair if policy π were followed?’, and the
+approximate value function oﬀers an approximate numerical
+answer. In this precise sense the value function provides a
+semantics for the knowledge represented by the AI agent’s
+approximate value function.
+Finally, we note that the value function for a policy is of-
+ten estimated solely for the purpose of improving the policy.
+Given a policy π and its value function Qπ, we can con-
+struct a new deterministic greedy policy π′ = greedy(Qπ)
+such that π′(s, arg maxa Qπ(s, a)) = 1, and the new pol-
+icy is guaranteed to be an improvement in the sense that
+Qπ′(s, a) ≥Qπ(s, a) for all s ∈S and a ∈A, with equality
+only if both policies are optimal. Through successive steps of
+estimation and improvement, a policy that optimizes the ex-
+pected return can be found. In this way the theory of value
+functions provides a semantics for goal-oriented knowledge
+(control) as well as for predictive knowledge.
+
+
+===== PDF PAGE 3 =====
+3.
+FROM VALUES TO KNOWLEDGE
+(GENERAL VALUE FUNCTIONS)
+Having made clear how a conventional value function pro-
+vides a grounded semantics for knowledge about upcoming
+reward, in this section we show how general value functions
+(GVFs) provide a grounded semantics for a more general
+kind of world knowledge. Using the ideas and notation de-
+veloped in the previous section, this is almost immediate.
+First note that although the action-value function Qπ is
+conventionally superscripted only by the policy, it is equally
+dependent on the reward and terminal-reward functions, r
+and z. These functions could equally well have been consid-
+ered inputs to the value function in the same way that π is.
+That is, we might have deﬁned a more general value func-
+tion, which might be denoted Qπ,r,z, that would use returns
+(1) deﬁned with arbitrary functions r and z acting as pseudo-
+reward function and pseudo-terminal-reward function. For
+example, suppose we are playing a game, for which the base
+terminal rewards are z = +1 for winning and z = −1 for los-
+ing (with a per-step reward of r = 0). In addition to this, we
+might pose an independent question about how many more
+moves the game will last.
+This could be posed as a gen-
+eral value function with pseudo-reward function r = 1 and
+pseudo-terminal-reward function z = 0. Later in this paper
+we consider several more examples from a robot domain.
+The second step from value functions to GVFs is to con-
+vert the termination function γ to a pseudo form as well.
+This is slightly more substantive because, unlike the rewards
+and terminal rewards, which do not pertain to the state evo-
+lution in any way, termination conventionally refers to an
+interruption in the normal ﬂow of state transitions and a
+reset to a starting state or starting-state distribution. For
+pseudo termination we simply omit this additional implica-
+tion of conventional termination.
+The real, base problem
+may still have real terminations or it may have no termina-
+tions at all. Yet we may consider pseudo terminations to
+have occurred at any time. For example, in a race, we can
+consider a pseudo-termination function that terminates at
+the half way point. This is a perfectly well deﬁned problem
+with a value function in the general sense.
+Or, if we are
+the racer’s spouse, then we may not care about when the
+race ends but rather about when the racer comes home for
+dinner, and that may be our pseudo termination. For the
+same world—the same actions and state transitions—there
+are many predictive questions that can be deﬁned in the
+form of general value functions.
+Formally, we deﬁne a general value function, or GVF, as
+a function q : S × A →R with four auxiliary functional
+inputs π, γ, r, and z, deﬁned over the same domains and
+ranges as speciﬁed earlier, but now taken to be arbitrary
+and with no necessary relationship to the base problem’s
+reward, terminal-reward, and termination functions:
+q(s, a; π, γ, r, z) = E[Gt | St =s, At =a, At+1:T −1 ∼π, T ∼γ] ,
+where Gt is still deﬁned by (1) but now with respect to the
+given functions. The four functions, π, γ, r, and z, are re-
+ferred to collectively as the GVF’s question functions; they
+deﬁne the question or semantics of the GVF. Note that con-
+ventional value functions remain a special case of GVFs.
+Thus, we can consider all value functions to be GVFs. In
+the rest of the paper, for simplicity, we sometimes use the
+expression “value function” to mean the general case, using
+“conventional value function” when needed to disambiguate.
+We also drop the ‘pseudo-’ preﬁx from the question func-
+tions when it can be done without ambiguity. In the robot
+experiments that we present later there are no privileged
+base problems, so there should be no confusion.
+4.
+THE HORDE ARCHITECTURE
+The Horde architecture consists of an overall agent com-
+posed of many sub-agents, called demons. Each demon is
+a independent reinforcement-learning agent responsible for
+learning one small piece of knowledge about the base agent’s
+interaction with its environment. Each demon learns an ap-
+proximation, ˆq, to the GVF, q, that corresponds to the de-
+mon’s setting of the four question functions, π, γ, r, and z.
+We turn now to describing Horde’s mechanisms for ap-
+proximating GVFs with a ﬁnite number of weights, and for
+learning those weights. In this paper we adopt the standard
+linear approach to function approximation. We assume that
+the world’s state and action at each time step, St and At, are
+translated, presumably incompletely via sensory readings,
+into a ﬁxed-size feature vector φt = φ(St, At) ∈Rn where
+n ≪|S|. We refer to the set of all features, for all state–
+action pairs, as Φ. In our experiments, the feature vector is
+constructed via tile coding and thus is binary, φt ∈{0, 1}n,
+with a constant number of 1 features (see Sutton & Barto
+1998). We also focus on the case where |S| is large, possibly
+inﬁnite, but |A| is ﬁnite and relatively small, as is common
+in reinforcement learning problems. These are convenient
+special cases, but none of them is essential to our approach.
+Our approximate GVFs, denoted ˆq : S × A × Rn →R, are
+linear in the feature vector:
+ˆq(s, a, θ) = θ⊤φ(s, a),
+where θ ∈Rn is the vector of weights to be learned, and
+v⊤w = P
+i viwi denotes the inner product of two vectors v
+and w.
+For learning the weights we use recently developed gradient-
+descent temporal-diﬀerence algorithms (Sutton et al. 2009,
+2008; Maei et al. 2009, 2010). These algorithms are unique
+in their ability to learn stably and eﬃciently with function
+approximation from oﬀ-policy experience. Oﬀ-policy expe-
+rience means experience generated by a policy, called the be-
+havior policy, that is diﬀerent from that being learned about,
+called the target policy. To learn knowledge eﬃciently from
+unsupervised interaction one seems inherently to face such a
+situation because one wants to learn in parallel about many
+policies—the diﬀerent target policies π of each GVF—but
+of course one can only be behaving according to one policy
+at a time.
+For a typical GVF, the actions taken by the behavior
+policy will match its target policy only on occasion, and
+rarely for more than a few steps in a row.
+For eﬃcient
+learning, we need to be able to learn from these snippets
+of relevant experience, and this requires oﬀ-policy learning.
+The alternative—on-policy learning—would require learn-
+ing only from snippets that are complete in that the ac-
+tions match those of the GVF’s target policy all the way
+to pseudo-termination, a much less common occurrence. If
+learning can be done oﬀ-policy from incomplete snippets of
+experience then it can be massively parallel and potentially
+much faster than on-policy learning.
+Only in the last few years have oﬀ-policy learning algo-
+rithms become available that work reliably with function ap-
+
+
+===== PDF PAGE 4 =====
+proximation and that scale appropriately for real-time learn-
+ing and prediction (Sutton et al. 2008, 2009). Speciﬁcally,
+in this work we use the GQ(λ) algorithm (Maei & Sutton
+2010). This algorithm maintains, for each GVF, a second
+set of weights w ∈Rn in addition to θ and an eligibility-
+trace vector e ∈Rn.
+All three vectors are initialized to
+zero. Then, on each step, GQ(λ) computes two temporary
+quantities, ¯φt ∈Rn and δt ∈R:
+¯φt =
+X
+a
+π(St+1, a)φ(St+1, a),
+δt = r(St+1)+(1−γ(St+1))z(St+1)+γ(St+1)θ⊤¯φt−θ⊤φ(St, At),
+and updates the three vectors:
+θt+1 = θt + αθ
+
+δtet −γ(St+1)(1 −λ(St+1))(w⊤
+t et)¯φt
+
+,
+wt+1 = wt + αw
+
+δtet −(w⊤
+t φ(St, At))φ(St, At)
+
+,
+et = φ(St, At) + γ(St)λ(St)π(St, At)
+b(St, At) et−1,
+where b : S × A →[0, 1] is the behavior policy and λ :
+S →[0, 1] in an eligibility-trace function which determines
+the rate of decay of the eligibility traces as in the TD(λ)
+algorithm (Sutton 1988). Note that the per-time-step com-
+putation of this algorithm scales linearly with the number of
+features, n. Moreover, if the features are binary, then with a
+little care the per-time-step complexity can be kept a small
+multiple of the number of 1 features.
+The approximation that will be found asymptotically by
+the GQ(λ) algorithm depends on the feature vectors Φ, the
+behavior policy b, and the eligibility-trace function λ. These
+three are collectively referred to as the answer functions. In
+this paper’s experiments we always used constant λ, and all
+demons shared the same Φ and b.
+Finally, we note that
+Maei and Sutton deﬁned a termination function, β, that is
+of the opposite sense as our γ; that is, β(s) = 1 −γ(s).
+This is purely a notational diﬀerence and does not aﬀect the
+algorithm in any way.
+We can think of the demons as being of two kinds.
+A
+demon with a given target policy, π, is called a predic-
+tion demon, whereas a demon whose target policy is the
+greedy policy with respect to its own approximate GVF
+(i.e., π = greedy(ˆq), or π(s, arg maxa ˆq(s, a, θ)) = 1) is called
+a control demon. Control demons can learn and represent
+how to achieve goals, whereas the knowledge in prediction
+demons is better thought of as declarative facts. One way
+in which the demons are not completely independent is that
+a prediction demon can reference the target policy of a con-
+trol demon. For example, in this way one could ask ques-
+tions such as ‘If I follow this wall as long as I can, will my
+light sensor then have a high reading?’. Demons can also
+use each others’ answers in their questions (as in temporal-
+diﬀerence networks).
+This allows one demon to learn a
+concept such as ‘near an obstacle,’ say as the probabil-
+ity of a high bump-sensor reading within a few seconds of
+random actions, and then a second demon to learn some-
+thing based on this, such as ‘If I follow this wall to its
+end, will I then be near an obstacle?’
+by using the ﬁrst
+demon’s approximate GVF in its terminal-reward function
+(e.g., z(s) = maxa ˆq(s, a, θﬁrst demon)).
+Figure 1. The Critterbot robotic platform.
+5.
+RESULTS WITH HORDE
+ON THE CRITTERBOT
+To evaluate the eﬀectiveness of the Horde architecture, we
+deployed it on the Critterbot, a custom-built mobile robot
+(Figure 1). The Critterbot has a comma-shaped frame with
+a ‘tail’ that facilitates object interaction and is driven by
+three omni-directional wheels separated by 120 degrees. A
+diverse set of sensors are deployed on the top of the robot,
+including sensors for ambient light, heat, infrared light, mag-
+netic ﬁelds, and sound. Another batch of sensors captures
+proprioceptive information including battery voltages, ac-
+celeration, rotational velocity, motor velocities, motor cur-
+rents, motor temperatures, and motor voltages. The robot
+can detect nearby obstacles with ten infrared proximity sen-
+sors distributed along its sides and tail. The robot has been
+designed to withstand the rigors of reinforcement learning
+experiments; it can drive into walls for hours without dam-
+age or burning out its motors, it can dock autonomously
+with its charging station, and it can run continuously for
+twelve hours without recharging.
+The Critterbot’s sensors provide useful information about
+its interaction with the world, but this information can be
+challenging to model explicitly.
+For example, the sensor
+readings from the magnetometer may be inﬂuenced by the
+operation of data servers in the next room, and the ambient
+light sensors are aﬀected by natural daylight, indoor ﬂores-
+cent lights, shadows from looming humans, and reﬂections
+from walls. Manually modeling these interactions is diﬃcult
+and potentially futile. The Horde architecture presents an
+alternative wherein each demon autonomously learns a little
+bit about the relationships among the sensors and actuators
+from unsupervised experience.
+We performed a series of experiments to examine how well
+the architecture supports learning. In each experiment, the
+observations and actions were tiled to form a state–action
+feature representation Φ. A discrete set of actions were se-
+lected, matching the formulation of the GQ(λ) algorithm.
+With these choices, the entire architecture operates in con-
+stant time per step. We have run the Horde architecture in
+real-time with thousands of demons using billions of binary
+features of which a few thousand were active at a time, using
+laptop computers.
+
+
+===== PDF PAGE 5 =====
+Figure 2.
+Accurately predicting time-to-obstacle.
+The robot was repeatedly driven toward a wall at a con-
+stant wheel speed. For each of three regions of the sensor
+space, for each time step spent in that region , we plot the
+demon prediction ˆq on that step (bold line) and the actual
+return from that step (thin line).
+5.1
+Subjective prediction experiments
+Our ﬁrst two experiments dealt with Horde’s ability to
+answer subjectively posed predictive questions.
+Figures 2
+and 3 show results on the Critterbot with instances of the
+Horde architecture each with a single prediction demon. The
+speciﬁc questions posed are ones that might be useful in en-
+suring safety: ‘How much time do I have before hitting an
+obstacle?’
+and ‘How much time do I need to stop?’.
+In
+both cases accurate predictions were made, and in the lat-
+ter case they were adapted so as to remain accurate as the
+experiment was changed from stopping on carpet, to stop-
+ping when suspended in the air, to stopping on a wood ﬂoor.
+The time step used in these experiment was approximately
+30ms in length.
+Figure 2 shows a comparison between predicted and ob-
+served time steps needed to reach obstacles when driving
+forward. Shown are the demon predictions ˆq on each step
+(bold line) for each time step spent in a region of the sensor
+space (a visit), and the actual return from that step (thin
+line). The prediction was learned from a behaviour policy
+that cycled between three actions: driving forward, reverse,
+and resting. This is plotted for each of three regions of the
+sensor space: IR=190–199, IR=210–219, and IR=230–239.
+These represent three diﬀerent value ranges of the Critter-
+bot’s front IR proximity sensor.
+The question functions for this demon were: π(s, forward)
+= 1, r(s) = 1, z(s) = 0, ∀s ∈S, and γ(s) = 0 if the value
+of the Critterbot’s front-pointing IR proximity sensor was
+over a ﬁxed threshold, else γ(s) = 1. The remaining answer
+Figure 3.
+Accurately tracking time-to-stop.
+The
+robot was repeatedly rotated up to a standard wheel speed,
+then switched to a policy that always took the stop action,
+on three diﬀerent ﬂoor surfaces. Shown is the prediction ˆq
+made on visits to a region of high velocity while stopping
+(bold line) together with the actual return from that visit
+(thin line). The ﬂoor surface was changed after visits 338
+and 534.
+functions were λ(s) = 0.4, ∀s ∈S, and Φ = a single tiling
+into twenty-six regions of the front IR sensor. The GQ(λ)
+step sizes were αθ = 0.3 and αw = 0.00001. As shown in
+Figure 2, this demon learned to accurately predict the return
+(time steps to impact) for each range of its sensors.
+Figure 3 demonstrates a demon’s ability to accurately pre-
+dict stopping times on diﬀerent surfaces. Shown is the pre-
+diction ˆq made on visits to a region of high velocity while
+stopping (bold line) together with the actual return from
+that visit (thin line). For this predictive question, we de-
+ﬁned a single demon that predicts the number of timesteps
+until one of the robot’s wheels approaches zero velocity (i.e.,
+comes to a complete stop) under current environmental con-
+ditions. The robot’s behaviour policy was to alternate at
+ﬁxed intervals between spinning at full speed and resting.
+The ﬂoor surface, and thus the nature of the stopping prob-
+lem, was changed after visits 338 and 534.
+The question functions for this demon were: π(s, stop) =
+1, r(s) = 1, z(s) = 0, ∀s ∈S, and γ(s) = 0 if the wheel’s
+velocity sensor was below a ﬁxed threshold, else γ(s) = 1.
+The remaining answer functions were λ(s) = 0.1, ∀s ∈S,
+and Φ = a single tiling into eight regions of the wheel’s
+velocity sensor. The GQ(λ) step sizes were αθ = 0.1 and
+αw = 0.001. As illustrated in Figure 3, this demon learned
+to correctly predict the return (time steps to stopping) on
+carpet, then adapted its prediction when the environment
+changed to air and then to wood ﬂooring.
+
+
+===== PDF PAGE 6 =====
+Figure 4. Illustration of policies learned by four control demons in the spinning experiment. The ﬁrst panel
+shows the standard starting position, and the other four panels show the motions from that position produced when control
+was given to one of the eight learned demon policies each tasked to maximize a diﬀerent sensor. By maximized sensor: IR9)
+Robot quickly rotates clockwise and stops in the position that maximizes the IR proximity sensor on the side of the robot’s
+tail; IRO) Robot quickly rotates counterclockwise, overshoots a bit, then settles in a position that maximizes the proximity
+sensor between the robot’s ‘eyes’; MAGX) Robot rotates clockwise and stops at a position that maximizes the magnetic x-axis
+sensor; VEL) Robot spins continuously, maximizing the wheel velocity sensor.
+5.2
+Off-policy learning of multiple
+spinning control policies
+Our third experiment examined whether control demons
+can learn policies in parallel while following a random be-
+havior policy, in other words, whether the demons can learn
+oﬀ-policy, a crucial ability for the scalability of the architec-
+ture. The action set in this experiment was {rotate-right,
+rotate-left, stop}. The behavior policy was to randomly
+select one of the three actions, with a bias (50% probability)
+toward repeating the action taken on the previous time step.
+The result of this behavior policy was that the robot would
+spin in place in both directions with a variety of speeds and
+durations over time. The state space was represented with
+four overlapping joint tilings across three sensors: the mag-
+netometer, one of the IR sensors, and the velocity of one
+of the wheels. Each sensor was divided into eight regions
+for the tilings, resulting in a total of 3 × 4 × 83 = 6144
+binary features. One additional feature was provided as a
+bias unit (always =1), and three additional binary features
+were used to encode the previous action. The time step cor-
+responded to approximately 100ms. The other parameters
+were αθ = 0.1, αw = 0.001, and λ(s) = 0.4, ∀s ∈S. Learn-
+ing was done online, but the data was also saved so that the
+whole learning process could be repeated without using the
+robot if desired (this is one of the advantages of an oﬀ-policy
+learning ability).
+In this experiment we ran eight control demons in par-
+allel for 100,000 time steps of oﬀ-policy learning with ac-
+tions selected according to the behavior policy. Each demon
+was tasked with learning how to maximize a diﬀerent sensor
+value. That is, their question functions were π = greedy(ˆq)
+and, for all s ∈S, γ(s) = 0.98, z(s) = 0, and r(s) = the
+value of one of eight sensors approximately normalized to a
+0 to 1 range. The eight sensors used as rewards were four
+of the IR proximity sensors, the magnetometer, the veloc-
+ity sensor for one of the wheels, one of the thermal sensors,
+and an IR beacon sensor for the charging station. To ob-
+jectively measure the quality of the policies learned by the
+eight demons, we occasionally interrupted learning to eval-
+uate them on-policy. That is, with learning turned oﬀ, the
+robot followed one of the eight learned demon policies for
+250 time steps and we measured the demon’s return. We
+0  
+10
+50
+100
+0.2
+0.4
+0.6
+0.8
+1
+Average Reward per Time Step
+Time Steps (thousands)
+Vel
+MagX
+IR0
+IR2
+IR7
+IR9
+Beacon
+Temp
+ 
+ 
+Figure 5. Learning curves for eight control demons learn-
+ing oﬀ-policy in the spinning experiment. From extensive
+experience spinning, eight control demons learned diﬀerent poli-
+cies each maximizing a diﬀerent sensor.
+The graph shows the
+performance of the policies, gathered in special on-policy evalu-
+ation sessions during which learning was turned oﬀ. All demons
+learned to perform near optimally. Rewards were scaled to the
+range [0, 1], but because the beacon light ﬂashes on and oﬀ, its
+maximal average was 0.5.
+repeated this for each demon ten times from each of three
+initial starting positions (angles) to produce 30 measures of
+the eﬀectiveness of each demon’s policy at that point in the
+training. These numbers were averaged together to produce
+the learning curves shown in Figure 5.
+Examples of the ﬁnal learned behavior from four of the
+demons are shown in Figure 4. These photos show typical
+behavior, which in the case of all eight demons appeared to
+successfully maximize the targeted sensor. In separate runs
+we found that it would take approximately 25,000 steps each
+to learn similarly competent control policies for a single de-
+mon while behaving according to its policy as it was learned
+(on-policy training). In only four times longer, we learned
+eight demons in parallel, and could potentially have learned
+thousands or millions more using oﬀ-policy learning.
+
+
+===== PDF PAGE 7 =====
+0
+1
+2
+3
+4
+5
+6
+7
+8
+Time (Minutes)
+0
+200
+400
+600
+800
+1000
+Front Light Sensor (Light0)
+Target Policy
+Behavior Policy
+Figure 6. Learning light-seeking behavior from random behavior. Shown are superimposed images of robot positions:
+Left) In testing, the robot under control of the demon policy turns and drives straight to the light source at the bottom of
+the image; Middle) Under control of the random behavior policy for the same amount of time, the robot instead wanders all
+over the pen; Right) Light sensor readings averaged over seven such pairs of runs, showing much higher values for the learned
+target policy.
+5.3
+Off-policy learning of light-seeking
+A ﬁnal experiment examined whether a control demon
+could learn a goal-directed policy when given a much greater
+breadth of experience. In particular, we chose question func-
+tions corresponding to the goal of maximizing the near-term
+value of one of the light sensors: π = greedy(ˆq), γ(s) = 0.9,
+z(s) = 0, r(s) = a scaled reading from the front light sen-
+sor. The behavior policy was to pick randomly from the set
+{+10, −10, 0}3 interpreted as velocities for the robot’s three
+wheels, for a total of 27 possible actions. The state space
+was represented with 32 individual tilings over each of the
+four directional light sensors, where each tile covered about
+1/8th of the range. With the addition of a bias unit, this
+made for a total of 27 × (32 × 4 × 8 + 1) = 27, 675 binary
+features, of which 32 × 4 + 1 = 129 were active on each time
+step. The time step corresponded to approximately 500ms.
+Using the random behavior policy, we collected a training
+set of 61,200 time steps (approximately 8.5 hours) with a
+bright light at nearly ﬂoor level on one side of the pen. Dur-
+ing this time the robot wandered all over the pen in many
+orientations. We trained the control demon oﬀ-line and oﬀ-
+policy in two passes over the training set. To assess what
+had been learned, we then placed the robot in the middle of
+the pen facing away from the light and gave control to the
+demon’s learned policy. The robot would typically turn im-
+mediately and drive toward the light, as shown in the ﬁrst
+panel of Figure 6.
+This result demonstrates that demons
+can learn eﬀective goal-directed behavior from substantially
+diﬀerent training behavior.
+Together, our results show that the Horde architecture can
+be applied to robot systems to learn potentially useful bits of
+knowledge in real-time from unsupervised experience. The
+approach works across a range of feature representations,
+parameters, questions, and goals. The robot is able to learn
+bits of knowledge that could serve as useful components for
+solving more complex tasks.
+6.
+CONCLUSION
+The Horde architecture is an experiment in knowledge rep-
+resentation and learning built upon ideas and algorithms
+from reinforcement learning.
+The approach is to express
+knowledge in the form of generalized value functions (GVFs)
+and thereby ground its semantics in sensorimotor data. This
+approach is promising because 1) value functions make it
+possible to capture temporally extended predictive and goal-
+oriented knowledge, 2) a large amount of important knowl-
+edge is of this form, 3) conventional knowledge representa-
+tions of the grounded type (such as diﬀerential equations)
+have diﬃculty representing knowledge of this form, and 4)
+conventional methods that can capture this kind of knowl-
+edge (high-level, symbolic methods such as rules, operators,
+and production systems) are not as grounded and therefore
+not as learnable as value functions. Although value func-
+tions have always been potentially learnable, only recently
+have scalable learning methods become available that make
+it practical to explore the idea of GVFs with oﬀ-policy learn-
+ing and function approximation. This work presents a ﬁrst
+look at the application and interpretation of GVFs in an
+architecture with parallel oﬀ-policy learners.
+In this paper we have focused on representing and learn-
+ing knowledge as GVFs, and as such we have made only
+suggestive comments about how such knowledge could be
+used. Although this is an important limitation of our work,
+we believe that it is an appropriate way to break down the
+problem.
+The issues in learning and representation with
+GVFs that we address here are non-trivial and have not been
+adequately addressed before—certainly not in an embodied,
+robotic form. In addition, reinforcement-learning ideas such
+as value functions are already closely connected to known
+action-selection and planning methods; it is not a great leap
+to imagine several ways in which GVFs could be used to gen-
+erate and improve behavior. We have brieﬂy demonstrated
+some of these, such as passing control to the learned pol-
+icy of single demons (e.g., the sensor-maximization demons
+in Section 5.2 and the light-seeking demon in Section 5.3),
+and indicated how several demons could be combined to
+
+
+===== PDF PAGE 8 =====
+modulate an existing policy (e.g., varying behavior based
+on impact and stopping time predictions as suggested by
+Section 5.1).
+A rich and varied collection of demons and
+questions, as made possible by the Horde architecture, al-
+lows for a broad set of fusions of this kind. We have not
+developed here the natural possibility of using GVFs to rep-
+resent multi-scale policy-contingent models of the world’s
+dynamics (option models; Sutton, Precup & Singh 1999),
+and then using the models for planning as in dynamic pro-
+gramming, Monte Carlo tree search (see Chaslot 2010), or
+Dyna architectures (Sutton 1990). This is another natural
+direction for future work.
+Acknowledgments
+The authors are grateful to Anna Koop, Mark Ring, Hamid
+Maei, and Chris Rayner for insights into the ideas presented
+in this paper. We also thank Michael Sokolsky and Marc
+Bellemare for assistance with the design, creation, and main-
+tenance of the Critterbot. This research was supported by
+iCORE and Alberta Ingenuity, both part of Alberta Inno-
+vates – Technology Futures, by the Natural Sciences and
+Engineering Research Council of Canada, and by MITACS.
+References
+Becker, J. D. (1973). A model for the encoding of experi-
+ential information. In Computer Models of Thought and
+Language, Schank, R. C., Colby, K. M., Eds. W. H. Free-
+man and Company.
+Chaslot, G. M. J-B. (2010). Monte-Carlo tree search. PhD
+thesis, Dutch Research School for Information and Knowl-
+edge Systems.
+Cohen, P. R., Atkin, M. S., Oates, T., Beal, C. R. (1997).
+Neo: Learning conceptual knowledge by sensorimotor
+interaction with an environment. In Agents ’97, Marina
+del Rey, CA. ACM.
+Cunningham, M. (1972). Intelligence: Its Organization and
+Development. Academic Press.
+Drescher, G. L. (1991). Made-Up Minds: A Constructivist
+Approach to Artiﬁcial Intelligence. MIT Press, Cam-
+bridge, MA.
+Kaelbling, L. P., Oates, T., Hernandez, N., Finney, S. (2001).
+Learning in worlds with objects. Working Notes of the
+AAAI Stanford Spring Symposium on Learning Grounded
+Representations.
+Maei, H. R., Sutton, R. S. (2010). GQ(λ): A general gradi-
+ent algorithm for temporal-diﬀerence prediction learn-
+ing with eligibility traces. In Proceedings of the Third
+Conference on Artiﬁcial General Intelligence, Lugano,
+Switzerland.
+Maei, H. R., Szepesv´ari, Cs., Bhatnagar, S., Precup, D.,
+Silver, D., Sutton, R. S. (2009). Convergent temporal-
+diﬀerence learning with arbitrary smooth function ap-
+proximation. In Advances in Neural Information Pro-
+cessing Systems 22, Vancouver, BC. MIT Press.
+Maei, H. R., Szepesv´ari, Cs., Bhatnagar, S., Sutton, R. S.
+(2010). Toward oﬀ-policy learning control with function
+approximation. In Proceedings of the 27th International
+Conference on Machine Learning, Haifa, Israel.
+Natale, L. (2005).
+Linking action to perception in a hu-
+manoid robot: A developmental approach to grasping.
+MIT PhD thesis.
+Oates, T., Schmill, M. D., Cohen, P. R. (2000). A method
+for clustering the experiences of a mobile robot that ac-
+cords with human judgments. Proceedings AAAI, 846–
+851, AAAI/MIT Press.
+Pasula, H., Zettlemoyer, L., Kaelbling L. (2007). Learning
+symbolic models of stochastic domains. Journal of Ar-
+tiﬁcial Intelligence Research 29:309–352.
+Pierce, D. M., Kuipers, B. J. (1997). Map learning with un-
+interpreted sensors and eﬀectors. Artiﬁcial Intelligence
+92:169–227.
+Ring, M. B. (1997). CHILD: A ﬁrst step toward continual
+learning. Machine Learning 28:77–104.
+Sutton, R. S. (1988). Learning to predict by the method of
+temporal diﬀerences. Machine Learning 3:9–44.
+Sutton, R. S. (1990).
+Integrated architectures for learn-
+ing, planning, and reacting based on approximating dy-
+namic programming. In Proceedings of the Seventh In-
+ternational Conference on Machine Learning, pp. 216–
+224. Morgan Kaufmann, San Mateo, CA.
+Sutton, R. S., Barto, A. G. (1998). Reinforcement Learning:
+An Introduction. MIT Press.
+Sutton, R. S., Maei, H. R., Precup, D., Bhatnagar, S., Sil-
+ver, D., Szepesvari, Cs., Wiewiora, E. (2009).
+Fast
+gradient-descent methods for temporal-diﬀerence learn-
+ing with linear function approximation. In Proceedings
+of the 26th International Conference on Machine Learn-
+ing, Montreal, Canada.
+Sutton, R. S., Precup D., Singh, S. (1999). Between MDPs
+and semi-MDPs: A framework for temporal abstrac-
+tion in reinforcement learning.
+Artiﬁcial Intelligence
+112:181–211.
+Sutton, R. S., Rafols, E. J., Koop, A. (2006).
+Temporal
+abstraction in temporal-diﬀerence networks. Advances
+in Neural Information Processing Systems 18.
+Sutton, R. S., Szepesv´ari, Cs., Maei, H. R. (2008). A conver-
+gent O(n) algorithm for oﬀ-policy temporal-diﬀerence
+learning with linear function approximation. Advances
+in Neural Information Processing Systems 21.
+Yu, C., Ballard, D. (2004). A multimodal learning interface
+for grounding spoken language in sensory perceptions.
+ACM Transactions on Applied Perception 1:57–80.

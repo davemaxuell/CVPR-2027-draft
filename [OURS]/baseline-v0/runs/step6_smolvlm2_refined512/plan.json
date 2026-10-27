@@ -1,0 +1,55 @@
+{
+  "step": 6,
+  "scope": "Initial full four-action scorer-label dataset for the selected SmolVLM2 policy",
+  "created_utc": "2026-10-26T02:41:31.380849+00:00",
+  "roots_B": 1024,
+  "roots_C": 256,
+  "total_roots": 1280,
+  "total_branches": 5120,
+  "roots_per_dataset_source_stratum": {
+    "B": 256,
+    "C": 64
+  },
+  "minimum_distinct_episodes": {
+    "B": 128,
+    "C": 32
+  },
+  "max_roots_per_carrier": 8,
+  "workers": 4,
+  "physical_gpu": 0,
+  "seed": 6,
+  "protocol_sha256": "f64398888e51f348db834ed21f1058b7f99eee2af8624d8c13bc975e5c639687",
+  "policy_identity_sha256": "729480bf5c8402b07cad653a7ef0f7124be212d50255077290316ba686777ca7",
+  "decoder": {
+    "family": "add STOP-only bias then argmax over four first-token action logits",
+    "stop_logit_bias": -0.25,
+    "action_order": [
+      "STOP",
+      "FORWARD",
+      "LEFT",
+      "RIGHT"
+    ],
+    "batch_size": 1,
+    "actions_per_forward": 1,
+    "tie_break": "first action in declared order"
+  },
+  "pilot_verification_sha256": "4d768591062f4b20f828fdee347fbbbaaf9e05e072c3c12b574f7acbc556033b",
+  "pilot_roots_reused": 64,
+  "pilot_collection_seconds": 2197.216656446457,
+  "pilot_actions": 40343,
+  "pilot_mean_best_candidate_gain": 0.23179398275144805,
+  "pilot_base_successful_branches": 27,
+  "pilot_best_utility_successful_branches": 41,
+  "budget_rationale": "Sixteen times the debug fitting-root count, at least 128 distinct group-B episodes, four balanced dataset/source strata and a separate 256-root group-C development set. Queues span every allowed scene; root count is fixed before full outcomes. This is an initial experimental scorer dataset, not a data-sufficiency or final-benchmark claim.",
+  "runtime_estimate": "About 12 hours from the 64-root pilot; varies with STOP frequency, route length and worker imbalance",
+  "runtime_environment_sha256": "d169881140b24de03d006c704717cad1a7a98af05a99f26f54a7eaf637fc841c",
+  "orchestration_source_sha256": {
+    "tools/run_step6_full.py": "d3f9b3057085a7122232460df439042bef4e22a4fb817be29c98ab4d0f1abdaa",
+    "tools/run_step6_stage.py": "6f934c7c6b55b0c44890ffa24e919a93fae6f1787cc9ab2ee4ab457f37ef17c8",
+    "tools/verify_step6.py": "3b8859fc204d9a99a5301374f77570a6062da1a5c67fb44793e8c401ae5c8f26",
+    "tools/finalize_step6.py": "01f711fb301a5f281501fcbea76b9441c9e6474ba395479c6059e7c4254d7b5a"
+  },
+  "pilot_audit_revision": "pilot/audit_revision.json",
+  "model_training_in_this_step": false,
+  "continuation_source": "Actual first candidate followed only by the frozen selected policy; no world-model/scorer/expert continuation"
+}

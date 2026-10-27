@@ -1,0 +1,63 @@
+{
+  "run_dir": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/step3b_smolvlm2_stop/train",
+  "train_views": [
+    "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/step3b_smolvlm2_stop/data/expert_A",
+    "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/step3b_smolvlm2_stop/data/round2_A"
+  ],
+  "val_view": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/step3b_smolvlm2_stop/data/expert_C",
+  "init_run": "runs/step3_smolvlm2/train",
+  "init_adapter": "runs/step3_smolvlm2/train/checkpoints/step_001024",
+  "max_steps": 2048,
+  "workers": 24,
+  "val_workers": 16,
+  "eval_initial": true,
+  "seed": 3,
+  "batch_size": 16,
+  "grad_accum": 4,
+  "learning_rate": 2e-05,
+  "warmup_fraction": 0.03,
+  "clip": 1.0,
+  "optimizer": "fresh AdamW; weight_decay=0",
+  "parent_adapter_sha256": "bb258ed12f62721d0eb2176174c4902400c2c47c77a6a4ca0902984957e77efb",
+  "source_sha256": {
+    "tools/train_policy_stop.py": "1e8b7a52e1d857c20642026d9f87f03fabcb4e5fc80e35a3590d8c0769e6ce83",
+    "policy/stop_data.py": "2023db8f137ed00b3d992ccb7d80312b9ea66032b4462e3be9931505a91f95ee",
+    "policy/smolvlm2.py": "2dc097c0f3bd09eacd94cb5a438e15635a62b1a9215a0c66f7c2655b437c1a96",
+    "policy/common.py": "fa30de03d782dae761b2444a2d1dcdb853dd756d25cd76cee84ce6b69c5b474e",
+    "tools/train_policy_sft.py": "eebf8ff1a78d8462d962d8382f3da26aa6abe00d59c00168e83ca0705d3d2043",
+    "tools/train_policy_dagger.py": "1f299ea2203c6418ae50e51159842fec2d411fea261b0a42dec2cee3383d3b97"
+  },
+  "sampling_categories": [
+    [
+      "expert",
+      "stop",
+      5
+    ],
+    [
+      "policy",
+      "stop",
+      1
+    ],
+    [
+      "expert",
+      "hard",
+      5
+    ],
+    [
+      "policy",
+      "hard",
+      5
+    ],
+    [
+      "expert",
+      "navigation",
+      32
+    ],
+    [
+      "policy",
+      "navigation",
+      16
+    ]
+  ],
+  "validation": "fixed balanced diagnostic; not natural accuracy"
+}

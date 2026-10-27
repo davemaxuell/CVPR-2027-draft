@@ -1,0 +1,139 @@
+{
+  "format": "scorer_branch_protocol_v1",
+  "policy_identity_sha256": "729480bf5c8402b07cad653a7ef0f7124be212d50255077290316ba686777ca7",
+  "reference": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/step4_smolvlm2_refined512/reference",
+  "decoder": {
+    "family": "add STOP-only bias then argmax over four first-token action logits",
+    "stop_logit_bias": -0.25,
+    "action_order": [
+      "STOP",
+      "FORWARD",
+      "LEFT",
+      "RIGHT"
+    ],
+    "batch_size": 1,
+    "actions_per_forward": 1,
+    "tie_break": "first action in declared order"
+  },
+  "simulator": {
+    "habitat_sim": "0.2.4 headless withbullet",
+    "habitat_lab": "v0.2.4",
+    "env": "conda `rolevln` (env/setup_env.sh)",
+    "rgb": {
+      "width": 640,
+      "height": 480,
+      "hfov": 79
+    },
+    "depth": {
+      "width": 640,
+      "height": 480,
+      "hfov": 79,
+      "min": 0.0,
+      "max": 10.0
+    },
+    "rgb_sensor_position_m": [
+      0.0,
+      1.25,
+      0.0
+    ],
+    "forward_step_m": 0.25,
+    "turn_angle_deg": 15,
+    "allow_sliding": true,
+    "success_distance_m": 3.0,
+    "max_episode_steps": {
+      "r2r": 500,
+      "rxr": 700
+    },
+    "gt_replay_check": "logs/check_ce_replay_r2r.json",
+    "rxr_expert_turn_angle_deg": 30,
+    "rxr_turn_handling": "unified_15",
+    "render_gpu": 0
+  },
+  "data": "/data/team_a/dave-workspace/RoleVLN/data/processed/baseline_v0/scorer_labels_smolvlm2_refined512_v1",
+  "groups": {
+    "fit": "B",
+    "development": "C"
+  },
+  "selection": "seed-6 scene-balanced episode queues; disjoint expert/policy episodes; no policy-success filter",
+  "root_sampling": "up to eight evenly spaced eligible decision indices from t=3 through the final decision; retain short eligible histories",
+  "expert_filter": "actual expert replay succeeds, consumes the full expert schedule, and has forward-location drift below 0.5m",
+  "restore": "reset original episode and RNG seed; replay every prefix action; assert exact pose, RGB hash, collisions, metrics and elapsed count",
+  "random_protocol": "deterministic greedy batch-one native policy; identical per-episode seed restored before every branch",
+  "continuation": "one forced candidate, then frozen selected policy until actual STOP or original task limit",
+  "candidates_live": {
+    "STOP": 0,
+    "FORWARD": 1,
+    "LEFT": 2,
+    "RIGHT": 3
+  },
+  "canonical_to_live": [
+    1,
+    2,
+    3,
+    0
+  ],
+  "warmup_observations": 4,
+  "evaluator": {
+    "success": "configured Habitat Success, same saved policy evaluator",
+    "ndtw": "pinned VLN-CE NDTW.update_metric on full actual path, exact DTW Euclidean backend, consecutive duplicates skipped, 3m normalization",
+    "source": {
+      "url": "https://raw.githubusercontent.com/jacobkrantz/VLN-CE/729d141b2ee10628061ada74dd3a5b9f70faeba5/habitat_extensions/measures.py",
+      "revision": "729d141b2ee10628061ada74dd3a5b9f70faeba5",
+      "sha256": "1b6c1adf3d19bbfbd76ced6918378b3e99e726072ff58bf3477e878a0c259d44",
+      "file": "vlnce_measures.py"
+    }
+  },
+  "utility": {
+    "success": 0.7,
+    "ndtw": 0.3,
+    "remaining_actions_over_Bmax": -0.01,
+    "remaining_forward_collisions_over_Bmax": -0.02
+  },
+  "STOP": "execute actual STOP; current RGB identity; n=1, c=0; evaluator supplies success/nDTW",
+  "rgb": "live 640x480 uint8 RGB, lossless PNG; native saved policy preprocessing; no future pose/collision inputs",
+  "budget_counts": "candidate and executed terminal STOP included; Bmax=500 R2R,700 RxR; original prefix clock retained",
+  "selection_caveat": {
+    "authority": "explicit_user_selection_2026-10-26",
+    "decision": "proceed_with_refined_checkpoint_512_and_STOP_bias_minus_0.25",
+    "original_stopping_safeguard_passed": false,
+    "all_original_locked_criteria_passed": false,
+    "failed_criterion": "premature_stops_at_most_step2",
+    "incorrect_stops": 149,
+    "confirmation_episodes": 224,
+    "reason": "User deliberately selected the highest measured-success refinement despite its failed stopping safeguard.",
+    "historical_decision_preserved": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/step3b_smolvlm2_stop/reference_decision.json",
+    "control_reference": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/step3_smolvlm2/frozen_reference",
+    "control_bundle_manifest_sha256": "e08277d7ef1fca0a1ddce470420c6b75ca53c5de8dfe1039dc02e6118680a3b5"
+  },
+  "world_models_used_for_collection": false,
+  "source_sha256": {
+    "scorer_data/__init__.py": "d4491e1766dbd1f6e50da83721d117d49ac53ad68631d8d2e67d8dfb7d25def2",
+    "scorer_data/common.py": "ea14e3683243bcb5d02293fd64ff0978bf9b16c8331b44e3be899b60593f9140",
+    "scorer_data/metrics.py": "7aedf33edd75dfaad4e020618db7c7e447b136edf18c63b4e90cb51629e08bb5",
+    "scorer_data/collection.py": "8e6de5e9302162d0174f84992750b2f78d2a5e8ea559542792194af6ded8f8b1",
+    "tools/prepare_step6.py": "6845a0c241073cd1b44d823a9ae20c38cdb239f87a81017ef89e65154805179f",
+    "tools/collect_scorer_labels.py": "f7dfce1c05e1b8bd7fb465f685e3f88ac72e9a2297a4800c58327f9aa861d70d",
+    "tools/check_step6.py": "f04f80d05a7f989780ad6c76a7e6cdcd455ef22686a6480edd0c4961f8b83ed9",
+    "Scorer/interfaces.py": "f04ebf78fd60242b203634acb51a814e3e147bd50da1ed293016d6d5cea0f4b5",
+    "Scorer/labels.py": "cf0292e3d858ef091f556cbea68972bed257423648bb806b37657c9bb7e2910e",
+    "sim/config.py": "c345359be6f06d8cbfcd993673c29a9f24df5669b50ade09f15de6a722ca3787",
+    "sim/episodes.py": "a80e05d3c3cf740095a5afaf115a8f8d87ec310a7ec3355118b1783e4ea27ef1",
+    "sim/rxr_dataset.py": "2b5fe06551eeed52b6dbdb3030c9e9c1cfbb884efe99d5a0c530592fd2187bcd",
+    "sim/transition_branch.py": "ff593f70b8cc012557d9f52e976ce73ffeed0dca17e482039550043d7bfdc38e",
+    "policy/common.py": "fa30de03d782dae761b2444a2d1dcdb853dd756d25cd76cee84ce6b69c5b474e",
+    "policy/smolvlm2.py": "2dc097c0f3bd09eacd94cb5a438e15635a62b1a9215a0c66f7c2655b437c1a96",
+    "policy/online.py": "763dd6e8873953cc82e427d196fba32aa2ba1d9bc0a5d64ade187d33d7481ac2",
+    "policy/experimental_reference.py": "fe22cc1084f3de7ebeadaace7674ca71e272b9fb5cbfeaec6226995066d17e77",
+    "manifest/scene_partition.json": "8ee6a37535c92f953fe509f9cfa38e1ce2ac069656d4b443fbdfd4b13f54d2d7",
+    "runs/step6_smolvlm2_refined512/assets/vlnce_measures.py": "1b6c1adf3d19bbfbd76ced6918378b3e99e726072ff58bf3477e878a0c259d44",
+    "runs/step6_smolvlm2_refined512/assets/evaluator_source.json": "47522b97c4ae1979e19512ebed82c9fab6b5020cd1363b7a36516ecd0f7dad87"
+  },
+  "input_sha256": {
+    "/data/team_a/dave-workspace/RoleVLN/data/datasets/R2R_VLNCE_v1-3_preprocessed/train/train.json.gz": "340a80133b2157520354ab055a91d98feb2f42e4bbda17b200c911f8788492ea",
+    "/data/team_a/dave-workspace/RoleVLN/data/datasets/R2R_VLNCE_v1-3_preprocessed/train/train_gt.json.gz": "b63fa10e5c57d1b80b241c49bdeddc3d481bbe54b41ca0d59f9584c10da7bd5d",
+    "/data/team_a/dave-workspace/RoleVLN/data/datasets/RxR_VLNCE_v0/train/train_guide.json.gz": "fe127cfe9350123e7ff511c858f866b2d538564bac910da698bfff4ee46be07e",
+    "/data/team_a/dave-workspace/RoleVLN/data/datasets/RxR_VLNCE_v0/train/train_guide_gt.json.gz": "46373fec825aa09f6e26fb7ec7be372d105ed9b4d01e162bb23a18f928e8229c"
+  },
+  "selection_sha256": "936e115826c3762aae44dd6356724d4ac0c5224b31ad9cb151d6180f73d69e5f",
+  "simulator_configs_sha256": "f80e58c343650f1017474d645c6959677e7ddd46af0347858f879c43eaea25a3"
+}

@@ -1,0 +1,821 @@
+=== PDF PAGE 1 ===
+Counterfactual Vision-and-Language Navigation
+          via Adversarial Path Sampler
+
+
+            Tsu-Jui Fu†, Xin Eric Wang‡, Matthew F. Peterson†,
+         Scott T. Grafton†, Miguel P. Eckstein†, William Yang Wang†
+
+                       †UC Santa Barbara
+              tsu-juifu@ucsb.edu, {peterson, scott.grafton,
+           miguel.eckstein}@psych.ucsb.edu, william@cs.ucsb.edu
+                        ‡UC Santa Cruz
+                            xwang366@ucsc.edu
+
+
+
+      Abstract. Vision-and-Language Navigation (VLN) is a task where agents
+      must decide how to move through a 3D environment to reach a goal by
+      grounding natural language instructions to the visual surroundings. One
+        of the problems of the VLN task is data scarcity since it is diﬃcult to
+        collect enough navigation paths with human-annotated instructions for
+       interactive environments. In this paper, we explore the use of counter-
+       factual thinking as a human-inspired data augmentation method that
+        results in robust models. Counterfactual thinking is a concept that de-
+       scribes the human propensity to create possible alternatives to life events
+       that have already occurred. We propose an adversarial-driven counter-
+       factual reasoning model that can consider eﬀective conditions instead of
+       low-quality augmented data. In particular, we present a model-agnostic
+       adversarial path sampler (APS) that learns to sample challenging paths
+       that force the navigator to improve based on the navigation perfor-
+      mance. APS also serves to do pre-exploration of unseen environments
+       to strengthen the model’s ability to generalize. We evaluate the inﬂu-
+       ence of APS on the performance of diﬀerent VLN baseline models using
+       the room-to-room dataset (R2R). The results show that the adversar-
+         ial training process with our proposed APS beneﬁts VLN models under
+      both seen and unseen environments. And the pre-exploration process can
+       further gain additional improvements under unseen environments.
+
+
+1  Introduction
+
+Vision-and-language navigation (VLN) [3,8] is a complex task that requires an
+agent to understand natural language, encode visual information from the sur-
+rounding environment, and associate critical visual features of the scene and
+appropriate actions with the instructions to achieve a speciﬁed goal (usually to
+move through a 3D environment to a target destination).
+   To accomplish the VLN task, the agent learns to align linguistic semantics
+and visual understanding and also make sense of dynamic changes in vision-
+and-language interactions. One of the primary challenges of the VLN task for
+artiﬁcial agents is data scarcity; for instance, while there are more than 200K
+
+=== PDF PAGE 2 ===
+2       Fu, Wang, Peterson, Grafton, Eckstein, and Wang
+
+
+
+
+
+Fig. 1. The comparison between randomly-sampled (rand) and APS-sampled (aps)
+under validation-seen set for Seq2Seq over diﬀerent ratios of augmented path used.
+
+
+
+possible paths in the Room-to-Room (R2R) dataset [3], the R2R training data
+comprises only 14K sampled paths. This scarcity of data makes learning the
+optimal match between vision and language within the interactive environments
+quite challenging.
+
+   Meanwhile, humans often lack extensive experience with joint access to visual
+experience and accompanying language instructions for navigating novel or un-
+familiar environments, yet the human mind can navigate environments despite
+this data scarcity by incorporating mechanisms such as counterfactual reasoning
+[30] and self-recovered missing information. For example, if a human follows an
+instruction to “turn right” and they see a door in front of them, they can also
+consider what they may have encountered had they turned left instead. Or, if we
+stop in front of the dining table instead of walking away from it, what should the
+instruction be? The premise, then, is that counterfactual reasoning can improve
+performance in a VLN task through exploration and consideration of alternative
+actions that the agent did not actually make. This may allow the agent to op-
+erate in data-scarce scenarios by bootstrapping familiarity of environments and
+the links between instructions and multiple action policy options.
+
+   Counterfactual thinking has been used to increase the robustness of models
+for various tasks [24,12]. However, no explicitly counterfactual models have been
+applied to the VLN task speciﬁcally. Speaker-Follower [11], which applies a back-
+translated speaker model to reconstruct the instructions for randomly-sampled
+paths as augmented training examples, is probably the VLN model that comes
+closest to instantiating counterfactual thinking.
+
+   While the use of augmented training examples by the Speaker-Follower agent
+resembles a counterfactual process, the random sampling method is too arbitrary.
+Fig. 1 reports the performance of the model trained with randomly-sampled
+augmented data (the line in a light color) over diﬀerent ratios of the augmented
+path used. It shows that the success rate stops increasing once augmented paths
+account for 60% or more of the training data [19]. Since those paths are all
+randomly sampled, it can limit the beneﬁt of counterfactual thinking to data
+augmentation.
+
+=== PDF PAGE 3 ===
+               Fu et al.: Counterfactual Vision-and-Language Navigation      3
+
+
+   In this paper, we propose the use of adversarial-driven counterfactual think-
+ing where the model learns to consider eﬀective counterfactual conditions instead
+of sampling ample but uninformative data. We introduce a model-agnostic ad-
+versarial path sampler (APS) that learns how to generate augmented paths for
+training examples that are challenging, and thus eﬀective, for the target naviga-
+tion model. During the adversarial training process, the navigator is trying to
+accomplish augmented paths from APS and thus optimized for a better navi-
+gation policy, while the APS aims at producing increasingly challenging paths,
+which are therefore more eﬀective than randomly-sampled paths.
+   Moreover, empowered by APS, the model can adapt to unseen environments
+in a practical setting—environment-based pre-exploration, where when deployed
+to a new environment, the robot can ﬁrst pre-explore and get familiar with it,
+and then perform natural language guided tasks within this environment.
+   Experimental results on the R2R dataset show that the proposed APS can be
+integrated into a diverse collection of VLN models, improving their performance
+under both seen and unseen environments. In summary, our contributions are
+four-fold:
+ – We integrate counterfactual thinking into the vision-and-language naviga-
+    tion task, and propose the adversarial path sampler (APS) to progressively
+   sample challenging and eﬀective paths to improve the navigation policy.
+ – The proposed APS method is model-agnostic and can be easily integrated
+    into various navigation models.
+ – Extensive experiments on the R2R dataset validate that the augmented
+    paths generated by APS are not only useful in seen environments but also
+    capable of generalizing the navigation policy better in unseen environments.
+ – We demonstrate that APS can also be used to adapt the navigation policy
+    to unseen environments under environment-based pre-exploration.
+
+
+2  Related Work
+
+Vision-and-Language Navigation  Navigation in 3D environments based
+on natural language instruction has recently been investigated by many stud-
+ies [3,8,21,22,26,20,35,25,11,33,32,16,29,34]. For vision-and-language navigation
+(VLN), ﬁne-grained human-written instructions are provided as guidance to nav-
+igate a robot in indoor environments. But data scarcity is a critical issue in VLN
+due to the high cost of data collection.
+   In order to augment more data for training, the Speaker-Follower model [11]
+applies a back-translated speaker model to generate instructions for randomly-
+sampled paths. In spite of obtaining some improvements from those extra paths,
+a recent study [19] shows that only a limited number of those augmented paths
+are useful and after using 60% of the augmented data, the improvement dimin-
+ishes with additional augmented data. In this paper, we present a model-agnostic
+adversarial path sampler that progressively produces more challenging paths via
+an adversarial learning process with the navigator, therefore forcing the naviga-
+tion policy to be improved as the augmented data grows.
+
+=== PDF PAGE 4 ===
+4       Fu, Wang, Peterson, Grafton, Eckstein, and Wang
+
+
+Counterfactual Thinking Counterfactual thinking is a concept that describes
+the human propensity to create possible alternatives to life events that have al-
+ready occurred. Humans routinely ask questions such as: “What if ...?” or “If
+there is only ...” to consider the outcomes of diﬀerent scenarios and apply inferen-
+tial reasoning to the process. In the ﬁeld of data science, counterfactual thinking
+has been used to make trained models explainable and more robust [24,12,14].
+Furthermore, counterfactual thinking is also applied to augment training tar-
+gets [39,9,6]. Although previous studies have shown some improvements over
+diﬀerent tasks, they all implement counterfactual thinking arbitrarily without
+a selection process to sample counterfactual data that might optimize learning.
+This can limit the eﬀectiveness of counterfactual thinking. In this paper, we
+combine the adversarial training with counterfactual conditions to guide models
+that might lead to robust learning. In this way, we can maximize the beneﬁt of
+counterfactual thinking.
+Adversarial Training Adversarial training refers to the process by which two
+models try to detrimentally inﬂuence each other’s performance and as a result,
+both models improve by competing against each other. Adversarial training has
+been successfully used to guide the target during model training [13,37,10,27,18,1].
+Apart from leading the training target, adversarial training is also applied to
+data augmentation [5,38]. While previous studies just generate large amounts
+of augmented examples using a ﬁxed pre-trained generator. In this paper, the
+generator is updated along with the target model and serves as a path sampler
+which samples challenging paths for eﬀective data augmentation.
+Pre-Exploration under Unseen Environments Pre-exploration under un-
+seen environments is a popular method to bridge the gap between seen and
+unseen environments. Speaker-Follower [11] adopts a state-factored beam search
+for several candidate paths and then selects the best one. RCM [33] introduces
+self-imitation learning (SIL) that actively optimized the navigation model to
+maximize the cross-matching score between the generated path and the original
+instruction. Nevertheless, beam search requires multiple runs for each inference,
+and SIL utilizes the original instructions in the unseen environments for op-
+timization. EnvDrop [32] conducts pre-exploration by sampling shortest paths
+from unseen environments and augments them with back-translation, which how-
+ever utilizes the meta-information of unseen environments (e.g., the shortest path
+planner that the robot is not supposed to use).
+
+
+3  Methodology
+
+
+3.1  Background
+
+Visual-and-Language Navigation (VLN) At each time step t, the environ-
+ment presents the image scene st. After stepping an action at, the environment
+will transfer to next image scene st+1:
+
+                         st+1 = Environment(st, at).                        (1)
+
+=== PDF PAGE 5 ===
+               Fu et al.: Counterfactual Vision-and-Language Navigation      5
+
+
+
+
+
+Fig. 2. The  learning framework  of our
+adversarial path sampler (APS), where  Fig. 3. The architecture of the adversarial
+Speaker  is  the  back-translated  speaker  path sampler (APS).
+model and NAV is the navigation model.
+
+
+To carry out a VLN task, the navigation model steps a serious of actions {at}Tt=1
+to achieve the ﬁnal goal described in the instruction. Though previous studies
+propose diﬀerent architectures of navigation model (NAV), in general, NAV is a
+recurrent action selector based on the visual feature of the image scene, naviga-
+tion instruction, and previous history:
+
+                            ft = VisualFeature(st),
+                                                                              (2)
+                          at = softmax(NAV(ft, I, ht)),
+
+where ft  is the visual feature of the image scene st at time step t, I  is the
+navigation instruction, ht represents the previous history of image scenes, and
+at is the probability of each action to step at time step t. With at, we can decide
+which action to step based on greedy decoding (step the action with the highest
+probability).
+   In this work, we experiment under navigator with 3 diﬀerent architectures,
+Seq2Seq [3], Speaker-Follower [11], and RCM [33].
+
+Back-Translated Speaker Model  Introduced in Speaker-Follower [11], the
+back-translated speaker model (Speaker) generates the instruction of a naviga-
+tion path:
+                  I = Speaker({(f1, a1), (f2, a2), ..., (fL, aL)}),               (3)
+
+where ft  is the visual feature of the image scene, at  is the action taken at
+time step t, L represents the length of the navigation path, and I is the gener-
+ated instruction. Speaker is trained with pairs of navigation paths and human-
+annotated instructions in the training data. With Speaker, we can sample various
+paths in the environments and augment their instructions.
+
+
+3.2  Overview
+
+The overall learning framework of our model-agnostic adversarial path sampler
+(APS) is illustrated in Fig. 2. At ﬁrst, APS samples batch of paths P and we
+adopt the Speaker [11] to obtain the reconstructed instructions I. With the pairs
+
+=== PDF PAGE 6 ===
+6       Fu, Wang, Peterson, Grafton, Eckstein, and Wang
+
+of (P, I), we obtain the navigation loss LNAV. NAV minimizes LNAV to improve
+navigation performance. While APS learns to sample paths that NAV can not
+perform so well by maximizing LNAV. Hence, there is an adversarial situation for
+LNAV between NAV and APS, where APS aims at sampling challenging paths
+and NAV tries to solve the navigation tasks from APS.
+  By the above adversarial training process, we collect all of the (P, I) sampled
+from APS to compose the adversarial augmented data which can be more helpful
+to NAV than randomly-sampled one. Both Speaker and NAV are pre-trained us-
+ing the original training set and Speaker keeps ﬁxed during adversarial training.
+We collect all (P, I) sampled from APS as APS-sampled augmented path and
+further train NAV. More detail can be seen in Sec. 3.4.
+
+
+3.3  Architecture of APS
+
+As shown in Fig. 3, the proposed APS is a recurrent action sampler πAPS which
+samples series of actions {at}Tt=1 (with the scene images {ft}Tt=1 presented from
+the environment) and combines as the path output, where ft means the vi-
+sual feature (e.g., extracted from the convolutional neural networks). For the
+panoramic image scene, ft,j represents the visual feature of the image patch at
+viewpoint j at time step t.
+   At each time step t, the history of previous visual feature and at−1 is encoded
+as ht by a long short-term memory (LSTM) [17] encoder:
+
+                          ht = LSTM([vt, at−1], ht−1),                       (4)
+
+where at−1 is the action taken at previous step and vt is the weighted sum of
+visual feature of each image path for the panoramic image scene. vt is calculated
+using the attention [7] between the history ht−1 and the image patches {ft,j}mj=1:
+
+                      vt = Attention(ht−1, {ft,j}mj=1)
+             = X softmax(ht−1Wh(ft,jWf)T )ft,j,                 (5)
+                                  j
+
+where Wh and Wf are learnable projection matrics. The above equation of vt is
+for panoramic scene with m viewpoints. APS also supports the navigator which
+uses visuomotor view as input (e.g., Seq2Seq [3]) and the single visual feature ft
+is seen as vt directly.
+    Finally, APS decides which action to step based on the history ht and action
+embedding u:
+                           at = softmax(htWc(ukW uT )),                       (6)
+where uk is the action embedding of the k-th navigable direction. Wc and Wu
+are learnable projection matrics.
+
+
+3.4  Adversarial Training of APS
+
+After each unrolling of APS, we comprise the navigation history {at}Tt=1 and
+{ft,j}mj=1 to obtain the path P. To be consistent with the original training data
+
+=== PDF PAGE 7 ===
+               Fu et al.: Counterfactual Vision-and-Language Navigation      7
+
+
+Algorithm 1 Training Process of Adversarial Path Sampler
+ 1: NAV: the target navigation model
+ 2: Speaker: the back-translated instruction model
+ 3: APS: the adversarial path sampler
+ 4: augaps: collected APS-sampled augmented data
+ 5:
+ 6: Pre-train NAV with original training set
+ 7: Pre-train Speaker with original navigation path
+ 8: Initialize APS
+ 9: augaps ←∅
+10:
+11: while DO APS do
+12:   P = {(f1, a1), (f2, a2), ..., (fL, aL)} ←APS samples
+13:     I ←back-translated by Speaker with P
+14:   LNAV ←student-forcing loss of NAV using (P, I)
+15:
+16:    Update NAV by minimizing LNAV
+17:    Update APS by maximizing LNAV using Policy Gradient
+18:    augaps ←augaps ∪(P, I)
+19: end while
+20:
+21: Train NAV with augaps
+22: Fine-tune NAV with original training set
+
+
+
+
+whose navigation paths are all shortest paths [3], we transform the sampled
+paths by APS into shortest paths1 (same start and end nodes as in the sampled
+paths). Then we employ the Speaker model [11] to produce one instruction I
+for each sampled path P, and eventually obtain a set of new augmented pairs
+(P, I). We train the navigation model (NAV) with (P, I) using student-forcing
+[3]. The training loss (LNAV) can be seen as an indicator of NAV’s performance
+under (P, I): the higher LNAV is, the worse NAV performs. Hence, in order to
+create increasingly challenging paths to improve the navigation policy, we deﬁne
+the loss function LAPS of APS as:
+
+                     LAPS = −Ep(P;πAPS)LNAV.                        (7)
+
+
+   Since the path sampling process is not diﬀerentiable, we adopt policy gradient
+[31] and view LNAV as the reward R to optimize the APS objective. According
+
+
+
+ 1 Note that transforming the sampled paths into shortest paths can only be done under
+  seen environments. For pre-exploration under unseen environments, we directly use
+  the sampled paths because the shortest path planner should not be exploited in
+  unseen environments.
+
+=== PDF PAGE 8 ===
+8       Fu, Wang, Peterson, Grafton, Eckstein, and Wang
+
+
+
+
+
+Fig. 4. The optimization ﬂow of environment-based pre-exploration under unseen en-
+vironments. APS samples paths from the unseen environment to optimize NAV and
+make it more adaptive. Then, NAV runs each instruction in a single turn.
+
+
+to the REINFORCE algorithm [36], the gradient is computed as following:
+
+
+                           T
+         ∇πAPSLAPS ≈− X[∇πAPS log p(at|a1:t−1; πAPS)R]
+                            t=1
+                                                                              (8)
+                           T
+           ≈− X[∇πAPS log p(at|a1:t−1; πAPS)(R −b)],
+                            t=1
+
+where b is the baseline estimation to reduce the variance and we treat b as the
+mean of all previous losses. Note that APS is model-agnostic and can be easily
+integrated into diﬀerent navigation models, since it only considers the training
+loss from a navigation model regardless of its model architecture.
+   Algorithm 1 illustrates the training process of APS. APS aims at maximizing
+the navigation loss LNAV of NAV to create more challenging paths, while NAV
+tries to minimize LNAV to do better navigation:
+
+                         min max LNAV.                              (9)
+                         NAV APS
+
+After collecting the challenging paths augmented by APS, we train NAV on them
+and ﬁnally ﬁne-tune NAV with the original training set. The detailed analysis
+of APS-sampled augmented data is shown in Sec. 4.3.
+
+
+3.5  Environment-based Pre-Exploration
+
+Pre-exploration is a technique that adapts the navigation model to unseen en-
+vironments. The navigator can explore the unfamiliar environment ﬁrst and
+increase the chance to carry out the navigation instructions under unseen en-
+vironments. For previous pre-exploration methods like beam search [11] or self-
+imitation learning (SIL) [33], they are instruction-based which optimizes for each
+instruction. This will make the navigation path excessive long since it ﬁrst runs
+many diﬀerent paths and then selects the possible best one.
+   In the real world, when we deploy a robot into a new environment, it might
+pre-explore and get familiar with the environment, and then eﬃciently execute
+the tasks following natural language instructions within this environment. So
+unlike previous approaches [33,32] that either optimize the given instructions or
+
+=== PDF PAGE 9 ===
+               Fu et al.: Counterfactual Vision-and-Language Navigation      9
+
+
+
+                                      Test (VLN Challenge Leaderboard)
+
+             Model               NE ↓  OSR ↑  SR ↑    SPL ↑
+
+              Seq2Seq [3]                    7.9     26.6    20.4      18.0
+          + augrand                    7.8     26.2    21.0      18.8
+          + augaps                   7.5    30.1   22.5     19.3
+          + augaps+pre-exploration   6.7     29.4    23.2     20.8
+
+                Speaker-Follower [11]          7.0     41.2    30.9      24.0
+          + augrand                    6.6     43.4    34.8      29.2
+          + augaps                   6.5    44.2   36.1      28.8
+          + augaps+pre-exploration   5.9    46.4   37.6     32.4
+
+         RCM [33]                      6.7     43.5    35.9      33.1
+          + augrand                    5.9     52.4    44.5      40.8
+          + augaps                   5.8    53.9   45.1     40.9
+          + augaps+pre-exploration   5.5    55.6   45.9     40.9
+
+Table 1. R2R results for Seq2Seq, Speaker-Follower, and RCM under testing set.
+Models are trained without augmented data, with randomly-sampled augmented path
+(augrand), with APS-sampled augmented path (augaps), and under pre-exploration in
+unseen environments. Note that those results are run in single turn and with greedy
+action decoding.
+
+
+
+assume access to all the unseen environments at once, we propose to use our
+APS method to do the environment-based pre-exploration where the agent pre-
+explore an environment only for the tasks within the same environment with no
+prior knowledge of it. Under an unseen environment, we adopt APS to sample
+multiple paths (P ′) and generate the instructions (I′) of the sampled paths2 with
+the Speaker model [11]. We then use (P ′, I′) to optimize NAV to adapt to the
+unseen environment as illustrated in Fig. 4. Note that during pre-exploration,
+we only optimize NAV and let APS ﬁxed3. We also present a detailed analysis
+of our proposed environment-based pre-exploration method in Sec. 4.3.
+
+
+4  Experiments
+
+4.1  Experimental Setup
+
+R2R Dataset We evaluate the proposed method on the Room-to-Room (R2R)
+dataset [3] for vision-and-language navigation. R2R is built upon the Matter-
+port3D [4], which contains 90 diﬀerent environments that are split into 61 for
+training and validation-seen, 11 for validation-unseen, and 18 for testing sets.
+There are 7,189 paths and each path has 3 human-written instructions. The
+
+ 2 Note that the shortest-path information is not used during pre-exploration.
+ 3 We have tried to update APS simultaneously with NAV during pre-exploration, but
+   it turns out that under a previous unseen environment without any regularization
+   of human-annotated paths, APS tends to sample too diﬃcult paths to accomplish,
+   e.g., back and forth or cycles. However, those paths will not improve NAV and may
+  even hurt the performance. To avoid this kind of dilemma, we keep APS ﬁxed under
+  the pre-exploration.
+
+=== PDF PAGE 10 ===
+10      Fu, Wang, Peterson, Grafton, Eckstein, and Wang
+
+
+
+                                  Val-Seen                     Val-Unseen
+
+ Model               NE ↓  OSR ↑  SR ↑  SPL ↑    NE ↓  OSR ↑  SR ↑  SPL ↑
+
+ Seq2Seq [3]                    6.0     51.7    39.4    33.8         7.8     27.7    22.1    19.1
+ + augrand                    5.3     58.1    43.7    37.2         7.7     28.9    22.6    19.9
+ + augaps                   5.0    60.8   48.2   40.1       7.1    32.7   24.2   20.4
+ + augaps+pre-exploration                        -                     6.6    37.8   27.0   24.6
+
+ Speaker-Follower [11]          5.0     61.6    51.7    44.4         6.9     40.7    29.9    21.0
+ + augrand                    3.7     74.2    66.4    59.8         6.6     46.6    36.1    28.8
+ + augaps                   3.3    74.9   68.2   62.5       6.1    46.7   38.8   32.1
+ + augaps+pre-exploration                        -                     5.2    49.1   42.0   35.7
+
+ RCM [33]                      5.7     53.8    47.0    44.3         6.8     43.0    35.0    31.4
+ + augrand                    4.1     66.9    61.9    58.6         5.7     52.4    45.6    41.8
+ + augaps                   3.9    69.3   63.2   59.5       5.4    56.6   47.7   42.8
+ + augaps+pre-exploration                        -                     5.3     56.2    48.0   42.8
+
+
+Table 2. R2R results for Seq2Seq, Speaker-Follower, and RCM under validation-seen
+and validation-unseen sets.
+
+
+
+
+validation-seen set shares the same environments with the training set. In con-
+trast, both the validation-unseen and the testing sets contain distinct environ-
+ments that do not appear during training.
+
+
+Evaluation Metrics  To compare with the existing methods, we report the
+same used evaluation metrics: Navigation Error (NE), Oracle Success Rate (OSR),
+Success Rate (SR), and Success Rate weighted by Path Length (SPL). NE is the
+distance between the agent’s ﬁnal position and goal location. OSR is the success
+rate at the closest point to the goal that the agent has visited. SR is calculated
+as the percentage of the ﬁnal position within 3m from the goal location. SPL,
+deﬁned in [2], is the success rate weighted by path length which considers both
+eﬀectiveness and eﬃciency.
+
+
+Baselines We experiment with the eﬀectiveness of the model-agnostic APS on
+3 kinds of baselines:
+
+ – Seq2Seq [3], the attention-based seq2seq model that is trained with student
+   forcing (or imitation learning) under the visuomotor view and action space;
+ – Speaker-Follower [11], the compositional model that is trained with student
+   forcing under the panoramic view and action space;
+ – RCM [33], the model that integrates cross-modal matching loss, and  is
+   trained using reinforcement learning under the panoramic view and action
+   space.
+
+In the following sections, we use the notations as:
+
+ – augrand: the randomly-sampled augmented path;
+ – augaps: the APS-sampled augmented path;
+ – modelrand: the model trained with augrand;
+ – modelaps: the model trained with augaps.
+
+=== PDF PAGE 11 ===
+               Fu et al.: Counterfactual Vision-and-Language Navigation     11
+
+
+
+
+
+Fig. 5.  The  comparison  between  randomly-sampled  and  APS-sampled  under
+validation-seen and validation-unseen sets for Seq2Seq and Speaker-Follower over dif-
+ferent ratios of augmented path used.
+
+
+For example, Speaker-Followeraps is the Speaker-Follower model trained with the
+APS-sampled augmented path.
+   For each baseline, we report the results of the model trained without any
+augmented data, trained with augrand, and trained with augaps. For the unseen
+environments, we also report the results under the pre-exploration.
+
+Implementation Details To follow the previous studies [3,11,33], we adopt
+ResNet-152 [15] to extract visual features (2048d) for all scene images without
+ﬁne-tuning; for the navigation instructions, the pre-trained GloVe embeddings
+[28] are used for initialization and then ﬁne-tuned with the model training. For
+baseline models, we apply the same batch size 100, LSTM with 512 hidden units,
+learning rate 1e-4, RL learning rate 1e-5, and dropout rate 0.5. For our proposed
+APS, the hidden unit of LSTM is also 512, the action embedding size is 128,
+and the learning rate is 3e-5. We adopt the learning rate 1e-5 under the pre-
+exploration for the unseen environments. All models are optimized via Adam
+optimizer [23] with weight decay 5e-4.
+   For augrand, we use the same 17K paths as Speaker-Follower [11]. To com-
+pare fairly, APS also adversarially samples the same amounts of paths for data
+augmentation. The navigation models are ﬁrst trained using augmented data for
+50K iterations and then ﬁne-tuned with original instructions for 20K iterations.
+
+
+4.2  Quantitative Results
+
+Table. 1 and 2 present the R2R results for Seq2Seq [3], Speaker-Follower [11], and
+RCM [33] under validation-seen, validation-unseen, and testing sets. All models
+are trained without augmented data, with augrand, and with augaps. First, we
+can observe that under validation-seen set, Seq2Seqaps outperforms Seq2Seqrand
+on all evaluation metrics, e.g., 4.5% absolute improvement on Sucess Rate and
+
+=== PDF PAGE 12 ===
+12      Fu, Wang, Peterson, Grafton, Eckstein, and Wang
+
+
+               As Testing Set
+                                                As Testing Set
+      Model    train augrand augaps
+                                           Model  augrand augaps
+      Seq2Seq   71.3   20.3   17.7
+                                         RCMrand  33.3    31.1
+     Seq2Seqrand 81.4  26.4   23.8                                        RCMaps  38.9   37.9
+     Seq2Seqaps  78.5  27.3  24.8
+
+Fig. 6. The success rate under training, randomly-sampled augmented (augrand), and
+APS-sampled augmented (augaps) sets for Seq2Seq and RCM.
+
+
+
+2.9% on SPL. Similar trends can be found for Speaker-Follower and RCM where
+models trained with APS-sampled paths comprehensively surpass models trained
+with randomly-sampled paths. Since APS can sample increasingly challenging
+and custom-made paths for the navigator, APS-sampled paths are more eﬀective
+than randomly-sample paths and bring in larger improvements on all metrics for
+all navigation models.
+   For the unseen environments, all models trained with APS consistently out-
+perform modelrand with 1.6%-2.7% success rate under validation-unseen set and
+0.6%-1.5% under testing set. The improvement shows that APS-sampled paths
+are not only helpful under the seen environments, but also strengthens the
+model’s generalizability under the unseen environments. The results under validation-
+seen, validation-unseen, and testing sets demonstrate that our proposed APS can
+further improve the baseline models in all terms of visuomotor view, panoramic
+view, imitation learning, and reinforcement learning.
+  And under the pre-exploration, all models gain further improvement, espe-
+cially on SPL for Seq2Seq and Speaker-Follower due to the prior exploration
+experience which can shorten the navigation path length.
+
+
+
+4.3  Ablation Study
+
+
+Random Path Sampling vs Adversarial Path Sampling To investigate
+the advantage of APS, we perform a detailed comparison between randomly-
+sampled and APS-sampled data. Fig. 5 presents the R2R success rate over dif-
+ferent ratios of augmented data used for Seq2Seq and Speaker-Follower. The
+trend line in light color shows that Seq2Seqrand cannot gain additional improve-
+ment when using more than 60% augmented data. However, for our proposed
+APS, the sampled augmented path can keep beneﬁting the model when more
+data used and achieve 4.5% and 1.6% improvement under validation-seen and
+validation-unseen sets, respectively. Since augrand is sampled in advance, the help
+to the model is limited. While, our proposed APS adversarially learns to sample
+challenging paths that force the navigator to keep improving. A similar trend can
+be found for Speaker-Follower where the improvement of Speaker-Followerrand
+is also stuck but Speaker-Followeraps can lead to even better performance.
+
+=== PDF PAGE 13 ===
+               Fu et al.: Counterfactual Vision-and-Language Navigation     13
+
+
+
+
+
+Fig. 7. The success rate under validation-                                       Fig. 8. The improvement of success rate
+unseen set under diﬀerent pre-exploration                                          over the scene feature diﬀerence under the
+steps for Seq2Seq and Speaker-Follower.                                            pre-exploration.
+
+
+
+Diﬃculty and Usefulness of the APS-sampled Paths  For a more intu-
+itive view of the diﬃculty and usefulness of the APS-sampled paths, we conduct
+experiments shown in Table 6 to quantitatively compare them with randomly-
+sample paths. As you can see, the APS-sampled paths seem to be the most
+challenging as all models perform worst on them. These paths can in turn help
+train a more robust navigation model (Seq2Seqaps) that outperforms the model
+trained with randomly sampled paths. Moreover, Seq2Seqaps even performs bet-
+ter on augrand than Seq2Seqrand which shows that augaps is not only challenging
+but also covers useful paths over augrand.
+
+Pre-Exploration  Table. 2 has shown the improvement brought from the pre-
+exploration. While, those paths in training, validation, and testing sets are all
+shortest path but the paths sampled from our APS under unseen environments
+are not promised to be the shortest. With more pre-exploration steps, the model
+has more opportunities to explore the unseen environment but at the same time,
+those too complicated paths sampled from APS may hurt the model. Fig. 7
+presents the success rate under diﬀerent pre-exploration steps. It shows a trade-
+oﬀbetween the model performance and the iterations of the pre-exploration. For
+Seq2Seq, 15 steps of pre-exploration come out the best result and 40 steps are
+most suitable for Speaker-Follower.
+  We also analyze the performance under the pre-exploration under each un-
+seen environments. Fig. 8 demonstrates the improvement of the success rate over
+the scene feature diﬀerence. Each point represents a distinct validation-unseen
+environment. The feature diﬀerence under each unseen environment is calcu-
+lated as the mean of the L2-distance between the visual feature of all scenes
+from that environment and all scenes in the training environments. In general,
+most of the unseen environments gain improvement under the pre-exploration.
+We also ﬁnd a trend that under the environment which has a larger feature dif-
+ference, it can improve more under the pre-exploration. It shows that under more
+diﬀerent environments, the pre-exploration can be more powerful which makes
+
+=== PDF PAGE 14 ===
+14      Fu, Wang, Peterson, Grafton, Eckstein, and Wang
+
+
+
+
+
+  Fig. 9. The visualization example of the comparison between the pre-exploration.
+
+
+it practical to be more adaptive and generalized to real-life unseen environments.
+
+Qualitative Results  Fig. 9 demonstrates the visualization results of the nav-
+igation path without and with pre-exploration for the instruction “Walk out of
+the bathroom”. Under the unseen environment, it is diﬃcult to ﬁnd out a path
+to get out of the unfamiliar bathroom, and as is shown in Fig. 9(a), the model
+without pre-exploration is stuck inside. In contrast, with the knowledge learned
+during the pre-exploration phase, the model can successfully walk out of the
+bathroom and eventually achieve the ﬁnal goal.
+
+
+5  Conclusion
+
+In this paper, we integrate counterfactual thinking into the vision-and-language
+navigation (VLN) task to solve the data scarcity problem. We realize counter-
+factual thinking via adversarial learning where we introduce an adversarial path
+sampler (APS) to only consider useful counterfactual conditions. The proposed
+APS is model-agnostic and proven eﬀective in producing challenging but useful
+paths to boost the performances of diﬀerent VLN models. Due to the power of
+reasoning, counterfactual thinking has gradually received attention in diﬀerent
+ﬁelds. We believe that our adversarial training method is an eﬀective solution to
+realize counterfactual thinking in general, which can possibly beneﬁt more tasks.
+
+Acknowledgments. Research was sponsored by the U.S. Army Research Oﬃce
+and was accomplished under Contract Number W911NF-19-D-0001 for the In-
+stitute for Collaborative Biotechnologies. The views and conclusions contained
+in this document are those of the authors and should not be interpreted as
+representing the oﬃcial policies, either expressed or implied, of the U.S. Govern-
+ment. The U.S. Government is authorized to reproduce and distribute reprints
+for Government purposes notwithstanding any copyright notation herein.
+
+=== PDF PAGE 15 ===
+               Fu et al.: Counterfactual Vision-and-Language Navigation     15
+
+References
+
+ 1. Agmon, N.: Robotic Strategic Behavior in Adversarial Environments. In: IJCAI
+    (2017) 4
+ 2. Anderson, P., Chang, A., Chaplot, D.S., Dosovitskiy, A., Gupta, S., Koltun, V.,
+    Kosecka, J., Malik, J., Mottaghi, R., Savva, M., Zamir, A.R.: On Evaluation of
+   Embodied Navigation Agents. In: arXiv:1807.06757 (2018) 10
+ 3. Anderson, P., Wu, Q., Teney, D., Bruce, J., Johnson, M., S¨underhauf, N., Reid,
+      I., Gould, S., van den Hengel, A.: Vision-and-Language Navigation: Interpret-
+    ing Visually-Grounded Navigation Instructions in Real Environments. In: CVPR
+    (2018) 1, 2, 3, 5, 6, 7, 9, 10, 11
+ 4. Angel, C., Angela, D., Thomas, F., Maciej, H., Matthias, N., Manolis, S., Shuran,
+     S., Andy, Z., Yinda, Z.: Matterport3D: Learning from RGB-D Data in Indoor
+    Environments. In: 3DV (2017) 9
+ 5. Antoniou, A., Storkey, A., Edwards, H.: Data Augmentation Generative Adversar-
+     ial Networks. In: 1711.04340 (2017) 4
+ 6. Ashual, O., Wolf, L.: Specifying Object Attributes and Relations in Interactive
+    Scene Generation. In: ICCV (2019) 4
+ 7. Bahdanau, D., Cho, K., Bengio, Y.: Neural Machine Translation by Jointly Learn-
+    ing to Align and Translate. In: ICLR (2015) 6
+ 8. Chen, H., Suhr, A., Misra, D., Snavely, N., Artzi, Y.: Touchdown: Natural Lan-
+    guage Navigation and Spatial Reasoning in Visual Street Environments. In: CVPR
+    (2019) 1, 3
+ 9. Chen, L., Zhang, H., Xiao, J., He, X., Pu, S., Chang, S.F.: Counterfactual Critic
+    Multi-Agent Training for Scene Graph Generation. In: ICCV (2019) 4
+10. Chou, C.J., Chien, J.T., Chen, H.T.: Self Adversarial Training for Human Pose
+    Estimation. In: APSIPA (2018) 4
+11. Fried, D., Hu, R., Cirik, V., Rohrbach, A., Andreas, J., Morency, L.P., Berg-
+    Kirkpatrick, T., Saenko, K., Klein, D., Darrell, T.: Speaker-Follower Models for
+    Vision-and-Language Navigation. In: NeurIPS (2018) 2, 3, 4, 5, 7, 8, 9, 10, 11
+12. Garg, S., Perot, V., Limtiaco, N., Taly, A., Chi, E.H., Beutel, A.: Counterfactual
+    Fairness in Text Classiﬁcation through Robustness. In: AIES (2019) 2, 4
+13. Goodfellow, I.J., Pouget-Abadie, J., Mirza, M., Xu, B., Warde-Farley, D., Ozair,
+     S., Courville, A., Bengio, Y.: Generative Adversarial Networks. In: NeurIPS (2014)
+    4
+14. Goyal, Y., Wu, Z., Ernst, J., Batra, D., Parikh, D., Lee, S.: Counterfactual Visual
+    Explanations. In: ICML (2019) 4
+15. He, K., Zhang, X., Ren, S., Sun, J.: Deep Residual Learning for Image Recognition.
+     In: CVPR (2016) 11
+16. Hemachandra, S., Duvallet, F., Howard, T.M., adnd Anthony Stentz, N.R., Walter,
+    M.R.: Learning Models for Following Natural Language Directions in Unknown
+    Environments. In: ICRA (2015) 3
+17. Hochreiter, S., Schmidhuber, J.: Long Short-term Memory. In: Neural Computa-
+    tion (1997) 6
+18. Hong, Z.W., Fu, T.J., Shann, T.Y., Chang, Y.H., Lee, C.Y.: Adversarial Active
+    Exploration for Inverse Dynamics Model Learning. In: CoRL (2019) 4
+19. Huang, H., Jain, V., Mehta, H., Baldridge, J., Ie, E.: Multi-modal Discriminative
+   Model for Vision-and-Language Navigation. In: NAACL Workshop (2019) 2, 3
+20. Huang, H., Jain, V., Mehta, H., Ku, A., Magalhaes, G., Baldridge, J., Ie, E.: Trans-
+    ferable Representation Learning in Vision-and-Language Navigation. In: ICCV
+    (2019) 3
+
+=== PDF PAGE 16 ===
+16      Fu, Wang, Peterson, Grafton, Eckstein, and Wang
+
+
+21. ihan Jain, Magalhaes, G., Ku, A., Vaswani, A.,  Ie,  E., Baldridge,  J.: Stay
+   on  the  Path:  Instruction  Fidelity  in  Vision-and-Language  Navigation.  In:
+    arXiv:1905.12255 (2019) 3
+22. Ke, L., Li1, X., Bisk, Y., Holtzman, A., Gan, Z., Liu, J., Gao, J., Choi, Y., Srini-
+    vasa, S.: Tactical Rewind: Self-Correction via Backtracking in Vision-and-Language
+    Navigation. In: CVPR (2019) 3
+23. Kingma, D.P., Ba, J.: Adam: A Method for Stochastic Optimization. In: ICLR
+    (2015) 11
+24. Kusner, M., Loftus, J., Russell, C., Silva, R.: Counterfactual Fairness. In: NeurIPS
+    (2017) 2, 4
+25. Ma, C.Y., Lu, J., Wu, Z., AlRegib, G., Kira, Z., Socher, R., Xiong, C.: Self-
+    Monitoring Navigation Agent via Auxiliary Progress Estimation. In: ICLR (2019)
+    3
+26. Ma, C.Y., Wu, Z., AlRegib, G., Xiong, C., Kira, Z.: The Regretful Agent: Heuristic-
+    Aided Navigation through Progress Estimation. In: CVPR (2019) 3
+27. Miyato, T., Dai, A.M., Goodfellow, I.: Adversarial Training Methods for Semi-
+    Supervised Text Classiﬁcation. In: ICLR (2017) 4
+28. Pennington, J., Socher, R., Manning, C.: Glove: Global Vectors for Word Repre-
+    sentation. In: EMNLP (2014) 11
+29. Qi, Y., Wu, Q., Anderson, P., Wang, X., Wang, W.Y., Shen, C., van den Hen-
+     gel, A.: REVERIE: Remote Embodied Visual Referring Expression in Real Indoor
+    Environments. In: CVPR (2020) 3
+30. Roese, N.J.: Counterfactual thinking. In: Psychological Bulletin (1997) 2
+31. Sutton, R.S., McAllester, D., Singh, S., Mansour, Y.: Policy Gradient Methods for
+    Reinforcement Learning with Function Approximation. In: NeurIPS (2000) 7
+32. Tan, H., Yu, L., Bansal, M.: Learning to Navigate Unseen Environments: Back
+    Translation with Environmental Dropout. In: NAACL (2019) 3, 4, 8
+33. Wang, X., Huang, Q., Celikyilmaz, A., Gao, J., Shen, D., Wang, Y.F., Wang,
+   W.Y., Zhang, L.: Reinforced Cross-Modal Matching and Self-Supervised Imitation
+    Learning for Vision-Language Navigation. In: CVPR (2019) 3, 4, 5, 8, 9, 10, 11
+34. Wang, X., Jain, V., Ie, E., Wang, W., Kozareva, Z., Ravi, S.: Environment-agnostic
+    Multitask Learning for Natural Language Grounded Navigation. In: ECCV (2020)
+    3
+35. Wang, X., Xiong, W., Wang, H., Wang, W.Y.: Look Before You Leap: Bridging
+    Model-Free and Model-Based Reinforcement Learning for Planned-Ahead Vision-
+    and-Language Navigation. In: ECCV (2018) 3
+36. Williams, R.J.: Simple Statistical Gradient-Following Algorithms for Connectionist
+    Reinforcement Learning. In: Machine Learning (1992) 8
+37. Wu, Y., Bamman, D., Russell, S.: Adversarial Training for Relation Extraction.
+     In: EMNLP (2017) 4
+38. Zhang, R., Che, T., Ghahramani, Z., Bengio, Y., Song, Y.: MetaGAN: An Adver-
+     sarial Approach to Few-Shot Learning. In: NeurIPS (2018) 4
+39. Zmigrod, R., Mielke, S.J., Wallach, H., Cotterell, R.: Counterfactual Data Aug-
+    mentation for Mitigating Gender Stereotypes in Languages with Rich Morphology.
+     In: ACL (2019) 4

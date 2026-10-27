@@ -1,0 +1,138 @@
+{
+  "scope": "One bounded STOP repair study; no world-model/scorer fitting, no group E",
+  "diagnostic_checkpoints": [
+    "step3/1024",
+    "step3/2048"
+  ],
+  "calibration": {
+    "family": "nonnegative additive STOP-logit bias; all other logits unchanged",
+    "bias_grid": [
+      0.0,
+      0.125,
+      0.25,
+      0.375,
+      0.5,
+      0.625,
+      0.75,
+      0.875,
+      1.0,
+      1.125,
+      1.25,
+      1.375,
+      1.5,
+      1.625,
+      1.75,
+      1.875,
+      2.0,
+      2.125,
+      2.25,
+      2.375,
+      2.5,
+      2.625,
+      2.75,
+      2.875,
+      3.0,
+      3.125,
+      3.25,
+      3.375,
+      3.5,
+      3.625,
+      3.75,
+      3.875,
+      4.0,
+      4.125,
+      4.25,
+      4.375,
+      4.5,
+      4.625,
+      4.75,
+      4.875,
+      5.0,
+      5.125,
+      5.25,
+      5.375,
+      5.5,
+      5.625,
+      5.75,
+      5.875,
+      6.0
+    ],
+    "development_episodes": 64,
+    "selection": "maximize macro SR, then SPL, then lower premature-stop rate, then lower bias",
+    "sufficient_on_development": {
+      "macro_success_at_least": 0.2,
+      "spl_at_least_step2": true,
+      "premature_stop_rate_at_most_step2": true
+    }
+  },
+  "conditional_training": {
+    "start": "runs/step3_smolvlm2/train/checkpoints/step_001024",
+    "teacher": "goal-first STOP when geodesic task-goal distance <2m, regardless of route progress; ordered-route movement outside",
+    "collection_group": "A",
+    "episodes_per_dataset": 64,
+    "collection_seed": 2,
+    "policy_beta": 0.0,
+    "original_round1_used_for_training": false,
+    "retain_expert_navigation": true,
+    "batch_categories": {
+      "expert_stop": 5,
+      "round2_stop": 1,
+      "hard_nonstop": 10,
+      "expert_navigation": 32,
+      "round2_navigation": 16
+    },
+    "all_sources_use_same_2m_labels": true,
+    "dedup": "cap repeated identical pose+rotation+label states; turns with changed view retained",
+    "max_policy_stop_examples_per_episode": 8,
+    "max_expert_stop_examples_per_episode": 2,
+    "hard_negatives": "outside 2m STOP region; 3-5m states and policy incorrect-STOP states",
+    "updates": 2048,
+    "batch_size": 16,
+    "grad_accum": 4,
+    "learning_rate": 2e-05,
+    "optimizer": "fresh AdamW",
+    "seed": 3,
+    "loss": "existing masked target-token cross-entropy",
+    "checkpoint_selection_updates": [
+      512,
+      1024,
+      2048
+    ]
+  },
+  "confirmation": {
+    "episodes": 224,
+    "scenes": [
+      "1pXnuDYAj8r",
+      "S9hNv5qa7GM",
+      "ULsKaCPVFJR",
+      "Vvot9Ly1tCj",
+      "mJXqzFtmKg4",
+      "rPc6DW4iMge",
+      "sKLMLpTHeUy"
+    ],
+    "controls": [
+      "step2/3072",
+      "step3/1024"
+    ],
+    "extra_control_if_calibration_uses_2048": "step3/2048",
+    "pass": {
+      "absolute_macro_SR_gain_vs_each_control_at_least": 0.05,
+      "paired_scene_bootstrap_SR_difference_lower95_above_zero_vs_each_control": true,
+      "macro_SPL_at_least_step2": true,
+      "premature_stop_rate_at_most_step2": true,
+      "mean_nDTW_drop_vs_unmodified_step3_1024_at_most": 0.05
+    },
+    "bootstrap": "50000 paired scene-resampling replicates, seed 20261025; finite seven-scene pilot uncertainty",
+    "freeze_candidate_and_decoding_before_confirmation": true,
+    "if_calibration_fails_A": "one predeclared training round, then use untouched B; no training/tuning on A",
+    "if_training_fails": "report failure under the locked pass bar; no third round"
+  },
+  "protocol": {
+    "native_batch_one_decoding": true,
+    "rgb": "live simulator",
+    "turn_degrees": 15,
+    "rxr_note": "15 degrees differs from official 30-degree RxR-CE",
+    "success_distance_m": 3.0,
+    "ndtw": "exact DTW with official dense GT locations and Euclidean local distance, normalized by 3m"
+  }
+}

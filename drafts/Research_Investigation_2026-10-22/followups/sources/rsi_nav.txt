@@ -1,0 +1,1390 @@
+=== PDF PAGE 1 ===
+                      Preprint. Under review.
+
+
+         DATA-CENTRIC RECURSIVE SELF-IMPROVEMENT
+         FOR NAVIGATION VIA POLICY-SYNCHRONIZED
+        LANGUAGE-ACTION DUAL BOOTSTRAPPING
+
+
+                   Songze Li∗1,2    Haoming Gu∗3     Ziyang Gong4     Zhitong Wang5
+                 Gengze Zhou6    Zun Wang7    Yuhan Zhu8     Tianxiang Jiang2,9     Juanzi Li5
+                 Qi Wu6    Weinan Zhang3    Yu Qiao2    Wenwei ZhangB 2     Yi WangB 2
+                  1Fudan University     2Shanghai AI Laboratory     3Harbin Institute of Technology
+                   4Shanghai Jiao Tong University     5Tsinghua University     6University of Adelaide
+              7UNC Chapel Hill     8Nanjing University     9University of Science and Technology of China
+
+               https://github.com/OpenGVLab/RSI-Nav2026
+Oct
+                                     Unified capabilities                                                       Multi-task performance
+                                                   Instruction following      Long-horizon navigation                                                         R2R-CE SR  68.611                                                                                                                                                MindCube    93.5                                                                                                                                                     0.86               58.6 R2R-CE SPL
+
+                                                                              “...enter the hallway...”           Multi-step route to the goal                                         SQA3D  65.4                  -1.14                                                                                        -0.64                                                                                        -0.14                -0.140.36                                                            0.36                                                                                    0.86      72.4 RxR-CE SR
+
+
+
+
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   -0.64                                                     Spatial understanding        Instruction generation
+                                                                                                                                              ScanQA     96.4
+                                                                                                                                                                                                                                                                               70.6                                                                 Nightstand                                                                                                                                                                                        RxR-CE                                                                                                                                                                   nDTW
+                                                                        the                                                                beside                                                                                                                                                                                      VSI-Bench                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               -1.14 64.9                                                        bed                                                                                                                                                                      RSI-Nav                                                                                                                                                              NavFoM                                                                                                                                                                                             DualVLN                                                                                                                                                                                                    AwareVLN                                                                               “Go                                                                                                                straight                                                                                        and                                                                                                         then                                                  Qwen3.5-9B                                                                                                                                                                          Cosmos3                                                                                                                                                                                 Nano                                                                                                                                                                                        MiMo                                                                                         in the scene                                                                                                                                                                                                                    Embodied-7B                                                                                                        turn                                                               Object relations                                                                                                              to the                                                                                                                                                               left...”[cs.CV]
+                                          RSI-Nav      Recursive self-improvement
+
+                                                                                                                                                          Navigation                                                                                                                    & Spatial                                                                                                                                                                    Understanding        Trajectory Captioning          Generate Instructions                                            Cold-start data mixture                    One unified model                                                                                                                 & Instruction                                                                                                                                                                            generation
+                                                                                                                                                                                      Path₁: walk to...
+                                                               Navigation
+                                                                                     Navigation                                                                        Path₂: turn near...
+                                      VLA
+
+                                                                                           Spatial
+                                                      VSI      Spatial  VA2L                                                                                                        instruction₁
+                                                                             Understanding                                                                                                               instruction₂ ×
+                                                                                                       Instruction
+                                                                                            Generation        InstrGen                                                                                                       Qualifiedkeep         Rejectedfilter
+                                                        LLaVA-3D                                                                      Policy Evolving             Execute & Filter
+
+
+
+                   Figure 1: RSI-Nav unifies navigation, instruction generation, and spatial understanding in one
+                  model, and recursively improves through policy-synchronized language-action dual bootstrapping.arXiv:2610.15782v1                                     ABSTRACT
+
+                           Vision-language navigation requires agents to follow natural-language instruc-
+                               tions to reach target locations, making high-quality language supervision essen-
+                                       tial. Since human annotation is costly, prior work has explored scalable data syn-
+                                thesis methods. However, existing methods typically either use separate models
+                               for navigation and instruction generation or couple the two tasks through task-
+                               specific components; most also annotate the full trajectory corpus with a fixed
+                        model before updating, which can cause generated supervision to lag behind the
+                            evolving policy. Therefore, we introduce RSI-Nav, a data-centric recursive self-
+                         improvement framework for navigation via policy-synchronized language-action
+                            dual bootstrapping, which unifies vision-language-to-action instruction follow-
+                            ing and vision-action-to-language instruction generation within a shared model.
+                        *Equal contribution. B Corresponding authors.
+                        † This work was performed at Shanghai AI Laboratory.
+
+
+                                                        1
+
+=== PDF PAGE 2 ===
+Preprint. Under review.
+
+
+
+
+
+          Specifically,  after supervised fine-tuning establishes fundamental capabilities,
+       RSI-Nav progressively processes unlabeled trajectories in small shards. The cur-
+         rent model generates instructions for these trajectories, executes them to evaluate
+        goal completion and path efficiency, retains qualified samples, and immediately
+        updates itself before processing the next shard.  This shard-wise update keeps
+       newly generated supervision aligned with the evolving policy. We also incorpo-
+          rate spatial understanding data, since stronger spatial reasoning benefits naviga-
+          tion. Extensive experiments show that RSI-Nav reaches 68.6% SR on R2R-CE
+       and 72.4% SR on RxR-CE, while providing stronger instruction-generation utility
+       and modestly improved spatial understanding after recursive evolution.
+
+
+1  INTRODUCTION
+
+Vision-language navigation (VLN) requires an embodied agent to ground natural-language instruc-
+tions in visual observations and execute sequential actions to reach a target. This task begins with
+R2R (Anderson et al., 2018) and has expanded to longer-range navigation in RxR (Ku et al., 2020),
+goal-oriented settings such as REVERIE (Qi et al., 2020) and SOON (Zhu et al., 2021), and con-
+tinuous navigation in VLN-CE (Krantz et al., 2020). These increasingly challenging settings place
+greater demands on language grounding, spatial reasoning, and long-horizon decision making. Ac-
+cordingly, research has progressed from improving navigation architectures and learning strate-
+gies (Chen et al., 2021; 2022a; Wang et al., 2023b; An et al., 2024) to scaling instruction-trajectory
+supervision through automatic data synthesis (Chen et al., 2022b; Wang et al., 2023c; 2025b).
+
+Scalable data synthesis allows navigation agents to learn from large amounts of unlabeled trajecto-
+ries that would otherwise lack language supervision. Early methods use speaker models and back-
+translation to generate instructions for additional trajectories (Fried et al., 2018; Tan et al., 2019),
+while later work substantially scales this paradigm with larger environments and stronger instruc-
+tion generators (Chen et al., 2022b; Wang et al., 2023c; 2025b;a). Despite this progress, current
+pipelines still leave substantial room for improvement. Most methods learn instruction generation
+and navigation separately, while existing dual-learning approaches typically rely on task-specific ar-
+chitectures (Wang et al., 2022; 2023a), limiting the benefit of bidirectional language-action learning.
+In addition, synthetic instructions are commonly generated by a fixed model, and the navigation pol-
+icy is updated only after a large set of trajectories has been annotated. As the policy improves, the
+generated supervision can therefore become increasingly mismatched with the model being trained.
+These limitations call for a learning process that jointly exploits the two directions of language-
+action grounding while keeping newly generated supervision synchronized with the current policy.
+
+This connection is particularly natural in navigation. More generally, complementary capabilities
+can benefit each other when one provides feedback for the other. An unlabeled trajectory can first
+be described as a route instruction and then executed again from its starting point, forming two
+complementary directions of language-action grounding. Instruction generation maps visual-action
+experience to language, while navigation maps language and visual observations back to actions. A
+faithful instruction should capture the navigation task well enough to guide the agent to the intended
+goal efficiently, making navigation execution a direct way to evaluate the generated supervision.
+When both capabilities are handled by the same evolving model, execution feedback can filter and
+improve language supervision, which in turn provides better data for subsequent navigation learning.
+
+Based on this observation, we introduce RSI-Nav, a data-centric recursive self-improvement frame-
+work for navigation via policy-synchronized language-action dual bootstrapping. RSI-Nav uses a
+shared model to unify instruction following and generation for dual bootstrapping. We first apply
+supervised fine-tuning to establish basic capabilities for navigation and trajectory annotation. The
+model then progressively processes unlabeled trajectories in small shards. For each shard, the model
+generates instructions and executes them. The resulting rollouts assess whether generated instruc-
+tions can guide the current model to the intended goal efficiently, and only qualified instruction-
+trajectory pairs are retained. The model is then immediately updated before the next shard. As a
+result, the updated model generates and evaluates the rollouts used in subsequent training, rather
+than relying on data produced by a fixed annotator at the beginning of the process. This shard-
+wise update keeps the generated supervision closely aligned with the evolving policy and forms a
+recursive process in which better models produce better training data for subsequent improvement.
+
+
+                                       2
+
+=== PDF PAGE 3 ===
+Preprint. Under review.
+
+
+
+
+
+    (a) Task-specific dual learning      (b) Two-model bootstrapping                    (c) Our RSI-Nav
+
+          Task-specific model                 Instruction generator                     RSI-Nav πt
+          Shared encoders                                                              Navigation         Instruction generation
+                                         Generate             Train
+                                                                                           Generate, execute & filter
+       Action decoder   Language decoder                                                                                                                                                                                                                      shard
+                                                 Offline synthetic data               Policy-synchronized self-generated data
+                                                                                                                                                                                                                                                 Next
+               Joint training                    Train                 Filter                     Immediate update
+
+           Offline paired data                   Instruction follower                     RSI-Nav πt+1
+
+
+Figure 2: Comparison of three VLN training paradigms. (a) Dual-task learning relies on task-
+specific architectures and costly human annotation. (b) Data flywheel refines data at scale with sep-
+arate navigation and instruction-generation models. (c) RSI-Nav generates and filters data with the
+current policy and updates immediately after each shard, forming a policy-synchronized language-
+action dual bootstrapping loop for data-centric recursive self-improvement.
+
+
+Beyond language-action dual learning, we also incorporate spatial understanding into the same
+model, as spatial reasoning is crucial for interpreting routes and making navigation decisions (Ma
+et al., 2022; Cheng et al., 2024; Yang et al., 2025).  Joint training with spatial-understanding
+data strengthens this capability and in turn benefits navigation. We evaluate RSI-Nav on continu-
+ous vision-language navigation, trajectory-to-instruction generation, and spatial understanding. On
+R2R-CE (Krantz et al., 2020) and RxR-CE (Ku et al., 2020), RSI-Nav consistently improves nav-
+igation performance over its supervised initialization. The evolved model also maintains strong
+spatial understanding, with modest improvements on all four evaluated benchmarks over its super-
+vised initialization, while its generated instructions provide stronger training utility for subsequent
+navigation. We further analyze the self-improvement process, examining policy synchronization,
+dual learning, action-conditioned instruction generation, and spatial supervision. These analyses
+explain why the proposed process improves both generated supervision and the navigation policy.
+Generally, our contributions can be summarized as follows:
+
+• We present RSI-Nav, a data-centric recursive self-improvement framework that unifies instruction
+  following, instruction generation, and spatial understanding within a single model, where dual
+  language-action learning provides complementary supervision to improve navigation.
+• We obtain large-scale execution-verified instructions paired with source trajectories as well as a
+  strong unified model. To our knowledge, RSI-Nav is the first navigation framework to combine
+  unified language-action dual learning with policy-synchronized recursive self-improvement.
+• We demonstrate strong navigation performance on VLN-CE benchmarks, including leading suc-
+  cess rates among the compared methods, while maintaining strong spatial understanding. Analy-
+  ses examine key components of the pipeline to explain how and why RSI-Nav improves.
+
+2  RELATED WORK
+
+Vision-and-Language Navigation.  Vision-and-Language Navigation (VLN) requires agents to
+follow natural-language instructions and navigate to target locations in visual environments. Exist-
+ing scenarios include navigation with detailed action instructions (Anderson et al., 2018; Ku et al.,
+2020; Thomason et al., 2020), remote object navigation with coarse-grained instructions (Zhu et al.,
+2021; Qi et al., 2020), and navigation in continuous environments (Kolve et al., 2017; Krantz et al.,
+2020; Hong et al., 2022).  Substantial progress has been made through vision-language pretrain-
+ing and history modeling (Hao et al., 2020; Chen et al., 2021; Guhur et al., 2021), explicit map
+construction and planning (Chen et al., 2022a; Wang et al., 2023b; An et al., 2024), and modern
+vision-language models that directly predict navigation actions (Zhou et al., 2024; Zheng et al.,
+2024; Zhang et al., 2024). However, the high cost of human annotation remains a major bottleneck,
+motivating automatic data augmentation and synthesis. Early methods use speaker models and back-
+translation (Fried et al., 2018; Tan et al., 2019), while later work exploits large-scale environments
+and synthetic instructions to construct millions of instruction-trajectory pairs (Chen et al., 2022b;
+
+
+                                       3
+
+=== PDF PAGE 4 ===
+Preprint. Under review.
+
+
+
+
+
+Wang et al., 2023c; 2025b; Li et al., 2025). Recent studies further highlight spatial understanding,
+including situated 3D reasoning and spatial memory (Yang et al., 2025; Yin et al., 2025).
+
+Complementary Learning and Mutual Bootstrapping.  Learning complementary capabilities
+together provides supervision and supports joint improvement across multiple abilities. In machine
+translation, dual learning couples forward and backward translation to provide richer mutual feed-
+back (He et al., 2016). Similar ideas also appear in mathematical reasoning, where a language model
+acts as both solver and verifier (Weng et al., 2023; Lightman et al., 2023), with recent work jointly
+training answer generation and self-verification in a single model (Zhang et al., 2025a). These meth-
+ods broadly share the principle that complementary capabilities can provide supervision or feedback
+for one another. In VLN, instruction following and generation form a similar bidirectional language-
+action relationship. Prior work realizes this through separate speaker and follower models, where
+generated instructions mainly serve as augmentation or scoring signals, or through task-specific
+architectures and consistency objectives (Fried et al., 2018; Wang et al., 2022; 2023a).
+
+Recursive Self-Improvement.  Recursive self-improvement (RSI) broadly studies how an AI sys-
+tem can contribute to improving its subsequent versions.  In the data-centric setting, RSIBench-
+Data (Meng et al., 2026) frames this as turning model failures and checkpoint feedback into better
+training data and, in turn, better models. Related approaches generate, filter, or verify model outputs
+for subsequent training in language reasoning (Zelikman et al., 2022; Dong et al., 2023; Xiong et al.,
+2025; Yuan et al., 2024) and embodied agents (Bousmalis et al., 2023; Lin et al., 2025). In VLN,
+SRDF (Wang et al., 2025b) iteratively refines synthetic instructions, self-correction methods (Yu
+et al., 2026) mine failure trajectories, and SID-VLN (Li et al., 2025) reuses successful exploration
+trajectories. However, these methods generally separate data generation and model updates into
+relatively coarse rounds, allowing supervision to lag behind the evolving policy.
+
+
+3  METHODOLOGY
+
+RSI-Nav learns from unlabeled navigation trajectories through policy-synchronized language-action
+dual bootstrapping. As illustrated in Fig. 3, the framework begins with supervised initialization and
+recursively improves both the model and its generated supervision. We first introduce the contin-
+uous VLN setting, followed by a shared model that unifies instruction following, instruction gen-
+eration, and spatial understanding in Sec. 3.1.  Sec. 3.2 presents the core data-centric recursive
+self-improvement process, where the current policy generates instructions, executes them to assess
+goal completion and path efficiency, retains qualified samples, and updates itself before processing
+the next trajectory shard. Finally, Sec. 3.3 describes how we curate supervision for initialization and
+recursive evolution, including spatial-data replay and newly generated instruction-trajectory pairs.
+
+Preliminary.  We consider vision-language navigation in continuous environments, where an agent
+follows a natural-language instruction through low-level interaction with the environment.  At
+step t, the agent receives an egocentric RGB observation ot and selects an action at ∈A =
+{FORWARD, LEFT, RIGHT, STOP}. A navigation trajectory is represented as
+
+                                     τi = (o1, a1, o2, a2, . . . , oT , aT ) ,                               (1)
+where T denotes the trajectory length. Each trajectory starts from an initial state sstarti    and ter-
+minates at a target location defined by its final state. Given a natural-language instruction xi, the
+agent is required to reach the corresponding target efficiently. We use the term policy-synchronized
+rather than strict on-policy learning. The source trajectories remain offline, while instruction gen-
+eration and execution-based evaluation are repeatedly refreshed by the current model, reducing the
+gap between generated supervision and the evolving policy, as detailed in Sec. 3.2.
+
+
+3.1 A UNIFIED VISION-LANGUAGE-ACTION MODEL
+
+RSI-Nav is built on Qwen3.5-9B and uses a single model for instruction following, instruction gen-
+eration, and spatial understanding. All capabilities share the same model parameters and are dis-
+tinguished by task-specific prompts, without separate generators, verifiers, or output heads. We
+formulate the two complementary language-action tasks and present spatial understanding below.
+
+
+                                       4
+
+=== PDF PAGE 5 ===
+Preprint. Under review.
+
+
+
+
+                       Data-Centric Recursive Self-Improvement
+
+    Unlabeled trajectory shard                             Language-action loop with the same current policy
+                                              1  Generate               2  Execute                 3   Filter
+
+                              RSI-Nav           RSI-Nav                       Goal not reached
+                                           “Walk through the door,                                          Reached, inefficient
+                                                 then turn right...
+              Action sequence                     stop by the couch.”                                            Reached, efficient
+
+       Navigation Performance                   Immediate update before the next shard                      Keep
+               Prior best   Cold start  RSI-Nav                                                                       Accepted training pairs
+      80.0        65.4              68.6           67.6              72.4
+      60.0                 52.9                             54.7                                                                                              “Walk through the door, then
+   (%)      40.0                                   RSI-Nav                                                         turn right... stop by the couch.”
+  SR
+      20.0
+        0.0                                  Policy-Synchronized Dual Bootstrapping
+            R2R-CE        RxR-CE                                                                                                               Original trajectory and actions
+
+Figure 3: Overview of RSI-Nav. The current policy generates instructions for unlabeled trajectories
+and executes them to evaluate goal completion and efficiency. Qualified instructions are paired with
+the original trajectories to train instruction following and instruction generation jointly. The model
+is then updated with the accepted samples and spatial replay data before processing the next shard.
+
+
+Instruction Following.  At navigation step t, the agent maintains an observation history Ht =
+{o1, . . . , ot} and uniformly samples eight frames as visual context eHt. Conditioned on instruction
+x, eHt, and the task prompt, the model predicts a four-action chunk ct = (at, at+1, at+2, at+3). We
+optimize the standard cross-entropy loss over the predicted action chunk:
+
+                                                  3
+             LIF = −log pθ(ct | x, eHt) = − X log pθ(at+j | x, eHt, at:t+j−1).             (2)
+                                          j=0
+
+Instruction Generation.  For the reverse direction, the model uniformly samples 32 frames eVτi
+from the trajectory and uses the full action sequence Aτi = (a1, . . . , aT ) as input. Given these
+inputs and the task prompt, the model generates x = (w1, . . . , wM) with the objective:
+
+                           M
+           LIG = −log pθ(x | eVτi, Aτi) = − X log pθ(wm | eVτi, Aτi, w<m).             (3)
+                                   m=1
+
+Spatial Understanding.  We further incorporate spatial-understanding training data, which pro-
+vide an important scaffold for embodied decision making and navigation (Gong et al., 2026; Team
+et al., 2026). These samples are trained under the same token-level objective, denoted as Lspa.
+
+3.2  POLICY-SYNCHRONIZED RECURSIVE SELF-IMPROVEMENT
+
+With the shared instruction-following and instruction-generation model defined above, RSI-Nav
+recursively improves on a large corpus of unlabeled continuous trajectories. We partition the corpus
+into small, non-overlapping trajectory shards U = {B1, B2, . . . , BK} and process each trajectory
+once. After each shard, the model is immediately updated before generating new supervision for the
+next one. This fine-grained update keeps data generation and execution-based evaluation close to
+the current policy, rather than relying on a fixed model over the entire corpus.
+
+Generate, Execute, and Filter.  For each trajectory τi ∈Bk, the model generates an instruction ˆxi
+from the visual-action trajectory and then follows ˆxi from the original start state. The endpoint of τi
+serves as the navigation target. This execution tests whether the generated instruction can guide the
+current model to the intended destination efficiently. We retain a sample based on goal completion
+and path efficiency. An execution is considered successful if its final position is within 3 m of the
+target. We further use SPL to measure navigation efficiency and define the acceptance indicator as
+                                   qi = I [di < 3 m ∧SPLi ≥τSPL] ,                             (4)
+
+
+                                       5
+
+=== PDF PAGE 6 ===
+Preprint. Under review.
+
+
+
+
+where di is the geodesic distance from the final position to the target and τSPL is a fixed efficiency
+threshold. Only samples satisfying both criteria are retained for subsequent training.
+
+Dual Bootstrapping and Shard-Wise Update.  The filtering stage determines which generated
+instructions are reliable enough for training. For each accepted pair (τi, ˆxi), we retain the original
+trajectory τi.  Since ˆxi is generated from τi, successful and efficient execution toward the same
+goal provides an execution-grounded check that the instruction is executable and consistent with the
+navigation task represented by the source trajectory. We therefore retain the original trajectory as the
+supervision target rather than the executed trajectory, avoiding the accumulation of execution errors
+and the cost of repeatedly re-rendering continuous trajectories in Habitat. Keeping the trajectory
+fixed also focuses recursive improvement on the generated language supervision.
+
+Each accepted pair provides supervision for both complementary directions. For instruction fol-
+lowing, ˆxi is paired with the observation histories and original actions along τi; for instruction
+generation, (eVτi, Aτi) is paired with ˆxi. For shard Bk, these accepted samples form DIFk  and DIGk  ,
+respectively. During the shard-wise update, we mix them with spatial-understanding data replayed
+from supervised initialization. The overall training objective is
+                   Lk = LIF DIFk + LIG DIGk  + Lspa (Rspak  ) .                        (5)
+Here, LIF and LIG follow the objectives defined in Sec. 3.1, while Lspa denotes the corresponding
+loss on spatial-understanding samples. This decomposition only distinguishes the three supervision
+sources; in practice, all samples are mixed and jointly optimized with a single SFT objective. The
+resulting θk is immediately used to process the next trajectory shard.
+
+Recursive Self-Improvement.  The updated model θk immediately processes the next shard Bk+1.
+Refreshing instruction generation and execution-based filtering ensures that new supervision is pro-
+duced by the latest model rather than a fixed policy. Repeating this cycle allows the model and
+its generated supervision to co-evolve across shards, while replayed spatial-understanding data help
+maintain the capability acquired during SFT initialization. The full evolution yields a stronger uni-
+fied model and a large collection of execution-verified instruction-trajectory pairs, detailed in Sec. 4.
+
+3.3  TRAINING DATA AND SUPERVISION
+
+RSI-Nav is initialized with multi-source supervision for instruction following, instruction gener-
+ation, and spatial understanding. We use continuous navigation data from SRDF (Wang et al.,
+2025b), EnvDrop (Tan et al., 2019), ScaleVLN (Wang et al., 2023c), R2R (Anderson et al., 2018),
+and RxR (Ku et al., 2020), and construct corresponding instruction-generation data by reversing
+the trajectory-instruction pairs. Since SRDF trajectories are originally discrete, we convert them
+into continuous trajectories for training, with details in Appendix D. We also incorporate spatial-
+understanding data from VSI-590K (Yang et al., 2026), 546K samples from LLaVA-3D (Zhu et al.,
+2024), and MindCube (Yin et al., 2025). All data are mixed for standard supervised fine-tuning,
+with the same spatial data replayed during recursive evolution. Starting from unlabeled continuous
+trajectories, RSI-Nav generates about 2.5M instruction-following samples and 1.1M instruction-
+generation samples through policy-synchronized recursive improvement.
+
+4  EXPERIMENTS
+
+Implementation Details.  RSI-Nav is built on Qwen3.5-9B and trained in two stages on 64 GPUs.
+First, we perform supervised fine-tuning for one epoch on the multi-source data described in Sec. 3.3,
+using a learning rate of 5×10−6, a global batch size of 128, and AdamW optimization. We then con-
+duct recursive self-improvement on the unlabeled trajectory corpus, partitioned into non-overlapping
+shards of 16,384 trajectories. After each shard, qualified instruction-trajectory pairs are immediately
+used for model updating together with spatial-understanding replay before processing the next shard.
+
+Benchmarks and Evaluation Metrics.  We evaluate navigation on R2R-CE (Krantz et al., 2020)
+and RxR-CE (Ku et al., 2020) using their validation-unseen splits. Following prior work, we report
+Navigation Error (NE), Oracle Success Rate (OSR), Success Rate (SR), and Success weighted by
+Path Length (SPL) on R2R-CE, and additionally nDTW on RxR-CE for trajectory alignment. For
+
+
+                                       6
+
+=== PDF PAGE 7 ===
+Preprint. Under review.
+
+
+
+
+Table 1: Comparison on R2R-CE and RxR-CE Val-Unseen and four spatial-understanding
+benchmarks. ∗denotes methods using the waypoint predictor from Hong et al. (2022).
+
+
+                                             Observation                      Spatial Understanding           R2R-CE Val-Unseen    RxR-CE Val-Unseen
+Method
+                             S.RGB Pano. Depth Odo. VSI-Bench↑ScanQA↑SQA3D↑MindCube↑NE↓OSR↑SR↑SPL↑NE↓SR↑SPL↑nDTW↑
+
+ Waypoint-Predictor-Based VLN Models
+VLN⟳BERT∗(Hong et al., 2022)        ✓  ✓  ✓          -              -            -              -      5.74  53.0  44.0  39.0  8.98  27.0  22.6    46.7
+Sim2Sim∗(Krantz & Lee, 2022)         ✓  ✓  ✓          -              -            -              -      6.07  52.0  43.0  36.0     -       -       -         -
+GridMM∗(Wang et al., 2023b)         ✓  ✓  ✓          -              -            -              -      5.11  61.0  49.0  41.0     -       -       -         -
+Reborn∗(An et al., 2022)            ✓  ✓  ✓          -              -            -              -      5.40  57.0  50.0  46.0  5.98  48.6  42.0    63.3
+ETPNav∗(An et al., 2024)           ✓  ✓  ✓          -              -            -              -      4.71  65.0  57.0  49.0  5.64  54.7  44.8    61.9
+HNR∗(Wang et al., 2024)            ✓  ✓  ✓          -              -            -              -      4.42  67.0  61.0  51.0  5.50  56.3  46.7    63.5
+BEVBert∗(An et al., 2023)           ✓  ✓  ✓          -              -            -              -      4.57  67.0  59.0  50.0     -       -       -         -
+SRDF∗(Wang et al., 2025b)           ✓  ✓  ✓          -              -            -              -      4.12     -    65.0  57.0     -       -       -         -
+
+RGB-Based Continuous VLN Models
+ InstructNav (Long et al., 2024)          ✓  ✓  ✓          -              -            -              -      6.89     -    31.0  24.0     -       -       -         -
+LAW (Raychaudhuri et al., 2021)     ✓      ✓  ✓          -              -            -              -      6.83  44.0  35.0  31.0 10.90  8.0   8.0    38.0
+Dynam3D (Wang et al., 2026)      ✓      ✓  ✓          -              -            -              -      5.34  62.1  52.9  45.7     -       -       -         -
+ AO-Planner (Chen et al., 2024)         ✓  ✓                  -              -            -              -      5.55  59.0  47.0  33.0  7.06  43.3  30.5    50.1
+ Seq2Seq (Krantz et al., 2020)       ✓      ✓                  -              -            -              -      7.77  37.0  25.0  22.0 12.10 13.9  11.9    30.8
+CMA (Krantz et al., 2020)        ✓      ✓                  -              -            -              -      7.37  40.0  32.0  30.0     -       -       -         -
+ Uni-NaVid (Zhang et al., 2025b)     ✓                                    -              -            -              -      5.58  53.3  47.0  42.7  6.24  48.7  40.9       -
+NaVILA (Cheng et al., 2025)       ✓                                    -              -            -              -      5.22  62.5  54.0  49.0  6.77  49.3  44.0    58.8
+StreamVLN (Wei et al., 2025)      ✓                                    -              -            -              -      4.98  64.2  56.9  51.9  6.22  52.9  46.0    61.9
+NavFoM (Zhang et al., 2026)       ✓                                    -              -            -              -      4.61  72.1  61.7  55.3  4.74  64.4  56.2    65.8
+JanusVLN (Zeng et al., 2026)      ✓                                    -              -            -              -      4.78  65.2  60.5  56.8  6.06  56.2  47.5    62.1
+DualVLN (Wei et al., 2026)       ✓                                    -              -            -              -      4.05  70.7  64.3  58.5  4.58  61.4  51.8    70.0
+AwareVLN (Guo et al., 2026)      ✓                                    -              -            -              -      4.02  73.5  65.4  55.1  3.95  67.6  56.1    65.7
+
+ Spatial Understanding Models
+ RoboBrain2.5-8B (Tan et al., 2026)    ✓                          41.0       63.1      28.1       28.1        -       -       -       -       -       -       -         -
+MiMo Embodied-7B (Hao et al., 2025)  ✓                          48.5       55.5      44.6       32.3        -       -       -       -       -       -       -         -
+Qwen3.5-9B (Qwen Team, 2026)     ✓                          61.0       73.1      55.3       33.1        -       -       -       -       -       -       -         -
+Embodied R1.5 (Yuan et al., 2026)    ✓                          56.1       67.1      48.2       34.8        -       -       -       -       -       -       -         -
+Cosmos3 Nano (Agarwal et al., 2026)  ✓                          54.9       60.9      44.2       34.8        -       -       -       -       -       -       -         -
+RSI-Nav Cold Start           ✓                          64.6       93.2      65.1       91.8    5.54  66.4  52.9  45.5  5.39  54.7  48.8    62.4
+RSI-Nav (Ours)             ✓                          64.9       96.4      65.4       93.5    3.70  78.0  68.6  58.6  3.53  72.4  56.5    70.6
+
+
+Table 2: Ablation study of SFT data compo-  Table 3: Ablation on policy update granular-
+sition. We examine the effects of dual learning,  ity. Candidate denotes the number of trajectories
+action conditioning, and spatial supervision.      processed per GPU before one policy update.
+
+
+Nav  V2L  VA2L   Spatial  NE↓  OSR↑  SR↑  SPL↑  Candidate     NE↓     OSR↑     SR↑     SPL↑
+✓                           6.19   57.2   44.7   38.6   Cold Start       5.54        66.4        52.9       45.5
+✓  ✓                    5.78   58.1   47.0   38.8  64              5.57        62.9        51.9       45.9
+✓      ✓             5.69   59.9   48.8   41.0  256             4.91        68.7        57.2       48.7
+✓      ✓   ✓     5.54   66.4   52.9   45.5  1024            5.03        68.1        55.1       46.3
+
+
+
+trajectory-to-instruction generation, we report BLEU-1, BLEU-4, METEOR, ROUGE, CIDEr, and
+SPICE. Since prior methods are mainly evaluated in discrete Matterport3D environments, whereas
+RSI-Nav operates in continuous VLN-CE with Habitat observations, these NLP scores serve as ref-
+erence rather than strictly controlled comparisons. We further evaluate spatial understanding on
+VSI-Bench (Yang et al., 2025), ScanQA (Azuma et al., 2022), SQA3D (Ma et al., 2022), and Mind-
+Cube (Yin et al., 2025), reporting VSI Overall, ScanQA CIDEr, SQA3D EM1-R, and MindCube
+Accuracy, respectively. In the main comparison, we distinguish single-view RGB, panoramic RGB,
+depth, and odometry inputs, and separately mark methods using waypoint predictors.
+
+
+Real-World Evaluation Setup.  For real-world evaluation, we deploy RSI-Nav on a DEEP
+Robotics M20 robot. RSI-Nav runs on a remote server equipped with an NVIDIA GeForce RTX
+4090 GPU and continuously processes egocentric RGB observations and language instructions to
+generate navigation actions for closed-loop execution. We evaluate the agent in both indoor and
+outdoor environments with tasks covering obstacle avoidance, narrow-space navigation, instruction
+following, open-vocabulary landmark grounding, and long-horizon navigation.
+
+
+4.1  MAIN RESULTS
+
+Comparison with Prior Methods.  Tab. 1 compares RSI-Nav with previous methods on R2R-CE,
+RxR-CE, and four spatial-understanding benchmarks. On navigation, RSI-Nav achieves strong per-
+formance on R2R-CE and RxR-CE Val-Unseen, reaching 68.6% SR and 58.6% SPL on R2R-CE,
+and 72.4% SR, 56.5% SPL, and 70.6 nDTW on RxR-CE. Compared with the supervised initializa-
+
+
+                                       7
+
+=== PDF PAGE 8 ===
+Preprint. Under review.
+
+
+
+
+       Object                                                                                                                                                                          SpaceNarrow   Avoidance
+            Instruction: Walk forward and go around the yellow chair. Continue toward                  Instruction: Walk toward the door under the green exit sign. Go through the
+            the plant on your left and stop in front of the plant on your right.                       opened door and stop in the hallway outside.
+
+  FollowingInstruction                                                                                                                                                                                                                                                                                Landmark
+                                                                                                      Instruction: Walk forward toward the humanoid robot standing beside the            Instruction: Walk forward until the crossroad, and then turn left. Stop in front                                        Open-vocabulary     wooden box. Pass the robot on its right, then continue toward the glass
+            of the glass door.                                                             doorway behind it. Stop in front of the doorway.
+
+  Room-x- RoomLong-horizon
+            Instruction: Right now you are facing towards a potted plant, go straight along the pathway towards the doorway. Now take a left turn and go forward towards the quadruped
+            robot. Now turn around, go forward till you reach the bright room. Turn right, move forward and stop in front of the washing machine.
+
+           In-the-wild
+            Instruction: Walk forward, turn left at the crossroad, go up the steps, and stop.
+
+              Figure 4: Qualitative results of RSI-Nav in real-world environments.
+
+
+
+tion, recursive evolution consistently improves navigation success and trajectory alignment, showing
+that self-generated and execution-verified instructions provide supervision beyond the initial SFT
+stage. The gain in nDTW indicates that the model better follows the instructed route rather than
+merely reaching the goal through alternative paths, which is particularly important for long-horizon
+instruction following. For spatial understanding, RSI-Nav maintains strong performance after evo-
+lution, with modest improvements over its cold-start checkpoint on all four benchmarks. VSI-Bench
+increases from 64.6 to 64.9, ScanQA from 93.2 to 96.4, SQA3D from 65.1 to 65.4, and MindCube
+from 91.8 to 93.5, suggesting that navigation gains coexist with stable spatial understanding.
+
+
+Real-World Qualitative Results.   Fig. 4 presents qualitative results of RSI-Nav in real-world en-
+vironments. RSI-Nav successfully handles diverse navigation scenarios, including obstacle avoid-
+ance, narrow-space traversal, multi-step instruction following, open-vocabulary landmark ground-
+ing, long-horizon room-x-room navigation, and in-the-wild outdoor navigation. These examples
+demonstrate successful closed-loop execution across several real-world scenarios.
+
+
+4.2  ABLATION STUDIES
+
+How Does Policy Synchronization Affect Learning?  We study the update granularity on a fixed
+subset of 64K unlabeled trajectories using 64 GPUs, where candidate denotes the number of trajec-
+tories processed per GPU before each policy update. As shown in Tab. 3, 256 candidates perform
+best, improving SR and SPL most significantly. With only 64 candidates, performance also drops,
+suggesting that each update changes the policy too little for successive policies and their generated
+data to differ meaningfully. In contrast, 1,024 candidates process the entire subset before updating,
+approaching the conventional offline setting and enlarging the policy-data gap. The intermediate
+granularity therefore provides a better balance between meaningful policy evolution and timely su-
+pervision refresh. Based on this ablation, we use 256 candidates per GPU, corresponding to a global
+shard size of 16,384 trajectories on 64 GPUs, for full-scale recursive evolution.
+
+
+Does Dual Learning Benefit Navigation?  We examine whether instruction generation provides
+useful supervision for instruction following. As shown in Tab. 2, adding VA2L data improves SR
+from 44.7% to 48.8% and SPL from 38.6% to 41.0% over navigation-only training, confirming that
+trajectory annotation benefits navigation. Tab. 5 further shows that joint instruction following and
+generation substantially improves navigation while causing minor changes in instruction-generation
+metrics. This indicates that the two tasks can be jointly optimized with little loss in annotation qual-
+ity, while the complementary trajectory-to-language supervision provides clear gains for navigation.
+
+
+                                       8
+
+=== PDF PAGE 9 ===
+Preprint. Under review.
+
+
+
+
+Table 4: Trajectory-to-instruction generation and training utility. We report some NLP metrics
+for instruction generation and evaluate training utility by training navigation models on the generated
+supervision and measuring downstream R2R-CE navigation performance.
+
+
+                                                         Instruction Generation                         Training Utility
+Method
+                    BLEU-1↑BLEU-4↑METEOR↑ROUGE↑CIDEr↑SPICE↑NE↓OSR↑SR↑SPL↑
+
+ BT-speaker (Fried et al., 2018)     68.2      26.3       21.7       48.0     37.9     18.9      -       -       -       -
+EnvDrop (Tan et al., 2019)         72.3      27.1       23.6       49.0     41.7     21.8      -       -       -       -
+CCC (Wang et al., 2022)           70.8      27.2       23.1       47.7     46.1     21.4      -       -       -       -
+KEFA (Zeng et al., 2023)          73.8      28.3       24.4       50.3     42.7     23.4      -       -       -       -
+LANA (Wang et al., 2023a)        73.6      28.9       23.7       49.8     45.7     22.6      -       -       -       -
+ C-Instructor (Kong et al., 2024)    71.3      26.6       23.9       47.3     44.7     21.2      -       -       -       -
+ BEVInstructor (Fan et al., 2024)    69.9      26.4       23.0       46.7     44.9     20.8      -       -       -       -
+SRDF (Wang et al., 2025b)         75.3      31.1       25.0       51.4     49.2     26.2   5.67  55.2  36.8  30.4
+
+RSI-Nav                         71.0      28.2       23.2       48.5     50.6     20.1   5.58  58.7  41.3  35.1
+
+
+Table 5: Ablation of bidirectional language–action learning.  Joint VL2A–VA2L training sub-
+stantially improves navigation while maintaining comparable instruction-generation quality.
+
+
+ Training Objective Instruction Following (VL2A)                  Instruction Generation (VA2L)
+
+VL2A   VA2L  NE↓OSR↑SR↑   SPL↑  BLEU-1↑BLEU-4↑METEOR↑ROUGE↑CIDEr↑SPICE↑
+ ✓               6.19  57.2  44.7    38.6           -             -              -              -           -          -
+      ✓         -       -       -          -        71.7      28.8       23.3       48.8     49.8     20.6
+ ✓    ✓     5.69  59.9  48.8    41.0       71.0      28.2       23.2       48.5     50.6     20.1
+
+
+
+Are Actions Important for Dual Learning?  Under the same visual input, VA2L consistently
+outperforms V2L, improving SR from 47.0% to 48.8% and SPL from 38.8% to 41.0%. Although
+instruction generation can rely on visual observations alone, incorporating actions establishes a
+stronger dual relation between action-to-language generation and language-to-action navigation.
+This indicates that action information helps more effectively transfer instruction-generation super-
+vision back to navigation; we further examine this effect from the generation side next.
+
+
+How Does Joint Training Affect Instruction Generation?  For RSI-Nav, we use the jointly
+trained VL2A-VA2L generator evaluated in Tab. 5. We examine the reverse benefit of dual learning
+from instruction following to instruction generation. Prior methods are often evaluated in discrete
+Matterport3D settings with panoramic observations, whereas RSI-Nav operates in continuous VLN-
+CE using low-resolution Habitat observations; their NLP scores thus serve only as reference rather
+than strictly comparable baselines. NLP metrics also mainly measure similarity to human-written
+instructions and may not reflect downstream training utility (Gadre et al., 2024). We therefore an-
+notate the same trajectories with different generators and train identical navigation models on the
+resulting data. As shown in Tab. 4, although SRDF scores higher on most NLP metrics, RSI-Nav
+yields substantially better downstream navigation, improving SR from 36.8% to 41.3% and SPL
+from 30.4% to 35.1%. Together with the bidirectional-training results in Tab. 5, these results show
+that joint VL2A-VA2L training benefits navigation while preserving instruction-generation quality,
+and that the resulting RSI-Nav generator yields stronger downstream utility than prior work.
+
+
+Does Spatial Understanding Benefit Navigation?  Adding spatial-understanding supervision on
+top of VA2L further improves all navigation metrics, reducing navigation error while increasing
+success rate and efficiency. The gains support the role of spatial relations and viewpoint reasoning
+in navigation, highlighting spatial understanding as complementary supervision.
+
+
+Limitations.  RSI-Nav still relies on simulated environments and an offline trajectory pool, while
+execution-based filtering incurs considerable computational cost. Although we provide qualitative
+real-world demonstrations, systematic robustness across diverse real-world environments, unseen
+domains, and substantially longer-horizon navigation remains to be established.
+
+
+                                       9
+
+=== PDF PAGE 10 ===
+Preprint. Under review.
+
+
+
+
+5  CONCLUSION
+
+We introduce RSI-Nav, a data-centric recursive self-improvement framework for navigation via
+policy-synchronized language-action dual bootstrapping. RSI-Nav unifies instruction following,
+generation, and spatial understanding in one shared policy, turning unlabeled trajectories into super-
+vision through instruction generation, execution-based filtering, and shard-wise updates. By refresh-
+ing supervision with the latest model, RSI-Nav maintains policy-synchronized learning while jointly
+training instruction following and generation. Experiments on R2R-CE and RxR-CE demonstrate
+strong navigation improvements, while spatial-understanding evaluations show modest gains over
+supervised initialization and generated instructions provide useful downstream navigation supervi-
+sion. Ablations examine the effects of update granularity, dual-task training, action conditioning,
+and spatial supervision. Overall, RSI-Nav shows that large-scale unlabeled navigation trajectories
+support model improvement through generated and filtered supervision, providing a scalable direc-
+tion for self-improving embodied navigation. We discuss limitations and future work in Appendix H.
+
+
+AI USE DISCLOSURE
+
+We used generative AI tools only to assist with language polishing and editing of the manuscript,
+and with software programming. All AI-assisted text was reviewed and revised by the authors, and
+all AI-assisted code was inspected and tested for correctness. The authors take full responsibility for
+the final content of this work.
+
+
+REFERENCES
+
+Niket Agarwal, Arslan Ali, Jon Allen, Martin Antolini, Adeline Aubame, Alisson Azzolini, Junjie
+  Bai, Maciej Bala, Yogesh Balaji, Josh Bapst, et al. Cosmos 3: Omnimodal world models for
+  physical ai. arXiv preprint arXiv:2606.02800, 2026.
+
+Dong An, Zun Wang, Yangguang Li, Yi Wang, Yicong Hong, Yan Huang, Liang Wang, and Jing
+  Shao. 1st place solutions for rxr-habitat vision-and-language navigation competition. In CVPRW,
+  2022.
+
+Dong An, Yuankai Qi, Yangguang Li, Yan Huang, Liang Wang, Tieniu Tan, and Jing Shao. Bevbert:
+  Multimodal map pre-training for language-guided navigation. In Proceedings of the IEEE/CVF
+  International Conference on Computer Vision, pp. 2737–2748, 2023.
+
+Dong An, Hanqing Wang, Wenguan Wang, Zun Wang, Yan Huang, Keji He, and Liang Wang. Etp-
+  nav: Evolving topological planning for vision-language navigation in continuous environments.
+  IEEE Transactions on Pattern Analysis and Machine Intelligence, 2024.
+
+Peter Anderson, Qi Wu, Damien Teney, Jake Bruce, Mark Johnson, Niko S¨underhauf, Ian Reid,
+  Stephen Gould, and Anton van den Hengel.   Vision-and-language navigation:  Interpreting
+  visually-grounded navigation instructions in real environments. In Proceedings of the IEEE Con-
+  ference on Computer Vision and Pattern Recognition, pp. 3674–3683, 2018.
+
+Daichi Azuma, Taiki Miyanishi, Shuhei Kurita, and Motoaki Kawanabe. Scanqa: 3d question an-
+  swering for spatial scene understanding. In CVPR, 2022.
+
+Konstantinos Bousmalis, Giulia Vezzani, Dushyant Rao, Coline Devin, Alex X Lee, Maria Bauza,
+  Todor Davchev, Yuxiang Zhou, Agrim Gupta, Akhil Raju, et al.  Robocat: A self-improving
+  foundation agent for robotic manipulation. arXiv preprint arXiv:2306.11706, 2023.
+
+Jiaqi Chen, Bingqian Lin, Xinmin Liu, Xiaodan Liang, and Kwan-Yee K Wong.  Affordances-
+  oriented planning using foundation models for continuous vision-language navigation.  arXiv
+   preprint, 2024.
+
+Shizhe Chen, Pierre-Louis Guhur, Cordelia Schmid, and Ivan Laptev. History aware multimodal
+  transformer for vision-and-language navigation. Advances in Neural Information Processing Sys-
+  tems, 34:5834–5847, 2021.
+
+
+                                       10
+
+=== PDF PAGE 11 ===
+Preprint. Under review.
+
+
+
+
+
+Shizhe Chen, Pierre-Louis Guhur, Makarand Tapaswi, Cordelia Schmid, and Ivan Laptev. Think
+   global, act local:  Dual-scale graph transformer for vision-and-language navigation.  In Pro-
+  ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pp. 16537–
+  16547, 2022a.
+
+Shizhe Chen, Pierre-Louis Guhur, Makarand Tapaswi, Cordelia Schmid, and Ivan Laptev. Learning
+  from unlabeled 3d environments for vision-and-language navigation. In European Conference on
+  Computer Vision, pp. 638–655. Springer, 2022b.
+
+An-Chieh Cheng, Hongxu Yin, Yang Fu, Qiushan Guo, Ruihan Yang, Jan Kautz, Xiaolong Wang,
+  and Sifei Liu. Spatialrgpt: Grounded spatial reasoning in vision-language models. In NeurIPS,
+  2024.
+
+An-Chieh Cheng, Yandong Ji, Zhaojing Yang, Zaitian Gongye, Xueyan Zou, Jan Kautz, Erdem
+  Bıyık, Hongxu Yin, Sifei Liu, and Xiaolong Wang. Navila: Legged robot vision-language-action
+  model for navigation. Robotics: Science and Systems, 2025.
+
+Hanze Dong, Wei Xiong, Deepanshu Goyal, Yihan Zhang, Winnie Chow, Rui Pan, Shizhe Diao,
+  Jipeng Zhang, Kashun Shum, and Tong Zhang. Raft: Reward ranked finetuning for generative
+  foundation model alignment. arXiv preprint arXiv:2304.06767, 2023.
+
+Sheng Fan, Rui Liu, Wenguan Wang, and Yi Yang.  Navigation instruction generation with bev
+  perception and large language models. In European Conference on Computer Vision, pp. 368–
+  387. Springer, 2024.
+
+Daniel Fried, Ronghang Hu, Volkan Cirik, Anna Rohrbach, Jacob Andreas, Louis-Philippe
+  Morency, Taylor Berg-Kirkpatrick, Kate Saenko, Dan Klein, and Trevor Darrell. Speaker-follower
+  models for vision-and-language navigation. In Advances in Neural Information Processing Sys-
+  tems, pp. 3314–3325, 2018.
+
+Samir Yitzhak Gadre, Gabriel Ilharco, Alex Fang, Jonathan Hayase, Georgios Smyrnis, Thao
+  Nguyen, Ryan Marten, Mitchell Wortsman, Dhruba Ghosh, Jieyu Zhang, et al. Datacomp: In
+  search of the next generation of multimodal datasets. Advances in Neural Information Processing
+  Systems, 36, 2024.
+
+Ziyang Gong, Zehang Luo, Anke Tang, Zhe Liu, Shi Fu, Zhi Hou, Ganlin Yang, Weiyun Wang,
+  Xiaofeng Wang, Jianbo Liu, Gen Luo, Haolan Kang, Shuang Luo, Yue Zhou, Yong Luo, Li Shen,
+  Xiaosong Jia, Yao Mu, Xue Yang, Chunxiao Liu, Junchi Yan, Hengshuang Zhao, Dacheng Tao,
+  and Xiaogang Wang. Ace-brain-0: Spatial intelligence as a shared scaffold for universal embodi-
+  ments, 2026.
+
+Pierre-Louis Guhur, Makarand Tapaswi, Shizhe Chen, Ivan Laptev, and Cordelia Schmid. Airbert:
+  In-domain pretraining for vision-and-language navigation. In Proceedings of the IEEE/CVF In-
+  ternational Conference on Computer Vision, pp. 1634–1643, 2021.
+
+Wenxuan Guo, Xiuwei Xu, Yichen Liu, Xiangyu Li, Hang Yin, Huangxing Chen, Wenzhao Zheng,
+  Jianjiang Feng, Jie Zhou, and Jiwen Lu. Awarevln: Reasoning with self-awareness for vision-
+  language navigation. arXiv preprint arXiv:2605.22816, 2026.
+
+Weituo Hao, Chunyuan Li, Xiujun Li, Lawrence Carin, and Jianfeng Gao.  Towards learning
+  a generic agent for vision-and-language navigation via pre-training.   In Proceedings of the
+  IEEE/CVF conference on computer vision and pattern recognition, pp. 13137–13146, 2020.
+
+Xiaoshuai Hao, Lei Zhou, Zhijian Huang, Zhiwen Hou, Yingbo Tang, Lingfeng Zhang, Guang Li,
+  Zheng Lu, Shuhuai Ren, Xianhui Meng, et al. Mimo-embodied: X-embodied foundation model
+  technical report. arXiv preprint arXiv:2511.16518, 2025.
+
+Di He, Yingce Xia, Tao Qin, Liwei Wang, Nenghai Yu, Tie-Yan Liu, and Wei-Ying Ma.  Dual
+  learning for machine translation. In Advances in Neural Information Processing Systems, 2016.
+
+Yicong Hong, Zun Wang, Qi Wu, and Stephen Gould. Bridging the gap between learning in dis-
+   crete and continuous environments for vision-and-language navigation.  In Proceedings of the
+  IEEE/CVF Conference on Computer Vision and Pattern Recognition, pp. 15439–15449, 2022.
+
+
+                                       11
+
+=== PDF PAGE 12 ===
+Preprint. Under review.
+
+
+
+
+
+Eric Kolve, Roozbeh Mottaghi, Winson Han, Eli VanderBilt, Luca Weihs, Alvaro Herrasti, Matt
+  Deitke, Kiana Ehsani, Daniel Gordon, Yuke Zhu, et al. Ai2-thor: An interactive 3d environment
+   for visual ai. arXiv preprint arXiv:1712.05474, 2017.
+
+Xianghao Kong, Jinyu Chen, Wenguan Wang, Hang Su, Xiaolin Hu, Yi Yang, and Si Liu. Control-
+   lable navigation instruction generation with chain of thought prompting. In European Conference
+  on Computer Vision, pp. 37–54. Springer, 2024.
+
+Jacob Krantz and Stefan Lee. Sim-2-sim transfer for vision-and-language navigation in continuous
+  environments. In European Conference on Computer Vision, pp. 588–603. Springer, 2022.
+
+Jacob Krantz, Erik Wijmans, Arjun Majumdar, Dhruv Batra, and Stefan Lee. Beyond the nav-graph:
+  Vision-and-language navigation in continuous environments. In Computer Vision–ECCV 2020:
+  16th European Conference, Glasgow, UK, August 23–28, 2020, Proceedings, Part XXVIII 16, pp.
+  104–120. Springer, 2020.
+
+Alexander Ku, Peter Anderson, Roma Patel, Eugene Ie, and Jason Baldridge. Room-across-room:
+  Multilingual vision-and-language navigation with dense spatiotemporal grounding. In Proceed-
+  ings of the 2020 Conference on Empirical Methods in Natural Language Processing (EMNLP),
+  pp. 4392–4412, 2020.
+
+Songze Li, Zun Wang, Gengze Zhou, Jialu Li, Xiangyu Zeng, Ziyang Gong, Limin Wang, Yu Qiao,
+  Qi Wu, Mohit Bansal, et al. Learning goal-oriented vision-and-language navigation with self-
+  improving demonstrations at scale. arXiv preprint arXiv:2509.24910, 2025.
+
+Hunter Lightman, Vineet Kosaraju, Yura Burda, Harri Edwards, Bowen Baker, Teddy Lee, Jan
+  Leike, John Schulman, Ilya Sutskever, and Karl Cobbe. Let’s verify step by step. arXiv preprint
+  arXiv:2305.20050, 2023.
+
+Bingqian Lin, Yunshuang Nie, Khun Loun Zai, Ziming Wei, Mingfei Han, Rongtao Xu, Minzhe
+  Niu, Jianhua Han, Liang Lin, Cewu Lu, et al. Evolvenav: Self-improving embodied reasoning for
+  llm-based vision-language navigation. arXiv preprint arXiv:2506.01551, 2025.
+
+Yuxing Long, Wenzhe Cai, Hongcheng Wang, Guanqi Zhan, and Hao Dong.  Instructnav: Zero-
+  shot system for generic instruction navigation in unexplored environment, 2024. URL https:
+  //arxiv.org/abs/2406.04882.
+
+Xiaojian Ma, Silong Yong, Zilong Zheng, Qing Li, Yitao Liang, Song-Chun Zhu, and Siyuan Huang.
+  Sqa3d: Situated question answering in 3d scenes. arXiv preprint arXiv:2210.07474, 2022.
+
+Fanqing Meng, Lingxiao Du, Qiguang Chen, Ziqi Zhao, Haocheng Lu, Mengkang Hu, and
+  Michael Qizhe Shieh.  Rsibench-data: Benchmarking data-centric research for recursive self-
+  improvement, 2026.
+
+Yuankai Qi, Qi Wu, Peter Anderson, Xin Wang, William Yang Wang, Chunhua Shen, and Anton
+  van den Hengel. Reverie: Remote embodied visual referring expression in real indoor environ-
+  ments. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition,
+  pp. 9982–9991, 2020.
+
+Qwen Team. Qwen3.5: Towards native multimodal agents, February 2026. URL https://qwen.
+  ai/blog?id=qwen3.5.
+
+Sonia Raychaudhuri, Saim Wani, Shivansh Patel, Unnat Jain, and Angel Chang. Language-aligned
+  waypoint (law) supervision for vision-and-language navigation in continuous environments. In
+  EMNLP, 2021.
+
+Hao Tan, Licheng Yu, and Mohit Bansal. Learning to navigate unseen environments: Back transla-
+   tion with environmental dropout. In Proceedings of the 2019 Conference of the North American
+  Chapter of the Association for Computational Linguistics: Human Language Technologies, Vol-
+  ume 1 (Long and Short Papers), pp. 2610–2621, 2019.
+
+Huajie Tan, Enshen Zhou, Zhiyu Li, Yijie Xu, Yuheng Ji, Xiansheng Chen, Cheng Chi, Pengwei
+  Wang, Huizhu Jia, Yulong Ao, et al. Robobrain 2.5: Depth in sight, time in mind. arXiv preprint
+  arXiv:2601.14352, 2026.
+
+
+                                       12
+
+=== PDF PAGE 13 ===
+Preprint. Under review.
+
+
+
+
+
+Brain Team, Ziyang Gong, Haoming Gu, Zehang Luo, Tianyi Zhang, Tao Tao, Yixiao Chi, Zhe
+  Liu, Lingsi Zhu, Jingyuan Liu, Anke Tang, Songze Li, Yilun Kong, Ningjing Liu, Tianyu Zhu,
+  Yunpeng Qing, Shuang Luo, Xiang Liu, Shi Fu, Dawei Nie, Sixiang Liu, Zhexi Wen, Feng Pan,
+  Xiaofeng Wang, Zhi Hou, Chunxiao Liu, Xue Yang, Junchi Yan, Hengshuang Zhao, Dacheng
+  Tao, and Xiaogang Wang. Ace-brain-0.5: A unified embodied foundational model for physical
+  agentic ai, 2026.
+
+Jesse Thomason, Michael Murray, Maya Cakmak, and Luke Zettlemoyer. Vision-and-dialog navi-
+   gation. In Conference on Robot Learning, pp. 394–406. PMLR, 2020.
+
+Hanqing Wang, Wei Liang, Jianbing Shen, Luc Van Gool, and Wenguan Wang.  Counterfactual
+  cycle-consistent learning for instruction following and generation in vision-language navigation.
+  In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition, pp.
+  15471–15481, 2022.
+
+Xiaohan Wang, Wenguan Wang, Jiayi Shao, and Yi Yang. Lana: A language-capable navigator for
+   instruction following and generation. In Proceedings of the IEEE/CVF conference on computer
+   vision and pattern recognition, pp. 19048–19058, 2023a.
+
+Zihan Wang, Xiangyang Li, Jiahao Yang, Yeqi Liu, and Shuqiang Jiang. Gridmm: Grid memory map
+   for vision-and-language navigation. In Proceedings of the IEEE/CVF International Conference
+  on Computer Vision, pp. 15625–15636, 2023b.
+
+Zihan Wang, Xiangyang Li, Jiahao Yang, Yeqi Liu, Junjie Hu, Ming Jiang, and Shuqiang Jiang.
+  Lookahead exploration with neural radiance representation for continuous vision-language navi-
+   gation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition,
+  pp. 13753–13762, 2024.
+
+Zihan Wang, Yaohui Zhu, Gim Hee Lee, and Yachun Fan. Navrag: Generating user demand instruc-
+   tions for embodied navigation through retrieval-augmented llm. arXiv preprint arXiv:2502.11142,
+  2025a.
+
+Zihan Wang, Seungjun Lee, and Gim Hee Lee. Dynam3d: Dynamic layered 3d tokens empower
+  vlm for vision-and-language navigation. Advances in Neural Information Processing Systems,
+  38:153522–153544, 2026.
+
+Zun Wang, Jialu Li, Yicong Hong, Yi Wang, Qi Wu, Mohit Bansal, Stephen Gould, Hao Tan,
+  and Yu Qiao.  Scaling data generation in vision-and-language navigation.  In 2023 IEEE/CVF
+  International Conference on Computer Vision (ICCV), pp. 11975–11986. IEEE, 2023c.
+
+Zun Wang, Jialu Li, Yicong Hong, Songze Li, Kunchang Li, Shoubin Yu, Yi Wang, Yu Qiao,
+  Yali Wang, Mohit Bansal, et al. Bootstrapping language-guided navigation learning with self-
+   refining data flywheel. In International Conference on Learning Representations, volume 2025,
+  pp. 23542–23568, 2025b.
+
+Meng Wei, Chenyang Wan, Xiqian Yu, Tai Wang, Yuqiang Yang, Xiaohan Mao, Chenming Zhu,
+  Wenzhe Cai, Hanqing Wang, Yilun Chen, Xihui Liu, and Jiangmiao Pang. Streamvln: Streaming
+  vision-and-language navigation via slowfast context modeling, 2025. URL https://arxiv.
+  org/abs/2507.05240.
+
+Meng Wei, Chenyang Wan, Peng Peng, Xiqian Yu, Yuqiang Yang, Delin Feng, Wenzhe Cai, Chen-
+  ming Zhu, Tai Wang, Jiangmiao Pang, et al. Ground slow, move fast: A dual-system foundation
+  model for generalizable vision-language navigation.  In International Conference on Learning
+  Representations, volume 2026, pp. 12380–12396, 2026.
+
+Yixuan Weng, Minjun Zhu, Fei Xia, Bin Li, Shizhu He, Shengping Liu, Bin Sun, Kang Liu, and
+  Jun Zhao. Large language models are better reasoners with self-verification. In Findings of the
+  Association for Computational Linguistics: EMNLP 2023, pp. 2550–2575, 2023.
+
+Wei Xiong, Jiarui Yao, Yuhui Xu, Bo Pang, Lei Wang, Doyen Sahoo, Junnan Li, Nan Jiang, Tong
+  Zhang, Caiming Xiong, et al. A minimalist approach to llm reasoning: from rejection sampling
+   to reinforce. arXiv preprint arXiv:2504.11343, 2025.
+
+
+                                       13
+
+=== PDF PAGE 14 ===
+Preprint. Under review.
+
+
+
+
+
+Jihan Yang, Shusheng Yang, Anjali W Gupta, Rilyn Han, Li Fei-Fei, and Saining Xie. Thinking in
+  space: How multimodal large language models see, remember, and recall spaces. In Proceedings
+   of the Computer Vision and Pattern Recognition Conference, pp. 10632–10643, 2025.
+
+Shusheng Yang, Jihan Yang, Pinzhi Huang, Ellis Brown, Zihao Yang, Yue Yu, Shengbang Tong,
+  Zihan Zheng, Yifan Xu, Muhan Wang, et al. Cambrian-s: Towards spatial supersensing in video.
+  In International Conference on Learning Representations, volume 2026, pp. 78185–78225, 2026.
+
+Baiqiao Yin, Qineng Wang, Pingyue Zhang, Jianshu Zhang, Kangrui Wang, Zihan Wang, Jieyu
+  Zhang, Keshigeyan Chandrasegaran, Han Liu, Ranjay Krishna, et al.  Spatial mental modeling
+  from limited views. In Structural Priors for Vision Workshop at ICCV’25, 2025.
+
+Zhuoyuan Yu, Yuxing Long, Zihan Yang, Chengyan Zeng, Hongwei Fan, Jiyao Zhang, and Hao
+  Dong. Correctnav: Self-correction flywheel empowers vision-language-action navigation model.
+  In Proceedings of the AAAI Conference on Artificial Intelligence, volume 40, pp. 18737–18745,
+  2026. doi: 10.1609/AAAI.V40I22.38942.
+
+Weizhe Yuan, Richard Yuanzhe Pang, Kyunghyun Cho, Sainbayar Sukhbaatar, Jing Xu, and Jason
+  Weston. Self-rewarding language models. arXiv preprint arXiv:2401.10020, 2024.
+
+Yifu Yuan, Yaoting Huang, Xianze Yao, Yutong Li, Shuoheng Zhang, Linqi Han, Pengyi Li, Jian-
+  geng Sun, Wenting Jia, Zhao Zhang, et al. Embodied-r1. 5: Evolving physical intelligence via
+  embodied foundation models. arXiv preprint arXiv:2606.11324, 2026.
+
+Eric Zelikman, Yuhuai Wu, Jesse Mu, and Noah Goodman.  Star: Bootstrapping reasoning with
+  reasoning. Advances in Neural Information Processing Systems, 35:15476–15488, 2022.
+
+Haitian Zeng, Xiaohan Wang, Wenguan Wang, and Yi Yang. Kefa: A knowledge enhanced and fine-
+  grained aligned speaker for navigation instruction generation. arXiv preprint arXiv:2307.13368,
+  2023.
+
+Shuang Zeng, Dekang Qi, Xinyuan Chang, Feng Xiong, Shichao Xie, Xiaolong Wu, Shiyi Liang,
+ Mu Xu, and Xing Wei. Janusvln: Decoupling semantics and spatiality with dual implicit mem-
+  ory for vision-language navigation.  In International Conference on Learning Representations,
+  volume 2026, pp. 33001–33026, 2026.
+
+Fuxiang Zhang, Jiacheng Xu, Chaojie Wang, Ce Cui, Yang Liu, and Bo An. Incentivizing llms to
+   self-verify their answers. In Advances in Neural Information Processing Systems, 2025a.
+
+Jiazhao Zhang, Kunyu Wang, Rongtao Xu, Gengze Zhou, Yicong Hong, Xiaomeng Fang, Qi Wu,
+  Zhizheng Zhang, and Wang He.  Navid: Video-based vlm plans the next step for vision-and-
+  language navigation. In RSS, 2024.
+
+Jiazhao Zhang, Kunyu Wang, Shaoan Wang, Minghan Li, Haoran Liu, Songlin Wei, Zhongyuan
+  Wang, Zhizheng Zhang, and He Wang. Uni-navid: A video-based vision-language-action model
+   for unifying embodied navigation tasks, 2025b. URL https://arxiv.org/abs/2412.
+  06224.
+
+Jiazhao Zhang, Anqi Li, Yunpeng Qi, Minghan Li, Jiahang Liu, Shaoan Wang, Haoran Liu, Gengze
+  Zhou, Yuze Wu, Xingxing Li, et al. Embodied navigation foundation model. In International
+  Conference on Learning Representations, volume 2026, pp. 127293–127322, 2026.
+
+Duo Zheng, Shijia Huang, Lin Zhao, Yiwu Zhong, and Liwei Wang. Towards learning a generalist
+  model for embodied navigation. In Proceedings of the IEEE/CVF Conference on Computer Vision
+  and Pattern Recognition, pp. 13624–13634, 2024.
+
+Gengze Zhou, Yicong Hong, Zun Wang, Xin Eric Wang, and Qi Wu. Navgpt-2: Unleashing navi-
+  gational reasoning capability for large vision-language models. In ECCV, pp. 260–278. Springer,
+  2024.
+
+Chenming Zhu, Tai Wang, Wenwei Zhang, Jiangmiao Pang, and Xihui Liu. Llava-3d: A simple yet
+   effective pathway to empowering lmms with 3d-awareness. arXiv preprint, 2024.
+
+Fengda Zhu, Xiwen Liang, Yi Zhu, Qizhi Yu, Xiaojun Chang, and Xiaodan Liang.  Soon: Sce-
+  nario oriented object navigation with graph-based exploration. In Proceedings of the IEEE/CVF
+  Conference on Computer Vision and Pattern Recognition, pp. 12689–12699, 2021.
+
+
+                                       14
+
+=== PDF PAGE 15 ===
+Preprint. Under review.
+
+
+
+
+6  APPENDIX
+
+A  EVALUATION METRICS
+
+We evaluate navigation using NE, SR, OSR, SPL, and nDTW. For episode  i,  let Pi =
+(pi,0, . . . , pi,Ti) denote the executed trajectory, gi the goal, and Ri = (ri,1, . . . , ri,Mi) the refer-
+ence trajectory. We use a success threshold of δ = 3 m. Let dgeo denote geodesic distance on the
+navigation mesh and 1[·] the indicator function.
+
+
+Navigation Error (NE)  measures the geodesic distance between the final position and the goal:
+
+                             N
+                                  1
+                    NE = X dgeo(pi,Ti, gi),                                 (6)
+                     N
+                                          i=1
+
+where N is the number of evaluation episodes. Lower NE indicates that the agent finishes closer to
+the goal.
+
+Success Rate (SR).  An episode is successful if agent executes STOP within the success threshold:
+
+                                                  N
+                                                            1
+             Si = 1[STOP is executed]1[dgeo(pi,Ti, gi) < δ],   SR = X Si.            (7)
+                                     N
+                                                                        i=1
+
+Oracle Success Rate (OSR).  OSR measures whether the agent enters the success region at any
+point during navigation, regardless of where it stops:
+
+                         N
+                             1
+                OSR = X 1  min  dgeo(pi,t, gi) < δ   .                         (8)
+                  N       0≤t≤Ti
+                                    i=1
+
+Success weighted by Path Length (SPL).  SPL considers both success and navigation efficiency:
+
+                             N
+                                  1               ℓi
+                      SPL = X Si                                              (9)                     N       max(ℓi, Li),                                          i=1
+
+where ℓi = dgeo(pi,0, gi) is the shortest start-to-goal distance and Li = PTit=1 ∥pi,t −pi,t−1∥2 is the
+traveled distance. Failed episodes receive zero, while successful episodes are penalized for taking
+detours.
+
+
+Normalized Dynamic Time Warping (nDTW). nDTW measures how closely the executed tra-
+jectory follows the reference trajectory while preserving traversal order. The alignment cost is
+
+                  DTW(Pi, Ri) = min X  ∥pi,t −ri,j∥2,                     (10)
+                        W ∈Wi
+                                                  (t,j)∈W
+
+where Wi contains monotonic alignments connecting the starts and ends of both trajectories, with
+each step advancing along either or both sequences. The normalized score is
+
+                           N
+                               1                    Ri)              nDTW = X exp −DTW(Pi,          .                      (11)
+                   N             Miδ                                       i=1
+
+Our implementation removes consecutive duplicate predicted positions and uses FastDTW by de-
+fault to approximate the alignment cost. Higher nDTW indicates better agreement with the reference
+route.
+
+NE is reported in meters. SR, OSR, SPL, and nDTW are reported on a percentage scale, with higher
+values indicating better performance.
+
+
+                                       15
+
+=== PDF PAGE 16 ===
+Preprint. Under review.
+
+
+
+
+                 Table A1: Action representation ablation on R2R val-unseen.
+
+
+                             Representation NE ↓ OSR ↑  SR ↑  SPL ↑
+
+                        Arrow           6.32   51.22  43.28   37.80
+                             Single           5.56   57.48  48.72   42.67
+                          Double          5.92   53.78  43.83   39.22
+
+
+B  ACTION REPRESENTATION
+
+We compare three action representations:  Arrow uses ↑  / ←  / →and stop, Single
+uses forward/left/right/stop, and Double uses move forward/turn left/turn
+right/stop.
+
+Table A1 shows that Single achieves the best performance across all four metrics. Compared with
+Arrow, it improves SR and SPL by 5.44 and 4.87 percentage points, respectively, and also out-
+performs Double. These results support using single-word action representations in our navigation
+model.
+
+
+C  ACTION INPUTS AND TRAJECTORY SAMPLING
+
+We compare V2L, which generates instructions from images alone, with VA2L, which also uses
+actions. We consider two frame sampling strategies: Uniform-32 uniformly samples up to 32 frames
+across the trajectory, while Interval-4 samples one frame every four action steps.
+
+Table A2: Downstream navigation results with different action inputs and frame sampling strategies.
+
+
+                Representation  Supervision  Sampling   NE ↓ OSR ↑  SR ↑  SPL ↑
+
+             Arrow       V2L          Interval-4     6.39   48.23  41.44   36.27
+             Arrow       VA2L        Interval-4     6.20   47.14  41.49   37.62
+             Arrow       V2L        Uniform-32   6.41   48.67  42.09   36.82
+             Arrow       VA2L       Uniform-32   5.71   50.68  44.15   39.54
+
+                Single       V2L          Interval-4     5.40   54.98  47.25   40.59
+                Single       VA2L        Interval-4     5.42   55.36  48.02   41.36
+                Single       V2L        Uniform-32   5.15   58.34  51.22   42.88
+                Single       VA2L       Uniform-32   5.00   60.14  53.13   45.38
+
+
+Table A2 shows that Uniform-32 consistently improves SR and SPL over Interval-4 across both ac-
+tion representations and supervision settings. Adding action inputs through VA2L further improves
+these two metrics in all settings. Combining Single, VA2L, and Uniform-32 achieves the best overall
+performance, with an SR of 53.13 and an SPL of 45.38.
+
+
+D  DISCRETE-TO-CONTINUOUS TRAJECTORY CONVERSION
+
+We convert discrete navigation paths into executable trajectories in Habitat. Given a path τ G =
+(v1, . . . , vN), we query MatterSim for each viewpoint’s position pGi = (xi, yi, zi) and map it to
+Habitat coordinates:
+
+                             ˜wi = (xi, zi −1.25, −yi),    wi = (xi, hi, −yi),                   (12)
+
+where 1.25 m is the camera-height offset and hi is the floor height obtained by snapping ˜wi to the
+navigation mesh. If snapping fails, we use hi = zi −1.25.
+
+Starting from the first waypoint with the converted initial orientation, a shortest-path follower fol-
+lows the waypoints in order, producing
+
+                 G  waypoint following  C
+                       τ  −−−−−−−−−−→τ = (s0, a1, s1, . . . , aL, sL),                    (13)
+
+
+                                       16
+
+=== PDF PAGE 17 ===
+Preprint. Under review.
+
+
+
+
+
+Algorithm 1 Discrete-to-Continuous Trajectory Conversion
+Require: Discrete path τ G = (v1, . . . , vN), initial orientation, navigation mesh M, action budget
+  B = 500
+Ensure: Habitat waypoints W, initial state s0, and action sequence A, or rejection
+ 1: W ←[ ], A ←[ ]
+ 2: for i = 1, . . . , N do
+ 3:   Query MatterSim for (xi, yi, zi) at vi
+ 4:     ˜wi ←(xi, zi −1.25, −yi)
+ 5:    qi ←SnapM(˜wi)
+ 6:   wi ←˜wi
+ 7:     if qi is valid then
+ 8:     wi ←(xi, [qi]y, −yi) {Adjust height only}
+ 9:   end if
+10:   Append wi to W
+11: end for
+12:  if dM(w1, wN) ≥100 m then
+13:   return rejection
+14: end if
+15: Initialize Habitat at w1 with the converted initial orientation; record s0
+16: Initialize shortest-path follower F with goal radius 0.25 m
+17: for i = 2, . . . , N do
+18:   loop
+19:        if |A| ≥B then
+20:        return rejection
+21:     end if
+22:     a ←F. NextAction(wi)
+23:        if a = STOP or a = None then
+24:       break
+25:     end if
+26:     Execute a in Habitat and append a to A
+27:   end loop
+28: end for
+29: return (W, s0, A)
+
+
+where sl denotes the agent’s position and orientation after action al, and L is the number of executed
+actions. Each movement action advances the agent by 0.25 m or turns it left or right by 15◦. Trajec-
+tories that exhaust the action budget are discarded. The recorded actions and rendered observations
+are used to construct navigation and instruction-generation examples.
+
+E  PROMPT TEMPLATES
+
+E.1  NAVIGATION
+
+The navigation prompt includes up to eight history frames and the current view. The history clause
+is omitted when no history is available. The model predicts up to four actions per turn; the responses
+below illustrate the dialogue format.
+
+   Navigation Prompt
+
+   User: You are an autonomous navigation assistant. Your task is to {instruction}. Devise
+   an action sequence to follow the instruction using the four actions: TURN LEFT (left) or
+  TURN RIGHT (right) by 15 degrees, MOVE FORWARD (forward) by 25 centimeters, or
+  STOP (stop).
+   These are your historical observations: {history images}
+   This is your current view: <image>
+   Assistant: forward,forward,left,forward
+
+
+
+                                       17
+
+=== PDF PAGE 18 ===
+Preprint. Under review.
+
+
+
+
+
+   User: in front of you is <image>
+   Assistant: forward,stop
+
+
+E.2  INSTRUCTION GENERATION
+
+VA2L uses the following system and user messages:
+
+   Instruction Generation Prompt
+
+   System: You are a navigation-instruction generator. Output only the requested instruction.
+   User: This is a navigation trajectory consisting of several image sequences:
+   (Viewpoint 1: Image:<image>, Action: {action span 1}),
+      . ..
+   (Viewpoint K: Image:<image>, Action: {action span K}).
+   Could you give me its corresponding navigation instruction in details?
+   Assistant: {navigation instruction}
+
+The viewpoint list is expanded for all sampled frames. Each action span is described using phrases
+such as forward 2 steps, then left. V2L removes the action fields.
+
+F  VISUALIZATION OF SPATIAL QUESTION ANSWERING
+
+Figure 5 presents selected correct predictions on VSI-Bench, ScanQA, SQA3D, and MindCube.
+These examples cover relative direction reasoning, object identification, situated question answer-
+ing, and viewpoint-dependent spatial relations. Each example includes one representative image,
+the question, and the model answer alongside a matching reference answer.
+
+
+                                            (a) VSI-Bench                                  (b) ScanQA
+
+
+
+
+
+                                                                          Video frame                                                     Scene view
+                                          Question. If I am standing by the bed and facing      Question. What is between the beds?
+                                               the tv, is the sofa to the left or the right of the tv?
+                                         A. right
+                                            B. left
+
+
+                                   Model answer: B                            Model answer: nightstand
+                                        Reference answer: B                             Reference answer: nightstand
+
+                                              (c) SQA3D                                      (d) MindCube
+
+
+
+
+
+                                                                            Scene view                                                    Image 2
+                                          Question. I am at the copier, working. There is a      Question. From the viewpoint presented in
+                                                 trash can to my left and another copier behind        image 2, is there a lamp behind the books?
+                                       me. If I turn right can I see out of the window?        A. Yes
+                                                                                               B. No.
+
+
+                                   Model answer: yes                           Model answer: A
+                                        Reference answer: yes                           Reference answer: A
+
+
+    Figure 5: Selected correct QA examples on VSI-Bench, ScanQA, SQA3D, and MindCube.
+
+
+
+
+
+                                       18
+
+=== PDF PAGE 19 ===
+Preprint. Under review.
+
+
+
+
+G  VISUALIZATION OF R2R-CE AND RXR-CE
+
+
+                       R2R
+
+
+
+
+
+                                      Instruction: Go down the stairs and turn right then wait by the glass doors that lead to the patio.
+
+
+
+
+
+                                      Instruction: Walk out of the room and past the stairs. Walk through the second hallway to the left. Turn left
+                               and walk into the room. Stop in front of the dining room table.
+
+
+                        RxR
+
+
+
+
+
+                                      Instruction: You are facing a hallway. You are going to move forward down this hallway. And then you are
+                                    going to turn to your right entering a living room. You are going to hop over the little coffee table in the middle
+                                    going towards the left side of the fireplace. And once you have landed there you are done.
+
+
+
+
+
+                                      Instruction: You begin standing just to the right of a doorway. Turn all the way around and you're going to see
+                                       at the end of the railing the floor will curve around a corner. Follow this corner and step into this empty room
+                                     here. Once you're standing in the room here you're done.
+
+
+           Figure 6: Visualization of navigation trajectories on R2R-CE and RxR-CE.
+
+H  LIMITATIONS AND FUTURE WORK
+
+RSI-Nav’s self-improvement is constrained by the capabilities of its current policy. Since the same
+model generates instructions and executes them for verification, the resulting supervision may re-
+inforce existing biases.  Instructions that are valid but difficult to execute may also be rejected,
+potentially favoring easier trajectories and limiting further improvement. Future work could explore
+difficulty-aware data selection, adaptive filtering, and complementary verification signals to retain
+challenging examples while controlling supervision quality.
+
+Execution-based filtering also provides an incomplete measure of instruction quality.  Reaching
+the intended destination efficiently does not necessarily imply that every landmark description or
+spatial relation is correct. Such semantic errors may persist in accepted examples and propagate
+through subsequent updates. Future work could combine trajectory-level verification with grounded
+semantic checks and targeted human evaluation to better assess instruction fidelity and understand
+how errors accumulate across self-improvement rounds.
+
+
+
+                                       19

@@ -1,0 +1,35 @@
+Feature:
+  object_feature_type: ""
+  angle_feat_size: 4
+  max_objects: 70
+  image_feat_size: 1024
+  feature_database:
+    "mp3d": "eva_features/mp3d_EVA02-CLIP-L-14-336.hdf5"
+  obj_feat_size: 768
+  object_database: {}
+
+Dataset:
+  R2R:
+    DIR: "R2R"
+    SPLIT: {
+      "train": "train/FGR2R_<scanID>_train.json",
+      "val_unseen": "val/FGR2R_<scanID>_val.json"
+    }
+
+Multi:
+  SOURCE: ['R2R']
+  Ratio: [1]
+  LOSS_COEF: {}
+
+Model:
+  num_l_layers: 9
+  num_pano_layers: 2
+  num_x_layers: 4
+  graph_sprels: True
+  fusion: "dynamic"
+  enc_full_graph: True
+  expert_policy: "spl"
+
+Optim:
+  val_max_action_len: { "R2R": 15 }
+  train_max_action_len: { "R2R": 15 }

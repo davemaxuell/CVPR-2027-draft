@@ -1,0 +1,18 @@
+defaults:
+  - actor: td3
+
+critic:
+  _target_: mad_td.nn.critic.TDMPC2Critic
+
+  feature_dim: [512, 512]
+  single_critic: False
+
+encoder:
+  _target_: mad_td.nn.model.IdentityEncoder
+  feature_dim: 100
+
+latent_model:
+  _target_: mad_td.nn.model.TDMPC2ContinuousDeterministicLatentModel
+
+  feature_dim: [10]
+  output_dim: ${env.state_shape}

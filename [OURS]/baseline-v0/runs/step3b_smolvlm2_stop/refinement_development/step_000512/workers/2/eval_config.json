@@ -1,0 +1,105 @@
+{
+  "controller": "policy",
+  "group": "C",
+  "split": "train",
+  "seed": 0,
+  "workers": 4,
+  "worker_index": 2,
+  "selected_episodes": {
+    "r2r": [
+      "3656",
+      "3202",
+      "8023",
+      "425",
+      "3515",
+      "5346",
+      "5861",
+      "1602"
+    ],
+    "rxr": [
+      "9467",
+      "54283",
+      "17784",
+      "15898",
+      "3085",
+      "51208",
+      "40743",
+      "11776"
+    ]
+  },
+  "simulator": {
+    "habitat_sim": "0.2.4 headless withbullet",
+    "habitat_lab": "v0.2.4",
+    "env": "conda `rolevln` (env/setup_env.sh)",
+    "rgb": {
+      "width": 640,
+      "height": 480,
+      "hfov": 79
+    },
+    "depth": {
+      "width": 640,
+      "height": 480,
+      "hfov": 79,
+      "min": 0.0,
+      "max": 10.0
+    },
+    "rgb_sensor_position_m": [
+      0.0,
+      1.25,
+      0.0
+    ],
+    "forward_step_m": 0.25,
+    "turn_angle_deg": 15,
+    "allow_sliding": true,
+    "success_distance_m": 3.0,
+    "max_episode_steps": {
+      "r2r": 500,
+      "rxr": 700
+    },
+    "gt_replay_check": "logs/check_ce_replay_r2r.json",
+    "rxr_expert_turn_angle_deg": 30,
+    "rxr_turn_handling": "unified_15",
+    "render_gpu": 0
+  },
+  "evaluator_sha256": "b49f66d200fd278fbd003e81c4a217b02f97ff9d700608f2494b91076161d5a7",
+  "partition_sha256": "8ee6a37535c92f953fe509f9cfa38e1ce2ac069656d4b443fbdfd4b13f54d2d7",
+  "selection_sha256": "a80e05d3c3cf740095a5afaf115a8f8d87ec310a7ec3355118b1783e4ea27ef1",
+  "decoding_batch_size": 1,
+  "rgb_source": "live simulator RGB, no JPEG compression",
+  "stop_bias": 0.0,
+  "movement_only": true,
+  "score_order": [
+    "STOP",
+    "FORWARD",
+    "LEFT",
+    "RIGHT"
+  ],
+  "selection_manifest_sha256": "0c1a9917315a5497f1c4777bb3deb813384b2795dbf6cb2bfd843f8923a81d28",
+  "diagnostics_sha256": "c0872a3d98ce5b1ed524227e2fc2b9d0de474ff766a36d3690895b0eacafdd18",
+  "ndtw": "exact DTW, official GT locations, Euclidean cost, skip identical consecutive actual positions, normalization len(GT)*3m",
+  "verify_against": null,
+  "checkpoint": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/step3b_smolvlm2_stop/train/checkpoints/step_000512",
+  "adapter_sha256": "7c0a0e8d1009af911967601f94460fa3acfc2cd4b087ddb94b32f8a8b316e1ea",
+  "policy_config": {
+    "backbone": "smolvlm2",
+    "repo": "HuggingFaceTB/SmolVLM2-500M-Video-Instruct",
+    "revision": "7b375e1b73b11138ff12fe22c8f2822d8fe03467",
+    "past_frames": 7,
+    "frame_sampling": "uniform",
+    "recent_actions": 16,
+    "forward_step_m": 0.25,
+    "turn_angle_deg": 15,
+    "action_words": [
+      "STOP",
+      "FORWARD",
+      "LEFT",
+      "RIGHT"
+    ],
+    "decoding": "argmax over the first token of each action word",
+    "image_splitting": false,
+    "max_length": 4096
+  },
+  "policy_source_sha256": "2dc097c0f3bd09eacd94cb5a438e15635a62b1a9215a0c66f7c2655b437c1a96",
+  "online_source_sha256": "763dd6e8873953cc82e427d196fba32aa2ba1d9bc0a5d64ade187d33d7481ac2",
+  "pixel_preprocessing": "cached native pixel tensors; full native vision forward each step"
+}

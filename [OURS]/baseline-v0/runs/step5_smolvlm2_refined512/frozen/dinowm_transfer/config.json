@@ -1,0 +1,105 @@
+{
+  "format": "frozen_ce_dino_dynamics_v1",
+  "trial": "dinowm_transfer",
+  "selected_step": 36864,
+  "selected_policy_identity_sha256": "729480bf5c8402b07cad653a7ef0f7124be212d50255077290316ba686777ca7",
+  "policy_reference": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/step4_smolvlm2_refined512/reference",
+  "policy_decoder": {
+    "family": "add STOP-only bias then argmax over four first-token action logits",
+    "stop_logit_bias": -0.25,
+    "action_order": [
+      "STOP",
+      "FORWARD",
+      "LEFT",
+      "RIGHT"
+    ],
+    "batch_size": 1,
+    "actions_per_forward": 1,
+    "tie_break": "first action in declared order"
+  },
+  "encoder_identity_sha256": "072c391c8764fbdcdb9e00bfbf9ec016873fa9707c573e400f44ff385f01f9dd",
+  "encoder_assets": "../encoder",
+  "history_frames": 3,
+  "minimum_real_observations": 4,
+  "raw_visual_shape": [
+    196,
+    384
+  ],
+  "pooled_visual_shape": [
+    49,
+    384
+  ],
+  "condition_widths": {
+    "zero_proprio": 10,
+    "learned_command": 10
+  },
+  "action_indices": {
+    "0": "FORWARD",
+    "1": "LEFT",
+    "2": "RIGHT"
+  },
+  "STOP": "identity current features; no dynamics call",
+  "precision": {
+    "parameters": "float32",
+    "dynamics_autocast": "bfloat16",
+    "encoder_compute": "float32",
+    "encoded_features": "float16"
+  },
+  "selection": {
+    "samples": 3072,
+    "macro_mse": 1.347413588121223,
+    "micro_mse": 1.347413588121223,
+    "copy_current_macro_mse": 4.61120967566967,
+    "by_dataset_action": {
+      "r2r/FORWARD": {
+        "samples": 512,
+        "mse": 1.1458684476092458,
+        "copy_current_mse": 2.3366357607301325
+      },
+      "r2r/LEFT": {
+        "samples": 512,
+        "mse": 1.420780734391883,
+        "copy_current_mse": 5.69539303611964
+      },
+      "r2r/RIGHT": {
+        "samples": 512,
+        "mse": 1.453434006194584,
+        "copy_current_mse": 5.8088326514698565
+      },
+      "rxr/FORWARD": {
+        "samples": 512,
+        "mse": 1.143273723544553,
+        "copy_current_mse": 2.3167997875716537
+      },
+      "rxr/LEFT": {
+        "samples": 512,
+        "mse": 1.4836834175512195,
+        "copy_current_mse": 5.760188234969974
+      },
+      "rxr/RIGHT": {
+        "samples": 512,
+        "mse": 1.4374411994358525,
+        "copy_current_mse": 5.7494085831567645
+      }
+    },
+    "blocked_samples": 0,
+    "collided_samples": 0,
+    "selection_group": "C",
+    "selection_domain": "fixed expert-path transitions; no simulator navigation-success claim",
+    "command_sensitivity": {
+      "closest_prediction_matches_executed_command": 1.0,
+      "mean_other_command_error_minus_correct": 3.8194140570703894,
+      "interpretation": "Conditioning diagnostic against the observed target, not measured alternate-action ground truth"
+    }
+  },
+  "model_sha256": "458ad8170d47525f81fa6b2be0e0676e41a098dfeab4d06bd811feec93b41fb3",
+  "plan_sha256": "4f4225c55449833e9e21ad7c6c5106108ea93aeaf01d79306f2d4dd41943b564",
+  "runtime_source_sha256": {
+    "wm/common.py": "a8f5349a5884ac8373f4c8b3d86f5591cc6861660c719d9bd362dc2b397941fa",
+    "wm/dino.py": "d4741247bcbb47c94be7873473ad53230a4f75d65157e614993d42b1995bf420",
+    "wm/frozen.py": "46adc698fbc1e3f4184f174d17ea4b17773e2437c8c5c0878b4d4da185db1b32",
+    "Scorer/world_models.py": "df909188d68c8a11015e1904ba9d196317fd850941574cc7e659653fccb373b0",
+    "Scorer/interfaces.py": "f04ebf78fd60242b203634acb51a814e3e147bd50da1ed293016d6d5cea0f4b5",
+    "third_party/dino_wm/models/vit.py": "60c77bdb03f3b2d565bfdb1695c9c193a802236763d33a03e79ed382b51f0670"
+  }
+}

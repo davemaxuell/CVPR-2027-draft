@@ -1,0 +1,98 @@
+=== PDF PAGE 1 ===
+Meta-Explore: Exploratory Hierarchical Vision-and-Language Navigation Using Scene Object Spectrum Grounding CVPR 2023 accepted (TUE-PM-244) Minyoung Hwang1, Jaeyeon Jeong1, Minsoo Kim3, Yoonseon Oh2, Songhwai Oh1 1Electrical and Computer Engineering and ASRI, Seoul National University 2Department of Electronic Engineering, Hanyang University 3Interdisciplinary Major in Artificial Intelligence, Seoul National University
+
+=== PDF PAGE 2 ===
+Contents 1) Vision-and-Language Navigation (VLN) 2) Hierarchical Exploration in VLN 3) Meta-Explore 4) Experiment Results 5) Experiment Visualization 1: R2R 6) Experiment Visualization 2: Local Goal Search 7) Ablation Study: Meta-Explore in Continuous Environment 2
+
+=== PDF PAGE 3 ===
+Vision-and-Language Navigation (VLN) Natural Language Instruction Visual Observation Task: Follow the instruction and arrive at the goal location. 3
+
+=== PDF PAGE 4 ===
+Vision-and-Language Navigation “(…) Turn right at the end of the hall and walk into the bedroom on your left. Stop in the doorway." If the agent is asked to turn right but turns left, the agent may end up in irrecoverable paths. 4
+
+=== PDF PAGE 5 ===
+Meta-Explore Meta-Explore deploys an exploitation policy that moves the agent toward a local goal. start local goal global goal t 𝑡𝑡ℎvisited node unvisited, observable node Instruction: "Walk forward, keeping the long table to the left. Exit the room via the white door to the left of the stairs. Descend a narrow circular stairwell and wait, facing two windows with circular stained glass in their centers." 𝒐𝟓 navigation mode:explore exploit 5
+
+=== PDF PAGE 6 ===
+Hierarchical Exploration Several existing studies solve this issue via hierarchical exploration. High-Level Planner Low-Level Planner Decides when to explore/exploit Chooses what actions to take 6
+
+=== PDF PAGE 7 ===
+Hierarchical Exploration Prior work returns the agent to the last successful state. start global goal visited node navigation mode: explore exploit 7
+
+=== PDF PAGE 8 ===
+Hierarchical Exploration start global goal visited node Problem of traditional exploitation methods: The agent has to reexplore visited regions after the exploitation ends. unnecessary actions and waste of time no advantage of the constructed map 8
+
+=== PDF PAGE 9 ===
+Hierarchical Exploration Our Solution: In the exploit mode, the agent should move toward a well-chosen local goal among unvisited and observable states. start global goal unvisited node 9
+
+=== PDF PAGE 10 ===
+Hierarchical Exploration Our Solution: In the exploit mode, the agent should move toward a well-chosen local goal among unvisited and observable states. start global goal Unvisited & observable node navigation mode: explore exploit local goal 10
+
+=== PDF PAGE 11 ===
+Hierarchical Exploration Our Solution: In the exploit mode, the agent should move toward a well-chosen local goal among unvisited and observable states. higher chance to get closer to the global goal 11 start global goal Unvisited & observable node local goal
+
+=== PDF PAGE 12 ===
+Meta-Explore We propose a learnable hierarchical exploration method called Meta-Explore, which decides (1) when to explore or exploit and (2) a new imagined local goal to seek during exploitation. 𝑭𝒐𝒃𝒋 “Lamp” “Table” “Curtain” “Chair” 𝒐𝒕 Mode Selector object spectrum object image feature or Cross- Attention Self- Attention 𝒂𝒕 action 𝑭𝒍𝒂𝒏𝒈 t current node next step reachable nodes Exploitation Module Exploration Module 𝑭𝑹𝑮𝑩 object detection candidate 1 candidate 2 candidate 𝑛𝑐𝑎𝑛𝑑 𝑯𝒕 "Walk forward, keeping the long table to the left. Exit the room via the white door to the left of the stairs. Descend a narrow circular stairwell and wait, facing two windows with circular stained glass in their centers." 𝒔𝒑𝒂𝒕𝒊𝒂𝒍 𝒍𝒂𝒏𝒈𝒖𝒂𝒈𝒆 𝒔𝒑𝒆𝒄𝒕𝒓𝒂𝒍 𝒄𝒂𝒏𝒅𝒊𝒅𝒂𝒕𝒆𝒐𝒃𝒔 12
+
+=== PDF PAGE 13 ===
+Meta-Explore Meta-Explore consists of a mode selector and two navigation modules corresponding to two modes: exploration and exploitation. Local Goal Search Module Path Planning Module 𝐦𝐢𝐧(෡𝒅) 𝒎𝒊𝒏(෍𝒘𝒊𝒋) Exploitation Module 𝑯𝒕 hidden state FFNN 𝑮= (𝑽, 𝑬) lookahead zone 𝒈𝒍𝒐𝒄𝒂𝒍 𝒈𝒈𝒍𝒐𝒃𝒂𝒍 𝒗𝒕 𝑽𝟏𝟑= 𝒗𝒕 𝑽𝟔 Mode Selector 𝑷𝒆𝒙𝒑𝒍𝒐𝒓𝒆< 𝟎. 𝟓 FFNN 𝒔𝒐𝒇𝒕𝒎𝒂𝒙 𝒂𝒕 Exploration Module ≥𝟎. 𝟓 𝒗𝟎 𝑽𝟏𝟐𝑽𝟏𝟏𝑽𝟗𝑽𝟕𝑽𝟔 𝑽𝟏𝟑 𝒂𝒕 𝒑𝒐𝒑 13
+
+=== PDF PAGE 14 ===
+Meta-Explore At each timestep, the mode selector chooses to explore or exploit. The explore-exploit switching decision occurs by estimating the probability to explore. 𝑯𝒕 hidden state FFNN Mode Selector 𝑷𝒆𝒙𝒑𝒍𝒐𝒓𝒆< 𝟎. 𝟓 FFNN 𝒔𝒐𝒇𝒕𝒎𝒂𝒙 𝒂𝒕 Exploration Module ≥𝟎. 𝟓 If 𝑷𝒆𝒙𝒑𝒍𝒐𝒓𝒆≥𝟎. 𝟓 14
+
+=== PDF PAGE 15 ===
+Meta-Explore At each timestep, the mode selector chooses to explore or exploit. The explore-exploit switching decision occurs by estimating the probability to explore. Local Goal Search Module Path Planning Module 𝐦𝐢𝐧(෡𝒅) 𝒎𝒊𝒏(෍𝒘𝒊𝒋) Exploitation Module 𝑯𝒕 hidden state FFNN 𝑮= (𝑽, 𝑬) lookahead zone 𝒈𝒍𝒐𝒄𝒂𝒍 𝒈𝒈𝒍𝒐𝒃𝒂𝒍 𝒗𝒕 𝑽𝟏𝟑= 𝒗𝒕 𝑽𝟔 Mode Selector 𝑷𝒆𝒙𝒑𝒍𝒐𝒓𝒆< 𝟎. 𝟓 ≥𝟎. 𝟓 𝒗𝟎 𝑽𝟏𝟐𝑽𝟏𝟏𝑽𝟗𝑽𝟕𝑽𝟔 𝑽𝟏𝟑 𝒂𝒕 𝒑𝒐𝒑 If 𝑷𝒆𝒙𝒑𝒍𝒐𝒓𝒆< 𝟎. 𝟓 15
+
+=== PDF PAGE 16 ===
+Meta-Explore When the mode selector recognizes that the agent is not following the instruction successfully, the mode is switched to exploitation. In the exploitation mode, the agent seeks a new local goal with the highest correspondence against the language instructions from the previously unvisited candidate nodes. current position goal position 16
+
+=== PDF PAGE 17 ===
+Meta-Explore Meta-Explore imagines regretful explorations with semantically meaningful clues. “Lamp” “Table” “Curtain” “Chair” object spectrum (spectral) object image feature (spatial) object detection binary masks 17
+
+=== PDF PAGE 18 ===
+Meta-Explore The key to our exploitation approach is understanding the object placements in spectral-domain. 𝟎° 𝟗𝟎° 𝟐𝟕𝟎° 𝟏𝟖𝟎° object placement “What objects are placed around the agent at what frequencies?” 18
+
+=== PDF PAGE 19 ===
+Scene Object Spectrum (SOS) We present a novel visual representation, called scene object spectrum (SOS), which performs category-wise 2D Fourier transform of detected objects. 𝟐𝑫𝑭𝑭𝑻 object spectrum 𝑲 η 𝑥 𝑦 object mask 𝒎𝒕 𝒌 separate categories 𝟎° 𝟗𝟎° 𝟐𝟕𝟎° 𝟏𝟖𝟎° object placement detection in panoramic image ζ 𝑓𝑥 𝑓𝑦 𝜼 𝑺𝒕 19
+
+=== PDF PAGE 20 ===
+Toy Example Combining the exploitation policy and SOS features, the agent can correct its path by choosing a promising local goal. observable objects 𝒗𝒕=𝟏 𝒗𝒕=𝟐 𝑨 𝑩 bed door painting sculpture navigation score 𝑆𝑛𝑎𝑣 We score the corrected trajectories to measure the alignment with the language instruction L. 20
+
+=== PDF PAGE 21 ===
+Toy Example Suppose the agent is in the exploitation mode. The agent wants to choose the local goal between A and B. 𝒘𝟏 𝒐𝒘𝟐 𝒐𝒘𝟑 𝒐 𝒗𝒕=𝟏 𝒗𝒕=𝟐 𝒗𝒕=𝟑 𝒘𝟏 𝒐𝒘𝟐 𝒐𝒘𝟑 𝒐 𝒗𝒕=𝟏 𝒗𝒕=𝟐 𝒗𝒕=𝟑 𝒗𝒕=𝟑= 𝑨, 𝑺𝒏𝒂𝒗= 𝟎. 𝟐𝟗𝟔 trajectory-instruction similarity matrices observable objects 𝒗𝒕=𝟏 𝒗𝒕=𝟐 𝑨 𝑩 bed door painting sculpture 0.9 0.0 0.0 0.3 1.0 0.0 0.0 0.0 1.0 0.9 0.0 0.0 0.3 1.0 0.0 0.5 0.4 0.0 𝒗𝒕=𝟑= 𝑩, 𝑺𝒏𝒂𝒗= 𝟎. 𝟐𝟎𝟏 21
+
+=== PDF PAGE 22 ===
+Experiment Results: R2R Meta-Explore improves success rate and SPL compared to hierarchical baselines. 22
+
+=== PDF PAGE 23 ===
+Experiment Results: SOON Meta-Explore outperforms other baselines and shows significant generalization performance. 23
+
+=== PDF PAGE 24 ===
+Experiment Visualization 1: R2R Meta-Explore constructs a topological map during exploration and uses it for decision making. visited node visited node visited node visited node shortest path 24
+
+=== PDF PAGE 25 ===
+Experiment Visualization 1: R2R Meta-Explore constructs a topological map during exploration and uses it for decision making. visited node visited node visited node visited node shortest path 25
+
+=== PDF PAGE 26 ===
+Experiment Visualization 1: R2R Meta-Explore constructs a topological map during exploration and uses it for decision making. visited node visited node visited node visited node shortest path 26
+
+=== PDF PAGE 27 ===
+Experiment Visualization 1: R2R Meta-Explore constructs a topological map during exploration and uses it for decision making. visited node visited node visited node visited node shortest path 27
+
+=== PDF PAGE 28 ===
+Experiment Visualization 1: R2R Meta-Explore constructs a topological map during exploration and uses it for decision making. visited node visited node visited node visited node shortest path 28
+
+=== PDF PAGE 29 ===
+Experiment Visualization 2: Local Goal Search Ground Truth Traj. Current Traj. Unvisited & Observed Nodes ground truth trajectory start local goal global goal visited node unvisited node agent navigation graph 29
+
+=== PDF PAGE 30 ===
+Experiment Visualization 2: Local Goal Search Local goal search using the proposed spectral-domain SOS features significantly improves the success rate and SPL. 0.22 0.08 0.18 0.06 0.05 0.13 0.05 Local Goal Search Exploit Trajectory 30
+
+=== PDF PAGE 31 ===
+Ablation Study: Extension to Continuous Env. We extend Meta-Explore to image-goal navigation task in continuous environments to address the impact of hierarchical exploration in realistic environments. navigation mode:explore exploit 31
+
+=== PDF PAGE 32 ===
+Contributions 1) We propose a hierarchical navigation method called Meta-Explore, deploying an exploitation policy to correct misled recent actions. The agent searches for an appropriate local goal instead of reversing the recent action sequence. 2) In the exploitation mode, the agent uses a novel scene representation called scene object spectrum (SOS). SOS features provide semantically meaningful clues to choose a near-optimal local goal. 3) Meta-Explore shows better generalization results compared to all baselines in three VLN benchmarks. 32
+
+=== PDF PAGE 33 ===
+If you have any questions, please contact to minyoung.hwang@rllab.snu.ac.kr Thank you for your attention project page: https://rllab-snu.github.io/projects/Meta-Explore/doc.html 33

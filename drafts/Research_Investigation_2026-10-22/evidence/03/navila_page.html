@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="description" content="">
+    <meta name="keywords" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>NaVILA: Legged Robot Vision-Language-Action Model for Navigation</title>
+
+    <!-- Fonts - combined Google Fonts request -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro|Material+Icons">
+    
+    <!-- CSS Dependencies -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.1/css/bulma.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
+    <!-- Local CSS -->
+    <link rel="stylesheet" href="static/css/bulma-carousel.min.css">
+    <link rel="stylesheet" href="static/css/bulma-slider.min.css">
+    <link rel="stylesheet" href="./static/css/index.css">
+    <!-- Favicon -->
+    <link rel="icon" href="images/icon.png">
+    
+    <!-- JavaScript Dependencies -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/js/all.min.js"></script>
+    <script defer src="static/js/bulma-carousel.min.js"></script>
+    <script defer src="static/js/bulma-slider.min.js"></script>
+    <script defer src="static/js/index.js"></script>
+
+</head>
+
+
+<style>
+    .hero-title-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .publication-title {
+        font-size: 2.5rem; /* Explicit size instead of is-1 */
+        line-height: 1.2;
+        margin: 0;
+        padding: 0;
+        text-align: center;
+        font-display: swap; /* Ensure text remains visible during webfont load */
+    }
+
+    .logo-video {
+        width: 100px;
+        height: 100px;
+        contain: strict; /* Optimize rendering */
+        content-visibility: auto; /* Defer off-screen content */
+    }
+
+    .section {
+        margin-bottom: -30px;
+        /* Adjust this value as needed to reduce the space */
+    }
+
+    .expandable-card .card-text-container {
+        max-height: 200px;
+        overflow-y: hidden;
+        position: relative;
+    }
+
+    .expandable-card.expanded .card-text-container {
+        max-height: none;
+    }
+
+    .expand-btn {
+        position: relative;
+        display: none;
+        background-color: rgba(255, 255, 255, 0.8);
+        /* margin-top: -20px; */
+        /* justify-content: center; */
+        color: #510c75;
+        border-color: transparent;
+    }
+
+    .expand-btn:hover {
+        background-color: rgba(200, 200, 200, 0.8);
+        text-decoration: none;
+        border-color: transparent;
+        color: #510c75;
+    }
+
+    .expand-btn:focus {
+        outline: none;
+        text-decoration: none;
+    }
+
+    .expandable-card:not(.expanded) .card-text-container:after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 90px;
+        background: linear-gradient(rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 1));
+    }
+
+    .expandable-card:not(.expanded) .expand-btn {
+        margin-top: -40px;
+    }
+
+    .card-body {
+        padding-bottom: 5px;
+    }
+
+    .vertical-flex-layout {
+        justify-content: center;
+        align-items: center;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .figure-img {
+        max-width: 100%;
+        height: auto;
+    }
+
+    .adjustable-font-size {
+        font-size: calc(0.5rem + 2vw);
+    }
+
+    .chat-history {
+        flex-grow: 1;
+        overflow-y: auto;
+        /* overflow-x: hidden; */
+        padding: 5px;
+        border-bottom: 1px solid #ccc;
+        margin-bottom: 10px;
+    }
+
+    #gradio pre {
+        background-color: transparent;
+    }
+
+    .hero-body {
+        padding-bottom: 0rem;
+        /* Adjust this value as needed */
+    }
+
+  .rss_text {
+  color: #333;
+  letter-spacing: 0;
+  margin-top: -10px;
+  font-size: 25px;
+  font-weight: 1000;
+}
+
+</style>
+
+<body>
+    <!-- Optimized hero section -->
+    <section class="hero">
+        <div class="hero-body">
+            <div class="container is-max-desktop">
+                <div class="columns is-centered">
+                    <div class="column has-text-centered">
+                            <video class="logo-video" src="images/logo-ani.mp4" width="100" height="100" autoplay muted loop playsinline
+                                loading="eager"></video>
+                        <h1 class="title is-1 publication-title">NaVILA: Legged Robot Vision-Language-Action Model
+                            for
+                            Navigation</h1>
+                            
+                            <span class="rss_text">
+                                <!-- CoRL 2023 <span style="color:rgb(182, 0, 10);font-weight:bolder;">Oral</span> -->
+                                RSS 2025
+                            </span>
+
+                        <div class="is-size-5 publication-authors">
+                            <!-- First Group of 4 Authors -->
+                            <div class="author-group">
+                                <span class="author-block">
+                                    <a href="https://www.anjiecheng.me"
+                                        style="color:#008AD7;font-weight:normal;">An-Chieh Cheng</a></a><sup>*</sup>,
+                                </span>
+                                <span class="author-block">
+                                    <a href="https://yandongji.github.io/"
+                                        style="color:#008AD7;font-weight:normal;">Yandong Ji</a><sup>*</sup>,
+                                </span>
+                                <span class="author-block">
+                                    <a href="https://yang-zj1026.github.io/"
+                                        style="color:#008AD7;font-weight:normal;">Zhaojing Yang</a><sup>*</sup>,
+                                </span>
+                                <span class="author-block">
+                                    <a href="#" style="color:#008AD7;font-weight:normal;">Zaitian Gongye</a>,
+                                    </span>
+                                    <span class="author-block">
+                                    <a href="https://maureenzou.github.io/"
+                                        style="color:#008AD7;font-weight:normal;">Xueyan Zou</a>,
+                                </span>
+                            </div>
+
+                            <!-- Second Group of 3 Authors -->
+                            <div class="author-group">
+                                <span class="author-block">
+                                    <a href="https://jankautz.com/" style="color:#F2A900;font-weight:normal;">Jan
+                                        Kautz</a>,
+                                </span>
+                                <span class="author-block">
+                                    <a href="https://ebiyik.github.io/" style="color:#F2A900;font-weight:normal;">Erdem
+                                        Bıyık</a>,
+                                </span>
+                                <span class="author-block">
+                                    <a href="https://hongxu-yin.github.io/"
+                                        style="color:#008AD7;font-weight:normal;">Hongxu
+                                        Yin</a><sup>&dagger;</sup>,
+                                </span>
+                                <span class="author-block">
+                                    <a href="https://sifeiliu.net/" style="color:#f68946;font-weight:normal;">Sifei
+                                        Liu</a><sup>&dagger;</sup>
+                                </span>
+                                <span class="author-block">
+                                    <a href="https://xiaolonw.github.io/"
+                                        style="color:#f68946;font-weight:normal;">Xiaolong
+                                        Wang</a><sup>&dagger;</sup>,
+                                </span>
+                            </div>
+                        </div>
+                        <div class=" is-size-5 publication-authors">
+                            UC San Diego, USC, NVIDIA
+                        </div>
+
+                        <div class=" is-size-7">
+                            <sup>*</sup>Equal Contribution, ordered
+                            alphabetically<br><sup>&dagger;</sup> Equal Advising
+                        </div>
+
+                        <div class="column has-text-centered">
+                            <div class="publication-links">
+                                <span class="link-block">
+                                    <a href="./static/navila_paper.pdf" class="button is-normal is-rounded is-dark">
+                                        <span class="icon">
+                                            <i class="far fa-file-pdf"></i>
+                                        </span>
+                                        <span>pdf</span>
+                                    </a>
+                                </span>
+                                <span class="link-block">
+                                    <a href="https://arxiv.org/abs/2412.04453" class="button is-normal is-rounded is-dark">
+                                        <span class="icon">
+                                            <i class="ai ai-arxiv"></i>
+                                        </span>
+                                        <span>arxiv</span>
+                                    </a>
+                                </span>
+                                <span class="link-block">
+                                    <a href="https://github.com/AnjieCheng/NaVILA" class="external-link button is-normal is-rounded is-dark">
+                                        <span class="icon">
+                                            <i class="fab fa-github"></i>
+                                        </span>
+                                        <span>Code (VLA)</span>
+                                    </a>
+                                </span>
+                                <span class="link-block">
+                                    <a href="https://github.com/yang-zj1026/legged-loco" class="external-link button is-normal is-rounded is-dark">
+                                        <span class="icon">
+                                            <i class="fab fa-github"></i>
+                                        </span>
+                                        <span>Code (Low-level)</span>
+                                    </a>
+                                    </span>
+                                    <span class="link-block">
+                                        <a href="https://github.com/yang-zj1026/VLN-CE-Isaac" class="external-link button is-normal is-rounded is-dark">
+                                        <span class="icon">
+                                            <i class="fas fa-star"></i>
+                                        </span>
+                                        <span>Benchmark</span>
+                                    </a>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section" style="padding-top: 0.5rem; padding-bottom: 4rem;">
+        <div class="container is-max-desktop">
+            <div class="columns is-centered has-text-centered">
+                <div class="column">
+                    <div style="position:relative;padding-top:56.25%;">
+                        <iframe src="https://www.youtube.com/embed/QsF5x3m_p7U?si=owOdR8I_GxMMeQuI"
+                            allowfullscreen style="position:absolute;top:0;left:0;width:100%;height:100%;">
+                        </iframe>
+                    </div>
+                    <div style="margin-top: 0.5rem;">
+                        <h3 class="title is-5" style="margin-bottom: 0.75rem;">TL;DR</h3>
+                        <p class="has-text-justified" style="font-weight: 600; font-size: 0.95rem;">
+                            NaVILA is a two-level framework that combines VLAs with locomotion skills for navigation. It
+                            generates high-level language-based commands, while a real-time locomotion policy ensures
+                            obstacle avoidance.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section" style="background-color:#efeff081">
+        <div class="container is-max-desktop">
+            <!-- Abstract. -->
+            <div class="columns is-centered has-text-centered">
+                <div class="column is-six-fifths">
+                    <h2 class="title is-3">🔥 Highlights</h2>
+                    <div class="content has-text-justified">
+                        <ol type="1">
+
+                            <li><b>Strongly Generalizable VLA Model</b>. We tamed a VLM model into a VLA model and
+                                trained it on diverse datasets, including <span style="color: #669900;">real-world human
+                                    video data</span>, simulated indoor navigation data, and question-answering tasks.
+                                NaVILA outperform all methods that do not rely on simulator pre-trained waypoint
+                                predictors, even when those methods leverage additional sensors.</li>
+
+                            <li><b>Vision-Based Legged Robot Policy</b>. We introduce an <span
+                                    style="color: #669900;">end-to-end vsion-based locomotion policy trained without
+                                    teacher-student distillation</span>.
+                                By directly interacting with the environment using LiDAR during training, our approach
+                                significantly reduces the
+                                sim-to-real gap.
+                                Our policy ensures safety in challenging environments, such as near transparency
+                                surfaces, and excels at
+                                traversing rough terrain.</li>
+
+                            <li><b>VLN-CE-Isaac Benchmark</b>. We introduce a <span
+                                    style="color: #669900;">high-fidelity</span>, <span
+                                    style="color: #669900;">physics-realistic</span> benchmark
+                                for low-level robotic
+                                control. It provides a safe, scalable platform to evaluate navigation across diverse
+                                robots and scenarios, reducing
+                                real-world testing costs and risks. </li>
+
+                            <li><b>Real-World Deployment</b>. NaVILA demonstrates strong performance in challenging
+                                real-world environments with <span style="color: #669900;">quadruped</span> and <span
+                                    style="color: #669900;">humanoid</span> robots,
+                                showcasing its generalization capabilities and robustness.
+
+                                <br>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+<section class="section">
+    <div class="columns is-centered has-text-centered">
+        <div class="column is-six-fifths">
+            <h2 class="title is-3">
+                <img src="images/icon.png" width="50" style="vertical-align: bottom;">
+                Real-world Results: Booster T1
+            </h2>
+        </div>
+    </div>
+
+    <div class="container is-max-desktop" style="max-width: 1200px;">
+        <div class="columns is-centered">
+            <div class="column is-full-width">
+                <div class="content">
+
+                    <div class="row g-1">
+                        <div class="col px-1">
+                            <video playsinline autoplay loop muted controls src="./videos/Real/t1/1.mp4"
+                                width="100%"></video>
+                        </div>
+                        <div class="col px-1">
+                            <video playsinline autoplay loop muted controls src="./videos/Real/t1/2.mp4"
+                                width="100%"></video>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+    <section class="section">
+        <div class="columns is-centered has-text-centered">
+            <div class="column is-six-fifths">
+                <h2 class="title is-3">
+                    <img src="images/icon.png" width="50" style="vertical-align: bottom;">
+                    Real-world Results: Unitree Go2
+                </h2>
+            </div>
+        </div>
+        <div class="container is-max-desktop" style="max-width: 1200px;">
+            <div class="columns is-centered has-text-centered">
+                <div class="column is-full-width">
+                    <video src="videos/Real/output_grid_1_1.mp4" width="100%" autoplay muted loop playsinline
+                        style="display: block; margin: 0; padding: 0;"></video>
+                    <video src="videos/Real/output_grid_2_1.mp4" width="100%" autoplay muted loop playsinline
+                        style="display: block; margin: 0; padding: 0; margin-top: 3px;"></video>
+                </div>
+                </div>
+        </div>
+    </section>
+    
+
+
+    <section class="section">
+        <div class="columns is-centered has-text-centered">
+            <div class="column is-six-fifths">
+                <h2 class="title is-3">
+                    <img src="images/icon.png" width="50" style="vertical-align: bottom;">
+                    Real-world Results: Unitree G1
+                </h2>
+            </div>
+        </div>
+
+        <div class="container is-max-desktop" style="max-width: 1200px;">
+            <div class="columns is-centered">
+                <div class="column is-full-width">
+                    <div class="content">
+
+                        <div class="row g-1">
+                            <div class="col px-1">
+                                <video playsinline autoplay loop muted controls src="./videos/Real/g1/2.mp4"
+                                    width="100%"></video>
+                            </div>
+                        </div>
+                        <div class="row g-1">
+                            <div class="col px-1">
+                                <video playsinline autoplay loop muted controls src="./videos/Real/g1/1.mp4" width="100%"></video>
+                            </div>
+                            <div class="col px-1">
+                                <video playsinline autoplay loop muted controls src="./videos/Real/g1/4_1.mp4" width="100%"></video>
+                            </div>
+                            <div class="col px-1">
+                                <video playsinline autoplay loop muted controls src="./videos/Real/g1/3.mp4" width="100%"></video>
+                            </div>
+                            </div>
+                            </div>
+                </div>
+                </div>
+                </div>
+    </section>
+
+
+
+    <section class="section">
+        <div class="columns is-centered has-text-centered">
+            <div class="column is-six-fifths">
+                <h2 class="title is-3"><img src="images/icon.png" width="50" style="vertical-align: bottom;">
+                    Learning from YouTube Human Touring Videos</h2>
+            </div>
+        </div>
+        <div class="columns is-centered has-text-centered">
+            <video src="videos/method/pipeline.mp4" width="900" autoplay muted loop> </video>
+        </div>
+
+        <div class="container is-max-desktop" style="max-width: 1200px;">
+            <div class="columns is-centered">
+
+                <div class="column is-full-width">
+                    <div class="content has-text-justified">
+
+                        <tr>
+                            <td>
+                                <div class="row g-1">
+                                    <div class="col px-1">
+                                        <video playsinline autoplay loop muted controls src="videos/human/output_grid_1.mp4" width="100%"></video>
+                                    </div>
+                                </div>
+
+                                <br>
+                            </td>
+                        </tr>
+
+                    </div>
+                </div>
+            </div>
+    </section>
+
+
+
+    <section class="section">
+        <div class="columns is-centered has-text-centered">
+            <div class="column is-six-fifths">
+                <h2 class="title is-3"><img src="images/icon.png" width="50" style="vertical-align: bottom;">
+                    Results: VLN-CE-Isaac NaVILA-Go2-Vision</h2>
+            </div>
+        </div>
+
+        <div class="container is-max-desktop has-text-centered">
+            <div id="results-carousel-teaser" class="carousel results-carousel">
+                <div class="item item-video2">
+                    <video poster="" id="video10" loop autoplay playsinline controls muted height="100%" style="border-radius:10px;">
+                        <source src="./videos/isaac/go2_vision_360.mp4" type="video/mp4">
+                    </video>
+                </div>
+                <div class="item item-video3">
+                    <video poster="" id="video11" loop autoplay playsinline controls muted height="100%" style="border-radius:10px;">
+                        <source src="./videos/isaac/go2_vision_359.mp4" type="video/mp4">
+                    </video>
+                </div>
+                <div class="item item-video3">
+                    <video poster="" id="video11" loop autoplay playsinline controls muted height="100%" style="border-radius:10px;">
+                        <source src="./videos/isaac/go2_vision_234.mp4" type="video/mp4">
+                    </video>
+                </div>
+            </div>
+        </div>
+
+    </section>
+
+
+    <section class="section">
+        <div class="columns is-centered has-text-centered">
+            <div class="column is-six-fifths">
+                <h2 class="title is-3"><img src="images/icon.png" width="50" style="vertical-align: bottom;">
+                    Results: VLN-CE-Issac NaVILA-H1-Vision</h2>
+            </div>
+        </div>
+
+        <div class="container is-max-desktop has-text-centered">
+            <div id="results-carousel-teaser" class="carousel results-carousel">
+                <div class="item item-video2">
+                    <video poster="" id="video10" loop autoplay playsinline controls muted height="100%" style="border-radius:10px;">
+                        <source src="./videos/isaac/h1_vision_2.mp4" type="video/mp4">
+                    </video>
+                </div>
+                <div class="item item-video3">
+                    <video poster="" id="video11" loop autoplay playsinline controls muted height="100%" style="border-radius:10px;">
+                        <source src="./videos/isaac/h1_vision_1.mp4" type="video/mp4">
+                    </video>
+                </div>
+                <div class="item item-video3">
+                    <video poster="" id="video11" loop autoplay playsinline controls muted height="100%" style="border-radius:10px;">
+                        <source src="./videos/isaac/h1_vision_3.mp4" type="video/mp4">
+                    </video>
+                </div>
+            </div>
+        </div>
+
+    </section>
+
+
+    <section class="section">
+        <div class="columns is-centered has-text-centered">
+            <div class="column is-six-fifths">
+                <h2 class="title is-3"><img src="images/icon.png" width="50" style="vertical-align: bottom;">
+                    Results: VLN-CE-Issac Vision vs Blind Policy</h2>
+            </div>
+        </div>
+        <div class="container is-max-desktop">
+            <div class="columns is-centered">
+                <div class="column is-full-width">
+                    <div class="content has-text-justified">
+                        <tr>
+                            <td>
+                                <div class="row">
+                                    <div class="col">
+                                        <video playsinline autoplay loop muted controls
+                                            src="./videos/isaac/go2_compare_final.mp4" width="100%"
+                                            style="border-radius:10px; "></video>
+                                        <figcaption>
+                                            The vision-based policy performs better in Success Rate than the blind
+                                            policy
+                                            because it avoids obstacles more
+                                            effectively.
+                                        </figcaption>
+
+                                    </div>
+                                </div>
+                                <br>
+                            </td>
+                        </tr>
+                    </div>
+                </div>
+            </div>
+    </section>
+
+
+    <section class="section">
+        <div class="columns is-centered has-text-centered">
+            <div class="column is-six-fifths">
+                <h2 class="title is-3"><img src="images/icon.png" width="50" style="vertical-align: bottom;">
+                    Results: R2R-CE (Habitat)</h2>
+            </div>
+        </div>
+
+        <div class="container is-max-desktop has-text-centered">
+            <div id="results-carousel-teaser" class="carousel results-carousel">
+                <div class="item item-video2">
+                    <video poster="" id="video10" loop autoplay playsinline controls muted height="100%" style="border-radius:10px;">
+                        <source src="./videos/R2R/episode=837.mp4" type="video/mp4">
+                    </video>
+                </div>
+                <div class="item item-video3">
+                    <video poster="" id="video11" loop autoplay playsinline controls muted height="100%" style="border-radius:10px;">
+                        <source src="./videos/R2R/episode=866.mp4" type="video/mp4">
+                    </video>
+                </div>
+                <div class="item item-video3">
+                    <video poster="" id="video11" autoplay loop playsinline controls muted height="100%" style="border-radius:10px;">
+                        <source src="./videos/R2R/episode=172.mp4" type="video/mp4">
+                    </video>
+                </div>
+                <div class="item item-video3">
+                    <video poster="" id="video11" autoplay loop playsinline controls muted height="100%" style="border-radius:10px;">
+                        <source src="./videos/R2R/episode=115.mp4" type="video/mp4">
+                    </video>
+                </div>
+                <div class="item item-video3">
+                    <video poster="" id="video11" autoplay loop playsinline controls muted height="100%" style="border-radius:10px;">
+                        <source src="./videos/R2R/episode=177.mp4" type="video/mp4">
+                    </video>
+                </div>
+                <div class="item item-video3">
+                    <video poster="" id="video11" autoplay loop playsinline controls muted height="100%" style="border-radius:10px;">
+                        <source src="./videos/R2R/episode=275.mp4" type="video/mp4">
+                    </video>
+                </div>
+                <div class="item item-video3">
+                    <video poster="" id="video11" autoplay loop playsinline controls muted height="100%" style="border-radius:10px;">
+                        <source src="./videos/R2R/episode=283.mp4" type="video/mp4">
+                    </video>
+                </div>
+            </div>
+        </div>
+
+    </section>
+
+
+    <section class="section">
+        <div class="columns is-centered has-text-centered">
+            <div class="column is-six-fifths">
+                <h2 class="title is-3"><img src="images/icon.png" width="50" style="vertical-align: bottom;">
+                    Results: RxR-CE (Habitat)</h2>
+            </div>
+        </div>
+
+        <div class="container is-max-desktop has-text-centered">
+            <div id="results-carousel-teaser" class="carousel results-carousel">
+                <div class="item item-video2">
+                    <video poster="" id="video10" loop autoplay playsinline controls muted height="100%" style="border-radius:10px;">
+                        <source src="./videos/RxR/episode=6676.mp4" type="video/mp4">
+                    </video>
+                </div>
+                <div class="item item-video3">
+                    <video poster="" id="video11" loop autoplay playsinline controls muted height="100%" style="border-radius:10px;">
+                        <source src="./videos/RxR/episode=594.mp4" type="video/mp4">
+                    </video>
+                </div>
+
+                <div class="item item-video3">
+                    <video poster="" id="video11" loop autoplay playsinline controls muted height="100%" style="border-radius:10px;">
+                        <source src="./videos/RxR/episode=594.mp4" type="video/mp4">
+                    </video>
+                </div>
+
+                <div class="item item-video3">
+                    <video poster="" id="video11" loop autoplay playsinline controls muted height="100%" style="border-radius:10px;">
+                        <source src="./videos/RxR/episode=1602.mp4" type="video/mp4">
+                    </video>
+                </div>
+
+                <div class="item item-video3">
+                    <video poster="" id="video11" loop autoplay playsinline controls muted height="100%" style="border-radius:10px;">
+                        <source src="./videos/RxR/episode=1101.mp4" type="video/mp4">
+                    </video>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <style>
+        #BibTeX {
+            margin-bottom: -80px;
+        }
+
+        #Acknowledgement {
+            margin-top: -80px;
+        }
+    </style>
+
+
+
+    <section class="section" id="BibTeX">
+        <div class="container is-max-desktop content">
+            <h2 class="title">Citation</h2>
+            <pre><code>
+@inproceedings{cheng2024navila,
+title = {NaVILA: Legged Robot Vision-Language-Action Model for Navigation},
+    author = {Cheng, An-Chieh and Ji, Yandong and Yang, Zhaojing and Zou, Xueyan and Kautz, Jan and Biyik, Erdem and Yin,
+    Hongxu and Liu, Sifei and Wang, Xiaolong},
+    booktitle = {RSS},
+    year = {2025},
+}
+  </code></pre>
+        </div>
+    </section>
+
+
+    <section class="section" id="Acknowledgement">
+        <div class="container is-max-desktop content">
+            <h2 class="title">Acknowledgement</h2>
+            <p>
+                We sincerely thank Chengjing Yuan for their support with hardware setup and 3D modeling. We also thank Xuxin Cheng and
+                Jialong Li for
+                their help in setting up the G1 robot, as well as Jiazhao Zhang and Yukang Chen for their valuable discussions.
+            </p>
+        </div>
+    </section>
+
+
+
+    <!-- </div> -->
+
+</body>
+
+</html>

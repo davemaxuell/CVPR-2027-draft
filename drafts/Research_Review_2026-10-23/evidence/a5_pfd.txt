@@ -1,0 +1,527 @@
+Source: https://arxiv.org/html/2604.25859v1
+Accessed: 2026-10-23
+
+Privileged Foresight Distillation: Zero-Cost Future Correction for World Action Models
+Report GitHub Issue
+×
+Title:
+Content selection saved. Describe the issue below:
+Description:
+Submit without GitHub
+Submit in GitHub
+arXiv is now an independent nonprofit!
+Learn more
+×
+Back to arXiv
+Why HTML?
+Report Issue
+Back to Abstract
+Download PDF
+Abstract
+1 Introduction
+2 Related Work
+3 Method
+3.1 Preliminaries
+3.2 A privileged forward via attention masking
+3.3 The foresight residual and the residual adapter
+3.4 Training objective and gradient routing
+3.5 Inference
+4 Experiments
+4.1 Experimental setup
+4.2 Main results
+4.3 Isolating the foresight signal
+4.4 Inference overhead
+5 Conclusion
+References
+License: CC BY 4.0
+arXiv:2604.25859v1 [cs.RO] 28 Apr 2026
+Privileged Foresight Distillation: Zero-Cost Future
+Correction for World Action Models
+Pengcheng Fang
+Affiliation: The University of Southampton
+Hongli Chen
+Affiliation: The University of Queensland
+Xiaohao Cai
+Affiliation: The University of Southampton
+Abstract
+World action models jointly predict future video and action during training, raising an open question about what role the future-prediction branch actually plays. A recent finding shows that this branch can be removed at inference with little to no loss on common manipulation benchmarks, suggesting that future information may act merely as a regularizer on the shared visual backbone. We propose instead that joint training induces an action-conditioned correction that privileged future observations impose on action denoising, and that current-only policies capture this correction only partially. Making the account precise, we formulate privileged foresight as a residual in the action-denoising direction — the difference between what a model predicts given the true future and what it predicts given only the current frame — and introduce Privileged Foresight Distillation (PFD), which transfers this residual from a training-time teacher into a small adapter on a current-only student. The teacher and student share the same backbone and differ only in the attention mask over video tokens; future video is never generated at inference. Controlled experiments verify that this gain reflects a genuine future-conditioned correction rather than a side effect of capacity or regularization. Empirically, PFD achieves consistent improvements on LIBERO and RoboTwin manipulation benchmarks while preserving the current-only inference interface at negligible added latency. This view reframes the role of future information in world action models: not as a target to predict, nor as a regularizer to absorb, but as a compressible correction to be distilled.
+August 24, 2026
+1 Introduction
+Joint prediction of future video and action is a central design pattern in world action models, motivated by the intuition that visual foresight during training helps an agent choose better actions. A recent finding challenges this premise: a model trained jointly with video prediction can be deployed without test-time future generation while matching or exceeding the predictive variant Yuan et al. (2026). The result has been read as evidence that test-time future imagination is unnecessary — but it leaves a deeper question unanswered. If the future branch is not used at inference, what role does future information play during training, and is any of its action-specific content lost when the branch is removed?
+Two readings of this finding are possible. On a regularizer reading, future video shapes the shared visual backbone but contributes nothing action-specific; the current-only policy captures everything useful, and there is nothing to recover. On a privileged-foresight reading, future video induces a structured correction on the action-denoising direction itself — a correction that joint training transfers only partially to the current-only path. The two readings are observationally similar in the existing literature, yet they imply opposite methodological prescriptions: the first directs effort toward stronger visual backbones, the second toward better mechanisms for transferring the privileged signal. We find that the first reading is incomplete. Simply exposing the current-only policy to more training capacity — naïve finetuning of the same backbone layers — fails to improve performance (Section 4.3), so the gap between what joint training can teach and what the current-only policy learns is not a capacity gap. The interesting signal, if it exists, must lie in a direction that pure supervision on the action target does not reach.
+We locate this signal by asking what privileged access to the future would change in the action-denoising process. During training, we instantiate the same backbone as two parallel paths, identical except for the attention mask over video tokens: a current-only student that sees only the current frame (matching the standard joint-training setup), and a privileged teacher that attends to the full future video. The teacher’s action-velocity prediction minus the student’s defines a foresight residual — the component of the denoising direction that becomes predictable once future information is available. Privileged Foresight Distillation (PFD) trains a small adapter on the student path to predict this residual from current-only context. The residual target is detached before use, so the inherited joint-training objective is not pulled away from the action target by a moving teacher signal. At inference, the teacher is discarded and the adapter augments the student’s prediction at each denoising step; the current-only inference interface is preserved exactly, with the foresight-induced correction restored through a residual head whose added latency is negligible (Section 4).
+We design controlled experiments to interpret PFD’s gain, isolating it from confounds of capacity, regularization, and fine-tuning-budget reallocation. None of these alternatives accounts for the observed effect, supporting a specific reading of the transferred signal: privileged foresight is a future-conditioned correction that is not recovered by matched direct fine-tuning under the same budget, and a small adapter is sufficient to absorb it.
+Contributions. We make the following contributions.
+•
+A new perspective on future information. We propose that future information in world action models is best understood as an action-conditioned correction residual — a direction not recovered by matched direct fine-tuning under the same budget.
+•
+Privileged Foresight Distillation (PFD). We introduce a training-only teacher–student construction that makes this view operational: the teacher accesses real future during training, a small adapter distills the teacher-minus-student residual, and the adapter preserves the current-only inference interface with no future generation at test time.
+•
+Controlled evidence for the transferred signal. We design experiments that isolate PFD’s gain from confounds of capacity, auxiliary regularization, and budget reallocation between backbone fine-tuning and adapter capacity, supporting the reading of the foresight residual as a future-conditioned correction.
+•
+Empirical results. PFD achieves consistent improvements over the Fast-WAM backbone on LIBERO and RoboTwin, matching or exceeding methods that rely on embodied pretraining, with negligible inference overhead.
+2 Related Work
+World action models and future video.
+Recent robot policies combine video backbones with action heads, either by jointly predicting future frames and actions Wu et al. (2024); Cheang et al. (2024); Hu et al. (2025) or by conditioning actions on externally generated future videos Du et al. (2023); Black et al. (2024b). In both settings, future materialization—as pixels or latent rollouts—is required at inference and often dominates computation. Fast current-only policies remove this test-time future generation with a single forward pass Yuan et al. (2026). We ask whether action-relevant future information can still benefit such current-only policies, and in what form.
+Uses of future information.
+Prior work mainly uses future information in two ways. Future-as-prediction explicitly generates future frames for action conditioning Du et al. (2023); Black et al. (2024b), while future-as-representation learns latent imagination rollouts for planning or representation learning Hafner et al. (2023); Schrittwieser et al. (2020); Hansen et al. (2024). Both require future content to exist at test time in some form. In contrast, PFD uses future-as-correction: future video is available only during training, where it reveals what a current-only policy misses, and is distilled into a residual correction that is not reconstructed at inference.
+Privileged information and adapter heads.
+PFD builds on asymmetric teacher–student learning with privileged information Vapnik and Vashist (2009); Chen et al. (2019), commonly used to transfer supervision from more informed teachers to constrained students. Here, teacher and student share the same backbone parameters and differ only in their attention mask over video tokens, removing architectural confounds. Moreover, PFD defines the adapter target as the teacher–student residual rather than replacing the student with full teacher imitation; a weak teacher-consistency term is used only to stabilize the corrected output, isolating the component attributable to future access. This residual is carried by a small action-stream adapter; unlike generic parameter-efficient adapters Hu et al. (2022), it is explicitly sized and trained to encode the foresight residual.
+Figure 1:
+Privileged Foresight Distillation (PFD).
+Top: Student and privileged teacher paths differ only in their attention mask:
+the student action tokens attend to the current-frame video tokens and action tokens,
+matching the Fast-WAM current-only inference interface, whereas the teacher action
+tokens attend to all video tokens, including real future frames available only during
+training.
+Left: During training, the same MoT backbone is evaluated under both masks,
+yielding a live student prediction v_{\mathrm{base}}vbasev_{\mathrm{base}} and a stop-gradient privileged
+prediction v_{\mathrm{teacher}}vteacherv_{\mathrm{teacher}}. The detached residual target
+r=\mathrm{sg}(v_{\mathrm{teacher}}-v_{\mathrm{base}})r=sg⁡(vteacher−vbase)r=\mathrm{sg}(v_{\mathrm{teacher}}-v_{\mathrm{base}}) captures the action-denoising
+correction induced by future access. A small adapter g_{\phi}gϕg_{\phi} takes the live
+v_{\mathrm{base}}vbasev_{\mathrm{base}} and predicts \hat{\delta}δ^\hat{\delta} to fit this residual, producing
+v_{\mathrm{final}}=v_{\mathrm{base}}+\hat{\delta}vfinal=vbase+δ^v_{\mathrm{final}}=v_{\mathrm{base}}+\hat{\delta}.
+Right: At inference, the teacher path and future video tokens are discarded.
+The model runs only the student mask and applies the adapter correction, preserving
+the current-only Fast-WAM interface with no test-time future generation and negligible
+adapter-only compute cost.
+3 Method
+Privileged Foresight Distillation (PFD) is a training-time mechanism that operationalizes the future-as-correction view of §1: a privileged path with future access produces an action-side correction signal, and a small adapter on the current-only path absorbs it. Inference uses the current-only path and the adapter; the privileged path is not instantiated.
+3.1 Preliminaries
+Let X=(X_{1},\ldots,X_{T})X=(X1,…,XT)X=(X_{1},\ldots,X_{T}) denote a sequence of TTT video frames with X_{1}X1X_{1} the current frame, and let AAA denote the corresponding action chunk. Following Yuan et al. (2026), we adopt a Mixture-of-Transformers backbone with parameters \thetaθ\theta, comprising a video expert and an action expert, with cross-stream information exchange controlled by a joint attention mask.
+Both streams are trained with flow matching. We sample timesteps \tau_{v},\tau_{a}\in[0,1]τv,τa∈[0,1]\tau_{v},\tau_{a}\in[0,1] independently and draw independent Gaussian noise \varepsilon_{v},\varepsilon_{a}εv,εa\varepsilon_{v},\varepsilon_{a}, yielding the corrupted inputs
+X_{\tau_{v}}\;=\;(1-\tau_{v})\,\varepsilon_{v}+\tau_{v}\,X,\qquad A_{\tau_{a}}\;=\;(1-\tau_{a})\,\varepsilon_{a}+\tau_{a}\,A,Xτv=(1−τv)​εv+τv​X,Aτa=(1−τa)​εa+τa​A,X_{\tau_{v}}\;=\;(1-\tau_{v})\,\varepsilon_{v}+\tau_{v}\,X,\qquad A_{\tau_{a}}\;=\;(1-\tau_{a})\,\varepsilon_{a}+\tau_{a}\,A,
+(1)
+with action-velocity target v_{\mathrm{target}}=A-\varepsilon_{a}vtarget=A−εav_{\mathrm{target}}=A-\varepsilon_{a}. We write u_{\mathrm{video}}uvideou_{\mathrm{video}} for the video-velocity output and u_{\mathrm{target}}=X-\varepsilon_{v}utarget=X−εvu_{\mathrm{target}}=X-\varepsilon_{v} for its target. We write
+v_{\mathrm{act}}\!\left(X_{\tau_{v}},\,A_{\tau_{a}},\,\tau_{v},\,\tau_{a};\;M\right)vact​(Xτv,Aτa,τv,τa,M)v_{\mathrm{act}}\!\left(X_{\tau_{v}},\,A_{\tau_{a}},\,\tau_{v},\,\tau_{a};\;M\right)
+for the action-velocity output produced by the backbone when the joint self-attention is restricted by mask MMM. The current-only forward used at inference adopts the student mask M_{\mathrm{S}}MSM_{\mathrm{S}}, under which each action-token query attends to the current-frame video tokens X_{1}X1X_{1} and to the other action tokens:
+v_{\mathrm{base}}\;=\;v_{\mathrm{act}}\!\left(X_{\tau_{v}},\,A_{\tau_{a}},\,\tau_{v},\,\tau_{a};\;M_{\mathrm{S}}\right).vbase=vact​(Xτv,Aτa,τv,τa,MS).v_{\mathrm{base}}\;=\;v_{\mathrm{act}}\!\left(X_{\tau_{v}},\,A_{\tau_{a}},\,\tau_{v},\,\tau_{a};\;M_{\mathrm{S}}\right).
+(2)
+Throughout the displayed equations we omit first-frame observation conditioning and the per-timestep scheduler weighting on the velocity outputs for clarity; both follow Yuan et al. (2026) and are applied identically to the student and teacher forwards introduced below.
+3.2 A privileged forward via attention masking
+PFD adds a second action forward, identical to (2) in every respect except for the attention mask:
+v_{\mathrm{teacher}}\;=\;\operatorname{sg}\!\left[\,v_{\mathrm{act}}\!\left(X_{\tau_{v}},\,A_{\tau_{a}},\,\tau_{v},\,\tau_{a};\;M_{\mathrm{T}}\right)\,\right].vteacher=sg⁡[vact​(Xτv,Aτa,τv,τa,MT)].v_{\mathrm{teacher}}\;=\;\operatorname{sg}\!\left[\,v_{\mathrm{act}}\!\left(X_{\tau_{v}},\,A_{\tau_{a}},\,\tau_{v},\,\tau_{a};\;M_{\mathrm{T}}\right)\,\right].
+(3)
+The teacher mask M_{\mathrm{T}}MTM_{\mathrm{T}} allows each action-token query to attend to the full set of video tokens X_{1},\ldots,X_{T}X1,…,XTX_{1},\ldots,X_{T}, including future frames; \operatorname{sg}(\cdot)sg⁡(⋅)\operatorname{sg}(\cdot) denotes the stop-gradient operator. The teacher and student forwards share the same parameters \thetaθ\theta at every step — there is no exponential moving average, no frozen copy, and no distinct teacher network — and they consume the same noisy inputs (X_{\tau_{v}},A_{\tau_{a}})(Xτv,Aτa)(X_{\tau_{v}},A_{\tau_{a}}) generated from a single noise sample (\varepsilon_{v},\varepsilon_{a})(εv,εa)(\varepsilon_{v},\varepsilon_{a}). The two forwards differ only in the attention mask over video tokens, which isolates the effect of future access: capacity, parameterization, optimizer state, and noise realization are held identical, so any difference between v_{\mathrm{teacher}}vteacherv_{\mathrm{teacher}} and v_{\mathrm{base}}vbasev_{\mathrm{base}} is attributable to the enlargement of the action queries’ attention support. The stop-gradient on (3) further removes the teacher from the optimization graph, so it contributes no parameter update of its own and serves only as a target source for the residual we now define. Because the two forwards share \thetaθ\theta, the residual v_{\mathrm{teacher}}-v_{\mathrm{base}}vteacher−vbasev_{\mathrm{teacher}}-v_{\mathrm{base}} is a model-dependent foresight-induced correction at the current parameter state and evolves during training.
+3.3 The foresight residual and the residual adapter
+Rather than have the student imitate v_{\mathrm{teacher}}vteacherv_{\mathrm{teacher}} in full, PFD distills only the component that future access changes. We define the foresight residual as
+r\;:=\;\operatorname{sg}\!\left(v_{\mathrm{teacher}}-v_{\mathrm{base}}\right);r:=sg⁡(vteacher−vbase);r\;:=\;\operatorname{sg}\!\left(v_{\mathrm{teacher}}-v_{\mathrm{base}}\right);
+(4)
+since v_{\mathrm{teacher}}vteacherv_{\mathrm{teacher}} is already detached, this is equivalent to r=v_{\mathrm{teacher}}-\operatorname{sg}(v_{\mathrm{base}})r=vteacher−sg⁡(vbase)r=v_{\mathrm{teacher}}-\operatorname{sg}(v_{\mathrm{base}}). Targeting rrr rather than v_{\mathrm{teacher}}vteacherv_{\mathrm{teacher}} confines supervision to the component that future access changes at the current \thetaθ\theta; whenever the two masks induce identical predictions, the target is zero and no teacher signal enters the loss.
+The residual is absorbed by a small residual adapter g_{\varphi}gφg_{\varphi} placed at the output of the action expert and applied token-wise:
+\hat{\delta}\;=\;g_{\varphi}\!\left(v_{\mathrm{base}},\,\tau_{a}\right),\qquad v_{\mathrm{final}}\;=\;v_{\mathrm{base}}+\hat{\delta}.δ^=gφ​(vbase,τa),vfinal=vbase+δ^.\hat{\delta}\;=\;g_{\varphi}\!\left(v_{\mathrm{base}},\,\tau_{a}\right),\qquad v_{\mathrm{final}}\;=\;v_{\mathrm{base}}+\hat{\delta}.
+(5)
+First, the adapter consumes v_{\mathrm{base}}vbasev_{\mathrm{base}} rather than \operatorname{sg}(v_{\mathrm{base}})sg⁡(vbase)\operatorname{sg}(v_{\mathrm{base}}); only the residual target rrr in (4) is detached. As we discuss in §3.4, this asymmetry is what allows residual supervision to influence the backbone subset \theta^{\prime}θ′\theta^{\prime} at all under partial fine-tuning, rather than reducing to a pure adapter-fitting problem on \varphiφ\varphi. Second, the adapter’s output projection is zero-initialized, so \hat{\delta}\equiv 0δ^≡0\hat{\delta}\equiv 0 at the start of training and v_{\mathrm{final}}=v_{\mathrm{base}}vfinal=vbasev_{\mathrm{final}}=v_{\mathrm{base}} identically; the corrected forward equals the standard Fast-WAM student forward at initialization, and any departure from it accumulates only as training drives g_{\varphi}gφg_{\varphi} to fit rrr.
+3.4 Training objective and gradient routing
+Let \theta^{\prime}\subseteq\thetaθ′⊆θ\theta^{\prime}\subseteq\theta denote the subset of backbone parameters that are permitted to update; the adapter parameters \varphiφ\varphi always update. PFD trains (\theta^{\prime},\varphi)(θ′,φ)(\theta^{\prime},\varphi) against the inherited video flow-matching loss together with three action-side losses:
+\displaystyle\mathcal{L}_{\mathrm{video}}ℒvideo\displaystyle\mathcal{L}_{\mathrm{video}}
+\displaystyle=w_{v}(\tau_{v})\,\bigl\lVert u_{\mathrm{video}}-u_{\mathrm{target}}\bigr\rVert^{2},=wv(τv)∥uvideo−utarget∥2,\displaystyle=w_{v}(\tau_{v})\,\bigl\lVert u_{\mathrm{video}}-u_{\mathrm{target}}\bigr\rVert^{2},
+(6)
+\displaystyle\mathcal{L}_{\mathrm{gt}}ℒgt\displaystyle\mathcal{L}_{\mathrm{gt}}
+\displaystyle=w_{a}(\tau_{a})\,\bigl\lVert v_{\mathrm{final}}-v_{\mathrm{target}}\bigr\rVert^{2},=wa(τa)∥vfinal−vtarget∥2,\displaystyle=w_{a}(\tau_{a})\,\bigl\lVert v_{\mathrm{final}}-v_{\mathrm{target}}\bigr\rVert^{2},
+(7)
+\displaystyle\mathcal{L}_{\mathrm{res}}ℒres\displaystyle\mathcal{L}_{\mathrm{res}}
+\displaystyle=\bigl\lVert\hat{\delta}-r\bigr\rVert^{2},=∥δ^−r∥2,\displaystyle=\bigl\lVert\hat{\delta}-r\bigr\rVert^{2},
+(8)
+\displaystyle\mathcal{L}_{\mathrm{teacher}}ℒteacher\displaystyle\mathcal{L}_{\mathrm{teacher}}
+\displaystyle=\bigl\lVert v_{\mathrm{final}}-v_{\mathrm{teacher}}\bigr\rVert^{2},=∥vfinal−vteacher∥2,\displaystyle=\bigl\lVert v_{\mathrm{final}}-v_{\mathrm{teacher}}\bigr\rVert^{2},
+(9)
+where w_{v}(\cdot)wv​(⋅)w_{v}(\cdot) and w_{a}(\cdot)wa​(⋅)w_{a}(\cdot) are the per-timestep weighting schedules of Yuan et al. (2026). The full PFD objective is
+\mathcal{L}\;=\;\lambda_{\mathrm{video}}\,\mathcal{L}_{\mathrm{video}}\;+\;\lambda_{\mathrm{gt}}\,\mathcal{L}_{\mathrm{gt}}\;+\;\lambda_{\mathrm{res}}\,\mathcal{L}_{\mathrm{res}}\;+\;\lambda_{\mathrm{teacher}}\,\mathcal{L}_{\mathrm{teacher}},ℒ=λvideo​ℒvideo+λgt​ℒgt+λres​ℒres+λteacher​ℒteacher,\mathcal{L}\;=\;\lambda_{\mathrm{video}}\,\mathcal{L}_{\mathrm{video}}\;+\;\lambda_{\mathrm{gt}}\,\mathcal{L}_{\mathrm{gt}}\;+\;\lambda_{\mathrm{res}}\,\mathcal{L}_{\mathrm{res}}\;+\;\lambda_{\mathrm{teacher}}\,\mathcal{L}_{\mathrm{teacher}},
+(10)
+with non-negative scalar coefficients; the values used in all experiments are reported in §4.1.
+Gradient routing. The teacher forward is fully stop-gradiented at (3) and contributes no update to \thetaθ\theta. The residual target rrr in (4) is also detached, which prevents \mathcal{L}_{\mathrm{res}}ℒres\mathcal{L}_{\mathrm{res}} from being trivially reduced by moving its target instead of fitting it. However, because the adapter input in (5) is the live v_{\mathrm{base}}vbasev_{\mathrm{base}} rather than \operatorname{sg}(v_{\mathrm{base}})sg⁡(vbase)\operatorname{sg}(v_{\mathrm{base}}), \mathcal{L}_{\mathrm{res}}ℒres\mathcal{L}_{\mathrm{res}} is not confined to updating \varphiφ\varphi: under partial fine-tuning, gradient also flows from \mathcal{L}_{\mathrm{res}}ℒres\mathcal{L}_{\mathrm{res}} through the dependence of \hat{\delta}δ^\hat{\delta} on v_{\mathrm{base}}vbasev_{\mathrm{base}} and into \theta^{\prime}θ′\theta^{\prime}. Residual supervision therefore reshapes both the correction head and the backbone’s emitted current-only velocity, with the detached target ensuring that the reshaping pulls v_{\mathrm{base}}vbasev_{\mathrm{base}} toward the privileged prediction rather than away from it.
+\mathcal{L}_{\mathrm{res}}ℒres\mathcal{L}_{\mathrm{res}} versus \mathcal{L}_{\mathrm{teacher}}ℒteacher\mathcal{L}_{\mathrm{teacher}}. The two teacher-derived losses coincide in forward value but differ in gradient path. Substituting v_{\mathrm{final}}=v_{\mathrm{base}}+\hat{\delta}vfinal=vbase+δ^v_{\mathrm{final}}=v_{\mathrm{base}}+\hat{\delta} into (9) gives \lVert\hat{\delta}-(v_{\mathrm{teacher}}-v_{\mathrm{base}})\rVert^{2}∥δ^−(vteacher−vbase)∥2\lVert\hat{\delta}-(v_{\mathrm{teacher}}-v_{\mathrm{base}})\rVert^{2}, which equals \mathcal{L}_{\mathrm{res}}ℒres\mathcal{L}_{\mathrm{res}} as a number. They diverge once gradients are computed: \mathcal{L}_{\mathrm{res}}ℒres\mathcal{L}_{\mathrm{res}} uses a fully detached residual target and routes gradient primarily through g_{\varphi}gφg_{\varphi}, with a secondary path into \theta^{\prime}θ′\theta^{\prime} via the adapter’s dependence on v_{\mathrm{base}}vbasev_{\mathrm{base}}; \mathcal{L}_{\mathrm{teacher}}ℒteacher\mathcal{L}_{\mathrm{teacher}} keeps the live v_{\mathrm{base}}vbasev_{\mathrm{base}} inside v_{\mathrm{final}}vfinalv_{\mathrm{final}} on the prediction side and detaches only v_{\mathrm{teacher}}vteacherv_{\mathrm{teacher}}, so its gradient pulls the current-only velocity itself toward the privileged prediction rather than routing through g_{\varphi}gφg_{\varphi}. PFD retains both terms: \mathcal{L}_{\mathrm{res}}ℒres\mathcal{L}_{\mathrm{res}} supervises the adapter through a detached target, while \mathcal{L}_{\mathrm{teacher}}ℒteacher\mathcal{L}_{\mathrm{teacher}} pulls v_{\mathrm{base}}vbasev_{\mathrm{base}} toward v_{\mathrm{teacher}}vteacherv_{\mathrm{teacher}} through the live prediction path.
+PFD admits two regimes via the choice of \theta^{\prime}θ′\theta^{\prime}: adapter-only (\theta^{\prime}=\varnothingθ′=∅\theta^{\prime}=\varnothing, the backbone is frozen) and partial fine-tuning (\theta^{\prime}θ′\theta^{\prime} unfreezes the last K_{a}KaK_{a} blocks of the action expert and the last K_{v}KvK_{v} blocks of the video expert); specific values and the default configuration are reported in §4.1.
+3.5 Inference
+At inference, PFD preserves the current-only denoising interface of Fast-WAM. At each flow-matching denoising step, the model computes the student velocity v_{\mathrm{base}}vbasev_{\mathrm{base}} from (2) under the student mask M_{\mathrm{S}}MSM_{\mathrm{S}}, applies the residual adapter, and uses
+v_{\mathrm{final}}\;=\;v_{\mathrm{base}}+g_{\varphi}(v_{\mathrm{base}},\,\tau_{a})vfinal=vbase+gφ​(vbase,τa)v_{\mathrm{final}}\;=\;v_{\mathrm{base}}+g_{\varphi}(v_{\mathrm{base}},\,\tau_{a})
+for the sampling update on A_{\tau_{a}}AτaA_{\tau_{a}}. The teacher mask M_{\mathrm{T}}MTM_{\mathrm{T}} is never instantiated at inference, and the future video frames X_{2},\ldots,X_{T}X2,…,XTX_{2},\ldots,X_{T} are neither generated nor consumed. The only added cost relative to Fast-WAM is one forward pass through g_{\varphi}gφg_{\varphi} per denoising step.
+4 Experiments
+4.1 Experimental setup
+Benchmarks.
+We evaluate on LIBERO Liu et al. (2023) and RoboTwin 2.0 Chen et al. (2025), following Fast-WAM Yuan et al. (2026). LIBERO contains four suites (Spatial, Object, Goal, Long); for each, we train one model on 500500500 demonstrations over 101010 tasks and report success rate over 500500500 trials. RoboTwin 2.0 is a bimanual dual-arm benchmark; we use its multi-task setup with 2{,}5002,5002{,}500 clean-scene and 25{,}00025,00025{,}000 randomized-scene demonstrations across more than 505050 tasks, reporting success over 100100100 trials per task in each condition.
+Baselines.
+Our primary baseline is Fast-WAM in two forms: “Fast-WAM (released)” directly transcribes the numbers from Yuan et al. (2026), while “Fast-WAM (reproduced)” is re-trained with the released configuration, codebase, and schedule used by our PFD runs, and serves as the reference for reported gains. The reproduced numbers are slightly lower than the original report but follow consistent suite-level trends under a unified evaluation pipeline. For broader context, we also include published numbers for OpenVLA Kim et al. (2024), \pi_{0}π0\pi_{0} Black et al. (2024a), \pi_{0.5}π0.5\pi_{0.5} Physical Intelligence et al. (2025), Motus Bi et al. (2025), and LingBot-VA Li et al. (2026), taken verbatim from Yuan et al. (2026). These five context baselines use embodied pretraining (“Emb. PT.”), whereas Fast-WAM and PFD use the Wan2.2-5B backbone without embodied pretraining.
+Training.
+We train for 303030 epochs on LIBERO and 151515 on RoboTwin using 888 H100 GPUs, matching Fast-WAM’s batch size, schedule, and optimizer family. We use AdamW with cosine decay, weight decay 0.010.010.01, gradient clipping 1.01.01.0, and benchmark-specific learning rates following Fast-WAM defaults: 6{\times}10^{-5}6×10−56{\times}10^{-5} for LIBERO and 1{\times}10^{-4}1×10−41{\times}10^{-4} for RoboTwin. PFD adds only the privileged forward of §3.2, which shares backbone parameters and introduces one additional attention pass per step.
+Inference.
+Following Fast-WAM, we use 101010 flow-matching denoising steps with classifier-free guidance scale 1.01.01.0. At each step, PFD runs one student forward under M_{\mathrm{S}}MSM_{\mathrm{S}} and applies the residual adapter,
+v_{\mathrm{final}}=v_{\mathrm{base}}+g_{\varphi}(v_{\mathrm{base}},\tau_{a})vfinal=vbase+gφ​(vbase,τa)v_{\mathrm{final}}=v_{\mathrm{base}}+g_{\varphi}(v_{\mathrm{base}},\tau_{a}),
+as in §3.5. The teacher mask M_{\mathrm{T}}MTM_{\mathrm{T}} is never instantiated at inference, and no future video frames are generated or consumed. End-to-end latency is reported in §4.4.
+Implementation.
+All main results use the partial fine-tuning regime of §3.4, with trainable parameters \theta^{\prime}\cup\varphiθ′∪φ\theta^{\prime}\cup\varphi. Here, \theta^{\prime}θ′\theta^{\prime} contains the last K_{a}KaK_{a} action-expert blocks and last K_{v}KvK_{v} video-expert blocks, each expert having 303030 blocks, and \varphiφ\varphi denotes the adapter. We set (K_{a},K_{v})=(12,12)(Ka,Kv)=(12,12)(K_{a},K_{v})=(12,12) for both benchmarks, unfreezing about 40\%40%40\% of blocks per expert. The adapter g_{\varphi}gφg_{\varphi} is a three-layer SiLU MLP of width 512512512; it takes a linear projection of the live base-action velocity v_{\mathrm{base}}vbasev_{\mathrm{base}} from (2) and a sinusoidal embedding of \tau_{a}τa\tau_{a} broadcast over tokens, with zero-initialized output projection. Loss weights are fixed for all PFD runs: \lambda_{\mathrm{video}}=\lambda_{\mathrm{gt}}=1.0λvideo=λgt=1.0\lambda_{\mathrm{video}}=\lambda_{\mathrm{gt}}=1.0, \lambda_{\mathrm{res}}=0.5λres=0.5\lambda_{\mathrm{res}}=0.5, and \lambda_{\mathrm{teacher}}=0.1λteacher=0.1\lambda_{\mathrm{teacher}}=0.1.
+4.2 Main results
+LIBERO. Table 1 reports per-suite success rates. PFD raises the LIBERO average from 96.9596.9596.95 for the reproduced Fast-WAM to 98.1098.1098.10, a gain of +1.15+1.15+1.15 on the four-suite mean. The per-suite breakdown is +1.6+1.6+1.6 on Spatial, -0.2−0.2-0.2 on Object, +2.6+2.6+2.6 on Goal, and +0.6+0.6+0.6 on Long. PFD improves on three of the four suites; on Object, where both methods exceed 99\%99%99\%, the difference of 0.20.20.2 points is at the binomial standard-error scale of 500500500-trial evaluation. The gains are most pronounced on Goal, while Long also improves over the reproduced Fast-WAM baseline. Comparing against methods that use embodied pretraining, PFD surpasses Motus (97.797.797.7), \pi_{0.5}π0.5\pi_{0.5} (96.996.996.9), and \pi_{0}π0\pi_{0} (94.194.194.1), and trails LingBot-VA (98.598.598.5) by 0.400.400.40 — without invoking a separate embodied pretraining stage. Adapter-only PFD (\theta^{\prime}=\varnothingθ′=∅\theta^{\prime}=\varnothing) reaches 96.6096.6096.60, competitive on Spatial, Object, and Goal but below the Fast-WAM baseline on Long; we therefore adopt partial fine-tuning as the default configuration and revisit the adapter-only regime as an ablation in §4.3.
+Table 1: LIBERO success rate (%) over 500500500 trials per suite. “Emb. PT.” indicates embodied pretraining; “(reproduced)” is re-trained under our codebase. Bold marks the rows and per-suite numbers where PFD (partial fine-tune) exceeds the reproduced Fast-WAM.
+Method
+Emb. PT.
+Spatial
+Object
+Goal
+Long
+Average
+OpenVLA Kim et al. (2024)
+✓
+84.7
+88.4
+79.2
+53.7
+76.5
+\pi_{0}π0\pi_{0} Black et al. (2024a)
+✓
+96.8
+98.8
+95.8
+85.2
+94.1
+\pi_{0.5}π0.5\pi_{0.5} Physical Intelligence et al. (2025)
+✓
+98.8
+98.2
+98.0
+92.4
+96.9
+Motus Bi et al. (2025)
+✓
+96.8
+99.8
+96.6
+97.6
+97.7
+LingBot-VA Li et al. (2026)
+✓
+98.5
+99.6
+97.2
+98.5
+98.5
+Fast-WAM (released) Yuan et al. (2026)
+–
+98.2
+100.0
+97.0
+95.2
+97.60
+Fast-WAM (reproduced)
+–
+97.0
+99.4
+96.6
+94.8
+96.95
+PFD (partial fine-tune, ours)
+–
+98.6
+99.2
+99.2
+95.4
+98.10
+PFD (adapter-only, \theta^{\prime}=\varnothingθ′=∅\theta^{\prime}=\varnothing)
+–
+97.2
+98.8
+96.6
+93.8
+96.60
+RoboTwin 2.0. Table 2 reports clean-scene, randomized-scene, and average success rates. PFD reaches 93.11/92.6993.11/92.6993.11/92.69 on clean and randomized respectively, with an average of 92.992.992.9, improving over the Fast-WAM row by +1.23+1.23+1.23 on clean, +0.91+0.91+0.91 on randomized, and +1.10+1.10+1.10 on the average. PFD’s 92.992.992.9 also exceeds the strongest embodied-pretrain baseline (LingBot-VA at 92.292.292.2) by 0.70.70.7 despite using no embodied pretraining, and is the highest among all Wan2.2-based entries.
+Table 2: RoboTwin 2.0 success rate (%) over 100100100 trials per task. “Emb. PT.” indicates embodied pretraining; “from Wan2.2” is re-trained on our backbone without embodied pretraining.
+Method
+Emb. PT.
+Clean
+Randomized
+Average
+\pi_{0}π0\pi_{0} Black et al. (2024a)
+✓
+65.92
+58.40
+62.2
+\pi_{0.5}π0.5\pi_{0.5} Physical Intelligence et al. (2025)
+✓
+82.74
+76.76
+79.8
+Motus Bi et al. (2025)
+✓
+88.66
+87.02
+87.8
+Motus from Wan2.2
+–
+77.56
+77.00
+77.3
+LingBot-VA Li et al. (2026)
+✓
+92.90
+91.50
+92.2
+LingBot-VA from Wan2.2
+–
+80.60
+–
+80.6
+Fast-WAM Yuan et al. (2026)
+–
+91.88
+91.78
+91.8
+PFD (partial fine-tune, ours)
+–
+93.11
+92.69
+92.9
+4.3 Isolating the foresight signal
+The aggregate gain reported in §4.2 is consistent with the privileged-foresight account but does not by itself rule out simpler explanations: extra trainable capacity in \theta^{\prime}θ′\theta^{\prime}, generic regularization from a second teacher forward, or a different allocation of the fine-tuning budget between backbone depth and adapter capacity. We design three controlled probes that share PFD’s training budget but each break exactly one ingredient of the foresight transfer, and verify whether breaking that ingredient erases the gain. We run probes on LIBERO; the four-suite split exposes capacity and correspondence dimensions independently of RoboTwin’s bimanual coordination, which we treat as an end-to-end test in §4.2. Numerical results are collected in Table 3 and visualized in Figure 2.
+Matched-capacity control. The first probe, pure finetune, unfreezes the same backbone subset \theta^{\prime}=(K_{a},K_{v})=(12,12)θ′=(Ka,Kv)=(12,12)\theta^{\prime}=(K_{a},K_{v})=(12,12) and trains against the action ground truth alone, with no teacher forward and no adapter. If the PFD gain were attributable to the additional trainable capacity that \theta^{\prime}θ′\theta^{\prime} exposes, this control would match or exceed PFD. It does not: pure finetune scores 96.4/99.2/96.4/94.896.4/99.2/96.4/94.896.4/99.2/96.4/94.8 for an average of 96.7096.7096.70, which is -0.25−0.25-0.25 below the reproduced Fast-WAM and -1.40−1.40-1.40 below PFD. Unfreezing the same subset of layers under direct action supervision slightly hurts the current-only policy at this training budget. The signal that PFD transfers is therefore not accessible to direct supervision on the action target, even when the layers permitted to update are identical.
+Shuffled-future control. The second probe, shuffled-future PFD, replaces the teacher’s future frames X_{2},\ldots,X_{T}X2,…,XTX_{2},\ldots,X_{T} at every training step with frames drawn from an unrelated trajectory in the same batch. The teacher mask M_{\mathrm{T}}MTM_{\mathrm{T}}, the adapter, the loss weights, and the schedule are otherwise identical to the default PFD run. If the gain reflected auxiliary-loss regularization or the mere presence of a second supervisory target, destroying the temporal correspondence between X_{1}X1X_{1} and X_{2:T}X2:TX_{2:T} should leave it largely intact, since the input statistics and loss magnitudes are preserved. Instead, shuffled-future PFD scores 96.1/99.2/96.2/95.096.1/99.2/96.2/95.096.1/99.2/96.2/95.0 for an average of 96.6296.6296.62, which is -0.33−0.33-0.33 below the reproduced Fast-WAM and -1.48−1.48-1.48 below PFD. The transferred signal therefore depends on genuine current-to-future correspondence, not on incidental properties of the teacher forward.
+Depth–width trade-off probe. The third probe asks whether reducing video-side fine-tuning depth while increasing residual-head width can substitute for the default full-depth PFD configuration. We double the adapter hidden width from 512512512 to 102410241024 and, to test a practical depth–width trade-off, halve the video-expert fine-tune depth from K_{v}=12Kv=12K_{v}=12 to K_{v}=6Kv=6K_{v}=6 (the action expert is held at K_{a}=12Ka=12K_{a}=12). This redirects the freed compute from updating the deeper video stack into a wider correction head. The resulting configuration scores 97.9/99.8/97.2/94.597.9/99.8/97.2/94.597.9/99.8/97.2/94.5 for an average of 97.3697.3697.36, which is -0.74−0.74-0.74 below the default PFD at width 512512512. Redirecting fine-tuning budget from the video expert to a wider adapter therefore fails to recover the gain. We cannot rule out a clean adapter-width effect at fixed (K_{a},K_{v})=(12,12)(Ka,Kv)=(12,12)(K_{a},K_{v})=(12,12) and leave that question to future work.
+Reading the probes together. Relative to the default PFD average of 98.10, the three probes land at deltas of -1.40−1.40-1.40 (matched-capacity), -1.48−1.48-1.48 (shuffled-future), and -0.74−0.74-0.74 (budget-reallocation). Two readings split cleanly. Ruled out: extra trainable capacity and auxiliary-loss regularization each erase the PFD gain when isolated, with the matched-capacity row falling below the frozen baseline and the shuffled-future row matching it. Argued against, not ruled out: budget-reallocation closes only part of the gap, and the supplementary K=6K=6K=6 row reported below scores similarly at 97.4097.4097.40 without any adapter widening, corroborating the reading that the residual gap from 97.4097.4097.40 to 98.1098.1098.10 tracks fine-tune depth on the video expert rather than adapter width. None of the three confounds reproduces the privileged-foresight residual rrr in (4): rrr is by construction the component of the action-velocity field that becomes available when the attention mask exposes future frames at the same parameters, and the alternatives examined here change capacity, target, or budget allocation while leaving that mask alone.
+Fine-tune depth (supplementary). As a supplementary check, we ablate the depth of the trainable backbone subset by halving K=K_{a}=K_{v}K=Ka=KvK=K_{a}=K_{v} from 121212 to 666 at the default adapter width of 512512512. This configuration scores 97.9/99.7/97.3/94.797.9/99.7/97.3/94.797.9/99.7/97.3/94.7 for an average of 97.4097.4097.40, which is -0.70−0.70-0.70 below default PFD but +0.45+0.45+0.45 above the reproduced Fast-WAM. Its close correspondence to the budget-reallocation row at 97.36 indicates that at the half-depth setting the gap to default PFD is already determined by KKK and is not closed by adapter widening. The teacher therefore contributes useful signal even at half depth, and additional fine-tune depth on the video expert continues to absorb it.
+Table 3: LIBERO epistemic probes (success rate %). The first three probes break, in turn, capacity, temporal correspondence, and the allocation of the fine-tuning budget between backbone depth and adapter width. The last two rows are supplementary ablations on the adapter regime and on fine-tune depth.
+Configuration
+Spatial
+Object
+Goal
+Long
+Average
+Fast-WAM (reproduced)
+97.0
+99.4
+96.6
+94.8
+96.95
+Pure finetune (\theta^{\prime}θ′\theta^{\prime}, no teacher)
+96.4
+99.2
+96.4
+94.8
+96.70
+Shuffled-future PFD
+96.1
+99.2
+96.2
+95.0
+96.62
+PFD, width 102410241024 at (K_{a},K_{v})=(12,6)(Ka,Kv)=(12,6)(K_{a},K_{v})=(12,6)
+97.9
+99.8
+97.2
+94.5
+97.36
+PFD (default) (K_{a},K_{v})=(12,12)(Ka,Kv)=(12,12)(K_{a},K_{v})=(12,12), W=512W=512W=512
+98.6
+99.2
+99.2
+95.4
+98.10
+adapter-only (\theta^{\prime}=\varnothingθ′=∅\theta^{\prime}=\varnothing)
+97.2
+98.8
+96.6
+93.8
+96.60
+fine-tune depth (K_{a},K_{v})=(6,6)(Ka,Kv)=(6,6)(K_{a},K_{v})=(6,6)
+97.9
+99.7
+97.3
+94.7
+97.40
+Figure 2: LIBERO average success rate for the three primary probes, Fast-WAM (reproduced), and PFD (default). Breaking matched-capacity (Pure FT) or temporal-correspondence (Shuffled Future) drops accuracy below the Fast-WAM baseline (red); the budget-reallocation control — redirecting video-side fine-tuning budget to a wider adapter (Width 102410241024 at K_{v}=6Kv=6K_{v}=6) — closes only part of the PFD gap (amber). The supplementary fine-tune-depth check (K=6K=6K=6) is shown for comparison and lands at the similar level.
+4.4 Inference overhead
+Table 4: End-to-end inference latency. Slowdown is reported relative to Fast-WAM
+Method
+Test-time future
+Latency (ms)
+Slowdown
+Fast-WAM-Joint
+joint video+action denoising
+580580580
+3.05\times3.05×3.05\times
+Fast-WAM-IDM
+generate future, then IDM
+810810810
+4.26\times4.26×4.26\times
+Fast-WAM
+none (current-only)
+190190190
+1.00\times1.00×1.00\times
+PFD (ours)
+none (current-only) + adapter
+\mathbf{192}𝟏𝟗𝟐\mathbf{192}
+\mathbf{1.01\times}1.01×\mathbf{1.01\times}
+A central practical question for any future-aware policy is how much foresight costs at deployment time. World action models that materialize future video at inference — either by jointly denoising future frames and actions, or by generating a future clip and running an inverse-dynamics module (IDM) on top — pay a multiplicative latency penalty over a current-only forward, because future frames must be produced before any action chunk can be emitted. Yuan et al. (2026) report that these two designs run at 580580580 ms and 810810810 ms per inference on the Wan2.2-5B backbone, whereas removing test-time future generation altogether brings the same backbone down to 190190190 ms — a 3.1\times3.1×3.1\times to 4.3\times4.3×4.3\times speedup at no loss in success rate (Yuan et al., 2026, Fig. 4). PFD inherits this current-only inference interface verbatim; the only question for deployment is whether the adapter forward at each denoising step erodes that advantage.
+It does not. Table 4 reports end-to-end latency on a single H100 averaged over 505050 trials per configuration, under the 101010 flow-matching denoising steps used throughout this paper. PFD runs at 192192192 ms, +2+2+2 ms over the 190190190 ms current-only Fast-WAM baseline (\sim∼\sim1\%1%1\% overhead) and accordingly 3.0\times3.0×3.0\times to 4.2\times4.2×4.2\times faster than the imagine-then-execute alternatives. The added cost is fully attributable to one forward through the 1.21.21.2M-parameter MLP g_{\varphi}gφg_{\varphi} at each denoising step (\sim∼\sim0.02\%0.02%0.02\% of the Wan2.2-5B backbone). PFD never instantiates the teacher mask at inference and never generates future video frames, exactly as specified in §3.5; the deployment profile of the current-only interface is preserved, and the foresight-induced correction is recovered without re-introducing the latency cost that motivated removing test-time future generation in the first place.
+5 Conclusion
+We revisited the role of future video in world action models once test-time imagination is removed, and argued that future is best understood not as a prediction target nor as a regularizer to absorb, but as a compressible correction to be distilled. Privileged Foresight Distillation operationalizes this view with a same-backbone teacher–student construction and a small output-side adapter that absorbs the foresight residual. Three epistemic probes — matched-capacity, shuffled-future, and budget-reallocation — attribute the gain to the foresight signal itself, and PFD improves over Fast-WAM on both LIBERO and RoboTwin at negligible added inference cost while preserving the current-only inference interface exactly.
+Limitations. Two limitations are worth noting. First, the construction is deliberately simple: a single output-side MLP adapter, a full-horizon teacher mask, and a single backbone family. More expressive adapter designs — multi-scale, gated, or cross-attentive — and richer teacher-mask schedules remain to be explored. Second, our claims are empirical: we observe that the foresight residual is absorbable by a small adapter and that capacity, regularization, and budget-reallocation alternatives do not account for the gain, but we do not provide a formal characterization of when the residual admits a low-capacity approximation. A theoretical account would tell us a priori which task families and backbones PFD should help.
+References
+Bi et al. (2025)
+H. Bi, H. Tan, S. Xie, Z. Wang, S. Huang, H. Liu, R. Zhao, Y. Feng, C. Xiang, Y. Rong, H. Zhao, H. Liu, Z. Su, L. Ma, H. Su, and J. Zhu
+Motus: a unified latent action world model.
+arXiv preprint arXiv:2512.13030.
+Cited by: §4.1,
+Table 1,
+Table 2.
+Black et al. (2024a)
+K. Black, N. Brown, D. Driess, A. Esmail, M. Equi, C. Finn, N. Fusai, L. Groom, K. Hausman, B. Ichter, S. Jakubczak, T. Jones, L. Ke, S. Levine, A. Li-Bell, M. Mothukuri, S. Nair, K. Pertsch, L. X. Shi, J. Tanner, Q. Vuong, A. Walling, H. Wang, and U. Zhilinsky
+\pi_{0}π0\pi_{0}: a vision-language-action flow model for general robot control.
+arXiv preprint arXiv:2410.24164.
+Cited by: §4.1,
+Table 1,
+Table 2.
+Black et al. (2024b)
+K. Black, M. Nakamoto, P. Atreya, H. Walke, C. Finn, A. Kumar, and S. Levine
+Zero-shot robotic manipulation with pre-trained image-editing diffusion models.
+In International Conference on Learning Representations (ICLR),
+External Links: Link
+Cited by: §2,
+§2.
+Cheang et al. (2024)
+C. Cheang, G. Chen, Y. Jing, T. Kong, H. Li, Y. Li, Y. Liu, H. Wu, J. Xu, Y. Yang, H. Zhang, and M. Zhu
+GR-2: a generative video-language-action model with web-scale knowledge for robot manipulation.
+arXiv preprint arXiv:2410.06158.
+External Links: Link
+Cited by: §2.
+Chen et al. (2019)
+D. Chen, B. Zhou, V. Koltun, and P. Krähenbühl
+Learning by cheating.
+In Conference on Robot Learning (CoRL),
+External Links: Link
+Cited by: §2.
+Chen et al. (2025)
+T. Chen, Z. Chen, B. Chen, Z. Cai, Y. Liu, Z. Li, Q. Liang, X. Lin, Y. Ge, Z. Gu, W. Deng, Y. Guo, T. Nian, X. Xie, Q. Chen, K. Su, T. Xu, G. Liu, M. Hu, H. Gao, K. Wang, Z. Liang, Y. Qin, X. Yang, P. Luo, and Y. Mu
+RoboTwin 2.0: a scalable data generator and benchmark with strong domain randomization for robust bimanual robotic manipulation.
+arXiv preprint arXiv:2506.18088.
+Cited by: §4.1.
+Du et al. (2023)
+Y. Du, M. Yang, B. Dai, H. Dai, O. Nachum, J. B. Tenenbaum, D. Schuurmans, and P. Abbeel
+Learning universal policies via text-guided video generation.
+In Advances in Neural Information Processing Systems (NeurIPS),
+External Links: Link
+Cited by: §2,
+§2.
+Hafner et al. (2023)
+D. Hafner, J. Pasukonis, J. Ba, and T. Lillicrap
+Mastering diverse domains through world models.
+arXiv preprint arXiv:2301.04104.
+External Links: Link
+Cited by: §2.
+Hansen et al. (2024)
+N. Hansen, H. Su, and X. Wang
+TD-MPC2: scalable, robust world models for continuous control.
+In International Conference on Learning Representations (ICLR),
+External Links: Link
+Cited by: §2.
+Hu et al. (2022)
+E. J. Hu, Y. Shen, P. Wallis, Z. Allen-Zhu, Y. Li, S. Wang, L. Wang, and W. Chen
+LoRA: low-rank adaptation of large language models.
+In International Conference on Learning Representations (ICLR),
+External Links: Link
+Cited by: §2.
+Hu et al. (2025)
+Y. Hu, Y. Guo, P. Wang, X. Chen, Y. Wang, J. Zhang, K. Sreenath, C. Lu, and J. Chen
+Video prediction policy: a generalist robot policy with predictive visual representations.
+In International Conference on Machine Learning (ICML),
+Note: Spotlight
+External Links: Link
+Cited by: §2.
+Kim et al. (2024)
+M. J. Kim, K. Pertsch, S. Karamcheti, T. Xiao, A. Balakrishna, S. Nair, R. Rafailov, E. Foster, G. Lam, P. Sanketi, Q. Vuong, T. Kollar, B. Burchfiel, R. Tedrake, D. Sadigh, S. Levine, P. Liang, and C. Finn
+OpenVLA: an open-source vision-language-action model.
+arXiv preprint arXiv:2406.09246.
+Cited by: §4.1,
+Table 1.
+Li et al. (2026)
+L. Li, Q. Zhang, Y. Luo, S. Yang, R. Wang, F. Han, M. Yu, Z. Gao, N. Xue, X. Zhu, Y. Shen, and Y. Xu
+Causal world modeling for robot control.
+arXiv preprint arXiv:2601.21998.
+Cited by: §4.1,
+Table 1,
+Table 2.
+Liu et al. (2023)
+B. Liu, Y. Zhu, C. Gao, Y. Feng, Q. Liu, Y. Zhu, and P. Stone
+LIBERO: benchmarking knowledge transfer for lifelong robot learning.
+arXiv preprint arXiv:2306.03310.
+Cited by: §4.1.
+Physical Intelligence et al. (2025)
+Physical Intelligence, K. Black, N. Brown, J. Darpinian, K. Dhabalia, D. Driess, A. Esmail, M. Equi, C. Finn, N. Fusai, M. Y. Galliker, D. Ghosh, L. Groom, K. Hausman, B. Ichter, S. Jakubczak, T. Jones, L. Ke, D. LeBlanc, S. Levine, A. Li-Bell, M. Mothukuri, S. Nair, K. Pertsch, A. Z. Ren, L. X. Shi, L. Smith, J. T. Springenberg, K. Stachowicz, J. Tanner, Q. Vuong, H. Walke, A. Walling, H. Wang, L. Yu, and U. Zhilinsky
+\pi_{0.5}π0.5\pi_{0.5}: a vision-language-action model with open-world generalization.
+arXiv preprint arXiv:2504.16054.
+Cited by: §4.1,
+Table 1,
+Table 2.
+Schrittwieser et al. (2020)
+J. Schrittwieser, I. Antonoglou, T. Hubert, K. Simonyan, L. Sifre, S. Schmitt, A. Guez, E. Lockhart, D. Hassabis, T. Graepel, T. Lillicrap, and D. Silver
+Mastering Atari, Go, chess and shogi by planning with a learned model.
+Nature 588 (7839), pp. 604–609.
+External Links: Document
+Cited by: §2.
+Vapnik and Vashist (2009)
+V. Vapnik and A. Vashist
+A new learning paradigm: learning using privileged information.
+Neural Networks 22 (5–6), pp. 544–557.
+External Links: Document
+Cited by: §2.
+Wu et al. (2024)
+H. Wu, Y. Jing, C. Cheang, G. Chen, J. Xu, X. Li, M. Liu, H. Li, and T. Kong
+Unleashing large-scale video generative pre-training for visual robot manipulation.
+In International Conference on Learning Representations (ICLR),
+External Links: Link
+Cited by: §2.
+Yuan et al. (2026)
+T. Yuan, Z. Dong, Y. Liu, and H. Zhao
+Fast-WAM: do world action models need test-time future imagination?.
+arXiv preprint arXiv:2603.16666.
+External Links: Link
+Cited by: §1,
+§2,
+§3.1,
+§3.1,
+§3.4,
+§4.1,
+§4.1,
+§4.4,
+Table 1,
+Table 2.
+Experimental support, please
+view the build logs
+for errors. Generated by
+L
+A
+T
+E
+xml
+.
+Instructions for reporting errors
+We are continuing to improve HTML versions of papers, and your feedback helps enhance accessibility and mobile
+support. To report errors in the HTML that will help us improve conversion and rendering, choose any of the
+methods listed below:
+Click the "Report Issue" (
+) button, located in the page header.
+Tip: You can select the relevant text first, to include it in your report.
+Our team has already identified the following issues. We appreciate your time reviewing and reporting rendering errors we
+may not have found yet. Your efforts will help us improve the HTML versions for all readers, because disability
+should not be a barrier to accessing research. Thank you for your continued support in championing open access for
+all.
+Have a free development cycle? Help support accessibility at arXiv! Our collaborators at LaTeXML maintain a list of packages that need conversion, and welcome developer contributions.
+We gratefully acknowledge support from
+our major funders,
+member institutions, ,
+and all contributors.
+About
+·
+Help
+·
+Contact
+·
+Subscribe
+·
+Copyright
+·
+Privacy
+·
+Accessibility
+·
+Operational Status (opens in new tab)
+Major funding support from

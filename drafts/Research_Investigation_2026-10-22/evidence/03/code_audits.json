@@ -1,0 +1,468 @@
+{
+  "analogical": {
+    "code": "INSPECTED CODE. At the pinned commit, gpt_agent.py:161–237 constructs candidate image/description inputs and calls the joint comparison planner; GPT/gpt_prompt.py:5–23 requests comparative candidate descriptions and structured Thought/Distance/Planning/Action output. There is no navigation training loss: the added mechanism is prompted inference. The agent relies on precomputed BLIP panorama and candidate descriptions loaded from hardcoded local paths at gpt_agent.py:16–22. This cache is part of the preprocessing dependency, not a learned component inspected here. eval_utils.py:6–25 implements DTW, nDTW and the 3 m success threshold.\n\nThe released scripts/gpt4o.sh:1–17 runs gpt-4o-2024-05-13, max_tokens=1000, max_action_len=10, and only the small start/end range in that example. These are not identical to the paper's reported model/configuration. gpt_agent.py:156–159 and 234–237 also forces STOP when image count exceeds 20. The source explains the mechanism, but exact reproduction requires matching API version, caches, episode list and prompts. No API inference or benchmark was executed.",
+    "code_files": [
+      "gpt_agent.py:16-22,156-237,340-352",
+      "GPT/gpt_prompt.py:1-32",
+      "scripts/gpt4o.sh:1-17",
+      "eval_utils.py:6-25"
+    ],
+    "status": "Paper and targeted implementation review complete; no experiments executed",
+    "limitations": "The supplied six-page paper, released comparative prompts, agent and evaluator were reviewed. No API or benchmark run was executed. Exact caption caches, model-release drift, candidate geometry and additional calls remain comparison controls."
+  },
+  "aoplanner": {
+    "code": "INSPECTED CODE. vlnce_baselines/zero_shot_agent.py:690–825 obtains current camera position/heading, renders four directional views, calls llm_waypoint_predictor_single_view for each, builds bidirectional path-graph edges and submits the resulting graph prompt to GPT-4o. Failed JSON parsing falls back to STOP. The code therefore contains a concrete perception-to-path-to-decision pipeline, rather than only an LLM wrapper. Policy_ViewSelection_ETP.py:150–214 exposes the inherited 120-angle by 12-distance waypoint heatmap and NMS; its llm_waypoint branch aligns the external proposals with visual features. Evaluation in zero_shot_agent.py:926–939 calculates final-distance success, oracle success, path length, SPL and DTW.\n\nThe run_r2r/zero_shot.bash example enables sliding, sets max_traj_len=5 and uses gpt-4o-2024-05-13. fast_eval selects every fifth episode at zero_shot_agent.py:383–386. These flags must be matched when comparing subsets and physical feasibility. This audit directly covers the zero-shot inference/evaluation path and inherited waypoint representation. It does not independently reconstruct the separate waypoint-distillation training run or establish that the released example is the exact main-table configuration. No project code was executed.\n\nAdditional preprocessing inspection: llm/grounded_sam_Gemini.py:313–316,430–437 runs GroundingDINO and SAM; llm/utils.py:22–69,87–142 converts normalized depth and image-space waypoints into world coordinates using camera intrinsics and poses. llm/prompting/Gemini.py:14 selects gemini-1.5-pro-latest, an unpinned service alias. These dependencies constrain reproducibility even when navigation itself is training-free. Distillation-training provenance was not independently reconstructed.",
+    "code_files": [
+      "vlnce_baselines/zero_shot_agent.py:77-106,255-305,383-386,579-633,690-825,926-939",
+      "vlnce_baselines/models/Policy_ViewSelection_ETP.py:109-214,317-340",
+      "run_r2r/zero_shot.bash:1-24",
+      "llm/grounded_sam_Gemini.py:313-316,430-437",
+      "llm/utils.py:22-69,87-142",
+      "llm/prompting/Gemini.py:14,43-47"
+    ],
+    "status": "Paper review and scoped source audit complete; access and reproduction limits documented"
+  },
+  "auxthink": {
+    "code": "INSPECTED CODE. RoboOrchardLab's robo_orchard_lab/models/aux_think/model.py:72–110 loads the VILA model and forwards training inputs or calls generate_content for inference; processor.py:33–156 loads RGB PIL images, formats navigation prompts and wraps generated text. These are usable integration components, but this wrapper does not itself implement or prove the paper-specific auxiliary-CoT training objective. projects/aux_think/README.md:33,55–90 links a separate markinruc/VILA training repository and markinruc/VLN_CE evaluation environment. Thus the pinned RoboOrchard snapshot covers deployment wiring, not the complete original training/evaluation provenance. Training-only CoT is a paper mechanism; it must not be inferred from this wrapper's forward method. No model, training script or simulator was executed.\n\nThe linked training repository was also inspected at markinruc/VILA commit f5853256e9e2e796ee9245c72a17a6f853743d45: llava/data/dataset_impl/llava_cot.py:32–99,130–133 substitutes annotated CoT conversations, while llava/model/language_model/llava_llama.py:122–149 forwards embeddings/labels and exposes a generic optional soft-token loss. These files do not by themselves establish the full Aux-Think-specific objective or original data pipeline. The linked markinruc/VLN_CE commit3a6259b2336b1164ee6f25a43a13f52041cbfdff, habitat_extensions/config/vlnce_task_aux_think_r2r.yaml:1–49, specifies RGB640×480,15° turns,0.25m forward steps, sliding enabled and 3m SR/SPL. Its task sensors also register oracle-progress/shortest-path information for the environment; this registration alone does not show that the policy consumes those fields. This is a partial training/evaluation provenance audit, not a claim of exact reproduction.\n\nPinned related sources: [CoT dataset transform](https://github.com/markinruc/VILA/blob/f5853256e9e2e796ee9245c72a17a6f853743d45/llava/data/dataset_impl/llava_cot.py), [language-model forward](https://github.com/markinruc/VILA/blob/f5853256e9e2e796ee9245c72a17a6f853743d45/llava/model/language_model/llava_llama.py), [Habitat task configuration](https://github.com/markinruc/VLN_CE/blob/3a6259b2336b1164ee6f25a43a13f52041cbfdff/habitat_extensions/config/vlnce_task_aux_think_r2r.yaml).",
+    "code_files": [
+      "robo_orchard_lab/models/aux_think/model.py:32-40,72-110",
+      "robo_orchard_lab/models/aux_think/processor.py:33-156",
+      "projects/aux_think/README.md:1-110"
+    ],
+    "status": "Paper review and scoped source audit complete; access and reproduction limits documented"
+  },
+  "awarevln": {
+    "code": "INSPECTED CODE. evaluation/vlnce_baselines/awarevln_trainer.py:31–50 strips reasoning markers and pads/samples RGB history;81–99 loads dedicated REASON/ACT token IDs and four action IDs. At 193–267 the prompt includes the previous reasoning and its age, then greedily generates at most256 tokens. A REASON result updates context and loops without moving; more than three consecutive reasoning calls forces STOP at 172–179. This establishes an actual repeated inference loop and a hard fallback beyond the conceptual event selector.\n\nTraining token registration is in llava/train/train.py:631–653. scripts/train/sft_8frames.sh:69–106 uses eight frames, freezes the vision tower/projector, tunes the language model, and defaults to 24 GPUs, one epoch, batch 8 per GPU with accumulation4 and lr 5e-5. llava/model/loss.py:11–48 implements a generic Gaussian soft-token CE utility; its presence alone does not establish that the AwareVLN event-token path calls it. The event-supervision construction and exact final model loss call require the dataset/model-specific path, and are not claimed verified from this utility. Habitat evaluation is wired in the trainer; no environment or checkpoint was executed.",
+    "code_files": [
+      "evaluation/vlnce_baselines/awarevln_trainer.py:31-50,81-99,160-267,269-353",
+      "scripts/train/sft_8frames.sh:1-106",
+      "llava/train/train.py:631-653",
+      "llava/model/loss.py:1-48"
+    ],
+    "pages": "1–7,12–15; alternate version4–7",
+    "results": "PAPER EXPERIMENT: Table 1 p.6 reports R2R 65.4 SR/55.1 SPL and RxR 67.6/56.1. Table 3 p.7: removing subtask events yields 52.3 R2R SR; removing deviations 55.1; removing stopping-error examples 60.0. However the latter gives 57.5 SPL , ABOVE the full model 55.1, contradicting the prose's 'best across all metrics' claim. Table 4 dense reasoning 63.8 SR versus sparse 65.4 supports sparse control, but latency distributions and equal-generation-budget controls are absent. Real-world 18 instructions across three scenes are useful demonstrations with small cell counts, not broad reliability evidence.\n\nVersion-specific caution: the main PDF's supplementary Section B (p.12) says training exclusively on RxR followed by RxR evaluation, while Table 5 (p.13) is captioned as evaluation without RxR training. The latter reports 39.8 SR/36.0 SPL. These statements conflict, so that transfer number is not treated as a settled protocol. The11-page proceedings alternate's method and Tables 1,3,4 were checked and retain the main65.4/55.1 R2R and 67.6/56.1 RxR results, including the ablation where removing stopping-error data improves R2R SPL to 57.5.",
+    "associated_files_reviewed": [
+      {
+        "file": "AwareVLN (alternate).pdf",
+        "sha256": "ef14b2f1014e871dd2907f330d288d9a4541766406c27d5e267b7c7ccaf46473",
+        "pages": "4–7",
+        "review_status": "Relevant method/results or supplement reviewed"
+      }
+    ],
+    "versions": "Associated local versions are recorded below with SHA256 identifiers. Exact duplicate bytes were not reread. Distinct alternatives were checked for the relevant method/results; their complete bibliographies were not separately reread.",
+    "status": "Paper review and scoped source audit complete; access and reproduction limits documented",
+    "limitations": "The main paper, embedded supplementary annotation/cross-dataset discussion (pp.12–15), alternate proceedings method/results and targeted training/inference code were reviewed. The contradictory RxR training description is preserved as uncertainty. Dataset generation, exact loss masking and all annotation examples were not independently reproduced. No benchmark was executed."
+  },
+  "ca_nav": {
+    "code": "INSPECTED CODE. common/constraints.py:34–59 tests room membership with BLIP VQA yes/no ranking and object presence through Grounded-SAM class names;61–93 tests direction from pose displacement, accepts ambiguous language without a directional check and requires at least0.5 m displacement for recognized directions. ZS_Evaluator_mp.py:551–587 removes satisfied constraints and advances on either full satisfaction or a maximum-step timeout, after enforcing the minimum-step bound. Timeout advancement therefore is not evidence that the subinstruction was completed.\n\nmap/value_map.py:34–66,140–175 stores two map channels (confidence and BLIP2 image/text value), uses angular cosine-squared confidence and projects image/text matching scores onto floor cells. map/history_map.py:21–36 multiplies visited trajectory cells by 0.95 each update. RGB-D preprocessing is explicit in ZS_Evaluator_mp.py:152–157; model initialization uses Grounded-SAM and semantic mapping at 137–150; metrics at 115–133 use a 3 m threshold and distance-weighted SPL. No task-specific training loop is required for this proposed zero-shot policy. Dependencies include frozen perception models, poses, depth, parsed language and Habitat; source inspection does not independently reproduce their outputs.",
+    "code_files": [
+      "vlnce_baselines/common/constraints.py:1-113",
+      "vlnce_baselines/ZS_Evaluator_mp.py:115-157,322-343,551-617",
+      "vlnce_baselines/map/value_map.py:34-66,140-175",
+      "vlnce_baselines/map/history_map.py:1-41"
+    ],
+    "status": "Paper and targeted implementation review complete; no experiments executed",
+    "limitations": "The full v4 method and principal tables plus targeted constraint/value-map/evaluation code were reviewed. Remaining qualitative appendix examples were not exhaustively reviewed. Final journal acceptance was not verified. No benchmark was executed."
+  },
+  "console": {
+    "code": "INSPECTED CODE. finetune_src/models/vln_clip.py:33–75 computes CLIP-normalized landmark similarities, selects the current/next landmark, and combines co-occurrence features. Candidate scores are softmax-normalized over candidates, whereas co-occurrence weights are scaled dot products and are not softmax-normalized at 57. Thus the latter can be signed; calling them probabilities or a convex mixture would overstate the code. agent_cmt.py:347–424 advances the landmark index with both visual evidence and a no-shift counter.\n\nagent_cmt.py:436–439 adds supervised action CE;487 adds candidate consistency CE;490–511 builds a candidate-by-candidate similarity matrix and symmetric contrastive CE with padded targets ignored. Lines 700–709 add consistency only when train_ml is active and contrastive loss only when train_rl is active. The inspected agent is the HAMT/CMT integration, not a verification that every DUET variant follows identical control flow. Model, feature construction, loss and rollout deltas were inspected; complete preprocessing of generated co-occurrence annotations and a matched DUET evaluator were not independently traced. No training/evaluation executed.",
+    "code_files": [
+      "finetune_src/models/vln_clip.py:1-90",
+      "finetune_src/r2r/agent_cmt.py:93-108,347-424,436-439,480-511,700-709"
+    ],
+    "status": "Paper review and scoped source audit complete; access and reproduction limits documented",
+    "venue": "IEEE TPAMI 2024 (author publication record); DOI10.1109/TPAMI.2024.3407759",
+    "source": "https://arxiv.org/abs/2405.18721",
+    "bibliography": "The first author's publication page confirms IEEE TPAMI2024: https://expectorlin.github.io/. The supplied paper is the expanded journal treatment, not a CVPR main-conference paper.",
+    "limitations": "Principal method and results of the supplied expanded paper and the HAMT/CMT code integration were reviewed. The author publication record confirms TPAMI2024. All alternative integrations and preprocessing assets were not independently reconstructed. No benchmark was executed."
+  },
+  "discussnav": {
+    "code": "INSPECTED CODE. DiscussNav.py contains the released implementation:102–119 decomposes actions/extracts landmarks with GPT-4;121–232 caches RAM and InstructBLIP perception;234–290 summarizes the trajectory and estimates completion;292–347 requests five candidate decisions;363–405 merges reasons by chosen viewpoint and asks a decision-testing expert to select. This is sampled prompting and voting/discussion, not trained expert routing or a search tree with simulator rollouts. The same file provides simulator actions and evaluation at 349–361 and 407–445. Configuration and required external paths are embedded in the script rather than a complete portable experiment package.\n\nNo navigation-specific gradient training or loss is introduced. Costs arise from repeated API calls, perception and history growth. Cached descriptions can avoid repeated calls but their version/content must be preserved for reproducibility. The official repository does not supply a full autonomous simulator installation or immutable API backend. The code was read, never executed.",
+    "code_files": [
+      "DiscussNav.py:55-92,102-405,407-445,448-455"
+    ],
+    "status": "Paper and targeted implementation review complete; no experiments executed",
+    "limitations": "The paper and the released single-script method/evaluation path were inspected. No API or robot experiments were executed. The paper's terminology of beam search should not be equated with independent API sampling without checking the backend."
+  },
+  "skillnav": {
+    "pages": "1,3–8,10,13–22",
+    "code": "INSPECTED CODE. At b56de12, skillnav/backbones/scalevln/maps_nav_src/moe/agent_moe_top1.py:720–735 rewrites text for the router while obtaining executor token IDs from the original observation. Lines 760–792 pass reordered text, past images and previous subinstructions to a local or remote router. The local default at 101–104 uses Qwen2.5-VL-7B for localization and Qwen3-8B for skill selection. The training agent r2r/agent.py:538–557,650–653 accumulates masked action CE and scales it by train_ml/batch_size; the supplied temporal script sets DAgger, ml_weight=.15 and precomputed 512-dimensional CLIP features. env.py supplies standard and NavNuances-specific evaluation paths.\n\nA material control-flow discrepancy deserves testing before using this checkout as a baseline. _get_input_embeds at 647–664 assigns self.vln_bert to each batch item's selected expert while constructing its language/panorama features. After the loop it remains the last item's expert; rollout line 838 then applies that single navigation head to the whole batch. This is an inspected source deduction, not an executed failure or evidence about the paper's original runs. The released test script uses batch 8. A batch-size-one versus mixed-expert batch equivalence test is the cheapest diagnostic.\n\nThe released temporal training script uses batch 16 and lr 1e-5, unlike Appendix F's batch 32 and lr 5e-5; its router defaults also differ from a single-model description. Exact main-table reconstruction therefore needs configuration clarification. Appendix F supplies A 6000 training budgets and router context length; no checkpoint or simulator was executed.",
+    "code_files": [
+      "skillnav/backbones/scalevln/maps_nav_src/moe/agent_moe_top1.py:98-104,281-295,595-684,688-879",
+      "skillnav/backbones/scalevln/maps_nav_src/r2r/agent.py:538-592,650-653",
+      "skillnav/backbones/scalevln/maps_nav_src/r2r/env.py:342-352,386-414,447-710",
+      "skillnav/backbones/scalevln/maps_nav_src/scripts/train_r2r_b16_mix_temporal.sh:1-77",
+      "skillnav/backbones/scalevln/maps_nav_src/scripts/test_r2r_b16_moe-top1.sh:1-98"
+    ],
+    "limitations": "Appendices A–I (PDF pp.13–22) were inspected for skill definitions, data integrity, training and routing failures. Appendix G/Table 13 reports Temporal DUET alone at 82.59 SR/75.40 SPL, versus full SkillNav 82.59/76.50 in Table 8: most R2R improvement over ScaleVLN 79.23/69.96 already occurs after temporal-data fine-tuning. Appendix I.3 examines 17 failure cases, with the landmark expert optimal in 13 but correctly selected once. The authors' vocabulary-overlap analysis is not a proof against all leakage; they explicitly acknowledge HM3D scene overlap. No benchmark was executed. The inspected batch-routing issue and configuration differences limit reproduction confidence. Appendix Table 10, visually checked in the rendered PDF p.18 (saved as evidence/03/skillnav_table10.png), reports Region DUET SR 36.67 and SPL 43.02. Under standard identical-episode SPL, SPL cannot exceed SR; the discrepancy needs author clarification before that row is used. The audit does not identify its cause. A separate four-line toy dispatch example reproduces the last-expert-over-batch mechanism, but no SkillNav checkpoint or simulator was run.",
+    "venue": "ACL 2026, long papers",
+    "status": "Main paper, relevant appendices and targeted implementation reviewed; reproducibility discrepancies documented",
+    "key_findings": [
+      {
+        "claim": "The inspected release assigns self.vln_bert per item while embedding the batch, then applies the last assigned expert head to all items. Batch-one versus mixed-expert batch-eight invariance is an unexecuted baseline diagnostic.",
+        "evidence_type": "INSPECTED CODE / call-path deduction",
+        "source": "Official repository snapshot; linked in dossier",
+        "locator": "skillnav/backbones/scalevln/maps_nav_src/moe/agent_moe_top1.py:647–664,838; commit b56de12a6af07ce09c9252938b1fb69e55d33103"
+      }
+    ],
+    "method": "Section 4 separates data construction, expert training and routing. The authors synthesize 450 instruction/trajectory pairs for each of five skills: direction, vertical movement, stopping, landmarks and regions. They additionally synthesize 2,000 temporal-order examples. Paths have 4–7 steps and are filtered by skill-specific rules; GPT-4o supplies captions. A DUET backbone first learns from R2R plus ScaleVLN (or SRDF) and temporal data. Five copies are then specialized on the corresponding 450-example sets. Temporal reasoning is therefore a training and routing operation, not a sixth execution expert.\n\nAt inference, a frozen language model rewrites the instruction into execution order (Eq.2). A visual-language router uses the instruction, observed history and previous subgoals to infer the current subgoal and choose one expert (Eqs 3–5). The selected expert receives the ORIGINAL instruction, current observations and DUET map (Eq 6). This distinction matters for a rewriting control: changing the executor's instruction would test a different intervention. ScaleVLN uses CLIP-B/16 and BERT features; the SRDF variant uses InternViT-6B features.\n\nExpert learning inherits supervised DUET behavior cloning/DAgger. In the inspected training path, each valid step contributes −log πθ(a*_t|I,O_t,M_t), summed over non-padding targets and scaled by the imitation weight and batch size. I is instruction text, O_t the visual observation, M_t the map, and a*_t an expert action over the current candidate set plus STOP. The frozen router has no gradient update. Five stored experts and the routing model still incur memory/API cost, even though only one expert executes at each step. Appendix F and released scripts disagree on some batch-size/learning-rate values, as recorded below.",
+    "results": "Table 2 reports ScaleVLN-based R2R val-unseen SR/SPL rising from approximately 79/70 to 83/77, while the stronger SRDF baseline remains near 84/78. This makes backbone strength and training data essential controls. Appendix G/Table 13 provides the most important attribution check: Temporal DUET alone reaches 82.59 SR/75.40 SPL, while full SkillNav reaches 82.59/76.50. Most R2R improvement is already present before specialist routing.\n\nOther settings show useful gains: GSA-N-Scene SPL rises roughly 43→48 for ScaleVLN and 43→45 for SRDF. Zero-shot RxR SR rises 26.8→30.3 and 21.4→31.8, respectively. Random routing gives 43.17 GSA-N-Scene SPL versus 47.96 for the Qwen router; instruction reordering adds 2.53 SPL. However, the mixed-skill agent outperforms the landmark specialist in Table 5 (48.90 versus 31.53 SR), so specialization is not uniformly beneficial. Appendix I.3's17-case analysis finds the landmark specialist optimal in 13 failures but selected correctly only once. These support grounded routing as a remaining problem, not a claim that routing is already solved."
+  },
+  "context_nav": {
+    "code": "INSPECTED CODE. vlfm/policy/_spatial_reasoning.py:11–60 evaluates left/right/front/behind/near relations in a candidate observer frame;62–87 restricts neighbors to a radius and inferred room;156–241 searches sampled joint viewpoints;243–323 combines candidate-instance assignments using depth-first search. It is a finite geometric test over a noisy map, not a proof that an object is the intended target. The implementation soft-passes unsupported relations and unavailable height values.\n\n_ynu_defer.py:22–52 buffers masked views and chooses the highest CLIP-scoring image for deferred verification;131–142 blacklists negative attribute decisions. At 181–196 repeated Unknown decisions eventually count as passed after a configurable threshold. This fallback matters for any comparison claiming strict retention of uncertainty. base_objectnav_policy.py:118–121 loads a pretrained PointNav controller,306–310 consumes posed RGB-D, and 392–421 verifies relations around STOP and resumes exploration if necessary. distractor_success.py:35–60 separately checks STOP near a distractor using geodesic distance and a 0.1 m wall offset. No task-specific gradient training is introduced. Model server outputs, map construction quality and full benchmark execution remain unverified here.",
+    "code_files": [
+      "vlfm/policy/_spatial_reasoning.py:11-323",
+      "vlfm/policy/_ynu_defer.py:15-196,236-309",
+      "vlfm/policy/base_objectnav_policy.py:118-121,170-178,306-310,392-421",
+      "vlfm/measurements/distractor_success.py:1-74"
+    ],
+    "status": "Paper and targeted implementation review complete; no experiments executed",
+    "key_findings": [
+      {
+        "claim": "Joint viewpoint-aware 3 D relation verification exists; its guarantee is conditional on map and parsed constraints.",
+        "evidence_type": "DEDUCTION",
+        "source": "Context-Nav.pdf",
+        "locator": "§3.4 Eq.5 p.5"
+      },
+      {
+        "claim": "Repeated Unknown verification eventually passes, and unsupported/missing-height spatial relations soft-pass.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "Official repository snapshot; linked in dossier",
+        "locator": "_ynu_defer.py:181–196; _spatial_reasoning.py:54–60"
+      }
+    ]
+  },
+  "mapgpt": {
+    "code": "INSPECTED CODE. GPT/one_stage_prompt_manager.py:41–87 assigns place IDs to simulator-provided candidates and records adjacency;124–165 serializes visited connectivity and unvisited observed nodes. Lines 216–263 build a prompt containing the instruction, trajectory, history, graph, previous plan and candidate images;265–295 extract the next textual plan. This verifies that the planning state is text over an observed topology, not a learned world-transition model. vln/gpt_agent.py:149–176 maps the selected option to a simulator action and records history;170 explicitly limits the implementation to batch size one. Parsing and stop-after heuristics affect behavior. No navigation training objective is introduced. The mechanism and inference interfaces were inspected; the entire feature/candidate preprocessing and exact sampled-evaluation list were not independently regenerated. No API or simulator execution occurred.",
+    "code_files": [
+      "GPT/one_stage_prompt_manager.py:41-165,216-352",
+      "vln/gpt_agent.py:149-176"
+    ],
+    "status": "Paper and targeted implementation review complete; preprocessing/evaluation data not reproduced",
+    "pages": "1,3–8,12–13",
+    "limitations": "Main method/results, Appendix A implementation and task prompts (pp.12–13), and the released graph/prompt/action path were inspected. Remaining selected qualitative figures were not exhaustively assessed. No API benchmark was executed.",
+    "results": "Table 1 216 trajectories across 72 scenes GPT-4V 47.7 SR/38.1 SPL ; Table 2 783 instructions 11 unseen scenes 43.7/34.8 vs NavGPT 34/29. Text-only 38.8 SR improves success but 25.8 SPL is below NavGPT 29. Table 3 REVERIE 500 sample 31.6/20.3; trained HAMT/ DUET retested on same subset. These are subset benchmarks, not full R2R all-instruction leaderboard numbers. §4.2 backtracking in 49%episodes and successful correction within 80%of those are descriptive operational statistics, not causal evidence that every return helps. Extra graph/context/ API model differences confound broad comparisons. Appendix B (p.12) identifies inaccurate instruction-detail following and insufficient exploration in ambiguous scenes as failure modes. Figure 4 explicitly instructs the REVERIE agent to ignore some interactive actions and relax color adherence; this is a task-specific prompt assumption, not verified instance grounding."
+  },
+  "mapnav": {
+    "code": "INSPECTED CODE. mapper.py:49–69 explicitly takes RGB, depth, position and rotation, projects depth to a world point cloud, associates semantic objects and accumulates the map. The full pipeline therefore depends on geometry even if the action model receives only rendered images. r2rnav_agent_nohis.py:180–245 formats current RGB plus a semantic-map image as a VLM action prompt;245–262 executes a parsed action with a maximum-step STOP. This supports the architectural interpretation that a map replaces much of the visual-history input.\n\nA reporting helper requires particular care: caculate_metrics.py:9–14 turns failures within 3.2 m into successes and sets their adjusted SPL to 1.0 regardless of path length. It prints both original and adjusted metrics. This is nonstandard relative to 3 m SR/SPL and must not be used as the comparison evaluator. Its presence does not establish that the paper's tables used adjusted metrics. The inspected source does not establish the complete DAgger collection/training provenance or exact final configuration; data generation and VLM fine-tuning remain paper-level evidence. No project code was executed.",
+    "code_files": [
+      "mapper.py:13-69,120-177",
+      "r2rnav_agent_nohis.py:180-274,387-473",
+      "caculate_metrics.py:1-43"
+    ],
+    "status": "Paper and targeted implementation review complete; metric helper discrepancy documented",
+    "pages": "1,3–8,12–15",
+    "method": "Construct M∈R^((n+4)×W×H): obstacle, explored, current-position, trajectory channels plus n semantic classes. Mask2Former segments RGB , depth gives point cloud, pose aligns successive observations, and projection updates BEV. Connected components over each semantic category above areaτ get centroid text labels, making a rendered ASM. Shared SigLIP-so400m encodes current RGB and ASM; spatial unpadding/patch merge Φ_spatial produces visual patches, separate 2 layer GELU projectors map to Qwen 2-7 B hidden space (Eqs 1–3). LLaVA-OneVision generates text commands; regex Ψ(text, patterns) maps synonyms to Forward/Left/Right/Stop (Eq 4). No differentiability through mapping/regex is claimed by its 'end-to-end' policy terminology. Training approximately 1 M total pairs, about 300 K oracle+200 K DAgger+25 K collision per R2R / RxR , with general VQA co-training;8 A 100 ×30 h. The 500 K R2R-only model is transferred zero-shot to RxR ; the best 2 history frame version trains both R2R / RxR . Appendix B freezes vision and fine-tunes the projector and Qwen2 for one epoch at 1e-6 using bfloat16; SigLIP features have width 1152 and Qwen2 hidden width 3584. Exact loss masks were not established in the released source audit. At inference maintain ASM, current RGB and optionally 2 history frames, then parse actions. Appendix A explicitly adds 600K general vision-language samples alongside500K navigation samples for the R2R recipe. Its expert-data prose says300K, while Eq 5 says approximately 200K; the total counts therefore have an internal ambiguity. Navigation-pair counts must not be treated as total training exposure.",
+    "results": "Table 1 RGB -only within MapNav 27.1 SR/23.5 SPL →ASM 36.5/34.3 R2R ; adding 2 history frames and RxR training 39.7/37.2 and RxR 32.6/27.7. This supports ASM within backbone; changing training data limits attributing all best model gain to history. Table 4 semantic map 29.1 SR vs ASM 36.5, but prose says original map improves baseline although 26.4<27.3. Table 5 oracle 23.9→ DAgger 33.5→collision 36.5 SR shows substantial data contribution. Table 3 .17 MB constant representation vs NaVid 276 MB at 300 steps is stored observation memory, not full model/ GPU memory; .25 s vs 1.22 s needs whole pipeline accounting. Real 50 instructions five environments show semantic advantages but small samples. Appendix Tables 6–7 isolate input rendering and segmenter choice: directly adding depth reduces SR 27.1→23.1, whereas ASM reaches 36.5. YOLOv8/MobileSAM/Mask2Former yield31.5/34.8/36.5 SR, showing sensitivity to perception quality. This supports the representation interface but does not establish the same mechanism under equally accurate semantic inputs.",
+    "limitations": "Main method/results and Appendix A–E data/training/sensor/ablation details were read, alongside the mapper/action/metric helper code. Complete DAgger regeneration and VLM loss masking were not independently reconstructed. Memory savings refer to the observation representation; no independent runtime or benchmark was measured.",
+    "key_findings": [
+      {
+        "claim": "ASM construction uses depth and pose even though comparison table lists MapNav without those sensor check marks",
+        "evidence_type": "Paper internal protocol audit",
+        "source": "Supplied PDF",
+        "locator": "§3.2/Fig3 versusTable1"
+      },
+      {
+        "claim": "The reporting helper adjusts failures within 3.2m to success and SPL 1.0; it prints both raw and adjusted metrics. This does not establish use in the paper.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "Official repository snapshot; linked in dossier",
+        "locator": "caculate_metrics.py:9–14; commit4a3acc70270688630b4ca8f6df39f26585898e0d"
+      }
+    ]
+  },
+  "navgpt2": {
+    "code": "INSPECTED CODE. The actual policy implementation is map_nav_src/models/NavGPT_model.py, rather than the generic retained vilmodel.py. NavGPTThought:400–597 computes Q-Former-conditioned LLM states and extracts image-token and instruction embeddings. Without target thoughts, its Flan-T5 branch runs only the encoder at 574–584; forward_thought_per_step:916–925 explicitly passes no text-output target. Thus the navigation policy can act from latent LLM features without generating or consuming a textual rationale. NavGPTAction's global branch at 854–859 scores unvisited graph nodes. The released run_r2r_xxl.sh:25–61 sets global fusion, DAgger, frozen Q-Former, EVA-CLIP-G1408-dimensional features and a 4096-dimensional LLM context.\n\nThe separate reasoning-tuning model blip2_t5_instruct_nav.py:78–130 freezes vision/T5 while learning Q-Former/projection;144–238 replaces image tokens with projected queries and optimizes output-token CE. r2r_navgpt_ft_xxl.yaml:33–66 specifies20 epochs, lr 1e-5, batch 1 and accumulation8. Navigation agent.py:380–420 passes latentstates through panorama/graph policy;450–461 applies supervised action CE and optional generation loss. This is a trained DUET-derived global graph policy with a foundation-model representation, not a frozen prompt-only agent. Main feature databases, checkpoints and exact outcomes were not executed or reproduced.",
+    "code_files": [
+      "map_nav_src/models/NavGPT_model.py:283-351,400-597,854-859,890-944",
+      "map_nav_src/models/lavis/models/blip2_models/blip2_t5_instruct_nav.py:78-238",
+      "map_nav_src/r2r/agent.py:32-46,380-461",
+      "map_nav_src/models/lavis/projects/blip2/train/r2r_navgpt_ft_xxl.yaml:1-66",
+      "map_nav_src/scripts/run_r2r_xxl.sh:1-70"
+    ],
+    "status": "Paper and targeted model/training/inference/configuration review complete; no experiments executed",
+    "limitations": "Main method, principal results and targeted Q-Former/LLM/policy/loss/configuration code were inspected. Full feature preprocessing, all appendix experiments and exact pretrained artifacts were not independently reproduced. No project code was executed."
+  },
+  "navgrpo": {
+    "code": "INSPECTED CODE. main_nav.py:25 imports agent_grpo.GMapNavAgent. Its rollout_grpo_sample:508–665 samples trajectories and stores old-policy log probabilities; compute_advantages:959–971 subtracts the within-instruction reward mean without standard-deviation normalization. train_grpo:915–935 recomputes selected log probabilities, clips their ratio to the old policy, and minimizes the clipped surrogate. The actual reward switch at 724–744 offers success, SPL, progress, mixed or dense rewards; none of these inspected branches implements the paper's exponential terminal reward plus per-step progress coefficient. The README writes the paper equations, but this does not make them executable.\n\nrun_r2r.sh uses CLIP-B/16, DAgger-initialized checkpoints, batch 8, lr 1e-5,200k iterations and ScaleVLN annotations. main_nav.py:189–212 evaluates with argmax and selects the best unseen SPL. The source therefore provides a concrete GRPO baseline but does not yet establish exact reproduction of all claimed NavGRPO components. The README TODO still leaves perturbation-evaluation scripts and pretrained checkpoints unchecked despite a news line announcing release. This audit does not infer which private version produced reported results. No training or benchmark was executed.",
+    "code_files": [
+      "map_nav_src/r2r/agent_grpo.py:508-665,667-748,750-973",
+      "map_nav_src/r2r/main_nav.py:19-70,150-212",
+      "map_nav_src/scripts/run_r2r.sh:1-75",
+      "README.md:49-63,108-122"
+    ],
+    "status": "Paper and released training path reviewed; paper/code reward discrepancy documented",
+    "limitations": "The PDF advertises a different GitHub account from the inspected Songlin-Dong release. This provenance difference and the reward-code discrepancy are recorded; neither proves what private implementation produced the tables. No benchmark was executed.",
+    "key_findings": [
+      {
+        "claim": "Supplied paper is CVPR Findings; robustness noise and RL rewards are not fully matched controls",
+        "evidence_type": "Primary paper protocol audit",
+        "source": "Supplied PDF",
+        "locator": "p.1 watermark,§4.2,§4.4/Table 7"
+      },
+      {
+        "claim": "The invoked agent_grpo reward branches do not match all printed paper reward components. Exact published-run reproduction is unestablished.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "Official repository snapshot; linked in dossier",
+        "locator": "main_nav.py:25; agent_grpo.py:724–744; commit4668d42506858ea971c62e26fdc6e4b71b75064e"
+      }
+    ]
+  },
+  "navid": {
+    "code": "INSPECTED CODE. navid/model/navid_arch.py:200–225 pools the latest frame to an 8-by 8 grid and history to the configured smaller grid, then projects visual features into the LLM. Lines 233–244 map grid:2 to four history tokens. language_model/llava_navid.py:99–112 applies shifted autoregressive CE to labeled output tokens. train/train.py:1165–1186 exposes backbone freezing, quantization and optional LoRA; these options alone do not identify the exact published training run.\n\nagent_navid.py:54–69 preprocesses newly arrived RGB images and appends them to a cached history tensor. Its generation path at 128–135 samples with temperature 0.2 and at most1024 tokens, rather than being intrinsically deterministic. Reset at 231–238 clears episode history. This confirms video-history action generation and exposes history-memory growth; it does not independently reproduce the paper's complete data mixture, annotation generation or benchmark evaluator. The released file also contains a Uni-NaVid agent, so care is needed to select the intended class. No checkpoint, training or navigation run was executed.",
+    "code_files": [
+      "navid/model/navid_arch.py:126-196,200-254",
+      "navid/model/language_model/llava_navid.py:55-120",
+      "navid/train/train.py:1165-1186",
+      "agent_navid.py:54-69,128-141,231-238"
+    ],
+    "limitations": "Main method/results and targeted video-token/model-loss/train/inference code were inspected. Complete annotation generation and exact evaluation assets were not reconstructed. No independent runtime or robot measurement was made.",
+    "status": "Paper review and scoped source audit complete; access and reproduction limits documented"
+  },
+  "navila": {
+    "code": "INSPECTED CODE. evaluation/vlnce_baselines/navila_trainer.py:38–52 pads short episodes with black frames and samples historical images plus the current image. Lines 163–211 format the instruction and greedily generate a language action with a 32-token cap. Lines 221–234 parse stop/forward/left/right by regular expressions before conversion to simulator actions; Habitat episode metrics are subsequently recorded. This is a high-level VILA navigation implementation. It is not the complete quadruped locomotion system. The low-level controller has a separate linked legged-loco release; the high-level RGB-only input does not imply an RGB-only physical robot. No checkpoint, simulator or robot code was executed.\n\nThe high-level scripts/train/sft_8frames.sh:10–41 specifies eight frames, SigLIP, all three VLM components trainable, one epoch and lr 1e-4, with a mixture including R2R, RxR, EnvDrop, human videos and general QA. The linked yang-zj1026/legged-loco commit87b0d3d18404e784abc0a62227bc41c940f29ecc was also inspected. go2_low_vision_cfg.py:301–324 explicitly consumes angular velocity, orientation, commands, joint positions/velocities, previous actions and a LiDAR-derived height map. Its reward block205–260 includes termination, joint deviation, base-height, action-smoothness, power, foot-sliding and collision penalties. actor_critic_depth_cnn.py:13–60 separately embeds proprioception and depth, concatenates two 128-dimensional latents and predicts joint commands;84–166 adds a Gaussian policy and scalar critic. rsl_rl/algorithms/ppo.py:151–175 implements the clipped surrogate/value/entropy update. This checks the sensing and learning mechanism, not the physical calibration or exact paper checkpoint.\n\nPinned related sources: [robot observations and rewards](https://github.com/yang-zj1026/legged-loco/blob/87b0d3d18404e784abc0a62227bc41c940f29ecc/isaaclab_exts/omni.isaac.leggedloco/omni/isaac/leggedloco/config/go2/go2_low_vision_cfg.py), [actor/critic](https://github.com/yang-zj1026/legged-loco/blob/87b0d3d18404e784abc0a62227bc41c940f29ecc/rsl_rl/rsl_rl/modules/actor_critic_depth_cnn.py), [PPO](https://github.com/yang-zj1026/legged-loco/blob/87b0d3d18404e784abc0a62227bc41c940f29ecc/rsl_rl/rsl_rl/algorithms/ppo.py).",
+    "code_files": [
+      "evaluation/vlnce_baselines/navila_trainer.py:38-52,163-234,313-330",
+      "scripts/train/sft_8frames.sh:10-41"
+    ],
+    "limitations": "The local image-only PDF was replaced for text review by author arXiv2412.04453v2; later proceedings changes are not assumed reviewed. High-level inference/SFT configuration and linked low-level observations/rewards/PPO were inspected. Physical calibration, all training assets and robot results were not reproduced. No Isaac or robot experiment was executed.",
+    "status": "Paper review and scoped source audit complete; access and reproduction limits documented"
+  },
+  "polarmem": {
+    "code": "INSPECTED CODE. src/backbone/qwen_wrapper.py:25–39 freezes Qwen and obtains the first token IDs for Yes/No;56–127 asks a single presence prompt and normalizes those two logits. src/logic/otsu_gate.py:25–46 uses Otsu when variance is sufficient, otherwise0.5, then a fixed±0.05 margin. This differs from the paper's ensemble and dispersion-scaled margin. src/database/neo4j_client.py:197–217 ranks a weighted sum of positive/negative matches, not the lexicographic ordering in the paper algorithm. The public retrieve_candidates path calls search_mixed_modality, whose image query at 303–319 scores positive-query HAS matches minus twice NOT_HAS matches; its negative-query argument is not used in that query.\n\nThese are material implementation differences: missing facts, observed absence and query negation must not be conflated when evaluating the intended method. The returned top-K list can still contain conflicting candidates. The released code is useful for inspecting the graph-memory concept, but it is not yet an exact executable specification of the paper's retrieval guarantee. Database queries and VLM outputs were read, never executed; benchmark scripts and complete dataset provenance have not been independently reproduced.",
+    "code_files": [
+      "src/backbone/qwen_wrapper.py:25-39,56-127",
+      "src/logic/otsu_gate.py:1-48",
+      "src/pipeline/retriever.py:110-139",
+      "src/database/neo4j_client.py:120-146,197-240,284-362"
+    ],
+    "status": "Paper and core released memory/retrieval code reviewed; discrepancies documented",
+    "limitations": "Core method, principal retrieval results and pinned graph-memory implementation were inspected. Full index construction, all dataset splits and end-to-end retrieval costs were not reproduced. It supplies no VLN performance evidence.",
+    "key_findings": [
+      {
+        "claim": "Algorithm 1 top-K can still return contradictory records; absence labels are model judgments",
+        "evidence_type": "Algorithm counterexample and paper inspection",
+        "source": "Supplied PDF",
+        "locator": "§3.1Eqs1–3; Algorithm1lines8–18"
+      },
+      {
+        "claim": "The inspected release uses a fixed uncertainty margin and weighted database scoring rather than the paper's ensemble/dispersion margin and lexicographic ranking.",
+        "evidence_type": "INSPECTED CODE",
+        "source": "Official repository snapshot; linked in dossier",
+        "locator": "otsu_gate.py:25–46; neo4j_client.py:197–217,303–319; commit4d0de0befe3571ddeaccafd55ac19aa764ef9b0d"
+      }
+    ]
+  },
+  "progressthink": {
+    "code": "INSPECTED CODE. The official RoboOrchardLab snapshot is shared with Aux-Think. progress_model.py and action_model.py each subclass the common MonoDream implementation and load separate checkpoints. projects/progress_think/infer.py:193–205 initializes both pipelines;306–326 first predicts partial_instruction from images and then supplies that text, the full instruction and images to the action model. Thus the released inference path exposes the two-stage text interface directly. analyze_results.py:47–64 averages stored Habitat success/SPL metrics, replacing NaN/Inf numeric values with zero.\n\nThe inspected release provides inference classes, processors and an evaluator wrapper. The paper-specific latent-prefix alignment and joint-GRPO training objectives are not established by these thin classes, and the project README documents inference rather than the complete training recipe. Those training mechanisms remain paper evidence, not verified code behavior. No model or Habitat evaluation was executed.",
+    "code_files": [
+      "robo_orchard_lab/models/progress_think/progress_model.py:32-56",
+      "robo_orchard_lab/models/progress_think/action_model.py:32-56",
+      "projects/progress_think/infer.py:193-205,306-326",
+      "projects/progress_think/analyze_results.py:27-66",
+      "projects/progress_think/README.md:38-119"
+    ],
+    "status": "Paper and released inference path reviewed; training implementation not verified",
+    "limitations": "The paper objective and the released inference interfaces were inspected. Exact prefix-CE reduction, empty-prefix treatment and joint-GRPO training implementation were not established by the thin released wrappers. No benchmark was executed.",
+    "associated_files_reviewed": [
+      {
+        "file": "Progress-Think (alternate).pdf",
+        "sha256": "f2d32f86f4e6444132f885f3f63c42516f7265a70e097a9930a39ced1b5918c9",
+        "pages": "4–7",
+        "review_status": "Relevant method/results or supplement reviewed"
+      }
+    ],
+    "versions": "Associated local versions are recorded below with SHA256 identifiers. Exact duplicate bytes were not reread. Distinct alternatives were checked for the relevant method/results; their complete bibliographies were not separately reread.",
+    "method": "Section 3 uses two NVILA-2B models: a progress reasoner and an action policy. Let I be an instruction with |I| tokens and O_t the observed history. The reasoner predicts completed instruction text. For each candidate prefix length k∈{1,…,|I|}, Eq.2 defines p(k) proportional to exp(−CE_k/τ), where CE_k compares the predicted text with I's first k tokens and τ>0 is a temperature. The expected prefix length is k̂_t=Σ_k k p(k). The prefix loss is −τ logΣ_k exp(−CE_k/τ). A second loss, max(0,k̂_early−k̂_late), penalizes decreases between ordered observations (Eqs 3–5). The paper does not resolve whether prefix CE is summed or averaged, which affects length bias; no zero-length prefix is listed. A constant estimate satisfies monotonicity, so these constraints alone do not identify true progress.\n\nStage 2 freezes the progress model and trains the policy on the full instruction, images and predicted progress, using cross-entropy for the next three actions (Eqs 6–7). Stage 3 samples four progress/action alternatives and jointly updates both models with a clipped GRPO objective. The action reward is the number of consecutive correct actions before the first error; the format reward checks syntax. The progress-length reward gives 1 to any text no longer than I and penalizes only excess length (Eqs 8–11). Thus a short but wrong progress statement receives the full length reward. Eq.14 multiplies progress-model and action-model probability ratios, forming a joint importance ratio; zero-variance group handling is not specified in the displayed advantage equation.\n\nTraining uses R2R/RxR/ScaleVLN state-action pairs plus 500K DAgger examples; the wording around1.2M examples per dataset is ambiguous. Stages 1–2 run one epoch at 1e-5; stage 3 runs3,000 updates at 1e-6, clipping 0.28 and KL coefficient 0. Eight H20 GPUs are used for roughly 8+60+60 hours. At inference the policy predicts and executes three parameterized actions (25/50/75 cm forward or 15/30/45° turns). Completed-history progress can be monotone, but the robot's current stage can regress after an error; treating the former as sufficient for action is an assumption."
+  },
+  "streamvln": {
+    "code": "INSPECTED CODE. streamvln/streamvln_agent.py:169–174 substitutes zero depth and identity pose because this deployed variant does not use voxel pooling. Lines 191–198 clear the conversation/KV cache at the configured window boundary;223–232 reintroduce sampled historical image features;244–253 pass and update past_key_values. The agent defaults to 32 simulator steps per window and four predicted future actions, consistent with eight action-generating turns rather than eight raw simulator steps. stream_video_vln.py:111–142 pools historical visual features into memory tokens.\n\nstreamvln_train.py:1743–1766 explicitly selects trainable multimodal components and 1816 constructs supervised data;1852–1855 runs the trainer. This verifies training wiring and streaming inference, but the precise loss masking, full dataset recipe and optional geometric voxel-pruning implementation were not all independently traced in this targeted pass. The paper's optional RGB-D/odometry variant must be distinguished from the RGB-only agent above. No training, checkpoint inference or benchmark executed.",
+    "code_files": [
+      "streamvln/streamvln_agent.py:169-258,265-290",
+      "streamvln/model/stream_video_vln.py:111-152",
+      "streamvln/streamvln_train.py:1743-1766,1816,1852-1855"
+    ],
+    "limitations": "The paper's metric-version inconsistencies are recorded. Targeted streaming inference and training wiring were inspected, but complete loss masking, data generation and optional voxel pruning were not exhaustively audited. No independent runtime or benchmark was measured.",
+    "status": "Paper review and scoped source audit complete; access and reproduction limits documented",
+    "method": "SectionIII organizes observations and predicted actions as an interleaved conversation. KV states are reused within an eight-turn window. At a boundary, the model discards the old prompt/action context, samples eight visual memory frames and starts a new window from those features. This lowers repeated prefilling cost while retaining a limited history. The policy predicts four actions per generation; eight turns therefore need not mean eight simulator steps.\n\nAn optional geometric variant (Algorithm 1) back-projects image patches using depth and poses into3D voxels. It retains the latest patch token for each stride-bin/voxel pair and can drop frames retaining too few patches. This is deterministic geometric selection, not a learned world model or a guarantee that the remaining patches preserve task-relevant detail. The RGB-only deployed agent must be distinguished from this depth/odometry variant.\n\nThe LLaVA-Video-7B/Qwen2 backbone receives two supervised fine-tuning stages: oracle navigation first, then DAgger and general vision-language data. Reported learning rates are2e-5 for language and 5e-6 for vision, with about 1,500 A 100 GPU-hours. The mixture includes450K MP3D navigation examples,300K ScaleVLN examples from 700 HM3D scenes,240K DAgger examples,248K video/ScanQA examples and 230K MMC4 examples. These data additions explain part of the headline gain. At inference, streaming cache reuse controls repeated computation, while window resets and finite memory introduce latency spikes and potential forgetting."
+  },
+  "susa": {
+    "code": "INSPECTED CODE. map_nav_src/r2r/agent.py:75–120 loads separate RGB, depth and semantic feature arrays. models/vilmodel.py:978–1049 uses distinct global RGB/depth and local RGB/semantic encoders, predicts four fusion weights and sums branch logits. The weights are sigmoid outputs followed by softmax at 1025–1028, so their relative ratio is bounded by e; this is a mathematical consequence of the inspected implementation, not a measured performance limit.\n\nagent.py:27–36 attention-pools each representation and defines symmetric cross-batch CE;551–585 adds action CE and a 0.8-weighted contrastive term. The contrastive fusion in 583 is an unweighted sum, with the weighted alternative commented out. pretrain_cmt.py exposes inherited MLM, MRC, SAP and object-grounding losses, but no explicit HAP task appears in its inspected dispatch at 71–124. Therefore the paper's historical-action pretraining provenance is not established by this file. The feature-generation pipelines and exact HAP training configuration remain unverified. No project execution occurred.",
+    "code_files": [
+      "map_nav_src/models/vilmodel.py:800-810,978-1049",
+      "map_nav_src/r2r/agent.py:27-58,75-120,551-585,659-664",
+      "pretrain_src/model/pretrain_cmt.py:71-124,145-149,198-207,264-269"
+    ],
+    "limitations": "The main file and its byte-identical alternate were accounted for. The four-branch model, fine-tuning losses and inherited pretraining dispatch were inspected; complete caption/depth generation and the claimed historical-action pretraining configuration remain unverified. No project code was executed.",
+    "associated_files_reviewed": [
+      {
+        "file": "SUSA (alternate).pdf",
+        "sha256": "07e8ca776eb6b523355eb41cdbfca8180ca312acd78be90f431dd0be98e4f48c",
+        "pages": "Exact SHA256 duplicate; no separate reread",
+        "review_status": "Duplicate accounted for"
+      }
+    ],
+    "versions": "Associated local versions are recorded below with SHA256 identifiers. Exact duplicate bytes were not reread. Distinct alternatives were checked for the relevant method/results; their complete bibliographies were not separately reread.",
+    "status": "Paper review and scoped source audit complete; access and reproduction limits documented",
+    "method": "Section 3 augments DUET at two scales. The local semantic branch generates 36 BLIP2-FlanT5-XXL view captions and encodes them with CLIP. Static caption/instruction matching takes maximum word similarities from a 36×L matrix, where L is instruction length. Dynamic cross-attention adds context-dependent matching. The printed Eqs 1–3 are not completely explicit about the projection needed to align vector scores and transformer outputs; the released branch fusion is described separately below.\n\nThe global spatial branch uses a Gibson-pretrained ResNet50 depth encoder alongside CLIP RGB features. A shared two-layer panorama transformer and average pooling produce768-dimensional topological node representations; cross-modal and graph attention relate them to the instruction. The four branches are global RGB, global depth, local RGB and local semantic features. Their pooled representations and language feed fusion and symmetric contrastive alignment (Eqs 4–9).\n\nThe reported fine-tuning objective is0.2 times expert-action CE plus DAgger-action CE plus 0.8 times symmetric contrastive loss (Eqs 10–11). For an action distribution p_t over candidates, CE is −log p_t(a*_t); the contrastive objective aligns matched visual/language representations while using other batch examples as negatives. The paper reports partial RGB-base pretraining with MLM/MRC/SAP/object-grounding tasks and 100K iterations at batch 32. Fine-tuning uses 25K iterations and task-dependent batches on one RTX4090. Continuous-environment transfer uses an ETPNav planner/executor. Inference fuses branch logits within the DUET policy; the captions are preprocessed representations, not generated step-by-step reasoning."
+  },
+  "uninavid": {
+    "code": "INSPECTED CODE. uninavid/model/uninavid_arch.py:113–155 implements an online cache with 64 short-term frames. Older frames are averaged into one token and merged with the latest long-term token only above a cosine threshold. The release default is0.985, differing from the0.95 value in the reviewed paper. The code correctly handles an initially absent long-term cache at 150–151, resolving the pseudocode empty-cache ambiguity. When consecutive summaries stay dissimilar, the long-term cache appends without a hard capacity bound. The offline process_tensor path at 168–210 applies the same merging idea.\n\nlanguage_model/llava_llama_vid.py:103–113 uses ordinary shifted token CE. This confirms memory compression and action-language supervision; it does not establish all dataset-construction, multitask-balancing or physical-robot results. The reviewed alternate arXiv text and the released source may represent different versions. No training, simulator or robot code was executed.",
+    "code_files": [
+      "uninavid/model/uninavid_arch.py:113-155,168-210",
+      "uninavid/model/language_model/llava_llama_vid.py:103-121"
+    ],
+    "pages": "Alternate arXiv v2:1,3–12 (main method, task results and ablations)",
+    "versions": "The local supplied PDF has no extractable text. Reviewed the authors' arXiv2412.06224v2 (6 February 2025), saved as evidence/03/uninavid_alternate.pdf. Numerical claims refer to that version; byte equivalence with the supplied proceedings PDF is not assumed.",
+    "associated_files_reviewed": [
+      {
+        "file": "evidence/03/uninavid_alternate.pdf",
+        "version": "arXiv2412.06224v2",
+        "pages": "1,3–12",
+        "reason": "Accessible text replacement for the supplied image-only PDF"
+      }
+    ],
+    "results": "Table II R2R^47 SR/42.7 SPL vs NaVid 37.4/35.9; Table III RxR^48.7/40.9 uses RxR training while NaVid 23.8/21.2 is R2R -only: not matched cross-dataset comparison. Table IV HM3D 73.7/37.1; Table V OVON unseen 39.5/19.8 zero-shot to OVON but trained ObjectNav . Scene overlap checked by authors§VI; no independent audit. Figure 8 compares single-task and multi-task learning and data scale, supporting synergy under the authors' recipe; it does not by itself equalize every task's effective data/compute exposure.\n\nTableX (alternate p.11) reports VLN SR 9.61 with only the current frame,39.7 with current/short memory and 48.7 with long memory added. Each ablation retrains the model. Removing VQA reduces EQA accuracy47.3→1.19, showing that preserving general language knowledge is a major part of the mixture. EQA TableVI distinguishes autonomous navigation47.3 from ground-truth-trajectory54.4. The memory ablation therefore supports retaining history, but not guaranteed preservation of rare landmarks. Additional external supplemental videos/results were not reviewed.",
+    "limitations": "An accessible author arXiv version, including main task results and TableX ablations, was reviewed instead of the local image-only proceedings PDF. Separate external supplemental videos and any proceedings-only changes were not reviewed. The released merge implementation was inspected; no benchmark or physical robot run was executed.",
+    "status": "Paper review and scoped source audit complete; access and reproduction limits documented",
+    "method": "SectionIV encodes each RGB frame with EVA-CLIP into256 patch features. Grid pooling retains 64 tokens for the current frame, four tokens per short-term frame (buffer size 64), and one token for each older frame. When adjacent old tokens have cosine similarity above 0.95, the paper merges them with a count-weighted mean; otherwise it appends a new token (Eqs 1–6). If all frames are sufficiently distinct, the long-term list grows linearly, so merging is not a hard memory bound. The released threshold and empty-cache handling differ from the displayed paper pseudocode, as recorded below.\n\nA two-layer MLP projects visual features into Vicuna-7B. Special navigation markers distinguish action generation from question answering. The action vocabulary is forward 25 cm, left30°, right30° and STOP, with four actions generated per decision. Stage 1 aligns the projector on LLaMA-VID data; stage 2 tunes the projector and language model, keeping vision frozen. The total mixture is5.9M examples:3.6M navigation and 2.3M video QA. Navigation includes2.4M VLN,483K ObjectNav,240K EQA action examples plus 10K answers, and 544K following examples across861 scenes. Training takes about 40 H800 GPUs×35 hours.\n\nFor EQA, the agent first navigates, then removes the navigation marker and answers from observed history after STOP. This separates action and answer modes; it does not supply future-state prediction. Real deployment generates four actions in approximately 0.2s on a remote A 100 and uploads new observations asynchronously. Robot heights/radii are varied in training, but the authors explicitly limit claims to the trained range rather than arbitrary embodiments."
+  },
+  "r3": {
+    "code": "The official IAII-CAS/navigation_R3 repository was located and pinned. README.md contains only the project name and the AAAI 2026 title. No model, GNN training, takeover logic, simulator configuration, preprocessing or evaluation implementation is present in this checkout. This is an unreleased implementation, not a failed inspection of accessible model code. The paper-level pipeline and numerical evidence remain inspectable, but its runtime handoff and computational accounting cannot be independently verified from released code. No code was executed.",
+    "code_files": [
+      "README.md:1-2"
+    ],
+    "repository_status": "Official repository exists; README-only, implementation unreleased",
+    "status": "Paper review complete; official implementation unavailable"
+  },
+  "ecot": {
+    "code": "INSPECTED CODE. prismatic/vla/datasets/datasets.py:32–48 controls reasoning dropout. Its RLDS transform at 69–108 combines the image, instruction, annotated reasoning and tokenized action; labels are copied from input_ids, with optional EOS masking. This inspected transform does not independently mask the instruction prompt. Lines 137–151 specify a one-frame window, no depth/proprioception and action normalization by quantiles. vla-scripts/finetune.py:167–169,233–247,295–297 runs AdamW, the model loss, backward and optimizer steps. It is a released fine-tuning path, not verification of the entire original pretraining run.\n\nopenvla.py:94–111 builds the task prompt;128–156 and 188–205 implement reuse of asynchronously generated reasoning;215–229 converts seven discrete action tokens into normalized continuous controls. The reasoning server at experiments/bridge/reasoning_server.py:65–81 loads the model and serves raw generation over ZMQ. The Bridge evaluator at 84–87 defaults to a 2 Hz control loop,600 steps and 500 episodes;139–165 times action calls. These files substantiate the reasoning/action interface and deployment mechanism. Complete original reasoning-label generation, all pretraining configurations and physical robot results were not independently reproduced. No project code was executed.",
+    "code_files": [
+      "prismatic/vla/datasets/datasets.py:32-48,69-108,137-151",
+      "vla-scripts/finetune.py:167-169,233-247,295-297",
+      "prismatic/models/vlas/openvla.py:33-46,94-111,128-156,188-229",
+      "experiments/bridge/reasoning_server.py:65-81",
+      "experiments/bridge/eval_model_in_bridge_env.py:84-87,126-175"
+    ],
+    "status": "Paper review and scoped source audit complete; access and reproduction limits documented",
+    "venue": "CoRL 2024; proceedings published as PMLR270 in 2025",
+    "source": "https://proceedings.mlr.press/v270/zawalski25a.html",
+    "bibliography": "The official PMLR270 index identifies the8th Conference on Robot Learning, held6–9 November 2024, with proceedings published12 January 2025. The supplied text is the March 2025 arXiv revision; proceedings byte equivalence was not assumed."
+  },
+  "gc_vln": {
+    "code": "INSPECTED CODE. src/solver/constraint.py implements the four families of geometric masks. Direction tolerances differ between RxR and R2R (π/4 versus π/6), so the geometric prior is dataset-configured. agent_policy.py:115–143 receives simulator pose/context and the parsed instruction DAG;310–322 calls the navigation-tree constraint process. navigation_tree.py:76–121 topologically orders the instruction DAG and groups object constraints by stage. region_solver.py:72–85 filters detected instances by range,141–170 additionally uses detection count, and 199–215 converts semantic relations into geometric constraints. Its failure branches at 777–790 and 905–916 invoke backtracking, then bounded exploration/final fallback. These are finite heuristics over estimated instances; they do not certify instruction satisfaction.\n\nnavigation_planner.py:124–234 constructs an FMM distance field, follows its gradient and handles incomplete paths, including a geodesic-to-straight-distance threshold of 3. No navigation gradient training is introduced. The inspected path covers constraint representation, instance selection and local motion, while exact upstream detector outputs, instruction parsing reproducibility and complete benchmark aggregation were not independently reproduced. The printed directional equation was not treated as a proven error because coordinate/typographic conventions require visual disambiguation. No project code was executed.",
+    "code_files": [
+      "src/solver/constraint.py",
+      "src/agent/agent_policy.py:115-143,310-322",
+      "src/solver/navigation_tree.py:76-121",
+      "src/solver/region_solver.py:72-85,141-170,199-215,777-790,905-916",
+      "src/agent/navigation_planner.py:124-234"
+    ],
+    "status": "Paper review and scoped source audit complete; access and reproduction limits documented"
+  },
+  "navgpt": {
+    "code": "INSPECTED CODE. nav_src/agent.py:300–325 serializes directional captions, object headings/distances and navigable viewpoint IDs. Lines 353–390 construct action/history prompts and call the LLM;397–406 reject nonexistent viewpoint IDs before simulator movement;421–431 summarize the resulting history. create_vln_agent:558–622 constructs action/backtrace tools and a LangChain executor with an iteration cap. This is prompted inference with no navigation-specific optimizer or training loss.\n\nThe released nav_src/env.py:264–290 evaluates final and oracle error, uses the success margin, and computes SPL as success times reference length divided by the larger reference/predicted length. Lines 294–321 aggregate the metrics. The prompt file and core loop were inspected; BLIP/object-description caches and exact historical API behavior were not regenerated. Consequently source inspection verifies interfaces and evaluator structure, not the numerical paper results. No API call, MatterSim episode or model execution was performed.",
+    "code_files": [
+      "nav_src/agent.py:300-440,558-622",
+      "nav_src/env.py:264-321"
+    ],
+    "limitations": "The supplied main paper and targeted prompt/inference/evaluation code were inspected. The complete original caption caches and API backend cannot be reconstructed from this review; additional supplementary examples were not exhaustively reviewed. No benchmark was executed.",
+    "status": "Paper review and scoped source audit complete; access and reproduction limits documented"
+  },
+  "psgnav": {
+    "code": "INSPECTED CODE. graph/scenegraph_combinations.py:60–125 sorts per-object categorical choices and enumerates high-probability combinations with a heap; log probabilities are added, implementing the paper's independence product. The search stops after at most10,000 visited configurations in that path. graph/enumerated_groups.py:252–263 invokes the LLM filter, so retained worlds still depend on semantic-prior judgments. PSG_Nav.py:1484–1489 reads Habitat outcome metrics. Its feedback path at 1497–1554 inserts successful detections into positive memory and, on a failed episode, puts recent detections into the false-positive database.\n\nThe latter is a potential credit-assignment problem: episode failure can result from control or stopping rather than false object recognition. The code alone does not show how often this mislabels memory, so an oracle-perception versus observed-feedback experiment is needed. calculate_avg_results.py:7–19 parses saved dictionaries and 41–52,72–82 averages SR/SPL, replacing NaN numeric values by zero. No task-specific gradient training is introduced, but persistent outcome-labeled updates are adaptation. Complete perception preprocessing, all planner branches and released-model outputs were not reproduced. No project code was executed.",
+    "code_files": [
+      "graph/scenegraph_combinations.py:60-125",
+      "graph/enumerated_groups.py:60-80,125,252-263",
+      "PSG_Nav.py:1484-1554",
+      "calculate_avg_results.py:7-19,41-52,72-82"
+    ],
+    "limitations": "Main method, Appendix A technical/memory/false-positive results and the released world-enumeration/outcome-memory/aggregation code were inspected. Exact episode order and full detector outputs were not independently reconstructed. The selected false-positive subset does not measure calibration on all deployment states. No ObjectNav benchmark was run.",
+    "status": "Paper review and scoped source audit complete; access and reproduction limits documented",
+    "pages": "1,3–8,13–15,21",
+    "results": "Table 1 correct dataset order HM3D 66.1 SR/32.1 SPL , MP3D 44.8/17.9, HSSD 67.9/33.4; abstract lists MP3D / HM3D opposite order before these values. Fixed no EEC 63.5 HM3D below ASCENT 65.4; adaptive 66.1 has extra feedback. Table 2 without probabilistic graph 58.4, without groups 58.8; Table 3 K 1→3 63.3→66.1. EEC adds 2.6 SR. Evidence supports useful uncertainty representation but not globally optimal decision or calibrated belief. Episode order/reset/ground truth availability must be reported.\n\nAppendix A.2/Table 5 evaluates a deliberately selected320-episode false-positive subset: EEC intercepts 246 wrong stops, recovers 97 episodes (30.3% SR), and leaves 74 false-positive stops. This supports reducing that failure mode within the selected protocol, not a universal false-positive guarantee. Table 6 shows a small memory bank already helps (capacity 0/5/10/20 gives 63.5/65.2/66.1/66.3 SR). Table 7 changes the detector to WeDetect for OVON, so comparisons there cannot isolate graph reasoning alone. Appendix A.3 defines geometric visibility using72 rays; the semantic entropy term still lacks an observation-conditioned expected posterior. The printed overall algorithm returns Success whenever the threshold triggers STOP, whereas actual success still requires environment evaluation.",
+    "key_findings": [
+      {
+        "claim": "Main adaptive benchmark retains GT-labeled experience across validation episodes",
+        "evidence_type": "Author protocol",
+        "source": "Supplied PDF",
+        "locator": "§3.4/§4.1"
+      },
+      {
+        "claim": "Failed-episode feedback marks recent detections as false positives even though episode failure can arise from control; incidence was not measured.",
+        "evidence_type": "INSPECTED CODE / deduction",
+        "source": "Official repository snapshot; linked in dossier",
+        "locator": "PSG_Nav.py:1497–1554"
+      }
+    ]
+  },
+  "rl4vla": {
+    "pages": "1,3–8,17–24",
+    "code": "INSPECTED CODE. SimplerEnv/simpler_env/policies/openvla/openvla_train.py:49–75 inserts LoRA and exposes the trainable value head;104–109 creates separate AdamW optimizers. Its action evaluation returns scalar values/log probabilities, and 273–319 implements clipped PPO, clipped Huber value loss and entropy regularization, followed by shared gradient clipping and both optimizer steps. The total minimized loss is policy_loss + value_loss − entropy_coefficient × entropy; accumulation divides this loss before backward.\n\nopenvla/prismatic/extern/hf/modeling_prismatic.py:627–642 selects the value-head mode. In the a 0 path at 690–716, the pre-action hidden state gives a B×1 value, action logits have shape B×7×256, and seven token log probabilities are summed to form the joint action log probability. This matches Appendix A.1's product-of-token-probabilities convention. The fetched eval_ms3_collect.py:23–44,62–78,90–128 is an Octo data-collection utility, not an RL4VLA performance evaluator; it is explicitly not treated as validation of the paper's PPO evaluation. Full main training orchestration, all reward/task implementations and the exact final evaluator remain outside this targeted source audit. No project code was executed.",
+    "code_files": [
+      "SimplerEnv/simpler_env/policies/openvla/openvla_train.py:49-75,104-109,152-163,197-209,273-319",
+      "openvla/prismatic/extern/hf/modeling_prismatic.py:627-642,690-716,824-835",
+      "SimplerEnv/simpler_env/eval_ms3_collect.py:23-44,62-78,90-128"
+    ],
+    "method": "Section 3 uses OpenVLA: SigLIP and DINOv2 image features feed Llama2-7B, which predicts a seven-dimensional end-effector/gripper action. Each action coordinate is discretized into256 bins between training quantiles. The base setting observes one 640×480 image and an instruction. All compared fine-tuning methods use rank 32 LoRA; the value head is fully trained.\n\nAppendix A.1, Eqs 1–2 defines PPO with scalar ratio r_t=πθ(a_t|s_t)/πold(a_t|s_t), where π(a_t|s_t) is the product of the seven action-token probabilities. The maximized surrogate is E[min(r_t A_t, clip(r_t,1−ε,1+ε)A_t)]. GAE estimates A_t by summing discounted temporal-difference residuals, Σ_l(γλ)^l[r_(t+l)+γV(s_(t+l+1))−V(s_(t+l))]. These are policy-gradient estimators, not a convergence guarantee. The three-layer shared critic reads the first action-token hidden state. GRPO instead uses 32 groups of 8 trajectories and group-normalized terminal outcomes; TPO/DPO compares whole trajectory preferences using the same sparse reward.\n\nThe base pick-and-place reward gives partial credit for grasping/holding and a larger terminal placement reward. A 140-demonstration warm start reduces interaction requirements. Motion-planner demonstrations are filtered when translation is below 0.01 and Euler-angle change below 0.06 (Appendix A.2), removing about one third of idle actions. This preprocessing is important when comparing SFT and RL. The shared critic uses 44.4 GB versus 81.3 GB for a separate critic; the main run takes roughly 42 hours on one A 100. Appendix B.5 adds four-action chunks with action-dimension clipping and retuned γ/λ, so it is a separate recipe. Appendix B.6 adds articulated-object opening on a Franka robot, extending the original pick-and-place scope.",
+    "results": "Figure 3 compares PPO, GRPO and DPO under the authors' setup; it supports PPO as a strong baseline, not a universal ordering of optimizers. Appendix Table 1 reports task success: in-distribution SFT0.781 versus RL0.938; unseen objects0.453 versus 0.714; changed robot pose0.339 versus 0.797; mid-episode object repositioning0.286 versus 0.745. Because base success differs, relative degradation as well as absolute SR matters. Figure 7 reports similar relative visual robustness and stronger semantic/execution transfer.\n\nThe extended tests qualify the conclusion. With action chunks, Table 3 shows a regression on unseen multiple receptacles (0.365 SFT versus 0.297 RL). On articulated objects, Table 4 reports visual-average SR 0.646 versus 0.591 and rephrased-instruction SR 0.703 versus 0.620; RL improves execution-average SR 0.300→0.398. Thus RL does not uniformly improve every semantic or visual shift. Thirty preliminary real trials in Table 2 yield pick-and-place SR 0 versus 0.27, which is promising but small. These manipulation findings motivate matched tests in VLN; they are not navigation results.",
+    "limitations": "Main method, Appendix A and additional results in Appendix B were read. The targeted actor/critic/PPO implementation was inspected at the pinned commit, but the full released task suite and evaluation orchestration were not reproduced. All reported benchmark/robot numbers are authors' experiments. No project code was executed.",
+    "status": "Paper review and scoped source audit complete; access and reproduction limits documented"
+  },
+  "evonav": {
+    "code": "ACCESS SCOPE: CVPR main paper states code will be released. Title and project searches did not verify an official implementation. No retrieval bank, feedback computation or evaluation ordering was inspected in code.",
+    "limitations": "Main paper and the separate four-page supplement were read. Supplement A.1 uses 100 sampled episodes for R2R-CE and 100 random NavRAG episodes. Section C.3 explicitly says no ground-truth trajectory is supplied to or stored by the agent: feedback comprises its own rollout plus terminal SR/SPL. The critique therefore concerns ground-truth-derived outcome feedback and episode ordering, not use of an oracle path at inference. No verified executable official release was inspected and no benchmark was executed.",
+    "results": "PAPER EXPERIMENT: sampled R2R-CE Table 1 p.6: same Gemini 2.5-Pro Open-Nav 23 SR/19.90 SPL versus EvoNav 43/37.77. NavRAG-CE 24/13.39 versus 30/17.60. Table 4 p.7: future-only 27 SR, adding trajectory experience 31, scene-description 39, both scene forms 40, full 43. These support memory utility conditional on episode ordering/outcome access. Main table includes some cited results using different waypoint predictors. No reset-memory or no-oracle-outcome control is established in reviewed main text. Source says code will be released.\n\nThe supplement distinguishes online accumulation from a larger offline bank. Outcome-derived feedback and episode order must be matched against frozen-memory baselines. Its correction text is LLM-generated from the agent's own failed experience; it is not an oracle-corrected demonstration path.",
+    "associated_files_reviewed": [
+      {
+        "file": "EvoNav (supplement).pdf",
+        "sha256": "716c3c0d20a588f474dbaae8d8507ea28f89e9b583de51f4d24fa3d3a058f901",
+        "pages": "1–4",
+        "review_status": "Relevant method/results or supplement reviewed"
+      },
+      {
+        "file": "EvoNav (alternate).pdf",
+        "sha256": "482fa22bc5fee6999276ef6c7040bb6166b4814f42a26a8a1d02062b946e3cc9",
+        "pages": "Exact SHA256 duplicate; no separate reread",
+        "review_status": "Duplicate accounted for"
+      }
+    ],
+    "versions": "Associated local versions are recorded below with SHA256 identifiers. Exact duplicate bytes were not reread. Distinct alternatives were checked for the relevant method/results; their complete bibliographies were not separately reread.",
+    "status": "Paper review and scoped source audit complete; access and reproduction limits documented"
+  },
+  "adanav": {
+    "limitations": "The main paper and relevant appendices were reviewed. The advertised official code URL was inaccessible at the cutoff; no implementation or benchmark was executed.",
+    "status": "Paper review and scoped source audit complete; access and reproduction limits documented"
+  },
+  "correctnav": {
+    "limitations": "The paper mechanism and data/iteration ablations were reviewed. No official executable implementation was verified in the scoped source search. Data regeneration and benchmark reproduction were not attempted.",
+    "status": "Paper review and scoped source audit complete; access and reproduction limits documented"
+  },
+  "ham_vln": {
+    "limitations": "The supplied method and reported subset experiments were reviewed. No verified official implementation was inspected. Memory fidelity, full API traces and a matched large-scale evaluation remain untested.",
+    "status": "Paper review and scoped source audit complete; access and reproduction limits documented"
+  },
+  "idealvln": {
+    "limitations": "The supplied main paper was reviewed. The advertised project URL was inaccessible, so no official implementation, exact dataset pipeline or training run was inspected. The causal language is assessed as a modeling claim, not an identification theorem.",
+    "status": "Paper review and scoped source audit complete; access and reproduction limits documented"
+  },
+  "navfom": {
+    "limitations": "The main paper, architecture/data/budget appendices, matched history-token ablations, runtime table and failure analysis were reviewed. The official project linked a code placeholder at inspection, so no implementation or checkpoint was inspected. Exact stochastic budget enforcement and metric code remain unverified; Appendix B.2 also prints an nDTW normalization using start-to-goal distance that should be checked against benchmark code before comparison. No experiment was run.",
+    "status": "Paper review and scoped source audit complete; access and reproduction limits documented",
+    "pages": "1,3–10,19,21–22,26,28–30",
+    "method": " DINOv2 + SigLIP 576 patch features concatenate channels; grid pool latest view to 64 patches, history to 4, then 2 layer MLP to Qwen 2-7 B. TVI token E_base+P_time(Time PE(t))+P_angle(Angle PE(φ)) identifies time and camera angle; video QA omit angle, image QA omit both. Sinusoidal PE of sin/cosφpreserves circular identity; sums need not provably be injective overtime and angle. BATS samples history with P(t)=(1−ε)exp(k(t−T)/T)+ε,ε=.1. Eq 5 integral expected frames=(1−ε)(1−exp(−k))T/k+εT; Brent solve k under[(5 E_frames)+65]N≤B_tokens. This is an expectation constraint, not a hard per-instance token cap; floorεmakes feasibility fail at sufficiently large T (authors acknowledge 1120 steps for four cameras 2048 budget). Action hidden state→3 layer MLP predicts M=8 waypoints in R^4(x, y, z, yaw); task scaleαrescales the[-1,1]coordinates; ground vehicles ignore z. L=10 MSE (valid waypoint dimensions)+QA autoregressive CE. MSE mixes position and yaw units after task normalization, so weighting depends units/scales. 12.7 M total examples=8.02 M navigation+3.15 M image QA+1.61 M video QA;56 H100 ×72 h 4032 GPU-hours , one epoch. 8 M navigation includes 3.37 M VLN,1.02 M object goal,897 K tracking,681 K driving and web videos. Simulator uses trajectory actions replacing discrete Forward/Left/Right; deployment costs are version-specific; see Appendix Table 11 below.\n\nAppendix A.2 supplies a practical fallback omitted from the core expectation equation: if the minimum sampling probability exceeds the budget at extremely long horizons, remove the oldest frames. Consequently the unresolved issue is evidence loss under truncation and whether every stochastic draw respects the intended budget, rather than an assertion that the entire method has no fallback. Appendix A.1 uses per-dimension99th-percentile trajectory scales. Appendix B.3 caches four-token history features offline while encoding current/QA images online, which is part of the reported training-efficiency recipe.",
+    "results": "Table 1 single view R2R 56.2 SR/51.2 SPL , RxR 57.4/49.4; four view 61.7/55.3 and 64.4/56.2. Table 2 unseen OVON 43.6/31.3 single view; different object goal training set, so zero-shot asterisk does not mean untrained navigation. Table 3 tracking 85.0 SR vs Track VLA 85.1 single-target,61.4 vs 57.6 distracted. Table 4 NAV SIM 84.3 PDM S vs PARA Drive 84.0, Uni AD 83.4, LAW 84.6. These broad results support generality, not superiority every metric. Data quantity and changed action space are material confounders.\n\nFigure 8 (p.9) compares BATS, uniform sampling and token merging within the four-camera RxR setting: at 2048 tokens BATS64.4 SR/56.2 SPL versus token merging63.2/54.9; at 1024 tokens BATS62.5/53.9 versus uniform59.7/49.6. These are more informative architectural controls than the headline multi-task numbers. Appendix Table 11 reports RTX4090 FP 16 at 19.8 GB/218 ms and 4bit at 10.7 GB/248 ms;19.1 GB/566 ms refers to Jetson Thor16bit. Appendix F attributes49% of analyzed failures to model issues such as history alignment, early stopping and insufficient turning, and 51% to dataset/simulator issues; the categorization is the authors' analysis. Six cameras slightly underperform four under the same token budget, exposing coverage/history competition."
+  },
+  "profocus": {
+    "limitations": "Main method, tables and the corresponding alternate-version result pages were read. No official executable code was verified. Exact sampled episode identities, API budgets and loop limits were not established by the reviewed material. No benchmark was executed.",
+    "associated_files_reviewed": [
+      {
+        "file": "ProFocus (alternate).pdf",
+        "sha256": "3d7809ccbd120cd49027bf13ee0c02a83e131639b75dcd91d8727ec09735e9d1",
+        "pages": "5–8",
+        "review_status": "Relevant method/results or supplement reviewed"
+      }
+    ],
+    "versions": "Associated local versions are recorded below with SHA256 identifiers. Exact duplicate bytes were not reread. Distinct alternatives were checked for the relevant method/results; their complete bibliographies were not separately reread.",
+    "status": "Paper review and scoped source audit complete; access and reproduction limits documented"
+  }
+}

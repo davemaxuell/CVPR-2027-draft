@@ -1,0 +1,46 @@
+# General Experiment Configuration
+experiment:
+  id: "default"                # Experiment ID
+  output_dir: "./outputs"       # Directory for output/experiment ID
+  data_dir: "../data"          # Root directory for the datasets
+  seed: 42                     # Random seed for reproducibility
+  detailed_output: false       # Enable detailed output
+  model: None                  # MLLM model
+  max_step: 15                 # Max inference steps
+  valid_from_file: false      # Valid from file
+
+  batch_size: 1                # Batch size
+  workers: 1                   # Number of workers
+
+# Agent Configuration
+agent:
+  type: "baseline_agent"       # Agent type
+
+# MP3D Environment
+environment:
+  obs_dir: "../data/marked_obs/"
+  caption_dir: "../data/MP3D/caption.json"
+  obs_sum_dir: "../data/MP3D/obs_summarized/"
+  map_dir: null
+
+# Distributed Training Configuration
+distributed:
+  dist_backend: "nccl"         # Backend choice: nccl, gloo
+  init_method: "env://"        # Initialization method
+  world_size: 1                # Number of processes
+  rank: 0                      # Rank of the current process
+  local_rank: -1               # Local rank of the current process
+  no_set_device_rank: false    # Do not set device rank
+
+# Tasks Configuration
+task:
+  val_source:                  # Source datasets for testing
+    ['R2R', 'REVERIE']
+
+  eval_splits: {                # Evaluation splits
+    "R2R": ["val_unseen"],
+    "REVERIE": ["val_unseen"],
+    "RXR": ["val_unseen_subset", "val_unseen"],
+    "CVDN": ["val_unseen_subset", "val_unseen"],
+    "OBJECTNAV": ["val_unseen_subset"]
+  }

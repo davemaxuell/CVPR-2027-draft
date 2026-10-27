@@ -1,0 +1,666 @@
+===== PDF PAGE 1 =====
+          Language-Aligned Waypoint (LAW) Supervision for
+     Vision-and-Language Navigation in Continuous Environments
+
+             Sonia Raychaudhuri1    Saim Wani2     Shivansh Patel2
+                      Unnat Jain3     Angel X. Chang1
+                1Simon Fraser University     2IIT Kanpur    3UIUC
+                              1{sraychau,angelx}@sfu.ca
+              2{saimdwani,shivanshpatel35}@gmail.com    3uj2@illinois.edu
+             https://3dlg-hcvc.github.io/LAW-VLNCE
+
+
+                Abstract                                                       Language-aligned path
+                                                                                                                   Goal-oriented path
+                                                                                                                                               #    Language-aligned               Goal
+    In   the  Vision-and-Language   Navigation                         waypoints
+                                                                                                          Agent Location                                                        Start   (VLN) task an embodied agent navigates a
+
+                                                                                                                                                                                                                     3   3D environment, following natural language                   Supervision:                                      4                                                                                                                                                                                                                            2   1
+     instructions. A challenge in this task is how                       Towards goal location
+                                                                                                    Towards language-aligned
+    to handle ‘off the path’ scenarios where an                        waypoint
+    agent veers from a reference path. Prior work
+    supervises the agent with actions based on                                             1                  2                  3                  4
+    the shortest path from the agent’s location to                                   Start                                                                                                              Goal
+    the goal, but such goal-oriented supervision                        Gowhitetowardtabletheon     Turn right     andthroughgo insidethe   Goroomthroughwiththe   stoveStop nextand toislandthe
+     is often not in alignment with the instruction.                                 the patio                            sliding doors    intotelevisionthe kitchenand     in the kitchen
+    Furthermore, the evaluation metrics employed
+   by prior work do not measure how much of        Figure 1: A language-aligned path (blue) in an in-
+    a language instruction the agent  is able to         struction following task may differ from the shortest
+    follow.  In this work, we propose a simple        path (red) to the goal. Language-aligned supervision
+    and  effective  language-aligned  supervision        (blue arrows) encourages the agent at any given loca-
+    scheme, and a new metric that measures the         tion (dark circles) to move towards the nearest way-
+   number  of  sub-instructions  the  agent  has        point on the language-aligned path and can hence be a
+    completed during navigation.                           better supervisory signal for instruction following than
+                                                          goal-oriented supervision (red arrows).
+1  Introduction
+
+Training agents to navigate in realistic environ-   (2019) observed, such supervision is goal-oriented
+ments based on natural language instructions is   and does not always correspond to following the
+a step towards building robots that understand hu-    natural language instruction.
+mans and can assist them in their daily chores. An-     Our key idea is that language-aligned supervi-
+derson et al. (2018b) introduced the Vision-and-   sion is better than goal-oriented supervision, as the
+Language Navigation (VLN) task, where an agent    path matching the instructions (language-aligned)
+navigates a 3D environment to follow natural lan-  may differ from the shortest path to the goal (goal-
+guage instructions. Much of the prior work on    oriented). This is especially true in ‘off the path’
+VLN assumes a discrete navigation graph (nav-   scenarios (where the agent veers off the reference
+graph), where the agent teleports between graph    path prescribed by the instructions). Language-
+nodes, both in indoor (Anderson et al., 2018b) and    aligned supervision encourages the agent to move
+outdoor (Chen et al., 2019; Mehta et al., 2020) set-   towards the nearest waypoint on the language-
+tings. Krantz et al. (2020) reformulated the VLN    aligned path at every step and hence supervises the
+task to a continuous environment (VLN-CE) by   agent to better follow instructions (see Figure 1).
+lifting the discrete paths to continuous trajectories,   In the discrete nav-graph setting, Jain et al. (2019)
+bringing the task closer to real-world scenarios.      interleave behavioral cloning and policy gradient
+  Krantz et al. (2020) supervised agent training    training, with a sparse ‘ﬁdelity-oriented reward’
+with actions based on the shortest path from the   based on how well each node is covered on the
+agent’s location to the goal, following prior work in    reference path. In contrast, we tackle the VLN-CE
+VLN (Fried et al., 2018; Tan et al., 2019; Hu et al.,    setting and propose a simple and effective approach
+2019; Anderson et al., 2019). However, as Jain et al.    that provides a denser supervisory signal leading
+                                        4018
+
+       Proceedings of the 2021 Conference on Empirical Methods in Natural Language Processing, pages 4018–4028
+                    November 7–11, 2021. c⃝2021 Association for Computational Linguistics
+
+===== PDF PAGE 2 =====
+the agent to the reference path. A dense supervi-    tions.  Anderson et al. (2019) adopt Bayesian
+sory signal is especially important for VLN-CE    state tracking to model what a hypothetical hu-
+where the episodes have a longer average length   man demonstrator would do when given the instruc-
+of 55.88 steps vs. 4-6 nodes in (discrete) VLN. To    tion, whereas Qi et al. (2020) attends to speciﬁc
+this end, we conduct experiments investigating the    objects and actions mentioned in the instruction.
+effect of density of waypoint supervision on task   Zhu et al. (2020) train the agent to follow shorter
+performance.                                         instructions and later generalize to longer instruc-
+  To assess task performance, we complement the    tions through a curriculum-based reinforcement
+commonly employed normalized Dynamic Time    learning approach. Hong et al. (2020) divide lan-
+Warping (nDTW) metric (Ilharco et al., 2019) with   guage instructions into shorter sub-instructions and
+a intuitive Waypoint Accuracy metric. Finally, to    enforce a sequential traversal through those sub-
+provide qualitative insights about degree of fol-    instructions. They additionally enrich the Room-
+lowing instructions, we combine language-aligned   to-Room (R2R) dataset (Anderson et al., 2018b)
+waypoints with information about sub-instructions.   with the sub-instruction-to-sub-path mapping and
+Our experiments show that our language-aligned    introduce the Fine-Grained R2R (FG-R2R) dataset.
+supervision trains agents to more closely follow in-    More closely related to our work is Jain et al.
+structions compared to goal-oriented supervision.    (2019), which introduced a new metric – Coverage
+                                              weighted by Length Score (CLS), measuring the
+2  Related Work                             coverage of the reference path by the agent, and
+                                                used it as a sparse ﬁdelity-oriented reward for train-
+Vision-and-Language Navigation. Since the in-                                                       ing. However, our work differs from theirs in a
+troduction of the VLN task by Anderson et al.                                          number of ways. First, in LAW we explicitly su-
+(2018b), there has been a line of work exploring                                                    pervise the agent to navigate back to the reference
+improved models and datasets. The original Room-                                                      path, by dynamically calculating the closest way-
+to-Room (R2R) dataset by Anderson et al. (2018b)                                                      point (on the reference path) for any agent state. In
+provided instructions on a discrete navigation graph                                                        contrast to calculating waypoints, Jain et al. (2019)
+(nav-graph), with nodes corresponding to positions                                                 optimize accumulated rewards, based on the CLS
+of panoramic cameras. Much work focuses on this                                                     metric. Moreover, we provide dense supervision
+discrete nav-graph setting, including cross-modal                                                             (at every time step) for the agent to follow the ref-
+grounding between language instructions and vi-                                                   erence path by providing a cross-entropy loss at all
+sual observations (Wang et al., 2019), addition of                                                       steps of the episode, in contrast to the single reward
+auxiliary progress monitoring (Ma et al., 2019),                                                           at the end of the episode during stage two of their
+augmenting training data by re-generating language                                                           training. Finally, LAW is an online imitation learn-
+instructions from trajectories (Fried et al., 2018),                                                  ing approach, which is simpler to implement and
+and environmental dropout (Tan et al., 2019).                                                         easier to optimize compared to their policy gradient
+  However, these methods fail to achieve simi-                                                    formulation, especially with sparse rewards. Simi-
+lar performance in the more challenging VLN-CE                                                            lar to Jain et al. (2019), Ilharco et al. (2019) train
+task, where the agent navigates in a continuous                                            one of their agents with a ﬁdelity oriented reward
+3D simulation environment. Chen et al. (2021)                                               based on nDTW.
+propose a modular approach using topological en-
+vironment maps for VLN-CE and achieve better                                       3  Approach
+results.  In concurrent work, Krantz et al. (2021)
+propose a modular approach to predict waypoints   Our approach  is  evaluated on  the VLN-CE
+on a panoramic observation space and use a low-   dataset (Krantz et al., 2020), which is generated
+level control module to navigate. However, both   by adapting R2R to the Habitat simulator (Savva
+these works focus on improving the ability of the    et al., 2019). It consists of navigational episodes
+agent to reach the goal. In this work, we focus on   with language instructions and reference paths. The
+the VLN-CE task and on accurately following the    reference paths are constructed by taking the dis-
+path speciﬁed by the instruction.                      crete nav-graph nodes corresponding to positions
+Instruction Following in VLN. Work in the dis-   of panoramic cameras (we call these pano way-
+crete nav-graph VLN setting has also focused on    points, shown as gray circles in Figure 2 top), and
+improving the agent’s adherence to given instruc-   taking the shortest geodesic distance between them
+                                        4019
+
+===== PDF PAGE 3 =====
+          w2        w3      w4 = 𝜙(𝐱,𝑊)          w6              supervising with the conventional goal-oriented
+  w1                                     w5                       sensor, we supervise with a language-aligned sen-
+                          Agent 𝐱                                  sor in both the teacher-forcing phase and the DAg-
+     RGBD Image          Optimal action towards w4 (closest waypoint)             ger phase. The language-aligned sensor helps bring
+                                          CE (𝑎t*, 𝑎t)      the agent back on the path to the next waypoint if
+          Instruction               GRU               Attn     GRU                          it wanders off the path (see Figure 2 top).
+   Walk         to the              bedroom,                         take                                                  Attn                        The training dataset D = {S(i), W (i)} consists    a right,            then                 stop at the
+          bathroom                       CMA
+                                                   of instructions S(i) and reference path W (i). For
+Figure 2: Top: The path from the start (orange) to the   each episode (S, W) ∼D with the agent starting
+goal (green) with grey circle indicating LAW pano    state as x0, we use cross entropy loss to maximize
+and the dashed segments indicating LAW step. Bot-   the log likelihood of the ground-truth action a∗
+tom: We adapt the Cross-Modal Attention (CMA)    at each time step t: LCE(x0; θ) = −PTt=1 ea∗·
+model (2020) which predicts an action. We optimize    log πθ(at|It, S, xt, x0). Here, xt is the 3D position
+ the model using language-aligned supervision, which                                                   of the agent at time t, ea∗is the one-hot vector
+ brings it back on the path toward the next waypoint.
+                                                       for the ground-truth action a∗, which is deﬁned
+                                                   as a∗= g(xt, φ(xt, W)). The set of language-
+to create a ground truth reference path consisting    aligned waypoints is W = {w1, ..., wm}. The
+of dense waypoints (step waypoints, see dashed   waypoint in W that is nearest to a 3D position
+path in Figure 2) corresponding to an agent step    xt is obtained by φ(xt, W). The best action based
+size of 0.25m.                               on the shortest path from a 3D position xt to w is
+                                                denoted by g(xt, w).  We take waypoints from these paths as language-
+aligned waypoints (LAW) to supervise our agent,
+                                        4  Experiments
+ in contrast to the goal-oriented supervision in prior
+work. We interpret our model performance qualita-   Dataset.  We base our work on the VLN-CE
+ tively, and examine episodes for which the ground-   dataset (Krantz et al., 2020).  The dataset con-
+ truth language-aligned path (LAW step) does not    tains 4475 trajectories from Matterport3D (Chang
+match goal-oriented shortest path (shortest)1.          et al., 2017). Each trajectory is described by mul-
+Task. The agent is given a natural language instruc-    tiple natural language instructions. The dataset
+ tion, and at each time step t, the agent observes the    also contains ∼150k augmented trajectories gen-
+environment through RGBD image It with a 90◦    erated by Tan et al. (2019) adapted to VLN-CE.
+ﬁeld-of-view, and takes one of four actions from A:   To qualitatively analyze our model behavior, we
+{Forward, Left, Right, Stop}. Left and Right turn    use the Fine-Grained R2R (FG-R2R) dataset from
+the agent by 15◦and Forward moves forward by   Hong et al. 2020. It segments instructions into sub-
+0.25m. The Stop action indicates that the agent has    instructions2 and maps each sub-instruction to a
+reached within a threshold distance of the goal.      corresponding sub-path.
+Model.  We adapt the Cross-Modal Attention   Evaluation Metrics. We adopt standard metrics
+(CMA) model (see Figure 2) which is shown to   used by prior work (Anderson et  al., 2018b,a;
+perform well on VLN-CE. It consists of two re-   Krantz et al., 2020).  In the main paper, we re-
+current networks, one encoding a history of the    port Success Rate (SR), Success weighted by in-
+agent state, and another predicting actions based    verse Path Length (SPL), Normalized dynamic-
+on the attended visual and instruction features (see   time warping (nDTW), and Success weighted by
+supplement for details).                 nDTW (SDTW). Trajectory Length (TL), Navi-
+Training. We follow the training regime of VLN-   gation Error (NE) and Oracle Success Rate (OS)
+CE. It involves two stages: behavior cloning (with    are reported in the supplement. Since none of the
+teacher-forcing) on the larger augmented dataset    existing metrics directly measure how effectively
+to train an initial policy, and then ﬁne-tuning with   waypoints are visited by the agent, we introduce
+DAgger (Ross et al., 2011). DAgger trains the   Waypoint Accuracy (WA) metric. It measures the
+model on an aggregated set of all past trajectories,    fraction of waypoints the agent is able to visit cor-
+sampling actions from the agent policy. Rather than    rectly (speciﬁcally, within 0.5m of the waypoint).
+                                                This allows the community to intuitively analyze
+   1We ﬁnd ∼6% of the VLN-CE R2R episodes to have
+ nDTW(shortest, LAW step) < 0.8 (see supplement)             2There are on average 3.1 sub-instructions per instruction
+                                        4020
+
+===== PDF PAGE 4 =====
+                                                                                       Goal-Oriented             LAW pano
+                              LAW pano     (WA)   (nDTW)                                         goal
+                                                                                  1                                1
+
+                                                                                   2                   ✓2      Performance                                                                                                                                                                                                    Performance                           ✓                   ✓
+   Agent                                                                                         Agent                                                                                    3     ✓4    5                   3     ✓4    5
+
+
+                                                                  NDTW=0.67 | WA=0.4          NDTW=0.88 | WA=0.6        nDTW (shortest, LAW step)             nDTW (shortest, LAW step)
+                                                                                                        Sub-Instructions
+                                                                                 1    2   3    4   Walk forward and turn left passing the television.
+Figure 3: Agent performance binned by nDTW value
+                                                                                          4    5   Keep walking towards the glass windows
+of reference path to shortest path (95% CI error bars)
+                                                                                          5    5   and stop there.shows that LAW pano performs better than goal, es-
+pecially on lower-range NDTW episodes.  This indi-    Figure 4: An example episode from R2R unseen split.
+cates that language-aligned supervision is better suited   The agent is able to learn to follow instruction bet-
+for the instruction following task.                             ter when supervised with language-aligned path (right)
+                                                       than the goal-oriented path (left). This is reﬂected in
+                                                        higher nDTW and waypoint accuracy (WA) metrics.
+the agent trajectory as we illustrate in Figure 4.      Note that WA can be intuitively visualized and inter-
+Implementation Details.  We implement our    preted. We also show the mapping of sub-instructions
+agents using PyTorch (Paszke et al., 2019) and the    to waypoints utilizing FG-R2R for this episode.
+Habitat simulator (Savva et al., 2019). We build
+our code on top of the VLN-CE codebase3 and use
+                                                 path performs better than the base model super-the same set of hyper-parameters as used in the
+                                                    vised with the goal-oriented path, across all metricsVLN-CE paper. The ﬁrst phase of training with
+                                                      in both validation seen and unseen environments.teacher forcing on the 150k augmented trajectories
+                                We observe the same trend in the Waypoint Ac-took ∼60 hours to train, while the second phase
+                                                curacy (WA) metric that we introduced. Table 2of training with DAgger on the original 4475 tra-
+                                            shows that agents perform similarly even when wejectories took ∼36 hours over two NVIDIA V100
+                                                vary the number of waypoints for the language-GPUs.
+                                                  aligned path supervision, since all of them essen-Ablations. We study the effect of varying the den-
+                                                              tially follow the path. This could be due to rel-sity of language-aligned waypoints on model per-
+                                                       atively short trajectory length in the R2R datasetformance. For all the ablations we use the CMA
+                                                   (average of 10m) making LAW pano denser thanmodel described in Section 3. We use LAW # to
+                                              needed for the instructions. To check this, we ana-distinguish among the ablations. On one end of the
+                                                    lyze the sub-instruction data and ﬁnd that one sub-density spectrum, we have the base model which is
+                                                       instruction (e.g. ‘Climb up the stairs’) often mapssupervised with only the goal (LAW#1 or goal).
+                                                        to several pano waypoints, suggesting fewer way-On the other end is LAW step which refers to
+                                                      points are sufﬁcient to specify the language-alignedthe pre-computed dense path from the VLN-CE
+                                                      path. For such paths, we ﬁnd that the LAW #4 isdataset and can be thought of as the densest su-
+                                                          better than the LAW pano (see supplement for de-pervision available to the agent. In the middle of
+                                                                     tails). Figure 3 further analyzes model performancethe spectrum, we have LAW pano, which uses the
+                                           by grouping episodes based on similarity betweennavigational nodes (an average of 6 nodes) from the
+                                                    the goal-oriented shortest path and the language-R2R dataset. We also sample equidistant points on
+                                                   aligned path in the ground truth trajectories (mea-the language-aligned path to come up with LAW#2,
+                                                 sured by nDTW). We ﬁnd that the LAW modelLAW#4 and LAW#15 containing two, four and ﬁf-
+                                               performs better than the goal-oriented model, es-teen waypoints, respectively. The intuition is that
+                                                      pecially on episodes with dissimilar paths (lowerLAW pano takes the agent back to the language-
+                                  nDTW) across both the nDTW and Waypoint Ac-aligned path some distance ahead of its position,
+                                                 curacy metrics.while LAW step brings it directly to the path.
+Quantitative Results.  In Table 1, we see that    Qualitative Analysis. To interpret model perfor-
+LAW pano, supervised with the language-aligned   mance concretely with respect to path alignment
+                                     we use the FG-R2R data, which contains mapping
+  3https://github.com/jacobkrantz/VLN-CE    between sub-instructions and waypoints. Figure 4
+                                        4021
+
+===== PDF PAGE 5 =====
+                                         Val-Seen                              Val-Unseen
+             Training
+                      SR↑  SPL↑  nDTW↑  sDTW↑  WA↑    SR↑  SPL↑  nDTW↑  sDTW↑  WA↑
+
+          goal           0.34   0.32     0.54      0.29    0.48     0.29   0.27     0.50      0.24    0.41
+        LAW pano     0.40   0.37     0.58      0.35    0.56     0.35   0.31     0.54      0.29    0.47
+
+Table 1:  Goal only vs language-aligned waypoint (LAW) supervision. LAW pano performs better than goal
+across all metrics, including the instruction-following metrics, nDTW and Waypoint Accuracy. This suggests that
+language-aligned supervision encourages the agent to follow instructions better than goal-oriented supervision.
+
+
+                             Distance                Val-Seen                        Val-Unseen
+       LAW        between
+                            waypoints    SR↑  SPL↑  nDTW↑  sDTW↑    SR↑  SPL↑  nDTW↑  sDTW↑
+
+           #2         5.00m      0.39   0.36     0.57      0.34       0.33   0.30     0.52      0.28
+           #4         2.50m      0.35   0.33     0.54      0.30       0.34   0.31     0.53      0.29
+         pano (6)   2.00m      0.40   0.37     0.58      0.35       0.35   0.31     0.54      0.29
+           #15        0.60m      0.34   0.32     0.54      0.29       0.33   0.30     0.52      0.28
+         step      0.25m      0.37   0.35     0.57      0.32       0.32   0.30     0.53      0.27
+
+Table 2: Varying density of language-aligned supervision from very sparse (#2) to dense (step). This study
+shows that with varying density of the language-aligned waypoint supervision, the agent performs similarly, since
+all of them essentially follow the same path.
+
+
+contrast the agent trajectories of the LAW pano    sub-instructions in the input natural language. We
+and goal-oriented agents on an unseen scene. We    believe that our results show that LAW is a simple
+observe that the path taken by the LAW agent con-   but useful strategy to improving VLN-CE.
+forms more closely to the instructions (also indi-
+                                          Acknowledgements  We thank Jacob Krantz for
+cated by higher nDTW). We present more examples
+                                                      the VLN-CE code on which this project was based,
+in the supplement.
+                                                   Erik Wijmans for initial guidance with reproducing
+Additional Experiments. We additionally exper-
+                                                    the original VLN-CE results, and Manolis Savva
+iment with mixing goal-oriented and language-
+                                                       for discussions and feedback. We also thank the
+oriented losses while training, but observe that they
+                                         anonymous reviewers for their suggestions and
+fail to outperform the LAW pano model. The best
+                                                 feedback.  This work was funded in part by a
+performing mixture model achieves 53% nDTW in
+                                          Canada CIFAR AI Chair and NSERC Discovery
+unseen environment, as compared to 54% nDTW
+                                                   Grant, and enabled in part by support provided by
+for LAW pano (see supplement). Moreover, we
+                                             WestGrid and Compute Canada.
+perform a set of experiments on the recently in-
+troduced VLN-CE RxR dataset and observe that
+language-aligned supervision is better than goal-   References
+oriented supervision for this dataset as well, with
+                                                          Peter Anderson, Angel Chang, Devendra Singh Chap-
+LAW step showing a 6% increase in WA and 2%                                                                            lot, Alexey Dosovitskiy, Saurabh Gupta, Vladlen
+increase in nDTW over goal on the unseen envi-      Koltun, Jana Kosecka,  Jitendra Malik, Roozbeh
+ronment. We defer the implementation details and      Mottaghi, and Manolis Savva. 2018a. On evalua-
+                                                                tion of embodied navigation agents. arXiv preprintresults to the supplement.
+                                                        arXiv:1807.06757.
+
+5  Conclusion                                       Peter  Anderson,  Ayush  Shrivastava,  Devi  Parikh,
+                                                Dhruv Batra, and Stefan Lee. 2019. Chasing ghosts:
+We show that instruction following during the VLN       Instruction following as bayesian state tracking. In
+                                                   Advances in neural information processing systems.task can be improved using language-aligned su-
+pervision instead of goal-oriented supervision as    Peter Anderson, Qi Wu, Damien Teney, Jake Bruce,
+commonly employed in prior work. Our quantita-     Mark Johnson, Niko Sünderhauf, Ian Reid, Stephen
+tive and qualitative results demonstrate the beneﬁt      Gould, and Anton van den Hengel. 2018b. Vision-
+                                                       and-language  navigation:   Interpreting  visually-
+of the LAW supervision. The waypoint accuracy                                                    grounded navigation instructions in real environ-
+metric we introduce also makes it easier to inter-      ments. In Proc. of Conference on Computer Vision
+pret how agent navigation corresponds to following      and Pattern Recognition (CVPR).
+                                        4022
+
+===== PDF PAGE 6 =====
+Angel Chang, Angela Dai, Thomas Funkhouser, Ma-   Jacob Krantz, Erik Wijmans, Arjun Majumdar, Dhruv
+   ciej Halber, Matthias Niebner, Manolis Savva, Shu-       Batra, and Stefan Lee. 2020.  Beyond the Nav-
+   ran Song, Andy Zeng, and Yinda Zhang. 2017. Mat-      Graph:  Vision-and-Language Navigation in Con-
+   terport3D: Learning from RGB-D data in indoor en-      tinuous  Environments.    In  Proc.  of European
+  vironments. In Proc. of International Conference on      Conference on Computer Vision (ECCV).
+  3D Vision (3DV).
+                                                   Alexander Ku, Peter Anderson, Roma Patel, Eugene
+Howard Chen, Alane Suhr, Dipendra Misra, Noah        Ie,  and Jason  Baldridge. 2020.   Room-across-
+   Snavely, and Yoav Artzi. 2019.  Touchdown: Nat-      room: Multilingual vision-and-language navigation
+   ural language navigation and spatial reasoning in vi-      with dense spatiotemporal grounding.  In Proc. of
+   sual street environments. In Proc. of Conference on       the conference on empirical methods in natural
+  Computer Vision and Pattern Recognition (CVPR).       language processing (EMNLP).
+
+Kevin Chen, Junshen K Chen, Jo Chuang, Marynel                                                 Chih-Yao Ma, Jiasen Lu, Zuxuan Wu, Ghassan Al-
+  Vázquez, and Silvio Savarese. 2021.   Topolog-                                                         Regib,  Zsolt  Kira,  Richard  Socher,  and Caim-
+   ical Planning with Transformers for Vision-and-                                                          ing  Xiong.  2019.    Self-monitoring  navigation
+  Language Navigation.  In Proc. of Conference on                                                         agent  via  auxiliary  progress  estimation.     In
+  Computer Vision and Pattern Recognition (CVPR).                                                           Proc.  of  International  Conference on  Learning
+                                                          Representations (ICLR).Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li,
+  and Li Fei-Fei. 2009. Imagenet: A large-scale hier-
+                                                 Harsh Mehta, Yoav Artzi, Jason Baldridge, Eugene Ie,   archical image database. In Proc. of Conference on
+                                                   and Piotr Mirowski. 2020. Retouchdown: Adding  Computer Vision and Pattern Recognition (CVPR).
+                                                Touchdown to StreetLearn as a shareable resource
+Daniel  Fried, Ronghang Hu,  Volkan  Cirik, Anna       for language grounding tasks in street view.   In
+  Rohrbach, Jacob Andreas, Louis-Philippe Morency,      Proc. of the Third International Workshop on Spatial
+  Taylor Berg-Kirkpatrick, Kate Saenko, Dan Klein,     Language Understanding.
+  and Trevor Darrell. 2018. Speaker-follower models
+   for vision-and-language navigation. In Advances in   Adam Paszke, Sam Gross, Francisco Massa, Adam
+   neural information processing systems.                    Lerer, James Bradbury, Gregory Chanan, Trevor
+                                                              Killeen, Zeming Lin, Natalia Gimelshein, and Luca
+Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian       Antiga. 2019.  Pytorch: An imperative style, high-
+  Sun. 2016. Deep residual learning for image recog-      performance deep learning library. In Advances in
+   nition. In Proc. of Conference on Computer Vision       neural information processing systems.
+  and Pattern Recognition (CVPR).
+                                                            Jeffrey Pennington, Richard Socher, and Christopher D
+Yicong Hong, Cristian Rodriguez-Opazo, Qi Wu, and      Manning. 2014. Glove: Global vectors for word rep-
+  Stephen Gould. 2020. Sub-instruction aware vision-       resentation. In Proc. of the conference on empirical
+  and-language navigation. In Proc. of the conference      methods in natural language processing (EMNLP).
+  on empirical methods in natural language processing
+  (EMNLP).                                       Yuankai Qi, Zizheng Pan, Shengping Zhang, Anton
+                                                    van den Hengel, and Qi Wu. 2020.  Object-and-
+Ronghang Hu, Daniel Fried, Anna Rohrbach, Dan                                                             action aware model  for visual language naviga-
+   Klein, Trevor Darrell, and Kate Saenko. 2019. Are                                                                    tion. In Proc. of European Conference on Computer
+  You Looking? Grounding to Multiple Modalities in                                                         Vision (ECCV).
+  Vision-and-Language Navigation.  In Proc. of the
+  Conference of the Association for Computational                                                    Stéphane Ross, Geoffrey Gordon, and Drew Bagnell.
+   Linguistics (ACL).                                                       2011. A reduction of imitation learning and struc-
+                                                            tured prediction to no-regret online learning.   InGabriel Ilharco, Vihan Jain, Alexander Ku, Eugene Ie,
+                                                           Proc. of the International Conference on Artiﬁcial  and Jason Baldridge. 2019. General evaluation for
+                                                               Intelligence and Statistics (AISTATS).   instruction conditioned navigation using dynamic
+  time warping. arXiv preprint arXiv:1907.05446.
+                                                  Manolis   Savva,   Abhishek  Kadian,   Oleksandr
+Vihan Jain, Gabriel Magalhaes, Alexander Ku, Ashish      Maksymets, Yili Zhao, Erik Wijmans, Bhavana Jain,
+  Vaswani, Eugene  Ie, and Jason Baldridge. 2019.       Julian Straub, Jia Liu, Vladlen Koltun, and Jitendra
+  Stay on the path: Instruction ﬁdelity in vision-and-      Malik. 2019. Habitat: A platform for embodied AI
+  language navigation.  In Proc. of the Conference       research.  In Proc. of International Conference on
+   of the Association for Computational Linguistics      Computer Vision (ICCV).
+  (ACL).
+                                           Hao Tan, Licheng Yu, and Mohit Bansal. 2019. Learn-
+Jacob Krantz, Aaron Gokaslan, Dhruv Batra, Stefan       ing to navigate unseen environments: Back trans-
+   Lee, and Oleksandr Maksymets. 2021.  Waypoint       lation with environmental dropout.   In Proc. of
+  Models for Instruction-guided Navigation in Con-      the Conference of the North American Chapter
+   tinuous Environments.   In Proc. of International       of the Association for Computational Linguistics
+  Conference on Computer Vision (ICCV).             (NAACL).
+                                        4023
+
+===== PDF PAGE 7 =====
+Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob
+   Uszkoreit, Llion Jones, Aidan N Gomez, Łukasz
+   Kaiser, and Illia Polosukhin. 2017.   Attention is
+   all you need.  In Advances in neural information
+   processing systems, volume 30, pages 5998–6008.
+
+Xin Wang, Qiuyuan Huang, Asli Celikyilmaz, Jian-
+  feng  Gao,  Dinghan  Shen,  Yuan-Fang  Wang,
+  William Yang Wang, and Lei Zhang. 2019.  Re-
+   inforced cross-modal matching and self-supervised
+   imitation learning for vision-language navigation.
+   In Proc. of Conference on Computer Vision and
+   Pattern Recognition (CVPR).
+
+Erik Wijmans, Abhishek Kadian, Ari Morcos, Ste-
+   fan Lee, Irfan Essa, Devi Parikh, Manolis Savva,
+  and Dhruv Batra. 2020. DD-PPO: Learning near-
+   perfect pointgoal navigators from 2.5 billion frames.
+   In Proc. of International Conference on Learning
+   Representations (ICLR).
+
+Wang Zhu, Hexiang Hu, Jiacheng Chen, Zhiwei Deng,
+  Vihan Jain, Eugene Ie, and Fei Sha. 2020.  Baby-
+  Walk: Going farther in vision-and-language naviga-
+   tion by taking baby steps. In Proc. of the Conference
+   of the Association for Computational Linguistics
+  (ACL).
+
+
+
+
+
+                                        4024
+
+===== PDF PAGE 8 =====
+A  Appendix                              on ImageNet (Deng et al., 2009) and a modiﬁed
+                                           ResNet50 trained on point-goal navigation (Wij-
+A.1  Glossary
+                                          mans et al., 2020) respectively. It also takes as input
+Some commonly used terminologies in this work    the GLoVE (Pennington et al., 2014) embeddings
+are described here:                                   for the tokenized words in the language instruc-
+                                                        tion and pass them through a bi-directional LSTM
+    • LAW refers to language-aligned waypoints
+                                                      to obtain their feature representations. The CMA
+    such that the navigation path aligns with the
+                                          model consists of two recurrent (GRU) networks.
+     language instruction.
+                                          The ﬁrst GRU encodes a history of the agent state,
+                                             which is then used to generate attended instruction    • nav-graph refers to the discrete navigation
+                                                          features. These attended instruction features are in    graph of a scene.
+                                                      turn used to generate visual attentions. The second
+    • pano refers to the reference paths constructed  GRU takes in all the features generated thus far
+    by taking the discrete nav-graph nodes corre-    to predict an action. The attention used here is a
+    sponding to positions of panoramic cameras    scaled dot-product attention (Vaswani et al., 2017).
+     in the R2R dataset.
+                                            A.4  Full Evaluation
+    • step refers to the reference paths constructed                                                 A.4.1  Metrics
+    by taking the shortest geodesic distance be-
+                                  We report the full evaluation of the models here on
+    tween the pano paths to create dense way-
+                                                     the standard metrics for VLN such as:
+     points corresponding to an agent step size of
+                                                Trajectory Length (TL): agent trajectory length.
+    0.25m.
+                                               Navigation Error (NE): distance from agent to
+    • ‘shortest’ refers to the goal-oriented path, i.e,   goal at episode termination.
+     the shortest path to the goal.                  Success Rate (SR): rate of agent stopping within
+                                                 a threshold distance (around 3 meters) of the goal.
+    • goal refers to the model supervised with                                             Oracle Success Rate (OS): rate of agent reaching
+     only the goal.                                                  within a threshold distance (around 3 meters) of
+                                                     the goal at any point during navigation.
+A.2  Analysis of VLN-CE R2R path
+                                               Success weighted by inverse Path Length (SPL):
+We analyze the similarity of the VLN-CE R2R    success weighted by trajectory length relative to
+reference path to the shortest path using nDTW.    shortest path trajectory between start and goal.
+We ﬁnd that ∼6% of episodes (including training   Normalized dynamic-time warping (nDTW):
+and validation splits), have nDTW(shortest, LAW    evaluates how well the agent trajectory matches
+step) < 0.8.                                       the ground truth trajectory.
+  Figure 5 shows the distribution of nDTW of   Success weighted by nDTW (SDTW): nDTW,
+the ground truth trajectories (LAW step) against    but calculated only for successful episodes.
+the shortest path (goal-oriented action sensor) and
+LAW pano (language-aligned action sensor).  It    A.4.2  Quantitative Results
+shows that the two distributions are different and  We observe that the models in the ablation (LAW
+that the language-aligned sensor will be much   #2 to LAW step in Table 3) perform similarly,
+closer to the ground truth trajectories. Figure 6   which could be due to the fact that the average tra-
+shows percentage of unseen episodes binned by    jectory length in the R2R dataset is around 10m and
+nDTW value of reference path to shortest path,   the LAW pano is actually denser than the agent
+which helps us analyze our model performance as   needs to follow instructions. We analyze this by
+shown in Figure 3 (main paper). Additionally, we    using the sub-instruction data and ﬁnd that one sub-
+visualize a few such paths to see how dissimilar    instruction often maps to several pano waypoints
+they are in Figure 7.                             and the language-aligned path can be explained via
+                                               fewer waypoints. We show some such examples
+A.3 CMA Model                                             from the dataset in Figure 8. We also report the re-
+The Cross-Modal Attention (CMA) Model takes    sults on the R2R test split in Table 4, which shows
+the input RGB and depth observations and encode    that LAW pano performs better on OS, while per-
+them using a ResNet50 (He et al., 2016) pre-trained   forming similarly to goal on SR and SPL metrics.
+                                        4025
+
+===== PDF PAGE 9 =====
+                      Train                            Val-Seen                         Val-Unseen
+    Sensor
+        Goal-oriented
+
+   Sensor
+        Language-aligned
+
+                                 nDTW (shortest,LAW step)
+
+
+Figure 5: Plots showing a distribution of the number of R2R episodes across different nDTW values of reference
+path to shortest path for train, val-seen and val-unseen splits. There are many episodes for which the goal-oriented
+shortest path does not match the language-aligned path, as generated by the goal-oriented action sensor (top). We
+mitigate this problem by using language-aligned action sensor (bottom).
+
+
+                 Distance                          Val-Seen                                              Val-Unseen
+ LAW        between
+                waypoints  TL↓  NE↓  OS↑  SR↑  SPL↑  nDTW↑  sDTW↑  WA↑  TL↓  NE↓  OS↑  SR↑  SPL↑  nDTW↑  sDTW↑  WA↑
+
+  #1(goal)   10m    9.06   7.21   0.44   0.34   0.32     0.54      0.29    0.48   8.27   7.60   0.36   0.29   0.27     0.50      0.24    0.41
+
+  #2        5m     9.39   6.76   0.47   0.39   0.36     0.57      0.34    0.51   8.57   7.41   0.39   0.33   0.30     0.52      0.28    0.44
+  #4          2.5m    9.08   6.94   0.47   0.35   0.33     0.54      0.30    0.49   8.57   7.01   0.41   0.34   0.31     0.53      0.29    0.44
+ pano      2m     9.34   6.35   0.49   0.40   0.37     0.58      0.35    0.56   8.89   6.83   0.44   0.35   0.31     0.54      0.29    0.47
+  #15         0.6m    9.51   7.16   0.45   0.34   0.32     0.54      0.29    0.50   8.71   7.05   0.41   0.33   0.30     0.52      0.28    0.44
+ step      0.25m   9.76   6.35   0.49   0.37   0.35     0.57      0.32    0.50   9.06   6.81   0.40   0.32   0.30     0.53      0.27    0.44
+
+Table 3: LAW pano model supervised with language-aligned waypoints performs better than the same model
+supervised with goal-oriented path, i.e. the shortest path to the goal. All models supervised with language-aligned
+path, but with varying density, perform similarly.
+
+
+                                     Test                   A.4.3  Qualitative Analysis       Training
+                 TL↓  NE↓  OS↑  SR↑  SPL↑         Table 5 shows a qualitative interpretation of some
+     goal           8.85   7.91   0.36   0.28   0.25       R2R unseen episodes for the two models goal and
+    LAW pano     9.67   7.69   0.38   0.28   0.25
+                             LAW pano, along with the sub-instruction data
+Table 4:  Evaluating LAW pano on the VLN-CE test   from the FG-R2R dataset. We see that LAW pano
+split gives us an increase in OS, although the SR and     is able to get more number of waypoints (and hence
+SPL is same as the goal.                               sub-instructions) correct than the goal model. We
+                                                      report the Waypoint Accuracy metric at threshold
+                                                    distances of 0.5m and 1.0m for the same. It also
+                                           shows that Waypoint Accuracy is more intuitive
+However, since the VLN-CE leaderboard4 does                                                  than nDTW in terms of interpreting what fraction
+not report the instruction-following metrics, nDTW                                                    of waypoints the agent is able to predict correctly.
+and sDTW, we could not report how well the LAW
+pano agent follows instructions on the test set.                                            A.5  Mixing goal-oriented and
+                                                     language-oriented losses
+
+                                We experiment with mixing goal-oriented loss
+    4https://eval.ai/web/challenges/challenge-page/719        (G) and language-oriented loss (L) during training
+                                        4026
+
+===== PDF PAGE 10 =====
+CMA + goal                            CMA + LAW pano
+
+ nDTW=0.52, WA@0.5m=0.4, WA@1.0m=0.8                 nDTW=0.98, WA@0.5m=1.0, WA@1.0m=1.0
+ 1→4 Walk straight through the living room towards the stairs.     1→4 Walk straight through the living room towards the stairs.
+ 4→5 Go to the right of the stairs towards the dining area        4→5 Go to the right of the stairs towards the dining area
+ 5→5 and wait by the leather chair at the entry to the dining room.  5→5 and wait by the leather chair at the entry to the dining room.
+
+ nDTW=0.15, WA@0.5m=0.4, WA@1.0m=0.6                 nDTW=0.74, WA@0.5m=0.8, WA@1.0m=1.0
+ 1→3 Walk straight into the kitchen area.                  1→3 Walk straight into the kitchen area.
+ 3→4 Turn left and exit the kitchen                     3→4 Turn left and exit the kitchen
+ 4→5 and stop there.                              4→5 and stop there.
+
+ nDTW=0.26, WA@0.5m=0.2, WA@1.0m=0.2                 nDTW=0.95, WA@0.5m=1.0, WA@1.0m=1.0
+ 1→4 Go to exit of writing room.  (1 correct)               1→4 Go to exit of writing room.
+ 4→5 Stop between pillars.                          4→5 Stop between pillars.
+
+Table 5: We analyse model performance on sub-instruction data (2020). CMA + LAW pano (right) correctly
+predicts more sub-instructions compared to CMA + goal (left). Mapping between sub-instruction and waypoints
+is indicated by start and end waypoint indices. Green and Red indicate correct and incorrect prediction respec-
+tively. WA@0.5m and WA@1.0m indicate Waypoint Accuracy measured at a threshold distance of 0.5m and 1.0m
+respectively from the waypoint.
+
+
+
+
+                                                                                                    nDTW(shortest,LAW step) = 0.72   nDTW(shortest,LAW step) = 0.50  nDTW(shortest,LAW step) = 0.44
+
+   episodes
+ of
+%                                                    Figure 7: Visualization of a few R2R unseen episodes
+                                                     with nDTW(shortest,LAW step)< 0.8 shows us how
+                                                            dissimilar the goal-oriented shortest path (red) and the
+                                                       language-aligned path (blue) are.
+              nDTW (shortest, LAW step)
+
+Figure 6: Plot showing percentage of episodes in R2R   Across-Room (RxR) dataset that consists of new
+unseen dataset binned by nDTW value of reference    trajectories designed to not match the shortest path
+path to shortest path. The lower nDTW values indicate   between start and goal. Importantly, they do not
+episodes for which the goal-oriented shortest path does                                              have a bias on the path length itself. The RxR
+not match language-aligned path.
+                                                     dataset is 10x larger than R2R and consists of
+                                                  longer trajectories and instructions in three lan-
+to further understand the contribution language-   guages, English, Hindi, and Telugu. Both the R4R
+oriented supervision. We pre-trained with G using   and RxR datasets are on the discrete nav-graph set-
+teacher forcing and then ﬁne-tuned with (a) only    ting. However, the RxR dataset has been recently
+L, (b) L+G, (c) randomly chosen L or G, using    ported to the continuous state space of the VLN-CE
+                                                         for the RxR-Habitat challenge at CVPR 20215. WeDAgger. The results as reported in Table 6 show
+that none of the models outperform LAW pano,   experiment on the VLN-CE RxR to further investi-
+indicating that training with mixed losses fail to    gate if language-aligned supervision is better than
+perform as well as training with only language-   goal-oriented supervision on a dataset other than
+oriented loss.                               R2R.
+                                            Model. We build our experiments on the model
+A.6  Evaluation on VLN-CE RxR dataset         architecture provided for the VLN-CE RxR Habitat
+                                                    challenge. The only difference in the CMA archi-Dataset.  Beyond the R2R dataset,  there ex-
+                                                         tecture in VLN-CE RxR from the one used in VLN-ist VLN datasets where the aim is to have the
+                                 CE is that they use pre-computed BERT featureslanguage-aligned path not be the shortest path.
+                                                      for the language instructions instead of GLoVEJain et al. (2019) proposed the Room-for-Room
+(R4R) dataset by combining paths from R2R. More      5https://github.com/jacobkrantz/
+recently, Ku et al. (2020) introduced the Room-   VLN-CE/tree/rxr-habitat-challenge
+                                        4027
+
+===== PDF PAGE 11 =====
+                                Val-Seen                                  Val-Unseen
+  Training
+           OS↑  SR↑  SPL↑  nDTW↑  sDTW↑  WA↑  OS↑  SR↑  SPL↑  nDTW↑  sDTW↑  WA↑
+
+ LAW pano   0.49   0.40   0.37     0.58      0.35    0.56   0.44   0.35   0.31     0.54      0.29    0.47
+
+ G−→L        0.49   0.36   0.34     0.56      0.32    0.56   0.40   0.32   0.29     0.51      0.27    0.47
+ G−→G+L     0.46   0.34   0.31     0.57      0.30    0.55   0.38   0.27   0.25     0.51      0.23    0.45
+  G−→G-or-L   0.45   0.35   0.34     0.55      0.31    0.51   0.41   0.32   0.29     0.53      0.27    0.46
+
+Table 6:  Experiments show that models trained with a mixture of goal-oriented (G) and language-oriented (L)
+superivision underperforms the model trained with only our language-oriented loss.
+
+
+                                      Val-Seen                                               Val-Unseen
+  Training
+            TL↓  NE↓  OS↑  SR↑  SPL↑  nDTW↑  sDTW↑  WA↑  TL↓  NE↓  OS↑  SR↑  SPL↑  nDTW↑  sDTW↑  WA↑
+
+ goal        4.55  12.01   0.14   0.06   0.05     0.34      0.05    0.28   4.03  11.00   0.16   0.06   0.05     0.36      0.05    0.27
+ LAW pano   6.27  12.07   0.17   0.09   0.09     0.35      0.08    0.31   4.62  11.04   0.16   0.10   0.09     0.37      0.08    0.28
+ LAW step   7.92  11.94   0.20   0.07   0.06     0.36      0.06    0.35   4.01  10.87   0.21   0.08   0.08     0.38      0.07    0.33
+
+Table 7: Experiments on the recently released RxR-Habitat benchmark (English language split) show that LAW
+methods outperform the goal, with LAW step having a 6% increase in WA and 2% increase in nDTW over
+goal on unseen environment. This indicates that our idea of language-aligned supervision is useful beyond R2R.
+
+
+
+
+
+              R2R waypoints                                               Explainable with fewer waypoints
+            1    2    3    4 Go straight past the pool.                      (  1    2    )          R2R experiments and does not have the DAgger
+                      4    5  Walk between the bar and chairs.                (  2    3    )
+                      5    6  Stop when you get to the corner of the bar.   (  3    4    )              ﬁne-tuning phase.
+                      6    6  That's where you will wait.                          (  4    4    )              Results. Table 7 shows the results of our exper-
+                                                   iments. We observe that the LAW methods out-
+                               6    5
+                                        4
+                                               3                         perform the goal, with LAW step showing a
+                                                         2 1              6% increase in WA and 2% increase in nDTW
+                                          on the unseen environment.  This indicates that
+                                                                      6   5                                    6   5  6   5
+                                                                              4                                            4          4                                                                                    3           language-aligned supervision is useful beyond the                                                  3                3
+                                                           2 1                         2 1                                                                                            2 1    R2R dataset.                                                                       LAW pano                                          LAW #4            LAW #2
+                                                                                     nDTW=0.70,                                                                                            WA=0.5                                                nDTW=0.92,                                                         WA=1.0         nDTW=0.77,                   WA=0.7
+
+Figure 8: Top: Analysis of the R2R dataset along with
+the FG-R2R shows that one sub-instruction often maps
+to several pano waypoints and can be explained via
+fewer waypoints.
+Bottom: The above path can be deﬁned via 4 waypoints
+and evaluating the episode with the different model
+variations shows that LAW #4 (supervising with 4 way-
+points) performs the best.
+
+
+
+embeddings. We vary the nature of supervision as
+before. The goal model receives goal-oriented
+supervision, whereas the LAW pano and LAW
+step are supervised with language-aligned pano
+and step waypoints, respectively. The baseline
+model in the VLN-CE RxR codebase also follows
+the step supervision.
+Training. We train the methods with teacher forc-
+ing as was done in the baseline model in the VLN-
+CE RxR Habitat challenge. However, we used only
+the RxR English language split for both training
+and evaluating our models. Note that the train-
+ing regime here is different from that of our main
+                                        4028

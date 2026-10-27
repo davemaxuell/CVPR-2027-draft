@@ -1,0 +1,272 @@
+[
+  {
+    "id": "psgnav",
+    "title": "PSG-Nav: Probabilistic Scene Graph Navigation via Multiverse Decision Making",
+    "authors": [
+      "Rufeng Chen",
+      "Yue Chang",
+      "Xiaqiang Tang",
+      "Hechang Chen",
+      "Sihong Xie"
+    ],
+    "year": 2026,
+    "venue": "ICML2026, PMLR306masthead",
+    "source": "https://arxiv.org/abs/2606.01313",
+    "pages": "1,3–8",
+    "problem": "Continualopen-vocabularyObjectNav underambiguousdetections. PosedRGBD,GLIP/GroundedSAM,occupancy,500steps,1mvisiblegoal; notR2Rrouteinstruction. Adaptivevariantusesgroundtruthterminalsuccessacrossvalidationepisodes, unlikefixedzero-shotbaselines.",
+    "method": "§3 Eqs1–3 objectcounts n_t=n_(t−1)+onehotlabel, normalizedcategoricalbelief; groupconfigurationprobabilityproductofobjectmarginals assumesindependence. Retain topKg combinations;LLMprunescommonsenseconflicts; roomlevelrepeats. Three sampled'deterministicworlds' drivepairwiseLLMlandmarkpreferences. GVG/frontierscarryspatialunknowncoverage/(πr²) andsumproximalobjectentropy; U_gain=I_spatial+I_sem; pruneU<.1. Semanticentropyisnotexpectedinformationgainbecause nofutureobservationlikelihood/expectedposterioriscomputed. Score=averagepairwisewinrateacrossworlds +.5U(Eqs4–8),Qwen2.5-7B. EEC storespositive/negativegoalcontexts(visualcrop,groupsemantic,roomdistribution); similarity=cosvisual+w1cosgroup+w2(1−JSDroom), S_final=S_det+maxpos−2maxneg;stopif>.61(Eqs9–10). This scoreisnotprobabilitycalibration. BanksupdatefromGTfeedback aftereachvalidationepisode,capacity10;evictmostaveragesimilarentry(Eq11). No gradienttraining but persistent labeledexperience. Independence,repeat-vote correlationandLLMhardpruning canmisrepresentuncertainty; unusuallayoutisnotlogicalimpossibility.",
+    "novelty": "Fullcategoricalsemanticmemory, world-conditionedpairwisereasoning andpositive/negativecontextverification forObjectNav. Negativeexperienceanduncertainty-awareexplorationmustcite it. PolarMemusesnegativeconceptretrieval; PSG-Navusesgoal-instancefeedback andspatialcontext. Its'calibrator'isretrievalscoreadjustment,notconformalorprobabilityguarantee.",
+    "results": "Table1correctdatasetorderHM3D66.1SR/32.1SPL,MP3D44.8/17.9,HSSD67.9/33.4; abstractlistsMP3D/HM3Doppositeorderbeforethesevalues. FixednoEEC63.5HM3DbelowASCENT65.4;adaptive66.1hasextrafeedback. Table2withoutprobgraph58.4,withoutgroups58.8;Table3K1→3 63.3→66.1. EECadds2.6SR. Evidence supportsusefuluncertaintyrepresentation butnotgloballyoptimaldecision or calibratedbelief. Episodeorder/reset/groundtruthavailabilitymustbereported.",
+    "bottlenecks": [
+      {
+        "id": "PSG-1",
+        "description": "Adaptation relies on labeled test outcomes and commonsense filters can reject valid unusual scenes",
+        "conditions": "Continualdeployment withoutoraclefeedback; atypicalroomlayouts",
+        "cause": "Success/failurebanks requireGT; topKhardlogicalpruningonfallibleLLMpriors",
+        "evidence": "§3.4 lastparagraph,§4.1lifelongeval; Eq3",
+        "followups": "EvoNavalsooraclefeedback; PolarMemdoesnothaveGTbutperceptualnegativesunreliable; calibratedself-supervision remainsopen",
+        "kind": "Methodological / protocol",
+        "status": "Partially addressed / not established in matched setting",
+        "confidence": "Moderate"
+      }
+    ],
+    "key_findings": [
+      {
+        "claim": "MainadaptivebenchmarkretainsGT-labeledexperienceacrossvalidationepisodes",
+        "evidence_type": "Authorprotocol",
+        "source": "SuppliedPDF",
+        "locator": "§3.4/§4.1"
+      }
+    ],
+    "limitations": "NoObjectNavrun. Staticmemorywarm-up,appendixparametersandepisodeorderstillrequireinspection."
+  },
+  {
+    "id": "r3",
+    "title": "Run, Ruminate, and Regulate: A Dual-process Thinking System for Vision-and-Language Navigation",
+    "authors": [
+      "Yu Zhong",
+      "Zihao Zhang",
+      "Rui Zhang",
+      "Lingdong Huang",
+      "Haihan Gao",
+      "Shuo Wang",
+      "Da Li",
+      "Ruijian Han",
+      "Jiaming Guo",
+      "Shaohui Peng",
+      "Di Huang",
+      "Yunji Chen"
+    ],
+    "year": 2026,
+    "venue": "AAAI2026copyright in suppliedarxivv1",
+    "source": "https://arxiv.org/abs/2511.14131",
+    "pages": "1,3–8",
+    "problem": "Usea trainedfastVLNexpert untilanomaly,thenpowerfulGPT4ocorrection. Itisnotentirelytraining-free: GridMMrunnerandGNNregulator aretrained. Discretegraph/pose/depthgiven; plansrestartfrominitiallocationin somecases.",
+    "method": "Methodology:RunnerGridMM~160M storesprojectedRGBDfeaturesinegocentricgridandusescrossmodaltransformer/FFN. Regulator checksmaxnodevisits>4, trajectorylength>20,orGNNanomalyscore>.35;twoedge-awaregraphattentionlayers useposition,lastvisit,visualembedding. Trainpseudo-labelsfromtrainandval-seentrajectories: nominal ifepisodeultimatelysucceeds ORallpastnodeslieonGTpath; otherwiseanomaly. Futureoutcomeisprivilegedlabelnotcausalleakatinference. Exactsupervisedlossnotdefinedinreviewedmaintext. StopalwaysverifiedbyGPT4owithinstruction/panorama. OnswitchGPT4oRuminator takesoverforrestofepisode(irreversible),sharedmemory,threepromptsperception→long-termplan→candidateaction. Criticalformulationmayrestartfromstartandresetmemory; returntravelcostmustbecountedforsameSPLprotocol. LLMisfrozen; runnerhasinheritedVLNtraining,scoringmodeladditionaltraining. Lackofregulatorequations/thresholdcalibrationsplitslimitsreproducibility.",
+    "novelty": "Anomaly-triggeredexpert/VLMhandoffandtrainedgraphfailurepredictor; MapGPTalreadygraphplans, earlydualprocessisnotgenericnoveltynowgivenAdaNav/AwareVLN. R3'shandoffisone-way,notperstepbidirectionalselectivethinking.",
+    "results": "Table1R2R77SR/66SPL,REVERIE53.76/42.14andRGSPL29.86. Runneronly51.37/36.47REVERIE;Ruminatoradds2.39SR/5.67SPL. Table2noscorer−2.05SR/−2.76SPL;nostopverifier−4.01RGSPL. MiniGPT4handoffworse thanrunner49.39SR/35.73SPL,showingwrongexpertchoicehurts. Sharedmemoryremoval−1.19SPL. SOTAcomparisonexcludesstrongerscaledSRDF; claimed'allmetrics'notliterallytrueforR2RTLandsomepriorNE. WallclockAPIversuslocalmodelcomparisonsmixdeploymentfactors.",
+    "code": "AdvertisedGitHubURI requires exactlinkverification: extractedtextshows navigation_R3-like suffix; initialnavigationURL404isnotproofthatcorrectrepositorydoesnotexist. Repositorydiscoverypending.",
+    "repository_status": "Advertised repository needs exact-link resolution",
+    "bottlenecks": [
+      {
+        "id": "R3-1",
+        "description": "One-way handoff and failure detection do not measure whether deliberation will improve decisions",
+        "conditions": "Strongrunner/weakVLM, falsepositiveanomalies, repeatedrecovery",
+        "cause": "Anomalyproxytrainedonpathmembership/outcomes,notcounterfactualgain; noreturntorunner",
+        "evidence": "Table3MiniGPT4worse thanrunner;Methodologyone-waytakeover",
+        "followups": "AdaNavlearnedgate,AwareVLNeventdata,SkillNavperstepspecialists; calibratedvalue-of-computation remainsunproven",
+        "kind": "Methodological / protocol",
+        "status": "Partially addressed / not established in matched setting",
+        "confidence": "Moderate"
+      }
+    ],
+    "limitations": "Noexecution. Restartcost/resetprotocol,exactrepoandscorertrainingdetails needadditionalverification."
+  },
+  {
+    "id": "rl4vla",
+    "title": "What Can RL Bring to VLA Generalization? An Empirical Study",
+    "authors": [
+      "Jijia Liu",
+      "Feng Gao",
+      "Bingwen Wei",
+      "Xinlei Chen",
+      "Qingmin Liao",
+      "Yi Wu",
+      "Chao Yu",
+      "Yu Wang"
+    ],
+    "year": 2025,
+    "venue": "NeurIPS2025; reviewedarxivv4Jan2026",
+    "source": "https://arxiv.org/abs/2505.19789",
+    "pages": "1,3–7",
+    "problem": "SystematicallycompareSFT/PPO/GRPO/DPOonvision,semanticandexecutiondistribution shiftsforOpenVLAmanipulation. FindingsaretransferhypothesesforVLN, notnavigationbenchmarkresults.",
+    "method": "§3 OpenVLAfusesSigLIP+DINOv2withLlama2-7B,singleimageH1,7Dend-effector/gripperaction quantized256binsbetween1st/99thpercentiles;action-onlyCE. RLobjectiveEΣγ^tr(s,l),policygradientAlogπ. ManiSkillWidowX8DoFpick-place uses640×480RGB+instruction,sparsestages.1correctgraspandhold,1successfulplacement. LoRA32allalgorithms. PPOsharedactorcritic:3layerMLPvaluefromfirstaction-tokenhiddenh0;GAEandclippedratios. 140demonstrationwarmuphalvesneededsteps;PPOepoch1bestwallclock. GRPO8rolloutsfromsameinitialstate andDPOreward-derivedtrajectorypreferences. Sharedcritic44.4GBvsseparate81.3GB and35%slower;singleA100~42hmainconvergence. SFTscaleup64Ktrajectories~1.26Mstepsplateaus~16K;3seedsSFTscale,2seedsRLdesignablations. Datasetheldoutobjects,receptacles,backgrounds,textures,positions,robotinitandmid-episodeobjectreposition isolateaxes.",
+    "novelty": "ControlledgeneralizationbenchmarkandpracticalPPOrecipe ratherthana newnavigationarchitecture. Strongcounterweightto claimsGRPOuniversallybestforembodiedpolicies. Authors'POMDP/nonstationarityexplanationisahypothesis: stateevolutiondoesnotitselfmakeMDPtransitionnonstationary.",
+    "results": "Figure3PPOoutperformsGRPO/DPOonthispick-place;Fig6SFTplateauandRLbetterOODobjects/tables. Abstract/overviewclaim strongestexecutiongains,moderatesemantic,similarvision; exactTable1generalizationnumbersnotyetread andnotinvented. Differenttasks/rewards/backbonesexplainwhythisdoesnotcontradictNavGRPOasareportedobservation. Memory44.4GBmeanslocal8GBGPUcannotreplicatetrainingrecipewithoutmajorchanges.",
+    "bottlenecks": [
+      {
+        "id": "RL4VLA-1",
+        "description": "RL's execution robustness does not imply visual or navigation semantic robustness",
+        "conditions": "Appearancechange, route-languagefollowing, partialhistory",
+        "cause": "On-policyinteractionlearnsrecoverybutrewarddoesnotguaranteeperceptualinvariance orinstructionfaithfulness",
+        "evidence": "Fig1and§4PPOvsGRPOsetting;single-tasksingle-imageformulation",
+        "followups": "NavGRPOstudiesgraphVLNwithdifferentreward; controlledmatchedoptimizer/rewardperturbationstudyneeded",
+        "kind": "Methodological / protocol",
+        "status": "Partially addressed / not established in matched setting",
+        "confidence": "Moderate"
+      }
+    ],
+    "limitations": "Manipulationonly. Fullgeneralizationresults/appendicespending;nocodeexecuted."
+  },
+  {
+    "id": "skillnav",
+    "title": "Breaking Down and Building Up: Mixture of Skill-Based Vision-and-Language Navigation Agents",
+    "authors": [
+      "Tianyi Ma",
+      "Yue Zhang",
+      "Zehao Wang",
+      "Parisa Kordjamshidi"
+    ],
+    "year": 2026,
+    "venue": "ACL2026longpapers",
+    "source": "https://aclanthology.org/2026.acl-long.595/",
+    "pages": "1,3–8",
+    "problem": "CompositionalgeneralizationbeyondR2Rinstructionstyles/environmentswithspecializedDUETexpertsandfrozenVLMrouting. Fiveexecutionexperts;temporalskillispretrainingdataandrouterreordering,notasixthruntimeexpert.",
+    "method": "§4 Eq1DUETπ(I,O,M). Synthesize450instruction-trajectorieseachfordirection,vertical,stop,landmark,region,plus2000temporal;4–7steppathsfilteredbyskillheuristics,GPT4ocaptions. Stage1DUETfine-tunesR2R+ScaleVLN(orSRDF)+temporalset;stage2eachspecialistfine-tunesits450set. ArchitectureCLIP-B16/BERTforScaleVLN;SRDFusesInternViT6B. RouterGPT4oreordersinstructiononce intoexecution-orderclauses(Eq2);Qwen2.5VL7Blocalizescurrentsubgoalusingvisualhistoryandpastsubgoals(Eqs3–4),selectsoneexpert(Eq5). Cruciallythechosenexpertreceivesoriginalinstruction,notrewrittenclause(Eq6). Thereforeinstructionrewritecontrolisessentialandmustpreserveoriginalexecutorinputwhenmatchingrouterreorder. Routerisfrozenprompted;expertlossinheritsDUETBC/DAgger(single-stepCE),exactweightsappendixF. Fullpolicyistrained,notzero-shot. FiveexpertsmemoryplusVLM/APIcalls remaincostevenoneactiveexpertperstep.",
+    "novelty": "Task-groundedNavNuances-derivedskills,smalltargetedsyntheticdataandspecialisttop1routing; closestSAME/MoEandplanner-executoragents. Explicittemporalreorderingandsemanticstagealignment alreadyoverlapproposedtextimportanceideas. Compareagainstsinglebackbonetrainedonuniondataandrewriting-only,randomrouting,oracle/learnedrouting.",
+    "results": "Table2ScaleVLN79/70→SkillNav83/77unseen,77/68→78/70test;SRDF84/78essentiallyunchangedandtestSR−.28absolute. GSA-N-SceneScale43→48SPL;SRDF43→45. RxRzero-shotScale26.8→30.3SR;SRDF21.4→31.8. RandomrouterGSA-N-Scene43.17SPLvsQwen47.96;reorderadds2.53SPL. Table5mixedskillagentlandmark48.90SRfarabovespecialist31.53,so'specialistseachexcel'notuniversal. Erroranalysis17failuresfindsvisualgroundingandtextpriorbias. R2Rheadroomclaimdoesnotsettlerobustcomposition.",
+    "bottlenecks": [
+      {
+        "id": "SKILL-1",
+        "description": "Router understands words but binds wrong visual entity or chooses coarser skill",
+        "conditions": "Clutteredscenes,landmark-heavyinstructions,unseenstyles",
+        "cause": "Textualpriors andunverifiedsubgoalcompletion dominate routing",
+        "evidence": "§5.3erroranalysis17cases;Table5mixedskilllandmark48.90vsspecialist31.53",
+        "followups": "ProFocusqueriesmissingvisualevidence;Progress-Think/IDEALalignment; groundedroutingstillnotresolvedbystyledecomposition",
+        "kind": "Methodological / protocol",
+        "status": "Partially addressed / not established in matched setting",
+        "confidence": "Moderate"
+      }
+    ],
+    "limitations": "DetailedappendixF/Ineededforroutercost,datafilter,17-caseanalysis; noexecution."
+  },
+  {
+    "id": "streamvln",
+    "title": "StreamVLN: Streaming Vision-and-Language Navigation via SlowFast Context Modeling",
+    "authors": [
+      "Meng Wei",
+      "Chenyang Wan",
+      "Xiqian Yu",
+      "Tai Wang",
+      "Yuqiang Yang",
+      "Xiaohan Mao",
+      "Chenming Zhu",
+      "Wenzhe Cai",
+      "Hanqing Wang",
+      "Yilun Chen",
+      "Xihui Liu",
+      "Jiangmiao Pang"
+    ],
+    "year": 2026,
+    "venue": "ICRA2026fromofficialproject/repo;reviewedarxivv2July2026",
+    "source": "https://arxiv.org/abs/2507.05240",
+    "pages": "1,3–7",
+    "problem": "RepeatedhistoryprefillmakesvideoVLAtoo slow; continuousstreamrequiresboundedrecentcontextandretainedhistory. DistinguishRGB-onlycorefromoptionaldepth/odometryvoxelpruning.",
+    "method": "§IIIinterleaved(observation,action)dialogues reuseKVwithinN8turnwindow. Windowenddiscardsnonobservationprompt/actionstates, samples8memoryframes;newwindowprefillmemorythenappendcurrentframe. Slowmemoryretainsvisualtokens,fastdialoguekeepsrecentfinegrainedcontext. Algorithm1backprojectsimagepatchesusingdepth/posesinto3Dvoxels,keepslatesttokenper(stridebin,voxel),dropsframeifretainedfraction<θ. No learnedtokenaveraging; spatial pruningis'inference-training-free' butbaseVLAtrained. LLaVA-Video7B/Qwen2two-stageSFT:oracleepochthenDAgger+generalVLepoch,128clipsbatch,language2e−5vision5e−6,~1500A100GPUh. Data450KMP3DR2R/EnvDrop/RxR,300KScaleVLN700HM3Dscenes,240KDAgger,248KVQA/ScanQA,230KMMC4. Predict4actions,avg.27splusnetwork.2sindoor/1soutdoor. Depth/odomonlyoptionalpruning variant,explicitTableIfootnote.",
+    "novelty": "StreamingdialogueKVreuseplusboundedvisualmemoryconsolidation, and3Dlatestpatchselection. NaVid/Uni-NaVidcompressfeaturesbutrepeatedlyrefreshLLMcontext; StreamVLNchangescausalpromptorganization. Notallhistoryinformationcanbepreservedunderfixed8framebudget.",
+    "results": "Reviewedv2TableIextra-dataRGB56.4SR/50.2SPLR2R,54.4/45.4RxR;PruneMem57.4/51.1and53.9/45.1. Maintextclaims56.9/51.9and52.9/46.0whichdonotmatchTableI; citeversion+table. TableIV2memoryframes37.3SR→8frames45.5,allhistory40.0. DatacontrolTableIII45.6oracle→50.8DAgger+VidQA→52.8MMC4→56.4Scale; architecturalgainnotisolatedbyfullnumber. TableIIIproseincrementvaluesalsodifferliteralrows. Real20trials/scenario. Timinglowmeanandwindowboundaryspikesmustbebothreported.",
+    "bottlenecks": [
+      {
+        "id": "STREAM-1",
+        "description": "Fixed memory and geometric pruning can erase decision-critical appearance or earlier actions",
+        "conditions": "Revisits, subtleobjects, dynamicchanges, pose/depthnoise",
+        "cause": "Recenttokenpervoxelassumesredundancy; oldactionstatesdiscarded;uniform8framesnotinstructionaware",
+        "evidence": "Algorithm1;TableIVmemorysize;§III-B",
+        "followups": "PolarMem/HAMretrieveexplicitcontext;NavFoMBATSrecencyweight; nofaithfulboundedmemoryguarantee",
+        "kind": "Methodological / protocol",
+        "status": "Partially addressed / not established in matched setting",
+        "confidence": "Moderate"
+      }
+    ],
+    "limitations": "Metricsversioninconsistenciesrecorded;noindependentruntime/benchmark. Detailedloss/configinspectionpending."
+  },
+  {
+    "id": "susa",
+    "title": "Agent Journey Beyond RGB: Hierarchical Semantic-Spatial Representation Enrichment for Vision-and-Language Navigation",
+    "authors": [
+      "Xuesong Zhang",
+      "Yunbo Xu",
+      "Jia Li",
+      "Ruonan Liu",
+      "Zhenzhen Hu"
+    ],
+    "year": 2026,
+    "venue": "AAAI2026",
+    "source": "https://github.com/HCI-LMC/VLN-SUSA",
+    "pages": "1,3–7",
+    "problem": "DUETRGB-onlyrepresentationsunderusesemanticsandgeometry. SUSAaddsview-levelcaptionandtrajectory-leveldepthbranch whilepreservingdual-scaleactionfusion. RequiresGTsimulatordepthandpretrainedcaptionfeatures; nohumanannotationsdoesnotmeannoextrasensors/pretraining.",
+    "method": "§3TSUgenerates36BLIP2FlanT5XXLcaptions('aphotoof'),CLIPtextembeddings. StaticviewscoremaxwordcosinesimilarityM∈R^(36×l);dynamiccrossattentioncaption→instruction;δ=.5mix(Eqs1–3). AsprintedΓ_staticis36-vector,Γ_dynamictransformeroutputneedsprojectiontosame shape: codeinspectionnecessarytospecifywhetherlogitsorfeaturesarefused. DSPGibsonResNet50depthandCLIPRGB,shared2layerpanoramatransformer,averagepoolinto768Dglobaltopologicalnodemaps;crossmodal+graphattentiontoinstruction. HAPattentionpoolsfourbranchesandlanguageintoR768,sigmoidweightsβ∈R4(notnecessarilyunit-sum); weightedrepresentationcontrastivealignmentandweightedlocal/globalactions(Eqs4–9),DUETdynamicfusion. L=.2L_expertCE+L_DAggerCE+.8L_symmetricInfoNCE(Eqs10–11);partialpretrainingRGBbaseonlyMLM/MRC/SAP/OG100Kitersbatch32;fine25Kbatch4R2R8REVERIE2SOON16CE,oneRTX4090. CEusesETPNavplanner/executortransfer.",
+    "novelty": "Multiscalecomplementarity: localcaptionmatchingandglobaldepthmemoryratherthannaivefeatureconcat; contrastivefusionandpartialpretraining. DUETderivativewithVLMpreprocessing,notstandalonegenerativeVLMpolicy. CONSOLEalreadytextknowledgefeatureenrichment; SUSAaddsdepthbranchandcaptionmatching.",
+    "results": "Table1R2R73SR/64.8SPLvsDUET72/60;test72.5/63.8vs69/59. REVERIEtest41.5SPL/27.3RGSPLvs36/22. Table3CE52.7/43.6vsDUET51.9/41.2,butbelowETPNav57/49. Table4upgradingRGBViT→CLIPalone46.9→51.5SR;Gibsondepth52.0/39.2versusImageNetdepth50.1/34.6. Table6HAPreducesval55→51.7SRbutimprovestest51.9→54.3; thisisnotmonotoniccomponentbenefit. §4.3textreversesδstatic/dynamicrelativeEq3; exactconfigcodeimportant.",
+    "bottlenecks": [
+      {
+        "id": "SUSA-1",
+        "description": "Caption/depth branches bring pretrained-data/sensor dependence and inconsistent split gains",
+        "conditions": "Domain-shifteddepth,missedcaptionlandmarks, fusiontuning",
+        "cause": "Frozenperceptionandweightingcanamplifysemanticerror;CLIPupgradeconfoundsmoduleclaim",
+        "evidence": "Table4featureablation,Table6val/testtradeoff,Eq3/proseδmismatch",
+        "followups": "CONSOLE/MapNav/SkillNavdifferenttextinterfaces;sensor-matchedandcaption-errorcontrolledanalysisstillneeded",
+        "kind": "Methodological / protocol",
+        "status": "Partially addressed / not established in matched setting",
+        "confidence": "Moderate"
+      }
+    ],
+    "limitations": "Supplementarycaptionqualityandpretrainingdetailspending; noexecution."
+  },
+  {
+    "id": "uninavid",
+    "title": "Uni-NaVid: A Video-based Vision-Language-Action Model for Unifying Embodied Navigation Tasks",
+    "authors": [
+      "Jiazhao Zhang",
+      "Kunyu Wang",
+      "Shaoan Wang",
+      "Minghan Li",
+      "Haoran Liu",
+      "Songlin Wei",
+      "Zhongyuan Wang",
+      "Zhizheng Zhang",
+      "He Wang"
+    ],
+    "year": 2025,
+    "venue": "Robotics: Science and Systems2025",
+    "source": "https://roboticsproceedings.org/rss21/p013.html",
+    "pages": "Alternate arXivv2pages1,3–8 (smallaction-promptparagraphoutputtruncated; notreliedupon)",
+    "versions": "LocalprovidedPDFhasnoextractabletext. Reviewedauthorarxiv2412.06224v2(6Feb2025),downloadedevidence/03/uninavid_alternate.pdf; do notassumebyteequivalencewithproceedings.",
+    "associated_files_reviewed": [
+      {
+        "file": "evidence/03/uninavid_alternate.pdf",
+        "version": "arxiv2412.06224v2",
+        "pages": "1,3–8",
+        "reason": "Textreplacement for image-onlylocalPDF"
+      }
+    ],
+    "problem": "UnifyVLN,ObjectNav,EQAandhumanfollowingratherthantaskspecificpolicies, whileprocessinglongvideoefficiently. RGBsingleviewandtextin,4lowlevelactionsout;EQAactionandanswerphasesexplicitlyseparated.",
+    "method": "§IV EVA-CLIP256patches/frame;gridpoolcurrent64,shortterm4/frameforB64,old1/frame. Incrementalgroupboundarypoolingreusesencodedframes. Longtermadjacenttokensmergeweightedmean(Kold+new)/(K+1) ifcosine>.95(Eqs1–6); otherwiseappend,so worst-casememory stillgrowslinearly withdistinctframes—notahardbound. 2layerMLPprojectsintoVicuna7B,autoregressive4tokensForward25cm/Left30°/Right30°/Stop. Stage1projectoralignmentLLaMA-VIDdata,stage2projector+LLMfine-tune5.9M=3.6Mnav+2.3MvideoQA,visionfrozen;40H800×35h1400GPUh,oneepoch. Nav2.4MVLN,483KObjectNav,240KEQAactions+10Kanswers,544Kfollowing,861scenes. Embodimentheight.88–1.25m/radius.1–.6mvaried. EQAStopthenremove<NAV>andaskquestionusinghistory. RealasyncA100inference.2s/4actions. Algorithm1looksforX_long[-1]beforeguardatfirstlongtoken, apseudocodeempty-listedgecase, notassumedcodebug.",
+    "novelty": "Unifiedmulti-tasknavigationtrainingandonlinecurrent/short/longtokenhierarchy; weightedadjacentmergingsavesreal-timecost. Doesnotpredictfutureobservations/worldstates despitefutureactionchunking. NavFoMextendscrosscamera/embodimentandtrajectoryoutput; StreamVLNaddsKVreuse.",
+    "results": "TableIIR2R47SR/42.7SPLvsNaVid37.4/35.9;TableIIIRxR48.7/40.9usesRxRtrainingwhileNaVid23.8/21.2isR2R-only: notmatchedcross-datasetcomparison. TableIVHM3D73.7/37.1;TableVOVONunseen39.5/19.8zero-shottoOVONbuttrainedObjectNav. Sceneoverlapcheckedbyauthors§VI; noindependentaudit. Multi-tasksuccessdoesnotyetisolatesynergywithoutlaterablationtables.",
+    "bottlenecks": [
+      {
+        "id": "UNINAVID-1",
+        "description": "Token merging is unbounded worst-case and may discard rare relevant detail",
+        "conditions": "Diversevisualhistories,task-switches,dynamicfollowing",
+        "cause": "Similaritythreshold+globalpooledoldframe;onlyadjacentmerge",
+        "evidence": "Eqs2–6;B64/τ.95;data/protocolTableIII",
+        "followups": "StreamVLNfixedwindow,NavFoMBATSbudget; instruction-awareutilityretention notestablished",
+        "kind": "Methodological / protocol",
+        "status": "Partially addressed / not established in matched setting",
+        "confidence": "Moderate"
+      }
+    ],
+    "limitations": "Alternateversiononly;remainingtaskresults/ablationappendixpending. Nobenchmarkexecuted."
+  }
+]

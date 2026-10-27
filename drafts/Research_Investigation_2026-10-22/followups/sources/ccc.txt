@@ -1,0 +1,679 @@
+=== PDF PAGE 1 ===
+    Counterfactual Cycle-Consistent Learning for Instruction Following and
+                 Generation in Vision-Language Navigation
+
+
+        Hanqing Wang1,2 , Wei Liang1, Jianbing Shen3, Luc Van Gool2, Wenguan Wang4∗
+  1 Beijing Institute of Technology 2 ETH Zurich 3 SKL-IOTSC, University of Macau 4 ReLER, AAII, University of Technology Sydney
+
+                          https://github.com/HanqingWangAI/CCC-VLN
+
+
+
+                 Abstract
+
+   Since the rise of vision-language navigation (VLN), great
+progress has been made in instruction following – building
+a follower to navigate environments under the guidance of
+instructions. However, far less attention has been paid to the
+inverse task: instruction generation – learning a speaker to
+generate grounded descriptions for navigation routes. Exi-
+sting VLN methods train a speaker independently and often
+treat it as a data augmentation tool to strengthen the fol-
+lower, while ignoring rich cross-task relations. Here we des-                                          X                    Aˆ
+cribe an approach that learns the two tasks simultaneously
+and exploits their intrinsic correlations to boost the training
+of each: the follower judges whether the speaker-created                        E          ¯E
+instruction explains the original navigation route correctly,
+and vice versa.Without the need of aligned instruction-path         A                  Xˆ
+pairs, such cycle-consistent learning scheme is complemen-
+tary to task-speciﬁc training targets deﬁned on labeled data,      Figure 1:  (a) VLN [7].  (b) Our counterfactual cycle-consistent
+and can also be applied over unlabeled paths (sampled     (CCC) learning system consists of three agents, i.e., speaker s (  )
+                                                                          for instruction generation, follower f (  ) for instruction follow-without paired instructions). Another agent, called creator
+                                                                            ing, and creator c (  ) for counterfactual environment creation.is added to generate counterfactual environments. It greatly
+changes current scenes yet leaves novel items – which are                                                                 agents. In many scenarios, AI agents should be able to com-
+vital for the execution of original instructions – unchanged.                                                         municate with humans for efﬁcient collaboration, instead of
+Thus more informative training scenes are synthesized and                                                             executing instructions only [76, 29]. For example, when a
+the three agents compose a powerful VLN learning system.                                                       human-robot team is doing search and rescue [68, 18, 75],
+Extensive experiments on a standard benchmark show that                                                                the human may ﬁrst issue commands (e.g., “explore along
+our approach improves the performance of various follower                                                                        this direction until the end of the hallway”) that direct the
+models and produces accurate navigation instructions.                                                              robot to navigate a building and search for survivors. In this
+                                                                process, the robot is expected to report its progress (e.g., “I
+1. Introduction                                       have inspected three rooms”) and explain its plan (e.g., “I
+                                                                   will continue to navigate this direction and stop at the end
+   Vision-language navigation (VLN) [7], i.e., enabling an
+                                                              of the hallway”) [69]. Robot’s ability to generate linguistic
+agent to navigate across realistic environments given human
+                                                              explanations can help human to resolve potential ambiguity
+instructions, has received great attention (Fig. 1(a)). Many
+                                                                             (e.g., identifying “this direction” and “hallway”) [18] and
+powerful wayﬁnding agents (i.e., follower) were developed
+                                                                   establish trust [9, 20]. Hence, the robot can even in turn help
+to perform such embodied instruction following task. Un-
+                                                                the human to navigate its explored area (which is unfamil-
+fortunately, the inverse task – learningaspeaker that vividly
+                                                                          iar to the human) [27], e.g., “go straight and you will pass
+explains navigation paths – has remained under-explored.In
+                                                          through four rooms before reaching the end of the hallway”.
+fact, instruction generation is also a crucial ability of AI
+                                                                 In addition to emphasizing the importance of instruc-
+   ∗Corresponding author: Wenguan Wang.                               tion generation, we explore the intrinsic correlation between
+
+
+                                                       15471
+=== PDF PAGE 2 ===
+instruction following and generation to derive a powerful     like“walk away from the door”, the agent builds a counterfa-
+VLN learning framework. Speciﬁcally, given the visual en-      ctual like “if I walk in the door, what should the instruction
+vironment space E, linguistic instruction space X, and navi-     be?” by augmenting sampled paths with artiﬁcial instruc-
+gation path space A, instruction following learns a follower      tions. This allows the agent to be more efﬁciently trained
+f : E ×X 7→A that maps visual observations and navigable     by performing alternative actions that  it did not actually
+directions into action sequences, while instruction genera-    make [25]. Although our speaker-follower game naturally
+tion learns a speaker s : E ×A 7→X that maps observations     supports such path sampling based counterfactual thinking
+and action sequences into trustable instructions.  Clearly,        (i.e., involving unlabeled data (E, A′) during training, as
+there exists strong dependencies among the input and output     mentioned before), our creator can build another kind of
+spaces of s and f. Surprisingly, such task correlation was      counterfactuals, e.g., “if I change current environment by,
+long ignored; current VLN methods only learn an isolated      for example, removing or putting in a lot of furniture that
+speaker as an one-off plugin for data augmentation [24, 66].      are irrelevant to the instruction, I will still execute the orig-
+                                                                     inal navigation plan”.  Concretely, given an environment-  We instead propose to jointly train the speaker and fol-
+                                                                  instruction-path tuple (E, X, A) ∈E × X × A, the creatorlower in a compact, cycle-consistent learning framework
+                                         c:E×X ×A7→E “images” a new environment ¯E ∈E, such(Fig.1(b)). During training, (E, X)∈E ×X is ﬁrst mapped
+to ˆA ∈A through the follower f (  ) and then translated to      that i) ¯E is greatly different from E, and ii) ¯E should be still
+                                                              aligned with the original instruction-path pair (X, A). Withan instruction ˜X ∈X through the speaker (  ), i.e., s(E, ˆA).
+                                                                                     i) and ii), we address both diversity and realism, which areIn environment E, the dissimilarity between X and ˜X, de-
+                                                         proved critical in counterfactual thinking [26, 84]. Hence,noted as △E(X, ˜X), is used as the feedback signal to regu-
+                                                              as ¯E and (X, A) compose a new valid training sample, thelarize training. Similarly, given (E, A)∈E ×A, △E(A, ˜A)
+                                                                 cycle-consistent errors, i.e., △¯E(A, ˜A) and △¯E(X, ˜X), cancan be estimated and used for training. As △errors are
+                                                       be estimated over (¯E, X, A). In this way, our speaker, fol-only about the cycle-consistency over (E, X) and (E, A),
+                                                          lower and creator form a powerful learning system, whichany other training objectives deﬁned on labeled triplets, i.e.,
+                                                   makes a clever use of cross-task and cross-modal connec-(E, X, A), are compatible. Hence, we can apply such learn-
+                                                                   tions as well as resembles a counterfactual thinking process.ing system on “unlabeled” data (E, A′),  i.e., sampling a
+path A′ in an environment E without corresponding instruc-       Our counterfactual cycle-consistent (CCC) framework is
+                                                          optimized by policy gradient methods and compatible withtion. Thus both labeled instruction-path samples and un-
+                                                                current imitation learning (IL) and reinforcement learninglabeled paths can be simultaneously used during training.
+                                                     (RL) based VLN training protocols. We apply our CCC overThis is more elegant than current de facto VLN training
+                                                                 several VLN baseline models and test it on gold-standardprotocol [24, 66] that has three phases: i) train the follower
+                                          R2R dataset [7]. Experimental results verify the efﬁcacy ofand speaker separately on aligned instruction-path samples;
+                                       CCC on both instruction following and generation tasks.ii) use the speaker to create synthetic instructions for ran-
+domly sampled paths; and iii) ﬁne-tune the follower on the
+                                                          2. Related Workpseudo instruction-path samples. Further, as learning from
+pseudo-parallel data inevitably accompanies with the data                                                      Vision-Language Navigation  (Instruction Following).
+quality problem (i.e., the quality of the pseudo instruction-                                                       Although VLN [7] is a relatively new task in computer vi-
+path samples is difﬁcult to guarantee) [47], our speaker-                                                                    sion, its core part – instruction following[12, 53] – has been
+follower collaborative learning game is more favored, i.e.,                                                          long studied in natural language processing and robotics.
+△errors can be viewed as quality scores and play as super-                                                            Early studies typically built the navigator in controlled en-
+visory signals to boost the training of both f and s.                                                          vironments with formulaic route descriptions [51, 68, 12, 8,
+   Besides the speaker and follower, another agent, called     53, 54]. Anderson et al. thus introduced R2R dataset [7]
+creator (  ), is put into our cycle-consistent learning game.      to investigate embodied navigation in photo-realistic sim-
+The creator serves as a plug-and-play component for coun-      ulated environments [11] with human-created instructions.
+terfactual environment synthesis, enabling more robust    Soon after, numerous efforts were made towards:  i) rais-
+training. Thinking about alternative possibilities for past or     ing more efﬁcient learning paradigms, e.g., IL [7], hybrid
+future events is central to human thinking [62]. We fre-     of model-free and model-based RL [81], and ensemble of
+quently construct counterfactuals (“counter to the facts”):     IL and RL[79]; ii) exploring extra supervisory signals from
+what might happen if · · · ?  Counterfactual thinking gives     synthesized samples[24, 66, 25], auxiliary tasks[79, 37, 49,
+us the ﬂexibility in learning from past limited experience      90], or even massive web image-text paired data [52, 30];
+through mental simulation. Nevertheless, this issue is rarely        iii) developing more powerful perception-linguistic embed-
+addressed in VLN. Recently, [25] interpreted current pre-     ding schemes [36, 60, 80, 35]; and iv) designing smarter
+vailing data augmentation technique [24] – back-translation     path planning strategies by self-correction [38, 50], active
+– as a kind of counterfactual thoughts – given an instruction     exploration [74], or map building [73, 13, 19]. Some oth-
+
+
+                                                                 215472
+=== PDF PAGE 3 ===
+ers learn environment-agnostic representations [80], or fo-      translation [39], question answering [67, 64, 42], etc.
+cus on ﬁne-grained instruction parsing [34].                       In a broader sense, our study can be viewed as the ﬁrst at-
+  Our work differs signiﬁcantly from the above body of     tempt that explores the duality of instruction generation and
+work. We address the importance of both instruction fol-     following in embodied navigation tasks. Both the two tasks
+lowing and generation, instead of the navigation task only.      are learnt in a dual-task learning framework, where their
+The dual tasks form a closed loop for end-to-end joint train-     symmetric structures are explored as informative feedback
+ing. We are particularly interested in how to leverage their      signals for boosting each, even with unlabeled samples.
+intrinsic connections to better learn each other, within fac-     CounterfactualThinking.Counterfactualthinking[62](i.e.,
+tual environments as well as counterfactual alternatives.         the construction of mental alternatives to reality) is crucial
+Instruction Generation. Though being less studied in com-      to how people learn from experience and predict the fu-
+puter vision [2], generating linguistic route instructions[16]      ture, and can inﬂuence different cognitive behaviors such as
+has raised wide research interest in robotics [27], linguis-     deduction, decision making, and problem solving [86, 21].
+tics[65], cognition[40], and environmental psychology[70],     Recent studies proved that counterfactual thoughts can im-
+and can be traced to Lynch’s work [48] in 1960.  Early ef-     prove the explainability [33, 28], fairness [41], and robust-
+forts investigated the principles underlying the process of     ness [78] of trained models. The use of counterfactual ex-
+human constructing route descriptions [83, 4, 45] and the     amples has also been explored in the context of visual ques-
+characteristics of “easy-to-follow” instructions [44, 72, 61].      tion answering [3, 1, 14] and open set recognition [56, 87].
+They pointed out the importance of involving intuitive land-       Fu et al. [25] revisit the idea of back-translation based
+marks (e.g., physical objects and locations) and concise     data augmentation from a counterfactual thinking perspec-
+topological descriptions (e.g., turn-by-turn directions) in      tive: extra routes are adversarially selected, instead of ran-
+instructions [18].  Based on these studies, some simple    domly sampled [24], and translated into instructions for
+systems [44, 27] for instruction creation were developed     smarter data augmentation. Apart from sampling paths in
+using handcrafted templates, i.e., slotting the content into      real environments, we learn a creator to generate new visual
+pre-built linguistic structures. Some complicated ones [17]     scenes as more effective counterfactuals. Although coun-
+made use of linguistically motivated rules or full-ﬂedged      terfactual environment synthesis is also addressed in [59], it
+grammars, to better emulate the way people compose in-       is achieved by introducingminimuminterventionsthatcause
+structions and produce outputs in a more ﬂexible and exten-      the follower to change its output. In contrast, we seek to mo-
+sible manner [22]. Recent solutions [15, 57, 18, 23] lean      dify the factual environments to maximum, on the premise
+on end-to-end, data-driven techniques, without manually     of ensuring the original instructions can be still executed.
+crafted templates or rules. But they are typically performed    The combination of diversity and realism makes generated
+onsimple grid or rendered environments and thus factor out     environments useful as training examples.  Moreover, we
+the role of perception in instruction creation to some extent.      learn the speaker and follower end-to-end collaboratively.
+   Instruction creation attains far less attention in VLN [2].
+                                                          3. Methodology
+Only some data augmentation techniques[24, 66, 25] learn
+an instruction generator (speaker) with training pairs of     We address two related tasks, i.e., instruction following
+aligned navigation paths and human instructions. Then they     and generation, under R2R VLN setting [7]. For instruction
+use the speaker to synthesize instructions for newly sampled     following, a follower f is learnt to ﬁnd a route A to the
+paths as extra training examples. However, they only treat      target location, speciﬁed by the instruction X, in a 3D envi-
+instruction creation as an auxiliary task and train the speaker     ronment E. For instruction generation, a speaker s is learnt
+and follower separately. Hence it is hard to control the qual-      to create a description X for route A in E. Here, s and f are
+ity of the pseudo instructions created by the speaker. Unlike      jointly trained in an end-to-end cycle-consistent framework
+these methods, we propose a uniﬁed framework that learns       (cf. §3.1) and a creator c is further introduced to synthesize
+the speaker and follower simultaneously, and explicitly uses      counterfactual environments for boosting training (cf. §3.2).
+their correlation as a regularization term for robust training.
+                                                               3.1. Cycle-Consistent Learning for Instruction Fol-
+Cycle-Consistent Learning. Cycle-consistent learning ex-
+                                                       lowing and Generation
+plores task correlations to regularize training and can be
+implemented in different forms, such as forward-backward     We learn the two tasks jointly (Fig. 2(a)): the speaker s
+object tracking [77, 46], CycleGAN [91], and dual learn-     and follower f act as an evaluator for each other. s is used to
+ing [31]. Taking dual learning as an example, its idea is      evaluate the quality of ˆA generated by f(E, X) and returns
+intuitive: if we map an x from one domain to another and      the feedback signal △E(X, s(E, ˆA)) to f, and vice versa.
+then map it back, we should recover the original x [89]. It     Follower. The follower f  is instantiated as a Seq2Seq
+was successfully applied to many tasks like neural machine     model which computes a distribution P(A|X; E) over route
+translation [31], sentiment analysis [85], image-to-image   A (i.e., a serious of actions A = {at}Tt=1) given instruction
+
+                                                                 315473
+=== PDF PAGE 4 ===
+                                                                                             Ladv  X                Aˆ                       sE( A)ˆ △E(X, sE( A))ˆ        X
+                                                       A                                               ¯V
+
+                                                                                                                        r      Lℓ2   A               Xˆ                       fE( X)ˆ △E(A, fE( X))ˆ           V          V
+
+Figure 2: (a) Our cycle-consistent learning scheme (cf. §3.1) for the speaker s (  ) and follower f (   ), trained over both factual and
+counterfactual environments. (b) Our creator c (  ) for counterfactual environment generation (cf. §3.2).
+
+X (i.e., a sequence of words X = {xl}Ll=1) under environ-      Finally, we have P(X|A; E) = Ql pl(xl), where pl(xl) =
+ment E. At each step t, the follower observes E as an image     P(xl|x1:l−1, a1:T ,V1:T) for brevity. For fair comparison, our
+scene Vt ⊂E. Conditioned on the visual and linguistic fea-     speaker is the same as, but not speciﬁc to, the one in [24].
+tures, i.e., Vt and X ={xl}Ll=1, and prior action embedding     Cycle-Consistent Training. Given aligned (E, X)∈E×X,
+at−1, the follower f ﬁrst produces current hidden state hft :    we can ﬁrst obtain a navigation path ˆA through the follower
+                                                  f(E, X) (shortly fE(X)). We then use the speaker to trans-
+         hft = LSTMf([Vt−1, X, at−1], hft−1).          (1)                                                                        late ˆA to a visual-grounded instruction s(E, ˆA) (shortly
+There are two basic follower designs in the literature, based    sE(ˆA)), which is expected to be semantically similar to X,
+on their deﬁnitions of the action space. The ﬁrst-type fol-        i.e., gaining a small cycle-consistent error △E(X, sE(ˆA))
+lowers [7] simplify the action space to six low-level visuo-      (shortly △XE ). Similarly, for paired (E, A)∈E×A, we have
+motor behaviors, i.e., left, right, up, down, forward   △AE. Then the △error can be speciﬁed as the negative log-
+and stop.  For example, left refers to turning left by      likelihood, which is minimized for regularizing training:
+30◦. The action embeddings are linguistic features and only
+                                      △AE =−log X P(sE(A)= X|A)P(fE(ˆ       X)=A|sE(A)=ˆ            X),ˆa front view is perceived as Vt. Given proceeding actions
+a1:t−1, instructionX and pastobservationsV1:t−1,thecondi-           X∈Xˆ                                                    (6)
+tional probability of current action at is computed as:      △XE =−log X P(fE(X)= ˆA|X)P(sE(ˆA)=X|fE(X)= ˆA).
+                                                       A∈Aˆ
+       P(at|a1:t−1, x1:L, V1:t−1) = softmaxat(W1hft ),     (2)
+                                                         For ease of reference, we brieﬂy denote Eq. 6 as:
+where W1ht ∈R6 gives a score vector over the six actions.
+  The second-type followers [24, 79] ﬁrst “look around”        △AE =−log XX∈Xˆ   P(X|A;ˆ   E)P(A|X;ˆ E),
+                                                                                                                                           (7)         panoramicand    gain a                  view                          Then                                                      into                                             36                          as Vt.                                   Vt is divided                                                                    P(ˆA|X; E)P(X|ˆA; E).                                         △XE =−log X
+                                                                A∈Aˆsubviews,              i.e.,                          forming                                      current                                              action                                                    space.             Vt ={Vt,i}36                          i=1,
+Thus each action at is associated with a subview Vt,at, and      Directly calculating the gradients for △AE is intractable due
+at ≡Vt,at. Then, the likelihood of at is formulated as:           to the huge space of X. A similar issue also holds for △XE .
+      P(at|a1:t−1, x1:L, V1:t−1) = softmaxat(a⊤t W2ht).   (3)      Inspired by [31, 82], the gradients for △AE w.r.t. the param-
+                                                                     eters of the follower and speaker, i.e., θf and θs, can be
+As the percepts V1:t−1 are completely determined by the                                                     computed as (and similarly for △XE ):
+navigation actions a1:t−1 in all our cases, we can further
+specify P(A|X; E) according to the probability chain rule:    ∂△AE                  P(A|X;ˆ E)                                        ≈−EX∼Pˆ   (·|A;E)[∂log                  ]
+P(A|X; E) = QtP(at|a1:t−1, x1:L,V1:t−1). And for nota-       ∂θf                      ∂θf
+tional simplicity, we abbreviate the probability distribution        ≈−∂log P(A|X;ˆ E) ,
+P(at|a1:t−1, x1:L, V1:t−1) over actions at step t as pt(at).                     ∂θf                                          (8)
+  To fully examine the efﬁcacy of our CCC framework, we    ∂△AE                                        ≈−EX∼Pˆ   (·|A;E)[log P(A|X;ˆ E)∂log P(X|A;ˆ   E) ]
+experiment with different follower architectures [7, 24, 79].       ∂θs                                  ∂θs
+Speaker. The speaker s is built as a recurrent neural net-                                                        ≈−(log P(A|X;ˆ E) −bf)∂log P(X|A;ˆ   E) ,
+work based encoder-decoder architecture which computes                                       ∂θs
+a distribution P(X|A; E) over possible instruction X (=     where bf is a baseline to reduce the training variance and
+{xl}Ll=1) given route A in environment E.                     estimated by the mean of previous log P(A|ˆX; E). Please
+  The encoder ﬁrst embeds the sequences of the actions     see our supplementary for more details.
+{at}Tt=1 and visual observations {Vt}Tt=1 along the route,       Hence, as the estimation for the △error does not re-
+and generates hidden states os1:T using an LSTM:               quire any aligned instruction-trajectory pairs (X, A), Eq. 6
+           ost = LSTM-Encoders([Vt, at], ost−1).          (4)     can be naturally applied over both labeled and unlabeled
+                                                              paths for training. Let us denote D = {(En, Xn, An)}Nn=1
+Afterwards, the decoder computes the conditional probabil-                                                              as a labeled data collection which consists of N aligned
+ity of each target word xl given its proceeding words x1:l−1                                                               environment-instruction-pathtuples. As in conventions [24,
+as well as the input embedding osT :                            66, 38], we can also build an unlabeled data collection, U =
+ P(xl|x1:l−1, a1:T , V1:T )=LSTM-Decoders(hsl , xl−1, osT ). (5)    {(Em, A′m)}Mm=1 through sampling some paths A′m from
+
+                                                                 415474
+=== PDF PAGE 5 ===
+existing environments Em (but without instruction annota-      ¯E, under the above-mentioned constraints: i) diversity: re-
+tions). Then our cycle-consistent learning loss is deﬁned as:     placing elements in E, as many as possible, with the ones
+          1                      1                          in Er; ii) realism: maintaining (X, A) still feasible in the
+   Lcycle =     X  (△AE+△XE ) +
+      N                 M             X  △A′E .    (9)     changed environment ¯E. To do so, a compact descriptor u
+              (E,X,A) ∈D                  (E,A′) ∈U
+                                                                              is ﬁrst generated for (E, X, A):
+Other learning objectives for instruction following and gen-
+                                               u=hcT ,  hct = LSTMc([Vt, at, X], hct−1).      (10)eration, deﬁned over the labeled triplets (E, X, A), are also
+compatible and used in our training stage (cf. §3.3).                                                     Here u is desired to encode all the necessary information
+Remark. Our cycle-consistency design is driven by two be-                                                                     that make (E, X, A) valid. As shown in Fig. 2(b), given an
+liefs. First, a desired VLN agent should be able to ground                                                          observed scene V ∈E and its reference V r ∈Er, the creator
+both navigation actions and linguistic cues together on the     c fuses them together, in the feature rather than pixel space:
+visual environments. Thus it is necessary to explore both
+navigation planning and instruction creation in a uniﬁed               qk = softmax([vr1, vr2, · · · , vrK]⊤· vk),
+learning scheme, enabling the agent to better capture cross-               gk = [vr1, vr2, · · · , vrK] · qk,
+                                                                                                                                 (11)
+modal and cross-task connections. Second, assuming the               λk = sigmoid(u⊤W3vk),
+generated instruction sE(A) is a valid rephrasing of the                                                                                                   ¯vk = λkvk + (1 −λk)gk,
+original X, a robust follower should execute this rephras-
+ing sE(A) with the same navigation plan as the original X.     where vk is the embedding of a visual element vk insceneV
+A similar conclusion also holds for the speaker.                       (i.e., V= max-pool([v1, v2,· · ·, vK])), qk refers to normal-
+                                                              ized correlation score vector between vk and V r = {vrk}k,
+3.2. Counterfactual Environment Creation                                                      gk indicates the attention summary, and λk gives the impor-
+   Back-translation based data augmentation [24] has be-     tance of vk for the successful execution of (E, X, A) and
+come a common practice in VLN. The central idea  is     decides whether vk needs to be replaced.  Eventually, we
+to translate sampled paths into artiﬁcial instructions and     have ¯vk, i.e., the embedding of a visual region ¯vk in the
+use these synthesized environment-instruction-path tuples     created counterfactual scene ¯V ∈¯E.
+to augment the labeled data D.  Aside from learning the     Training Objective. With the purposes of i) modifying the
+speaker and follower in isolation, it involves multiple train-      original scene V as much as possible and ii) keeping crucial
+ing stages (cf. §1). Contrarily, our cycle-consistent learning,     information/landmarks alignedwiththeinstruction-pathpair
+conducted on both labeled D and unlabeled data U, has a    (X, E), the training loss of the creator c is designed as:
+uniﬁed training objective (cf. Eq. 9).  Interestingly, recent                                                                Lc = Lℓ2 + Ladv,
+studies [25] suggested the advantage of such path sampling                                                                 (12)
+                                             = ||λ||2 + log(1 −d(¯V , X, A)).strategy [24] in counterfactual thinking: a path A′, sampled
+in E, and its artiﬁcial instruction ˆX′ compose a counter-    The ℓ2-norm loss Lℓ2 inspires the sparsity of λ = [λk]k and
+factual. Although our cycle-consistent learning scheme has     hence addresses i). The adversarial loss Ladv tries to “fool”
+naturally involved such kind of counterfactuals during the     a discriminator d : E × X × A 7→[0, 1]. The discriminator d
+computation of △A′E  in Eq. 9, to fully explore the potential       is learnt to estimate the alignment between environments
+of counterfactual thinking, we further propose an environ-     and instruction-action pairs by minimizing d(¯V , X, A) −
+ment creator c that generates counterfactual observations by     d(V, X, A). Thus Ladv addresses ii). Note that d only uses
+greatly changing house layouts but without interfering with     geometric action embedding. Optimizing above objectives
+the execution of original instructions.                      makes (¯E, X, A) a valid training example. Therefore, in our
+Creator. Our goal is to learn a creator c : (E, X, A) 7→¯E      counterfactual environment ¯E, we can still train the speaker
+that observes the environment E, instruction X, navigation      to translate the navigation path E into X, and train the fol-
+path A and generates a counterfactual environment ¯E such     lower to execute the instruction X as A.
+that i) the differences between E and ¯E are large; and ii) ¯E    Remark. The creator is fully differentiable and trained with
+and (X, A) present high compatibility. Such design is based      the speaker and follower together, leading to a triple-agent
+upon previous research that has proved that, i) human prefer      learning system. During training, the cycle-consistent er-
+large modiﬁcations (even introducing elements not present      rors, i.e., △AE¯ and △XE¯ , can also be estimated and minimized
+in the real experience), during counterfactual thinking [26];     over the counterfactual samples, i.e., (¯E, X, A), generated
+and, ii) the imagined world should not be completely di-     by the creator. Moreover, the creator can also access the su-
+vorced form the reality (with proper changes) [84].              pervision signals of cycle-consistent learning (cf. Eq. 9) and
+   For ease of optimization, instead of only considering the      training objectives for instruction following and generation
+aligned triplet (E, X, A)∈D, the creator c additionally uses      learning (detailed in §3.3). Thus the creator can progres-
+other real scene Er (sampled from D) as the reference. By      sively create more informative counterfactuals on-the-ﬂy, in
+mixing E with Er, it creates a counterfactual environment      turn boosting the training of the speaker and follower.
+
+
+                                                                 515475
+=== PDF PAGE 6 ===
+3.3. Implementation Details                            val seen          val unseen        test unseen
+                                              Model
+                                                    SR↑ NE↓OR↑ SPL↑ SR↑ NE↓OR↑ SPL↑ SR↑ NE↓OR↑ SPL↑
+Network Architecture. We imple-
+                                               Seq2Seq [7]       39.4   6.0   51.7   33.8  22.1   7.8   27.7   19.1  20.4   7.9   26.6   18.0
+ment our follower f with different                                          + BT [24]       43.7   5.3   58.1   37.2  22.6   7.7   28.9   19.9  21.0   7.8   26.2   18.8
+architectures [7, 24, 79].   Instruc-         + APS [25]      48.2   5.0   60.8   40.1  24.2   7.1   32.7   20.4  22.5   7.5   30.1   19.3
+tion embedding X is from an LSTM         + CCC          50.1   5.0   61.1   42.6  28.4   6.8   35.3   22.1  25.5   7.8   35.9   20.6
+based linguistic encoder as normally.    Speaker-Follower [24]   51.7   5.0   61.6   44.4  29.9   6.9   40.7   21.0  30.9   7.0   41.2   24.0
+                                          + BT [24]       66.4   3.7   74.2   59.8  36.1   6.6   46.6   28.8  34.8   6.6   43.4   29.2
+With [7], only front view  is used         + APS [25]      68.2   3.3   74.9   62.5  38.8   6.1   46.7   32.1  36.1   6.5   44.2   28.8
+and corresponding embedding V  is         + CCC          68.4   3.3   74.5   61.4  43.5   5.8   52.0   38.1  41.4   5.9   51.0   36.6
+obtained from a pretrained ResNet-      RCM [79]        47.0   5.7   53.8   44.3  35.0   6.8   43.0   31.4  35.9   6.7   43.5   33.1
+152 [32].  Action embedding a is         + BT [24]       61.9   4.1   66.9   58.6  45.6   5.7   52.4   41.8  44.5   5.9   52.4   40.8
+                                          + APS [25]      63.2   3.9   69.3   59.5  47.7   5.4   56.6   42.8  45.1   5.8   53.9   40.9
+also from the linguistic LSTM. With         + CCC          68.0   3.4   77.5   62.1  50.4   5.2   57.8   46.4  51.0   5.3   57.2   48.2
+[24, 79], the panoramic view is per-                                        Table 1: Quantitative comparison results (§4.1) for instruction following on R2R dataset [7].
+ceived and divided into 36 sub-views
+(12 headings × 3 elevations with 30◦intervals). Each sub-     (18 environments, 4, 173 instructions). There are no over-
+view is associated with a geometric feature, i.e., (cos φh,     lapping environments between the unseen and training sets.
+sin φh, cos φe, sin φe), where φh and φe are the angles of     Evaluation Metric. Following [7, 24], four standard met-
+heading and elevation, respectively. Visual and geometric      rics for instruction following are used: 1) Success rate (SR)
+features are concatenated as the embedding of the sub-view     computes the percentage of ﬁnal positions less than 3 m
+and corresponding action. See [7, 24, 79] for more network    away from the goal location. 2) Navigation error (NE) refers
+details. The model design of our speaker s follows the one      to the shortest distance between agent’s ﬁnal position and
+in [24], which is built upon the panoramic view system. For      the goal location. 3) Oracle success rate (OR) is the suc-
+the creator c, the discriminator d only uses geometric in-     cess rate if the agent can stop at the closest point to the goal
+formation based action representation (to ﬁlter out the vi-     along its trajectory. 4) Success rate weighted by path length
+sual cues in trajectories). Both c and d adopt cross-modal     (SPL) [5] is a trade-off between SR and navigation length.
+co-attention based network architectures, like [66].            Evaluation Protocol. As in [24, 25], we test our model
+Training.  Besides minimizing the cycle-consistent loss     with several representative baselines [7, 24, 79] using dif-
+Lcycle(cf. Eq. 9), our CCC framework is also learnt with the      ferent architectures, action spaces, and learning paradigms.
+training objectives for instruction generation and following,     • Seq2Seq [7]: an attention-based Seq2Seq model that is
+over the labeled data D and counterfactual samples.  For        trained with IL under the visuomotor action space.
+instruction following, IL [7] is adopted for off-policy learn-                                                    • Speaker-Follower [24]:  a compositional model that is
+ing, where the loss is deﬁned over the groundtruth navi-                                                                    trained with IL under the panoramic action space.
+gation action sequence A: LfIL = −log P(A|X). RL is     • RCM [79]: an improved multi-modal model that is trained
+also applied for on-policy learning [79, 66], i.e., optimiz-                                                              using both IL and RL under the panoramic action space.
+ing LfRL = −Pt log pt(at)Λt, where at ∼pt(at) and Λt
+                                                  The baselines are trained with labeled instruction-path pairsindicates the advantage in A2C [55]. For instruction gener-
+ation, the speaker is trained with Ls=−log P(X|A), where      in R2R train set. For each baseline, we further report
+                                                                the performance with our CCC and other two speaker-X refers to the groundtruth navigation instruction. To stabi-
+                                                         based data augmentation techniques, i.e., back-translationlize training, we apply an annealing strategy [66] to the IL
+                                                     (BT) [24] and adversarial path sampling (APS) [25]:signal which makes the agents learn a good initial policy.
+Inference. Once trained, the speaker and follower can per-     • CCC: our speaker is jointly learnt with the follower in real
+form their speciﬁc tasks independently. As in conventions,       and counterfactual environments and translates randomly
+we apply greedy prediction, i.e., x∗l =arg max(pl(xl)) and       sampled paths into instructions as extra training data.
+a∗t = arg max(pt(at)), for instruction creation and follow-     • BT [24]: the speaker is trained in isolation with the fol-
+ing, as approximations of X∗= arg max P(X|A; E) and       lower in real environments only and translates randomly
+A∗=arg max P(A|X; E), respectively.                       sampled paths into instructions as extra training data.
+                                                    • APS [25]: the speaker is trained in isolation with the fol-
+4. Experiment                                                            lower in real environments only but translates adversari-
+4.1. Performance on Instruction Following                   ally selected paths into instructions as extra training data.
+
+Dataset. We conduct experiments on R2R [7], originally     Quantitative Result. The comparison results on instruction
+developed for the instruction following task. R2R has four     following are summarized in Table 1. We ﬁnd CCC outper-
+sets: train (61 environments, 14, 039 instructions), val     forms other learning paradigms across diverse dataset splits
+seen (61 environments, 1, 021 instructions), val unseen     and metrics. For the three baseline followers [7, 24, 79],
+(11 environments, 2, 349 instructions), and test unseen   CCC gains remarkable SR improvements  (i.e.,  0.2-4.8,
+
+
+                                                                 615476
+=== PDF PAGE 7 ===
+                              test unseen           Evaluation Metric. Five standard textual evaluation met-           Models
+                         SR↑   NE↓   OR↑   SPL↑                                                                        rics are considered here [2]: 1) BLEU [58] refers to the geo-
+      Self-Monitoring [49]         43.0     6.0    55.0    32.0      metric mean of n-gram precision scores computed over ref-
+          Regretful [50]            48.0     5.7    56.0    40.0
+                                                            erence and candidate descriptions. 2) CIDEr [71] ﬁrst rep-
+      OAAM [60]             53.0       -      61.0    50.0
+                                                                 resents each sentence with a set of 1-4 grams and calculates       Tactical Rewind [38]         54.0     5.1    64.0    41.0
+       AuxRN [90]            55.0     5.2    62.0    51.0       the co-occurrences of n-grams in the reference sentences
+        E-Dropout [66]           48.0     5.6    58.0    44.0      and candidate sentence as the score. 3) METEOR [10] is
+     E-Dropout [66] + CCC        52.2     5.1    59.8    46.9      deﬁned as the harmonic mean of precision and recall of un-
+     Active Perception [74]        55.7     4.8    73.1    37.1      igram matches between sentences. 4) ROUGE [43] is com-
+  Active Perception [74] + CCC    60.6     4.3    71.4    41.3
+                                                          puted by comparing overlapping n-grams, word sequences
+       SSM [73]              57.3     4.7    68.2    44.1
+                                                      and word pairs. 5) SPICE [6] is based on the agreement of     SSM [73] + CCC          62.2     4.3    72.3    49.2
+                                                                the scenegraph [63] tuples of the candidate sentence and all
+ Table 2: Benchmarking results (§4.1) for instruction following
+                                                               reference sentences. These metrics are calculated by com- on R2R dataset [7].
+                                                             paring each candidate instruction to the three reference in-
+                                                                   structions given the navigation path. As suggested by [88],2.7-4.7, and 3.0-6.1) compared with the second best on
+                                                SPICE is adopted as the primary metric.val seen, val unseen and test unseen respectively.
+This validates the efﬁcacy of CCC across different follower     Evaluation Protocol. As we implement our follower over
+architectures.  Further, the performance improvements on      different baselines (i.e., Seq2Seq[7], Speaker-Follower[24],
+unseen sets are relatively more signiﬁcant, showing that     and RCM [24]), we report the performance of their cor-
+CCC strengthens models’ generalization ability.                responding speakers  (i.e., Ours-Seq2Seq, Ours-Speaker-
+Performance Benchmarking. For comprehensive evalu-     Follower, and Ours-RCM). For comparative methods, we
+ation, we conduct performance benchmarking by applying     consider the speaker in [24] (i.e., BT Speaker) and the in-
+our CCC technique to [66, 73, 74], which are current top-      struction generation model (i.e., VLS) in [2]. The former is
+leading instruction followers with public implementations:      widely used in current VLN instruction following methods
+                                                                   for data augmentation, and VLS is the only model that is
+• E-Dropout [66]: a multi-modal model that uses ‘environ-                                                               speciﬁcally designed for instruction generation in VLN.
+  mental dropout’ method to mimic unseen environments.
+                                                          Quantitative Result. The comparison results on instruc-
+• Active Perception [74]: a robust model that is able to ac-
+                                                                   tion generation are reported in Table 3. As seen, our speak-
+   tively explore surroundings for more intelligent planning.
+                                                                   ers achieve better performance on most of the metrics. For
+• SSM [73]: a graph model which is equipped with a map
+                                                         example, our three speakers gain the top three SPICE scores
+  building module for global decision making.
+                                                    on both val seen and val unseen sets.  Moreover,
+  As shown in Table 2, our CCC greatly boosts the perfor-    among our three speakers, Ours-RCM performs best. We
+mance of current three top-performing instruction follow-     suspect that a stronger follower can provide better feedback
+ers [66, 73, 74], across all the metrics. For example, SR      signals to the speaker during cycle-consistent learning.
+and SPL of E-Dropout [66] are improved by 4.2 and 2.9,     User Study. We organize two user studies. In the ﬁrst user
+respectively. For Active Perception [74], it obtains signiﬁ-      study, we sample 500 paths in val unseen and generate
+cant performance gains, e.g., 4.9 SR and 4.2 SPL. Based on      instructions through our three speakers (i.e., Ours-Seq2Seq,
+SSM [73], our CCC further improves the SR to 62.2.           Ours-Speaker-Follower, Ours-RCM). 25 volunteer students
+                                                                are asked to select the most meaningful instruction from
+4.2. Performance on Instruction Generation                                                              those compared for each path. Ours-RCM receives more
+Dataset. As R2R [7] test unseen set is preserved for     votes than the others (Ours-RCM: 40.5% vs Ours-Speaker-
+benchmarking instruction following methods, we report the     Follower: 32.1% vs Ours-Seq2Seq: 27.4%). In the second
+performance of instruction generation on val seen and     user study, we let other 25 students compare the outputs
+val unseen sets. Note that, in R2R, each path is associ-     of Ours-RCM, BT Speaker and VLS. Ours-RCM wins with
+ated with three ground-truth navigation instructions.          68.6% picking rate (BT Speaker: 13.2%, VLS: 18.2%).
+
+
+                                     val seen                                   val unseen
+         Model
+                          Bleu-1 ↑Bleu-4 ↑CIDEr ↑  Meteor ↑Rouge ↑ SPICE ↑  Bleu-1 ↑Bleu-4 ↑CIDEr ↑  Meteor ↑  Rouge ↑SPICE ↑
+    BT Speaker [24]       0.537    0.155    0.121     0.233     0.350     0.203     0.522    0.142    0.114     0.228     0.346     0.188
+       VLS [2]           0.549    0.157    0.137     0.228     0.352     0.214     0.548    0.159    0.132     0.231     0.357     0.197
+      Ours-Seq2Seq        0.720    0.296    0.529     0.233     0.487     0.216     0.704    0.273    0.475     0.229     0.473     0.202
+   Ours-Speaker-Follower    0.723    0.299    0.566     0.235     0.490     0.229     0.706    0.275    0.477     0.229     0.474     0.207
+       Ours-RCM         0.728    0.287    0.543     0.236     0.493     0.231     0.708    0.272    0.461     0.231     0.477    0.214
+                    Table 3: Quantitative comparison results (§4.2) for instruction generation on R2R dataset [7].
+
+
+                                                                 715477
+=== PDF PAGE 8 ===
+                                                               Instruction Following                           Instruction Generation
+          Model            Component
+                                        SR↑  NE↓  OR↑  SPL↑  Bleu-1 ↑  Bleu-4 ↑  CIDEr ↑  Meteor ↑  Rouge ↑  SPICE ↑
+
+        Baseline [24]                      -                29.9   6.9   40.7   21.0    0.522     0.142     0.114     0.228     0.346     0.188
+                     △AE               33.2   6.7   44.7   23.7    0.694     0.269     0.446     0.228     0.471     0.192
+           Cycle-          △XE               28.6   6.9   40.1   20.5    0.699     0.271     0.456     0.228     0.472     0.195
+         Consistency        △AE+△XE             35.1   6.7   44.5   25.4    0.702     0.272     0.462     0.229     0.472     0.196
+                 △AE+△XE +△A′E          37.7   6.6   45.9   26.7    0.703     0.272     0.467     0.229     0.471     0.198
+        Counterfactual  w/o reference environment Er   29.9   6.9   40.7   21.0    0.522     0.142     0.114     0.228     0.346     0.188
+        Environment   w reference environment Er    41.7   5.9   50.7   35.6    0.701     0.271     0.459     0.229     0.472     0.200
+          Full Model   △AE+△XE +△A′E +△AE+△X¯   E¯    43.5   5.8   52.0   38.1    0.706     0.275     0.477     0.229     0.474     0.207
+                          Table 4: Ablation study on val unseen of R2R dataset [7]. See §4.3 for details.
+
+
+
+
+
+       Figure 3: Visual comparison results on instruction following (left) and instruction generation (right). See §4.3 for details.
+
+4.3. Diagnostic Experiments                          two critical components individually, we evaluate the effec-
+                                                                 tiveness of our full model design. Our full model learns the  To fully examine the effectiveness of our core model
+designs, a set of ablative studies are conducted on val      speaker, follower, and creator jointly with comprehensive
+unseen of R2R [7] (Table 4). Our model is built upon [24].     use of labeled and unlabeled “real” data as well as coun-
+                                                                     terfactual examples. As evidenced in Table 4, CCC bringsCycle-Consistent Learning. We ﬁrst assess the contribu-
+                                                   more signiﬁcant performance improvements over each indi-tion of our cycle-consistent learning scheme (cf. §3.1). For
+                                                              vidual module on both instruction following and generation.the baseline method, the follower and speaker are trained
+                                                          Visual Comparison Results. Finally, some visual resultsseparately and independently. Then we build four alterna-
+tives, i.e., △AE, △XE , △AE +△XE , and △AE+△XE +△A′E . The      are provided in Fig. 3 for more intuitive comparisons. From
+                                                                the left sub-ﬁgure we can observe that, the follower trainedﬁrst three baselines are trained by minimizing different △
+                                                          with our CCC framework can derive a more robust naviga-errors on the labeled dataset D only while the last one addi-
+                                                                   tion policy and thus reaches the target location successfully.tionally uses unlabeled data U, i.e., 17K randomly sampled
+paths A′ as in [24]. From Table 4, we can conclude that:    As shown in the right sub-ﬁgure, our speaker is able to gen-
+                                                                   erate more accurate instructions; some novel actions andi) leveraging cross-task relations indeed boosts the perfor-
+                                                        landmarks are successfully mentioned. During training, ourmance on both instruction following and generation (while
+△XE greatly facilitates instruction generation with small per-     strong speaker in turn boosts the learning of the follower.
+formance sacriﬁce of instruction following), and  ii) our
+                                                          5. Conclusion
+cycle-consistency learning scheme not only works well on
+labeled data, but also makes better use of unlabeled data.       We introduced a powerful training framework, CCC, that
+Counterfactual Environment Creation. Next we study the      learns navigation generation and following simultaneously.
+efﬁcacy of our counterfactual thinking strategy (cf. §3.2). To       It explicitly leverages cross-task connections to regularize
+this end, we separately train the speaker and follower on the      the training of both the speaker and follower. Hence, a cre-
+counterfactualexamplescreatedbythecreatorwithoutcycle-      ator is integrated into such cycle-consistent learning system,
+consistent learning. We build a baseline ‘w/o reference en-     so as to synthesize counterfactual environments and further
+vironment Er’ by randomly masking a part of the original      facilitate training. The CCC framework is model-agnostic
+scene without considering reference environment. Table 4     and can be integrated into a diverse collection of navigation
+shows that: i) our synthesized counterfactual environments     models, leading to performance improvements over both in-
+can beneﬁt the training of both the speaker and follower, and      struction following and generation, in the R2R dataset.
+ii) additionally considering reference environments during     Acknowledgements This work was supported by Natural Science
+synthesizing can produce more informative counterfactuals.      Foundation of China (NSFC) grant (No. 62172043) and ARC DE-
+Full Model Design.  After examining the contribution of    CRA DE220101390.
+
+
+                                                                 815478
+=== PDF PAGE 9 ===
+References                                                        Generating and evaluating landmark-based navigation in-
+                                                                                structions in virtual environments.  In European Workshop
+ [1] Ehsan Abbasnejad, Damien Teney, Amin Parvaneh, Javen                                                              on Natural Language Generation, 2015. 3
+      Shi, and Anton van den Hengel. Counterfactual vision and      [17] Robert Dale, Sabine Geldof, and J Prost. Using natural lan-
+     language learning. In CVPR, 2020. 3                             guage generation in automatic route.  Journal of Research
+ [2] Sanyam Agarwal, Devi Parikh, Dhruv Batra, Peter Ander-                                                              and Practice in Information Technology, 36(3):23, 2004. 3
+     son, and Stefan Lee.  Visual landmark selection for gener-      [18] Andrea F Daniele, Mohit Bansal, and Matthew R Walter.
+      ating grounded and interpretable navigation instructions. In           Navigational instruction generation as inverse reinforcement
+    CVPR Workshop, 2019. 3, 7                                           learning with neural machine translation.  In International
+ [3] Vedika Agarwal, Rakshith Shetty, and Mario Fritz. Towards                                                                    Conference on Human-Robot Interaction, 2017. 1, 3
+     causal VQA: Revealing and reducing spurious correlations      [19] Zhiwei Deng, Karthik Narasimhan, and Olga Russakovsky.
+    by invariant and covariant semantic editing. In CVPR, 2020.          Evolving graphical planner: Contextual global planning for
+    3                                                                  vision-and-language navigation. In NeurIPS, 2021. 2
+ [4] Gary L Allen.  From knowledge to words to wayﬁnding:      [20] Mary T Dzindolet, Scott A Peterson, Regina A Pomranky,
+     Issues in the production and comprehension of route direc-          Linda G Pierce, and Hall P Beck. The role of trust in automa-
+      tions.  In International Conference on Spatial Information            tion reliance.  International Journal of Human-Computer
+     Theory, 1997. 3                                                         Studies, 58(6):697–718, 2003. 1
+ [5] Peter Anderson, Angel Chang, Devendra Singh Chaplot,      [21] Kai Epstude and Neal J Roese.  The functional theory of
+     Alexey Dosovitskiy, Saurabh Gupta, Vladlen Koltun, Jana            counterfactual thinking. Personality and Social Psychology
+     Kosecka, Jitendra Malik, Roozbeh Mottaghi, Manolis Savva,           Review, 12(2):168–192, 2008. 3
+      et al. On evaluation of embodied navigation agents. arXiv      [22] Mary Ellen Foster.  Natural language generation for social
+     preprint arXiv:1807.06757, 2018. 6                                     robotics: opportunities and challenges. Philosophical Trans-
+ [6] Peter Anderson,  Basura Fernando, Mark Johnson, and           actions of the Royal Society B, 374(1771):20180027, 2019.
+     Stephen Gould.  Spice: Semantic propositional image cap-         3
+      tion evaluation. In ECCV, 2016. 7                               [23] Daniel Fried, Jacob Andreas, and Dan Klein.   Uniﬁed
+ [7] Peter Anderson, Qi Wu, Damien Teney, Jake Bruce, Mark           pragmatic models for generating and following instructions.
+     Johnson, Niko S¨underhauf, Ian Reid, Stephen Gould, and           arXiv preprint arXiv:1711.04987, 2017. 3
+    Anton van den Hengel. Vision-and-language navigation: In-      [24] Daniel Fried, Ronghang Hu, Volkan Cirik, Anna Rohrbach,
+      terpreting visually-grounded navigation instructions in real          Jacob  Andreas,  Louis-Philippe Morency,  Taylor  Berg-
+     environments. In CVPR, 2018. 1, 2, 3, 4, 6, 7, 8                        Kirkpatrick, Kate Saenko, Dan Klein, and Trevor Darrell.
+ [8] Jacob Andreas and Dan Klein. Alignment-based composi-           Speaker-follower models for vision-and-language naviga-
+      tional semantics for instruction following. In EMNLP, 2015.             tion. In NeurIPS, 2018. 2, 3, 4, 5, 6, 7, 8
+    2                                                               [25] Tsu-Jui Fu, Xin Wang, Matthew Peterson, Scott Grafton,
+ [9] Sean Andrist, Erin Spannan, and Bilge Mutlu.  Rhetorical          Miguel Eckstein, and William Yang Wang. Counterfactual
+      robots: making robots more effective speakers using linguis-           vision-and-language navigation via adversarial path sam-
+       tic cues of expertise. In International Conference on Human-            pling. In ECCV, 2020. 2, 3, 5, 6
+     Robot Interaction, 2013. 1                                      [26] Vittorio Girotto, Donatella Ferrante, Stefania Pighin, and
+[10] Satanjeev Banerjee and Alon Lavie. Meteor: An automatic          Michel Gonzalez. Postdecisional counterfactual thinking by
+     metric for mt evaluation with improved correlation with hu-            actors and readers. Psychological Science, 2007. 2, 5
+    man judgments. In ACL Workshop, 2005. 7                      [27] Robert Goeddel and Edwin Olson.  Dart: A particle-based
+[11] Angel Chang, Angela Dai, Thomas Funkhouser, Maciej Hal-         method for generating easy-to-follow directions. In Interna-
+      ber, Matthias Niessner, Manolis Savva, Shuran Song, Andy            tional Conference on Intelligent Robots and Systems, 2012.
+     Zeng, and Yinda Zhang. Matterport3D: Learning from RGB-             1, 3
+   D data in indoor environments. 3DV, 2017. 2                    [28] Yash Goyal, Ziyan Wu, Jan Ernst, Dhruv Batra, Devi Parikh,
+[12] David L Chen and Raymond J Mooney. Learning to interpret          and Stefan Lee.  Counterfactual visual explanations.   In
+      natural language navigation instructions from observations.         ICML, 2019. 3
+     In AAAI, 2011. 2                                               [29] Scott A Green, Mark Billinghurst, XiaoQi Chen, and J Ge-
+[13] Kevin Chen,  Junshen K. Chen,  Jo Chuang,  Marynel            offrey Chase. Human-robot collaboration: A literature re-
+     Vazquez, and Silvio Savarese.  Topological planning with          view and augmented reality approach in design.  Interna-
+     transformers for vision-and-language navigation. In CVPR,            tional Journal of Advanced Robotic Systems, 5(1):1, 2008.
+     2021. 2                                                   1
+[14] Long Chen, Xin Yan, Jun Xiao, Hanwang Zhang, Shiliang      [30] Weituo Hao, Chunyuan Li, Xiujun Li, Lawrence Carin, and
+     Pu, and Yueting Zhuang. Counterfactual samples synthesiz-           Jianfeng Gao. Towards learning a generic agent for vision-
+     ing for robust visual question answering.  In CVPR, 2020.           and-language navigation via pre-training.  In CVPR, 2020.
+    3                                                         2
+[15] Heriberto Cuay´ahuitl, Nina Dethlefs, Lutz Frommberger,      [31] Di He, Yingce Xia, Tao Qin, Liwei Wang, Nenghai Yu, Tie-
+     Kai-Florian Richter, and John Bateman. Generating adaptive         Yan Liu, and Wei-Ying Ma. Dual learning for machine trans-
+     route instructions using hierarchical reinforcement learning.             lation. In NeurIPS, 2016. 3, 4
+     In International Conference on Spatial Cognition, 2010. 3        [32] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
+[16] Amanda Cercas Curry, Dimitra Gkatzia, and Verena Rieser.
+
+
+                                                                 915479
+=== PDF PAGE 10 ===
+    Deep residual learning for image recognition.  In CVPR,         7
+     2016. 6                                                        [51] Matt MacMahon, Brian Stankiewicz, and Benjamin Kuipers.
+[33] Lisa Anne Hendricks, Ronghang Hu, Trevor Darrell, and         Walk the talk: connecting language, knowledge, and action
+    Zeynep Akata. Grounding visual explanations.  In ECCV,            in route instructions. In AAAI, 2006. 2
+     2018. 3                                                        [52] Arjun Majumdar, Ayush Shrivastava, Stefan Lee, Peter An-
+[34] Yicong Hong, Cristian Rodriguez-Opazo, Yuankai Qi, Qi           derson, Devi Parikh, and Dhruv Batra.  Improving vision-
+    Wu, and Stephen Gould. Language and visual entity rela-           and-language navigation with image-text pairs from the web.
+      tionship graph for agent navigation. NeurIPS, 2020. 3                 In ECCV, 2020. 2
+[35] Yicong Hong, Qi Wu, Yuankai Qi,  Cristian Rodriguez-      [53] Hongyuan Mei, Mohit Bansal, and Matthew R Walter. Lis-
+     Opazo, and Stephen Gould. Vln bert: A recurrent vision-             ten, attend, and walk: Neural mapping of navigational in-
+     and-language bert for navigation. In CVPR, 2021. 2                     structions to action sequences. In AAAI, 2016. 2
+[36] Ronghang Hu, Daniel Fried, Anna Rohrbach, Dan Klein,      [54] Dipendra Misra, Andrew Bennett,  Valts Blukis, Eyvind
+     Trevor Darrell, and Kate Saenko. Are you looking? ground-           Niklasson, Max Shatkhin, and Yoav Artzi. Mapping instruc-
+     ing to multiple modalities in vision-and-language navigation.            tions to actions in 3d environments with visual goal predic-
+     In ACL, 2019. 2                                                              tion. In EMNLP, 2018. 2
+[37] Haoshuo Huang, Vihan Jain, Harsh Mehta, Alexander Ku,      [55] Volodymyr Mnih, Adria Puigdomenech Badia, Mehdi Mirza,
+     Gabriel Magalhaes, Jason Baldridge, and Eugene Ie. Trans-          Alex Graves, Timothy Lillicrap, Tim Harley, David Silver,
+      ferable representation learning in vision-and-language navi-          and Koray Kavukcuoglu. Asynchronous methods for deep
+      gation. In ICCV, 2019. 2                                            reinforcement learning. In ICML, 2016. 6
+[38] Liyiming Ke, Xiujun Li, Yonatan Bisk, Ari Holtzman, Zhe      [56] Lawrence Neal, Matthew Olson, Xiaoli Fern, Weng-Keen
+     Gan, Jingjing Liu, Jianfeng Gao, Yejin Choi, and Siddhartha         Wong, and Fuxin Li. Open set learning with counterfactual
+      Srinivasa. Tactical rewind: Self-correction via backtracking           images. In ECCV, 2018. 3
+      in vision-and-language navigation. In CVPR, 2019. 2, 4, 7        [57] Stefan Oßwald, Henrik Kretzschmar, Wolfram Burgard, and
+[39] Taeksoo Kim, Moonsu Cha, Hyunsoo Kim, Jung Kwon Lee,            Cyrill Stachniss. Learning to give route directions from hu-
+     and Jiwon Kim. Learning to discover cross-domain relations        man demonstrations. In ICRA, 2014. 3
+     with generative adversarial networks. In ICML, 2017. 3          [58] Kishore Papineni, Salim Roukos, Todd Ward, and Wei-Jing
+[40] Benjamin Kuipers. Modeling spatial knowledge. Cognitive          Zhu.  Bleu: a method for automatic evaluation of machine
+     Science, 2(2):129–153, 1978. 3                                            translation. In ACL, 2002. 7
+[41] Matt Kusner, Joshua Loftus, Chris Russell, and Ricardo      [59] Amin Parvaneh, Ehsan Abbasnejad, Damien Teney, Qinfeng
+      Silva. Counterfactual fairness. In NeurIPS, 2017. 3                     Shi, and Anton van den Hengel. Counterfactual vision-and-
+[42] Yikang Li, Nan Duan, Bolei Zhou, Xiao Chu, Wanli Ouyang,          language navigation: Unravelling the unseen.  In NeurIPS,
+     Xiaogang Wang, and Ming Zhou. Visual question generation           2020. 3
+     as dual task of visual question answering. In CVPR, 2018. 3      [60] Yuankai Qi, Zizheng Pan, Shengping Zhang, Anton van den
+[43] Chin-Yew Lin. Rouge: A package for automatic evaluation           Hengel, and Qi Wu. Object-and-action aware model for vi-
+     of summaries. In Text Summarization Branches Out, pages            sual language navigation. In ECCV, 2020. 2, 7
+     74–81, 2004. 7                                                 [61] Kai-Florian Richter and Matt Duckham.  Simplest instruc-
+[44] Gary Look, Buddhika Kottahachchi, Robert Laddaga, and             tions: Finding easy-to-describe routes for navigation. In In-
+    Howard Shrobe. A location representation for generating de-            ternational Conference on Geographic Information Science,
+      scriptive walking directions. In Proceedings of the Interna-           2008. 3
+      tional Conference on Intelligent User Interfaces, 2005. 3         [62] Neal J Roese. Counterfactual thinking. Psychological Bul-
+[45] Kristin L Lovelace, Mary Hegarty, and Daniel R Montello.              letin, 121(1):133, 1997. 2, 3
+     Elements of good route directions in familiar and unfamiliar      [63] Sebastian Schuster, Ranjay Krishna, Angel Chang, Li Fei-
+     environments. In International Conference on Spatial Infor-            Fei, and Christopher D Manning. Generating semantically
+     mation Theory, 1999. 3                                                precise scene graphs from textual descriptions for improved
+[46] Xiankai Lu, Wenguan Wang, Jianbing Shen, Yu-Wing Tai,          image retrieval. In VL, 2015. 7
+     David J Crandall, and Steven CH Hoi. Learning video object      [64] Meet Shah, Xinlei Chen, Marcus Rohrbach, and Devi Parikh.
+     segmentation from unlabeled videos. In CVPR, 2020. 3               Cycle-consistency for robust visual question answering. In
+[47] Fuli Luo, Peng Li,  Jie Zhou, Pengcheng Yang, Baobao         CVPR, 2019. 3
+     Chang, Zhifang Sui, and Xu Sun. A dual reinforcement      [65] Kristina Striegnitz, Alexandre Denis, Andrew Gargett, Kon-
+     learning framework for unsupervised text style transfer. In            stantina Garouﬁ, Alexander Koller, and Mari¨et Theune. Re-
+     IJCAI, 2019. 2                                                         port on the second challenge on generating instructions in
+[48] Kevin Lynch. The Image of the City. The MIT Press, 1960.             virtual environments (give-2.5). In European Workshop on
+    3                                                                Natural Language Generation, 2011. 3
+[49] Chih-Yao Ma, Jiasen Lu, Zuxuan Wu, Ghassan AlRegib,      [66] Hao Tan, Licheng Yu, and Mohit Bansal. Learning to nav-
+     Zsolt Kira, Richard Socher, and Caiming Xiong.   Self-            igate unseen environments: Back translation with environ-
+     monitoring navigation agent via auxiliary progress estima-          mental dropout. In NAACL, 2019. 2, 3, 4, 6, 7
+      tion. In ICLR, 2019. 2, 7                                        [67] Duyu Tang, Nan Duan, Tao Qin, Zhao Yan, and Ming Zhou.
+[50] Chih-Yao Ma, Zuxuan Wu, Ghassan AlRegib, Caiming          Question answering and question generation as dual tasks.
+     Xiong, and Zsolt Kira. The regretful agent: Heuristic-aided           arXiv preprint arXiv:1706.02027, 2017. 3
+     navigation through progress estimation. In CVPR, 2019. 2,      [68] Stefanie  Tellex,  Thomas  Kollar,   Steven  Dickerson,
+
+
+                                                 1015480
+=== PDF PAGE 11 ===
+    Matthew R Walter, Ashis Gopal Banerjee, Seth  Teller,         3
+     and Nicholas Roy.  Understanding natural language com-      [86] Yi Yang, Yueting Zhuang, and Yunhe Pan. Multiple knowl-
+    mands for robotic navigation and mobile manipulation.  In          edge representation for big data artiﬁcial intelligence: frame-
+     AAAI, 2011. 1, 2                                                work, applications, and case studies. Frontiers of Informa-
+[69] Jesse Thomason, Michael Murray, Maya Cakmak, and Luke            tion Technology & Electronic Engineering, 2021. 3
+     Zettlemoyer.  Vision-and-dialog navigation.  In Conference      [87] Zhongqi Yue, Tan Wang, Hanwang Zhang, Qianru Sun, and
+    on Robot Learning, 2020. 1                                     Xian-Sheng Hua. Counterfactual zero-shot and open-set vi-
+[70] Eric J Vanetti and Gary L Allen. Communicating environ-            sual recognition. In CVPR, 2021. 3
+     mental knowledge: The impact of verbal and spatial abili-      [88] Ming Zhao, Peter Anderson, Vihan Jain, Su Wang, Alexan-
+      ties on the production and comprehension of route directions.           der Ku, Jason Baldridge, and Eugene Ie. On the evaluation of
+     Environment and Behavior, 20(6):667–682, 1988. 3                   vision-and-language navigation instructions. In Conference
+[71] Ramakrishna Vedantam, C Lawrence Zitnick, and Devi            of the European Chapter of the Association for Computa-
+     Parikh.  Cider: Consensus-based image description evalua-            tional Linguistics, 2021. 7
+      tion. In CVPR, 2015. 7                                         [89] Zhibing Zhao, Yingce Xia, Tao Qin, Lirong Xia, and Tie-Yan
+[72] David Waller and Yvonne Lippa. Landmarks as beacons and            Liu.  Dual learning: Theoretical study and an algorithmic
+      associative cues: their role in route learning. Memory & Cog-            extension. In Asian Conference on Machine Learning, 2020.
+      nition, 35(5):910–924, 2007. 3                                 3
+[73] Hanqing Wang, Wenguan Wang, Wei Liang, Caiming Xiong,      [90] Fengda Zhu, Yi Zhu, Xiaojun Chang, and Xiaodan Liang.
+     and Jianbing Shen.  Structured scene memory for vision-           Vision-language navigation with self-supervised auxiliary
+     language navigation. In CVPR, 2021. 2, 7                            reasoning tasks. In CVPR, 2020. 2, 7
+[74] Hanqing Wang, Wenguan Wang, Tianmin Shu, Wei Liang,      [91] Jun-Yan Zhu, Taesung Park, Phillip Isola, and Alexei A
+     and Jianbing Shen. Active visual information gathering for            Efros.  Unpaired image-to-image translation using cycle-
+     vision-language navigation. In ECCV, 2020. 2, 7                       consistent adversarial networks. In ICCV, 2017. 3
+[75] Haiyang Wang, Wenguan Wang, Xizhou Zhu, Jifeng Dai,
+     and Liwei Wang.  Collaborative visual navigation.  arXiv
+     preprint arXiv:2107.01151, 2021. 1
+[76] Jijun Wang and Michael Lewis. Human control for cooper-
+      ating robot teams. In International Conference on Human-
+     Robot Interaction, 2007. 1
+[77] Ning Wang, Yibing Song, Chao Ma, Wengang Zhou, Wei
+     Liu, and Houqiang Li.  Unsupervised deep tracking.  In
+    CVPR, 2019. 3
+[78] Tan Wang, Jianqiang Huang, Hanwang Zhang, and Qianru
+     Sun. Visual commonsense r-cnn. In CVPR, 2020. 3
+[79] Xin Wang, Qiuyuan Huang, Asli Celikyilmaz, Jianfeng Gao,
+     Dinghan Shen, Yuan-Fang Wang, William Yang Wang, and
+     Lei Zhang.   Reinforced cross-modal matching and self-
+     supervised imitation learning for vision-language navigation.
+     In CVPR, 2019. 2, 4, 6
+[80] Xin Wang, Vihan Jain, Eugene Ie, William Yang Wang, Zor-
+      nitsa Kozareva, and Sujith Ravi. Environment-agnostic mul-
+      titask learning for natural language grounded navigation. In
+    ECCV, 2020. 2, 3
+[81] Xin Wang, Wenhan Xiong, Hongmin Wang, and William
+    Yang Wang.  Look before you leap: Bridging model-free
+     and model-based reinforcement learning for planned-ahead
+     vision-and-language navigation. In ECCV, 2018. 2
+[82] Yiren Wang, Yingce Xia, Tianyu He, Fei Tian, Tao Qin,
+    ChengXiang Zhai, and Tie-Yan Liu. Multi-agent dual learn-
+      ing. In ICLR, 2019. 4
+[83] Shawn L Ward, Nora Newcombe, and Willis F Overton. Turn
+       left at the church, or three miles north: A study of direc-
+      tion giving and sex differences. Environment and Behavior,
+     18(2):192–213, 1986. 3
+[84] James Woodward. Psychological studies of causal and coun-
+      terfactual reasoning.  Understanding Counterfactuals, Un-
+     derstanding Causation, 2011. 2, 5
+[85] Yingce Xia, Tao Qin, Wei Chen, Jiang Bian, Nenghai Yu,
+     and Tie-Yan Liu. Dual supervised learning. In ICML, 2017.
+
+
+                                                 1115481

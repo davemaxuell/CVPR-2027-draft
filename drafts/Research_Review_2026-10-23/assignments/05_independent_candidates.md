@@ -1,0 +1,19 @@
+# Assignment 5 — independent candidate record
+
+Recorded 2026-10-23, before inspecting Assignment 2/4/6 suggestions or their conclusions. Sources read at this point: REVIEW_BRIEF.md, original CE_World_Model_Approach.md and Scorer_Design.md; no prior review reports. These are hypotheses, not novelty claims.
+
+## Independent interventions from a cross-field view
+
+1. **Use predicted observations only to estimate an action-value correction.** Fit a history/action-only value estimator and a small future-conditioned residual with the same measured branch returns. Compare the residual from actual next observations against predicted next observations. Cross-fit the baseline so residual labels are honest out of sample. This asks whether a world model supplies a useful representation beyond the direct action-value model. It does not add information in the deterministic/infinite-capacity limit; the possible benefit is transfer, finite-sample inductive bias, or optimization. A general residual architecture is unlikely to be novel. Simplicity advantage: one scalar correction per action, no new planner.
+
+2. **Preserve within-root action-value contrasts while learning dynamics.** Train an actual-future evaluator on measured outcomes, freeze it, and make predicted futures preserve its pairwise action score differences, anchored by ordinary feature prediction. Hypothesis: route-relevant action distinctions matter more than global feature fidelity. Immediate concern: squared pairwise differences reduce to centered regression; generic task/value-aware model learning is prior art. The CE contribution would need a specific, demonstrated failure that ordinary value regression cannot address.
+
+3. **Spend branch collection where the decision is uncertain, with paired continuations.** Use common continuation random seeds across alternative actions, estimate paired utility differences, and allocate repeated branches only around uncertain override decisions. This may reduce label expense and produce an interpretable selective override rule. It is a classical experimental-design/control-variate idea; likely a practical protocol rather than a standalone contribution. Common seeds must not be interpreted as restoring identical future observations after actions diverge.
+
+4. **Match prediction horizon to the first discriminating consequence.** One primitive turn may only rotate a camera, while instruction-relevant effects become visible after several actions. Compare short fixed candidate prefixes with a continuation value at their endpoints, preserving actual execution/label agreement. Adaptive horizons require an explicit observable criterion and runtime accounting. Likely close to existing MPC, options, and reachability; do not claim novelty without a precise distinction.
+
+5. **Refresh the value target on the overridden policy's visited states.** Original labels follow a frozen base policy, while execution repeatedly overrides it. Keep the navigation backbone frozen but collect a second branch-label round under the current reranking policy and fit the same small evaluator. This is an approximate policy-iteration/reduction-to-cost-sensitive-learning intervention, not a new method by itself. It may resolve a material design mismatch if performance degrades in closed loop.
+
+## Provisional preference before literature
+
+First run candidate 1 as a stringent scientific control, using actual-future residuals to establish potential and predicted-future residuals to establish realization. Candidate 2 is the simplest trainable world-model intervention if a real gap is established, but it carries the largest exact-reduction risk. Candidate 3 is a useful data-efficiency addition; candidates 4–5 should be activated by evidence of horizon or policy-distribution failure. No two or three original CVPR contributions are established by these ideas alone.

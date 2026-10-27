@@ -1,0 +1,140 @@
+{
+  "format": "scorer_features_protocol_v1",
+  "version": "smolvlm2_refined512_dino_pair_v1",
+  "policy_identity_sha256": "729480bf5c8402b07cad653a7ef0f7124be212d50255077290316ba686777ca7",
+  "encoder_identity_sha256": "072c391c8764fbdcdb9e00bfbf9ec016873fa9707c573e400f44ff385f01f9dd",
+  "policy_reference": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/step4_smolvlm2_refined512/reference",
+  "policy_decoder": {
+    "family": "add STOP-only bias then argmax over four first-token action logits",
+    "stop_logit_bias": -0.25,
+    "action_order": [
+      "STOP",
+      "FORWARD",
+      "LEFT",
+      "RIGHT"
+    ],
+    "batch_size": 1,
+    "actions_per_forward": 1,
+    "tie_break": "first action in declared order"
+  },
+  "selection_caveat": {
+    "authority": "explicit_user_selection_2026-10-26",
+    "decision": "proceed_with_refined_checkpoint_512_and_STOP_bias_minus_0.25",
+    "original_stopping_safeguard_passed": false,
+    "all_original_locked_criteria_passed": false,
+    "failed_criterion": "premature_stops_at_most_step2",
+    "incorrect_stops": 149,
+    "confirmation_episodes": 224,
+    "reason": "User deliberately selected the highest measured-success refinement despite its failed stopping safeguard.",
+    "historical_decision_preserved": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/step3b_smolvlm2_stop/reference_decision.json",
+    "control_reference": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/step3_smolvlm2/frozen_reference",
+    "control_bundle_manifest_sha256": "e08277d7ef1fca0a1ddce470420c6b75ca53c5de8dfe1039dc02e6118680a3b5"
+  },
+  "index_manifest_sha256": "ec80d30acb34b389ab6bea82add7e72ce714d5b89b9a73a7447d6cfa4f65f49f",
+  "runtime_checks_sha256": "6e8dfa0ee73b1839a41ed35feb217d9a59f7e63980ee98f120cc0a55b5223762",
+  "cache": "/data/team_a/dave-workspace/RoleVLN/data/processed/baseline_v0/scorer_features_smolvlm2_refined512_dino_pair_v1",
+  "groups": {
+    "fit": "B",
+    "development": "C"
+  },
+  "models": {
+    "dinowm_transfer": {
+      "bundle": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/step5_smolvlm2_refined512/frozen/dinowm_transfer",
+      "config_sha256": "dec43aab2bd39cfa0094aff5e09b9d8138b8b7f89cf2cd9c4af5dd03639e4e64",
+      "model_sha256": "458ad8170d47525f81fa6b2be0e0676e41a098dfeab4d06bd811feec93b41fb3",
+      "selected_step": 36864
+    },
+    "dinov2_fresh_dynamics": {
+      "bundle": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/step5_smolvlm2_refined512/frozen/dinov2_fresh_dynamics",
+      "config_sha256": "dfb228c30a23e3ec14de5163c5504e975da8ded98b2a34fa76a79fb0fb0fd4ae",
+      "model_sha256": "17583b93a40a9a7ac26823bf36521ee2ebc6e08f14bdb4262a7fa45aa2682f91",
+      "selected_step": 36864
+    }
+  },
+  "instruction": "Native user chat containing the full instruction only; final norm at instruction-token offsets; whitespace strip matches the navigation prompt; no truncation",
+  "context": {
+    "hook": "base_model.model.model.text_model.norm",
+    "mask": "native expanded input attention_mask",
+    "forward": "one full native prefill, no KV/vision approximation",
+    "stored_dtype": "bfloat16"
+  },
+  "real_memory": "All actual observation updates from zero through each root; START=4 then actual canonical previous actions; elapsed=t/original_budget; no cached trainable memory",
+  "visual": {
+    "raw_shape": [
+      196,
+      384
+    ],
+    "raw_dtype": "float16",
+    "pooled_shape": [
+      49,
+      384
+    ],
+    "pooling": "float32 2x2 mean of raw FP16 features; store float32",
+    "encoder_batch": 1,
+    "loader_workers": 4,
+    "batch_choice": "Native one-image inference; avoids cuDNN TF32 convolution changing with large encoder batches",
+    "batch_diagnosis_sha256": "fc95160a851d72c5c3c5c246e0f0c2533be260f1fd5842d0178e238a14c92f4b"
+  },
+  "future": {
+    "models": [
+      "dinowm_transfer",
+      "dinov2_fresh_dynamics"
+    ],
+    "samples_per_movement_action_per_model": 1,
+    "prediction_batch": 1,
+    "history": "last three actual raw DINO frames, two intervening executed canonical commands",
+    "minimum_observations": 4,
+    "STOP": "exact current pooled features, no model call",
+    "actual_next": "encode each measured first-next RGB; same labels as both predictions",
+    "pooled_dtype": "float32",
+    "model_identity_input": false,
+    "intended_model_sampling": "equal (1/2 each) in Step 8"
+  },
+  "scope": "Initial DINO pair only; NWM/CDiT requires a new pooled dataset/scorer version",
+  "runtime": {
+    "flags": {
+      "matmul_tf32": false,
+      "cudnn_tf32": true,
+      "cudnn_benchmark": false,
+      "deterministic_algorithms": false,
+      "policy_batch_size": 1
+    },
+    "packages": {
+      "torch": "2.8.0+cu128",
+      "transformers": "4.57.1",
+      "peft": "0.17.1",
+      "numpy": "1.26.4",
+      "Pillow": "9.5.0",
+      "torchvision": "0.23.0+cu128"
+    },
+    "device": "physical GPU 0",
+    "policy_workers": 2
+  },
+  "native_source_sha256": {
+    "/home/bufsgpu/yes/envs/rolevln/lib/python3.9/site-packages/transformers/models/smolvlm/modeling_smolvlm.py": "a1ba6cfa366d4b4f385b5aa8d6962fa4b4bd94775f9775deee554c1ba27043d0",
+    "/home/bufsgpu/yes/envs/rolevln/lib/python3.9/site-packages/transformers/models/llama/modeling_llama.py": "31bf660a663259134324bc65da4e155951dc89c5ca46471d2325a9938e859e26"
+  },
+  "source_sha256": {
+    "Scorer/config.json": "04b05c8239bcd57484a0ccdbc40863ffef2535d5e7e7f3359ae2eb32ed100471",
+    "Scorer/interfaces.py": "f04ebf78fd60242b203634acb51a814e3e147bd50da1ed293016d6d5cea0f4b5",
+    "Scorer/scorer.py": "2863c9cbb80ea551ea334effb9aa99d903b87abc5239b9df51fdc633efb155e9",
+    "Scorer/world_models.py": "df909188d68c8a11015e1904ba9d196317fd850941574cc7e659653fccb373b0",
+    "policy/common.py": "fa30de03d782dae761b2444a2d1dcdb853dd756d25cd76cee84ce6b69c5b474e",
+    "policy/experimental_reference.py": "fe22cc1084f3de7ebeadaace7674ca71e272b9fb5cbfeaec6226995066d17e77",
+    "policy/online.py": "763dd6e8873953cc82e427d196fba32aa2ba1d9bc0a5d64ade187d33d7481ac2",
+    "policy/smolvlm2.py": "2dc097c0f3bd09eacd94cb5a438e15635a62b1a9215a0c66f7c2655b437c1a96",
+    "scorer_features/__init__.py": "c9e334817d0b109992efa65ea498539f71ad1e2d6dcdaf8f029ba7c2af7746bb",
+    "scorer_features/cache.py": "8ffd4f914c87d2a278d63b0694428148ab119a0f44ba4a352290f3f1921217b1",
+    "scorer_features/common.py": "a36e87ae759974636cf519a21d07d109c0f6d4842b9239d14fa44f79fbd752cd",
+    "scorer_features/dataset.py": "86bd9b7f4c2fe3de8e5abe2f799a5271fe3f70e4e1aff4acc1a68f868af864f4",
+    "scorer_features/policy.py": "a3b9ca7cfc9d1731d8472be6328e37748db035590911fe94eb768545e566b67c",
+    "tools/cache_step7.py": "69fc50c19af9b65ed8a7d8da60635a9d1664bf05827531be2797b58e943a4173",
+    "tools/check_step7_runtime.py": "5c81d569b08751f6a575bfda174ac25e62992e197e7b9e0d672b867842ef2a1a",
+    "tools/prepare_step7.py": "5afc1a74143c8d3fb5e70543be2ed1bd9494112a24ead6ffb0c4b149ab06c982",
+    "tools/run_step7.py": "da35812a4ef581c3f23170db05caf5a9be5ee1220d84a5cf37f5d5a52c190320",
+    "tools/verify_step7.py": "ef3c31178a210c460f2777c60f5beb562120b5a5b24a12cf481f2e5855034088",
+    "wm/common.py": "a8f5349a5884ac8373f4c8b3d86f5591cc6861660c719d9bd362dc2b397941fa",
+    "wm/dino.py": "d4741247bcbb47c94be7873473ad53230a4f75d65157e614993d42b1995bf420",
+    "wm/frozen.py": "46adc698fbc1e3f4184f174d17ea4b17773e2437c8c5c0878b4d4da185db1b32"
+  }
+}

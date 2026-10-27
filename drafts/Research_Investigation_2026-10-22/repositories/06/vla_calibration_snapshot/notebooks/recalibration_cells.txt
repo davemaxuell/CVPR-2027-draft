@@ -1,0 +1,347 @@
+CELL 0
+import numpy as np
+import matplotlib.pyplot as plt
+from tqdm import tqdm
+import torch
+
+from vla_calibration.utils import *
+from vla_calibration.calibration import *
+
+import warnings
+warnings.filterwarnings('ignore')
+
+plt.style.use('seaborn-v0_8')
+pal = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
+CELL 1
+def get_scaling_exp_data(data_save_dir, top_n_steps=1):
+
+    with open(f"{data_save_dir}/episode_data_true_prompt.pkl", "rb") as f:  # "rb" = read binary mode
+        data = pkl.load(f)
+
+    all_probs = []
+    all_logits = []
+    correct = []
+
+    for episode in data:
+
+        steps = episode["steps"]
+
+        episode_probs = []
+        episode_logits = []
+
+        for step in steps[:1]:
+
+            if ("molmo" not in data_save_dir) and ("nora" not in data_save_dir):
+
+
+                logits = step["logits"]
+
+                probs = softmax(logits, -1)
+
+            elif "molmo" in data_save_dir:
+                probs = step["probs"]
+                logits = np.log(probs)
+
+
+            else:
+
+                probs = step["probs"]
+
+
+
+            if "nora" in data_save_dir:
+                probs = np.mean(probs)
+
+            episode_probs.append(probs)
+            episode_logits.append(logits)
+
+        episode_probs = np.stack(episode_probs)
+        episode_logits = np.stack(logits)
+
+        all_probs.append(episode_probs)
+        all_logits.append(episode_logits)
+
+        correct.append(int(episode["done"]))
+
+    all_logits = np.stack(all_logits)
+    correct = np.array(correct)
+
+    if "molmo" in data_save_dir:
+
+        print("all logits", all_logits.shape)
+        all_logits = np.expand_dims(all_logits, -1)
+        print("all logits expanded", all_logits.shape)
+
+    all_probs = np.stack(all_probs)
+    print("all probs before", all_probs.shape)
+    if "openvla" in data_save_dir:
+        all_probs = np.max(all_probs, -1)[:,0]
+    else:
+        all_probs = all_probs[:, 0]
+    print("all probs after", all_probs.shape)
+
+    by_dim_results = {"baseline":[]}
+    n_cal_bins = 12
+    for i in range(all_probs.shape[-1]):
+        dim_ece = get_ece(all_probs[:,i], correct, n_cal_bins)
+        # print(f"Dimension {i} ECE: {dim_ece}")
+        by_dim_results["baseline"].append(dim_ece)
+
+    return all_probs, all_logits, correct, by_dim_results
+
+
+CELL 2
+def expand_binary_probs(probs):
+    """
+    Expand 1D probabilities with 0/1 labels into 2D format.
+
+    Args:
+        probs: 1D array-like of shape (N,), P(class 1)
+
+    Returns:
+        probs_2d: (N, 2) array with [P(class 0), P(class 1)]
+    """
+    probs = np.asarray(probs, dtype=float)
+    # 2D probabilities: [P(class 0), P(class 1)]
+    probs_2d = np.stack([1.0 - probs, probs], axis=1)
+    return probs_2d
+
+
+def recal_experiment(
+    action_conf, 
+    action_logits,
+    correct, 
+    test_size=0.4,
+    n_trials = 100,
+    n_cal_bins = 10
+):
+    
+    uncal_eces = []
+    recal_eces = []
+    action_recal_eces = []
+    temp_scale_eces = []
+    pb_eces = []
+    hist_eces = []
+    
+    for trial_no in tqdm(range(n_trials)):
+
+        conf_train, conf_test, logits_train, logits_test, correct_train, correct_test \
+              = train_test_split_three_way(action_conf, action_logits, correct, test_size=test_size, random_state=trial_no)
+        
+        mean_train_conf = np.mean(conf_train, -1)
+        mean_test_conf = np.mean(conf_test, -1)
+
+        uncal_ece = round(get_ece(mean_test_conf, correct_test, n_cal_bins), 3)
+
+        scaler = PlattScaler(max_iter=200, tol=1e-6)
+        scaler.fit(mean_train_conf, correct_train)
+
+        calibrated_probs = scaler.predict(mean_test_conf)
+
+        recal_ece = round(get_ece(calibrated_probs, correct_test, n_cal_bins), 3)
+
+        action_scaler = ActionPlattScaler(max_iter=200, tol=1e-8, combine_method="mean")
+        action_scaler.fit(conf_train, correct_train)
+
+        calibrated_probs = action_scaler.predict(conf_test)
+
+        action_recal_ece = round(get_ece(calibrated_probs, correct_test, n_cal_bins), 3)
+
+        temp_scaler = TempScaler()
+        temp_scaler.set_temperature(torch.Tensor(logits_train), torch.FloatTensor(correct_train))
+        temp_scaler.eval()
+
+        with torch.no_grad():
+            scaled_test_conf = temp_scaler.temperature_scale(torch.Tensor(logits_test).cuda()).cpu().numpy()
+
+        temp_scale_ece = round(get_ece(scaled_test_conf, correct_test, n_cal_bins), 3)
+
+        input_train_conf = expand_binary_probs(mean_train_conf)
+        input_test_conf = expand_binary_probs(mean_test_conf)
+
+        try:
+            pb_calibrator = cal.PlattBinnerTopCalibrator(input_train_conf.shape[0], num_bins=12)
+            pb_calibrator.train_calibration(input_train_conf, correct_train)
+            calibrated_probs = pb_calibrator.calibrate(input_test_conf)
+            pb_recal_ece = round(get_ece(calibrated_probs, correct_test, n_cal_bins), 3)
+        except:
+            print("platt binning failed")
+            pb_recal_ece = uncal_ece
+
+        hist_calibrator = cal.HistogramTopCalibrator(input_train_conf.shape[0], num_bins=8)
+        hist_calibrator.train_calibration(input_train_conf, correct_train)
+        calibrated_probs = hist_calibrator.calibrate(input_test_conf)
+        hist_recal_ece = round(get_ece(calibrated_probs, correct_test, n_cal_bins), 3)
+
+
+        uncal_eces.append(uncal_ece)
+        recal_eces.append(recal_ece)
+        action_recal_eces.append(action_recal_ece)
+
+        temp_scale_eces.append(temp_scale_ece)
+        pb_eces.append(pb_recal_ece)
+        hist_eces.append(hist_recal_ece)
+
+        
+    return {
+        "uncal_ece": np.mean(uncal_eces), "recal_ece": np.mean(recal_eces), "action_recal_ece": np.mean(action_recal_eces),
+        "temp_scale_ece": np.mean(temp_scale_eces), "pb_ece": np.mean(pb_eces), "hist_ece": np.mean(hist_eces),
+        "recal_ece_std": np.std(recal_eces), "action_recal_ece_std": np.std(action_recal_eces),
+        "temp_scale_std": np.std(temp_scale_eces), "pb_std": np.std(pb_eces), "hist_std": np.std(hist_eces),
+        }
+
+
+
+
+CELL 3
+def run_exp(task_name, model_name, quant, n_bins=12, test_size=0.8, n_prompts=20, n_trials=1000, alternate_set=1):
+
+
+    data_save_dir = f"../results/{model_name}/libero_{task_name}"
+    if quant is not None:
+        data_save_dir += f"/{quant}"
+    top_n_steps=1
+    base_conf, base_logits, correct, by_dim_results = get_scaling_exp_data(data_save_dir, top_n_steps)
+
+    print("base probs", base_conf.shape)
+    print("base logits", base_logits.shape)
+
+    print("---------------------\nBase Recalibration")
+    baseline_results = recal_experiment(
+        base_conf, 
+        base_logits,
+        correct, 
+        test_size=test_size,
+        n_trials=n_trials,
+        n_cal_bins=n_bins,
+    )
+    print(baseline_results)
+
+    if model_name == "openvla":
+        bar_colors = pal[1:7]
+    else:
+        bar_colors = pal[2:7]
+    scale_factor = 1.1
+
+    fig, axs = plt.subplots(1,2, figsize=(10, 3.5), width_ratios=[0.45,0.55])
+
+    scores = by_dim_results["baseline"]
+    X = np.arange(len(scores))
+    axs[0].bar(X, scores)
+    labels = [f"{i+1}" for i in range(len(by_dim_results["baseline"]))]
+    axs[0].set_xticks(X, labels, fontsize=15)
+    axs[0].set_xlabel("Action Dimension", fontsize=18)
+
+    scores = [
+        baseline_results["temp_scale_ece"], 
+        baseline_results["hist_ece"], 
+        baseline_results["pb_ece"], 
+        baseline_results["recal_ece"], 
+        baseline_results["action_recal_ece"]
+    ]
+    stds = [
+        baseline_results["temp_scale_std"], 
+        baseline_results["hist_std"], 
+        baseline_results["pb_std"], 
+        baseline_results["recal_ece_std"], 
+        baseline_results["action_recal_ece_std"]
+    ]
+    labels = [
+        "Temp\nScaling", 
+        "Hist.\nBinning", 
+        "Platt\nBinning",
+        "Platt\nScaling",
+        "Action-Wise\nScaling"
+    ]
+
+    if model_name == "molmo":
+        scores = scores[1:]
+        stds = stds[1:]
+        labels = labels[1:]
+
+    X = np.arange(len(scores))
+    axs[1].bar(X, scores, color=bar_colors, yerr=stds/np.sqrt(n_trials), error_kw=dict(ecolor='dimgrey', lw=2, capsize=3, capthick=2))
+    axs[1].set_xticks(X, labels, fontsize=12)
+
+    for i in range(2):
+        axs[i].set_ylabel(r"$\text{ECE}_1$", fontsize=18)
+        axs[i].tick_params(axis="y", labelsize=13)
+
+    if quant is not None:
+        quant_tag = f" ({quant})"
+    else:
+        quant_tag = ""
+
+    axs[1].set_ylim(min(baseline_results["recal_ece"], baseline_results["action_recal_ece"])/scale_factor, None)
+
+    uncal_ece = round(baseline_results["uncal_ece"], 3)
+    plt_text = f"Baseline ECE: {uncal_ece}"
+    axs[1].text(0.95, 0.95, plt_text,
+        transform=axs[1].transAxes,  # Use axes-relative coordinates
+        ha='right',              # Horizontal alignment: right
+        va='top',                # Vertical alignment: top
+        fontsize=12,
+        color='k')
+    
+    models_map = {
+        "openvla": "OpenVLA",
+        "molmo": "MolmoAct"
+    }
+
+    fig.suptitle(f"{models_map[model_name]}{str.title(quant_tag)} - {str.title(task_name)}", fontsize=18, y=0.95)
+    fig.tight_layout()
+
+    quant_save_string = quant_tag.replace("(","").replace(")","").strip()
+    final_save_string = f"../plots/action_scaling_{model_name}_{task_name}_{quant_save_string}_baseline_w_temp_scaling.png"
+    print("saving to", final_save_string)
+
+    plt.savefig(final_save_string, dpi=600, bbox_inches="tight")
+    plt.show()
+
+
+CELL 4
+n_bins = 10
+test_size = 0.8
+n_trials = 1000
+
+model_name = "openvla"
+
+run_exp("spatial", model_name, quant=None, n_bins=n_bins, test_size=test_size, n_trials=n_trials)
+run_exp("goal", model_name, quant=None, n_bins=n_bins, test_size=test_size, n_trials=n_trials)
+
+
+CELL 5
+n_bins = 10
+test_size = 0.8
+n_trials = 1000
+
+model_name = "molmo"
+
+run_exp("spatial", model_name, quant=None, n_bins=n_bins, test_size=test_size, n_trials=n_trials)
+run_exp("goal", model_name, quant=None, n_bins=n_bins, test_size=test_size, n_trials=n_trials)
+
+
+CELL 6
+n_bins = 10
+test_size = 0.8
+n_trials = 1000
+
+model_name = "openvla"
+
+run_exp("spatial", model_name, quant="quant8", n_bins=n_bins, test_size=test_size, n_trials=n_trials)
+run_exp("goal", model_name, quant="quant8", n_bins=n_bins, test_size=test_size, n_trials=n_trials)
+
+
+CELL 7
+n_bins = 10
+test_size = 0.8
+n_trials = 1000
+
+model_name = "openvla"
+
+run_exp("spatial", model_name, quant="quant4", n_bins=n_bins, test_size=test_size, n_trials=n_trials)
+run_exp("goal", model_name, quant="quant4", n_bins=n_bins, test_size=test_size, n_trials=n_trials)
+
+
+CELL 8

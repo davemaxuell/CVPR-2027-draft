@@ -1,0 +1,381 @@
+=== PDF PAGE 1 ===
+Landmark-RxR: Solving Vision-and-Language
+Navigation with Fine-Grained Alignment Supervision
+——– Supplemental Material ——–
+Keji He1,2
+Yan Huang1,2
+Qi Wu3
+Jianhua Yang5
+Dong An1,4
+Shuanglin Sima1,2
+Liang Wang∗1,2,6,7
+1Center for Research on Intelligent Perception and Computing
+National Laboratory of Pattern Recognition
+Institute of Automation, Chinese Academy of Sciences
+2School of Artiﬁcial Intelligence, University of Chinese Academy of Sciences
+3School of Computer Science, University of Adelaide
+4School of Future Technology, University of Chinese Academy of Sciences
+5School of Artiﬁcial Intelligence, Beijing University of Posts and Telecommunications
+6Center for Excellence in Brain Science and Intelligence Technology (CEBSIT)
+7Chinese Academy of Sciences, Artiﬁcial Intelligence Research (CAS-AIR)
+{keji.he, dong.an, shuanglin.sima}@cripac.ia.ac.cn
+{yhuang,
+wangliang}@nlpr.ia.ac.cn
+qi.wu01@adelaide.edu.au
+youngjianhua@bupt.edu.cn
+Appendix
+A Baseline
+Our baseline is similar to the RCM [1] implemented in [2] and is an encoder-decoder architecture.
+The words in instructions are encoded in reverse order in [2], and are encoded sequentially in our
+version.
+The encoder includes an embedding layer and an LSTM layer.
+wi = LSTM(embedding(wi)),
+i = 1, 2, ..., m
+(1)
+where wi is the tokenizer encoded id of the ith word in the instruction, m is the length of the
+instruction, wi is the context-aware feature of ith word in the instruction.
+The decoder includes a vision attention module, a text attention module and an action prediction
+module. At the tth step, the vision attention module computes attention weights for the ith view vt,i
+in panoramic representation and gets the attentive visual feature evt.
+evt = Σisoftmaxi(vT
+t,iWv(ehT
+t−1W e
+H1)T ) · vt,i,
+i = 1, 2, ..., 36
+(2)
+The agent randomly drops the concatenation of the attentive visual feature evt and previous action
+feature eat−1 and then inputs them combined with the context-aware hidden state eht−1 to an LSTM
+and a dropout layer to get the hidden state ht.
+ht = drop(LSTM(drop([evt; eat−1]),eht−1))
+(3)
+For the text attention module, analogous to the vision attention module, the agent computes the
+attentive textual feature ewt.
+ewt = Σisoftmaxi(wT
+i (hT
+t WH)T ) · wi,
+i = 1, 2, ..., m
+(4)
+∗Corresponding author
+35th Conference on Neural Information Processing Systems (NeurIPS 2021).
+
+
+=== PDF PAGE 2 ===
+(b) Mark the 1�� landmark (point#21) and split out 
+the corresponding sub-instruction.
+(c) Mark the 2�� landmark (point#134) and split 
+out the corresponding sub-instruction.
+(d) Mark the 3�� landmark (point#198) and split 
+out the corresponding sub-instruction.
+(e) Mark the 4�ℎ landmark (point#74) and split out 
+the corresponding sub-instruction.
+(f) Mark the 5�ℎ landmark (point#92) and split out 
+the corresponding sub-instruction.
+(g) Mark the 6�ℎ  landmark (point#188) and split 
+out the corresponding sub-instruction.
+(h) Reach the end point (point#191).
+(a) Initialize at the start point (point#57).
+Figure 1: Screenshots of an annotation process in our dataset collection tool.
+To compute context aware hidden state eht, the agent performs linear and tanh transformations on
+the concatenation of attentive textual feature ewt and the hidden state ht.
+eht = tanh([ ewt; ht]T W1)
+(5)
+The probability p(at,k) moving to the kth candidate point is calculated as the softmax of the
+Hadamard product of the kth candidate viewpoint feature ct,k and the context aware hidden state eht.
+p(at,k) = softmaxk(((cT
+t,kWc) ◦(ehT
+t W e
+H2))W2)
+(6)
+2
+
+
+=== PDF PAGE 3 ===
+Figure 2: A screenshot of the veriﬁcation process in our dataset collection tool.
+B Data Collection
+We show the screenshots of the annotation and veriﬁcation processes with our web-based collection
+tool in Figure 1 and Figure 2. An example of sub-instruction and sub-trajectory pairs split from the
+complete instruction and complete trajectory pair in en-RxR [3] according to the ﬁve principles is
+shown in Figure 3.
+C Fine-Grained Datasets
+Comparison with other ﬁne-grained datasets
+Compared to our human-annotated Landmark-
+RxR which is based on en-RxR, Fine-Grained R2R [4] and BabyWalk [2] are based on R2R [5],
+whose trajectories are shorter and instructions are much simpler with fewer descriptions of the visual
+scenes. In addition, they generate sub-instruction and sub-trajectory pairs with heuristic rules, and
+this inevitably leads to inaccurate matches as illustrated in Figure 4. In terms of the dataset scale,
+the number of sub-instructions in Landmark-RxR exceeds the other two datasets by one order of
+magnitude. Table 1 shows our Landmark-RxR has the largest scale of ﬁne-grained instructions and
+trajectories among all ﬁne-grained datasets.
+Table 1: Statistics on Fine-Grained R2R, BabyWalk, and our Landmark-RxR. Edge means the num-
+ber of edges each trajectory contains on average.
+Dataset
+Edge
+Instruction
+Trajectory
+Train
+Validation Seen
+Validation Unseen
+Test
+Total
+Fine-Grained R2R [4]
+1.5
+51,377
+3,775
+8,481
+15,385
+79,018
+34,602
+BabyWalk [2]
+2.8
+25,551
+1,863
+4,189
+7,646
+39,249
+19,895
+Landmark-RxR
+1.6
+133,602
+13,591
+19,547
+-
+166,740
+46,645
+Quality of ﬁne-grained data from Landmark-RxR
+In our comparison experiments, the trajec-
+tories from en-RxR are divided into the same number of sub-trajectories as Landmark-RxR equally
+or randomly, and the corresponding sub-instructions are obtained according to the word-level align-
+ment annotations in en-RxR. The resulting datasets are called Eq-RxR and Rand-RxR. Table 2 shows
+Table 2: Performances of models trained on Eq-RxR, Rand-RxR and Landmark-RxR.
+en-RxR
+Landmark-RxR
+#
+Dataset based
+nDTW↑
+SDTW↑
+SR↑
+SA↑
+SSA↑
+LN↓
+1
+Eq-RxR
+19.7
+8.5
+15.8
+47.0
+40.3
+8923 (45.6)
+2
+Rand-RxR
+19.0
+8.6
+17.0
+47.8
+42.8
+8353 (42.7)
+3
+Landmark-RxR
+21.8
+10.2
+18.6
+49.4
+44.1
+7849 (40.2)
+3
+
+
+=== PDF PAGE 4 ===
+You are standing in a bedroom, facing towards a bed, now turn to your left, in front of you you can see a glass door, open the glass door and walk 
+out of the room. Now to the left you can see a round table with four chairs around it, to the right you can see relaxing chairs.
+Walk to the relaxing chairs. Now in front of you you can see a white cart board wall.
+Walk to the wall.
+Now turn to your right, in front of you you can see another glass door, open the glass door and enter the room. To the left you can see tea-poi with 
+some fruits in a bowl on it.
+Walk straight, now on the right you have an sink, to the left you have an table with chair in-front of it, beside the table you can see a stand with 
+flower vase on it, walk to the stand. That's your end point.
+Figure 3: Sub-instruction and sub-trajectory pairs split from a complete instruction and complete
+trajectory pair in en-RxR.
+the performances of different models which are trained on the Eq-RxR, Rand-RxR and Landmark-
+RxR respectively. The model trained on Landmark-RxR outperforms other two models in all metrics
+on the unseen validation splits of both en-RxR and Landmark-RxR, demonstrating the high quality
+of Landmark-RxR annotations.
+4
+
+
+=== PDF PAGE 5 ===
+go down to the bottom of the stair. 
+and proceed down the step. 
+right at the round table. 
+turn around and walk down the stairs 
+to the bottom. 
+walk around the bed and exit the room 
+going straight to the end of the hallway. 
+exit garage and turn left and walk 
+down stairs. 
+(a) Mismatches in Fine-Grained R2R. 
+(b) Mismatches in BabyWalk.
+Figure 4: Examples of mismatches between sub-instructions and sub-trajectories in Fine-Grained
+R2R and BabyWalk. The red points indicate end points of the sub-trajectories.
+D Datasheet: Landmark-RxR
+The following datasheet documents dataset Landmark-RxR as [6].
+Motivation
+For what purpose was the dataset created?
+Landmark-RxR is created for ﬁne-grained learning and evaluation in VLN task. It can provide
+ﬁne-grained supervision that complements the coarse-grained supervision for both imitation and
+reinforcement learning phases.
+In addition, it can support ﬁne-grained evaluation like the re-
+initialization mechanism proposed in this paper.
+Composition
+What do the instances that comprise the dataset represent (e.g., documents, photos, people,
+countries)?
+The dataset Landmark-RxR includes ﬁne-grained sub-instruction and the sub-trajectory pairs split
+from en-RxR dataset [3].
+How many instances are there in total (of each type, if appropriate)?
+Landmark-RxR contains 166,740 sub-instructions and 46,645 sub-trajectories. For more details,
+please refer to Appendix C.
+Does the dataset contain all possible instances or is it a sample (not necessarily random) of
+instances from a larger set?
+5
+
+
+=== PDF PAGE 6 ===
+Our Landmark-RxR is based on dataset en-RxR. We split all the instruction and trajectory pairs
+from en-RxR and get the corresponding sub-instruction and sub-trajectory pairs included in our
+Landmark-RxR.
+What data does each instance consist of?
+Each instance contains one sub-instruction and one sub-trajectory represented as a series of points.
+The examples of sub-instruction and sub-trajectory pairs can be seen in Figure 3.
+Is there a label or target associated with each instance?
+Points of sub-trajectories are the labels in the training phase.
+Is any information missing from individual instances?
+No.
+Are relationships between individual instances made explicit (e.g., users movie ratings, social
+network links)?
+Yes. We totally have 90 buildings and each of them has a unique identiﬁer. All the sub-trajectories
+are sampled from the buildings.
+Are there recommended data splits (e.g., training, development/validation, testing)?
+Yes. Our Landmark-RxR is based on en-RxR and shares the same building splits to en-RxR. In
+addition, please refer to Section 3.2 in the main paper for more details about the data splits.
+Are there any errors, sources of noise, or redundancies in the dataset?
+During the annotation process, some errors in en-RxR have been corrected in our Landmark-RxR.
+In addition, although some errors will inevitably occur in data collection, we have tried to reduce
+the error rate as much as possible. The Landmark-RxR is manually annotated following the ﬁve
+principles strictly and has been veriﬁed again after the annotations are ﬁnished.
+Is the dataset self-contained, or does it link to or otherwise rely on external resources (e.g.,
+websites, tweets, other datasets)?
+The Landmark-RxR is based on dataset en-RxR. We split the instruction and trajectory pairs from en-
+RxR and get the corresponding sub-instruction and sub-trajectory pairs included in our Landmark-
+RxR.
+Does the dataset contain data that might be considered conﬁdential (e.g., data that is protected
+by legal privilege or by doctor-patient conﬁdentiality, data that includes the content of individ-
+uals non-public communications)?
+No.
+Does the dataset contain data that, if viewed directly, might be offensive, insulting, threatening,
+or might otherwise cause anxiety?
+No.
+Does the dataset identify any subpopulations (e.g., by age, gender)?
+No.
+Is it possible to identify individuals (i.e., one or more natural persons), either directly or indi-
+rectly (i.e., in combination with other data) from the dataset?
+No.
+Does the dataset contain data that might be considered sensitive in any way (e.g., data that re-
+veals racial or ethnic origins, sexual orientations, religious beliefs, political opinions or union
+memberships, or locations; ﬁnancial or health data; biometric or genetic data; forms of gov-
+ernment identiﬁcation, such as social security numbers; criminal history)?
+No.
+6
+
+
+=== PDF PAGE 7 ===
+Collection
+How was the data associated with each instance acquired?
+Please refer to Section 3.2 in the main paper for details about the annotation process.
+Over what timeframe was the data collected?
+From January 2021 to May 2021.
+What mechanisms or procedures were used to collect the data (e.g., hardware apparatus or
+sensor, manual human curation, software program, software API)?
+A 3D web-based collection tool is designed for annotation. Please refer to Section 3 in the main
+paper and the screenshots of annotation and veriﬁcation processes in Figure 1 and Figure 2 in the
+supplemental material respectively.
+If the dataset is a sample from a larger set, what was the sampling strategy (e.g., deterministic,
+probabilistic with speciﬁc sampling probabilities)?
+We obtain ﬁne-grained annotations based on all data in en-RxR.
+Who was involved in the data collection process (e.g., students, crowdworkers, contractors)?
+Totally 30 annotators participated in the annotation task, contributing about 2,700 hours.
+Does the dataset relate to people?
+No.
+Did you collect the data from the individuals in question directly, or obtain it via third parties
+or other sources (e.g., websites)?
+We collect the data directly from the individuals.
+Were the individuals in question notiﬁed about the data collection?
+Yes.
+Did the individuals in question consent to the collection and use of their data?
+Yes.
+Preprocessing / Cleaning / Labeling
+Was any preprocessing/cleaning/labeling of the data done(e.g.,discretization or bucketing, tok-
+enization, part-of-speech tagging, SIFT feature extraction, removal of instances, processing of
+missing values)?
+During the annotation process, some errors in en-RxR have been corrected in our Landmark-RxR.
+Was the raw data saved in addition to the preprocessed/cleaned/labeled data (e.g., to support
+unanticipated future uses)?
+Yes.
+Uses
+Has the dataset been used for any tasks already?
+Yes. We use the dataset for the VLN task in both imitation learning and reinforcement learning.
+Is there a repository that links to any or all papers or systems that use the dataset?
+No.
+What (other) tasks could the dataset be used for?
+Similar cross-modal tasks, like image/video caption, visual question answer and cross-modal re-
+trieval can all use our dataset for better cross-modal alignment learning. In addition, back-translation,
+reward shaping and pretraining can also base on our dataset.
+7
+
+
+=== PDF PAGE 8 ===
+Is there anything about the composition of the dataset or the way it was collected and prepro-
+cessed/cleaned/labeled that might impact future uses?
+No.
+Distribution
+Will the dataset be distributed to third parties outside of the entity (e.g., company, institution,
+organization) on behalf of which the dataset was created?
+Yes. The dataset will be distributed to the research community.
+How will the dataset will be distributed (e.g., tarball on website, API, GitHub)?
+GitHub.
+When will the dataset be distributed?
+We will release our dataset around December.
+Will the dataset be distributed under a copyright or other intellectual property (IP) license,
+and/or under applicable terms of use (ToU)?
+Landmark-RxR is distributed under a CC-BY license.
+Have any third parties imposed IP-based or other restrictions on the data associated with the
+instances?
+Yes. Anyone who uses the Matterport3D should follow the MATTERPORT END USER LICENSE
+AGREEMENT. In addition, data from en-RxR are under the CC-BY license.
+Maintenance
+Will the dataset be updated (e.g., to correct labeling errors, add new instances, delete in-
+stances)?
+There may be minor changes for future research requirements.
+8
+
+
+=== PDF PAGE 9 ===
+References
+[1] Xin Wang, Qiuyuan Huang, Asli Celikyilmaz, Jianfeng Gao, Dinghan Shen, Yuan-Fang Wang,
+William Yang Wang, and Lei Zhang.
+Reinforced cross-modal matching and self-supervised imitation
+learning for vision-language navigation. In IEEE Conference on Computer Vision and Pattern Recogni-
+tion, pages 6629–6638, 2019. 1
+[2] Wang Zhu, Hexiang Hu, Jiacheng Chen, Zhiwei Deng, Vihan Jain, Eugene Ie, and Fei Sha. Babywalk:
+Going farther in vision-and-language navigation by taking baby steps. Association for Computational
+Linguistics, 2020. 1, 3
+[3] Alexander Ku, Peter Anderson, Roma Patel, Eugene Ie, and Jason Baldridge. Room-across-room: Multilin-
+gual vision-and-language navigation with dense spatiotemporal grounding. Empirical Methods in Natural
+Language Processing, 2020. 3, 5
+[4] Yicong Hong, Cristian Rodriguez-Opazo, Qi Wu, and Stephen Gould. Sub-instruction aware vision-and-
+language navigation. Empirical Methods in Natural Language Processing, 2020. 3
+[5] Peter Anderson, Qi Wu, Damien Teney, Jake Bruce, Mark Johnson, Niko Sünderhauf, Ian Reid, Stephen
+Gould, and Anton Van Den Hengel. Vision-and-language navigation: Interpreting visually-grounded navi-
+gation instructions in real environments. In IEEE Conference on Computer Vision and Pattern Recognition,
+2018. 3
+[6] Timnit Gebru, Jamie Morgenstern, Briana Vecchione, Jennifer Wortman Vaughan, Hanna Wallach, Hal
+Daumé III au2, and Kate Crawford. Datasheets for datasets, 2020. 5
+9

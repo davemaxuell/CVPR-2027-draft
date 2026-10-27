@@ -1,0 +1,67 @@
+from pathlib import Path
+import json,re
+ROOT=Path(__file__).resolve().parents[2]
+PAPERS={p['id']:p for p in json.loads((ROOT/'assignments/01_papers.json').read_text('utf-8-sig'))}
+notes=json.loads((ROOT/'evidence/01/notes.json').read_text('utf-8'))
+def append(id,field,text):
+    if text not in notes[id].get(field,''):notes[id][field]=notes[id].get(field,'')+'\n\n'+text
+def code(id,path,locator,finding,repo_id=None):
+    c=dict(path=path,locator=locator,finding=finding)
+    if repo_id:
+        meta=json.loads((ROOT/'repositories/01'/repo_id/'source.json').read_text('utf-8'))
+        c.update(repo_url=meta['repo_url'],commit=meta['commit'])
+    a=notes[id].setdefault('code',[])
+    if c not in a:a.append(c)
+def extra(id,filename,pages,scope):
+    f=next(f for f in PAPERS[id]['local_files'] if f['filename']==filename)
+    a=notes[id].setdefault('associated',[])
+    rec=dict(filename=filename,sha256=f['sha256'],pages_read=pages,scope=scope)
+    if rec not in a:a.append(rec)
+
+extra('duet','DUET (arXiv).pdf',list(range(11,16)),'Distinct extended appendix: objectives, data, hyperparameters, backtracking statistics and failure analysis; text inspected. Extended.pdf is exact SHA duplicate.')
+extra('hamt','HAMT (supplement).pdf',list(range(1,11)),'All supplementary text, objective definitions, ablations, compute and qualitative captions inspected; no independent reproduction.')
+extra('hamt','HAMT (arXiv).pdf',list(range(15,24)),'Extended appendix checked against standalone supplement; tables renumbered, same principal experiments. Pages20–23 qualitative captions inspected; not an independent experiment.')
+extra('scalevln','ScaleVLN (supplement).pdf',list(range(1,7)),'Training/data details, Tables1–6 and graph/image figure captions inspected; visual graph and image quality figures do not quantify repair reliability. Supplement copy is exact SHA duplicate.')
+extra('navillm','NaviLLM (supplement).pdf',[1,2,3],'All supplemental text, prompts, dataset counts and ablations inspected.')
+extra('marval','MARVAL (slides).pdf',list(range(1,31)),'All slide text inspected; slides22–23 also rendered and visually inspected for failure analysis and DAgger expert rules.')
+extra('roomtour3d','RoomTour3D (slides).pdf',list(range(1,19)),'All slide text inspected; slide13 also rendered and visually inspected for the 100-action manual quality audit.')
+for id in ['duet','hamt','scalevln','navillm','marval','roomtour3d']:
+    notes[id]['versions']='Main-paper analysis is supplemented by the explicitly listed associated-file review below. Exact SHA256 duplicates were deduplicated and not counted as additional evidence. '+ '; '.join(f"{x['filename']}: pages {x['pages_read']}; {x['scope']}" for x in notes[id]['associated'])
+
+append('duet','method','Extended appendix A.1, PDF pp11–12, supplies the pretraining targets: masked language modeling masks 15% of tokens and minimizes −log p(w_i | W_without_i, trajectory), with a vocabulary classifier on the averaged coarse/fine text features. Masked region classification zeros 15% of final-view features and minimizes KL(P_teacher || P_model) over ImageNet view or Visual Genome object classes. These soft labels supervise semantic reconstruction, not correctness of instruction completion. Appendix B, p13, gives R2R pretraining 200k steps, batch64, then 20k fine-tuning steps, batch8, selecting by validation-unseen SPL; dataset-specific schedules differ.')
+append('duet','results','Extended appendix C.2–C.4, PDF pp13–14, explicitly reports backtracking in 48.6% of REVERIE unseen trajectories and 23.2% of R2R unseen trajectories, directly contradicting a no-return interpretation of visited-node masking. REVERIE unseen outcomes are 29.82% wrong room, 23.20% correct room but wrong location, and 46.98% correct location; object grounding conditional on the correct location is 68.43%. These are dataset-specific descriptive categories, not evidence that one softmax denominator causes all stopping failures. Figure8 shows different outcomes for paraphrases describing the same path. Appendix Table9 also shows a tradeoff between SR and grounding-weighted SPL as behavioral-cloning weight changes, rather than a uniformly optimal loss weight.')
+append('hamt','method','Supplement A.1 (p1; extended p15) makes the alignment objectives explicit. For word vocabulary size V, an MLP maps a masked token h_i in R^768 to a V-way distribution and minimizes token negative log likelihood. For each masked visual token, a 1000-way ImageNet teacher distribution P_i supplies soft-target cross entropy −sum_j P_ij log Q_ij, equal to KL up to teacher entropy. ITM scores text-CLS elementwise multiplied by history-CLS, both 768-dimensional, and uses a five-way contrastive objective with one positive, two other-trajectory negatives and two temporal shuffles. Supplement B.3 samples MLM:MRM:ITM:SAP:SAR:SPREL as 5:2:2:1:1:1. For R2R-Back, training requires two stops at distinct stages; success requires visiting the original endpoint before returning, and SPL uses the full reference route length. Ordinary start-goal geodesic SPL would be degenerate for this task.')
+append('hamt','results','Supplement C.1/Table2 (extended Table11) reports 2349 R2R unseen instructions on one P100: RecBERT 69s, HAMT 104s, and the no-text-to-vision variant 76s. This establishes a measured tradeoff for that setup, not constant history cost. Supplement D.1 compares a reimplemented PREVALENT without history, but also removes ITM, so the 57.5 versus52.7 SPL contrast does not isolate history alone despite the later phrase “same proxy tasks.” D.4 finds single-stage end-to-end training inferior at the tested schedule (SPL53.5 versus56.5 without end-to-end training). REVERIE grounding remains weaker than competing object features; the authors hypothesize that R2R-tuned ViT features transfer poorly to object grounding. Failure captions identify unusual spatial orientation and object recognition errors.')
+append('scalevln','results','Supplement Table5 shows improved R4R route fidelity: nDTW51.21→52.77 and SDTW30.00→32.73 after scaling, alongside SR43.97→45.60. This is counterevidence to a blanket claim that scaling necessarily weakens instruction following. Supplement Table4 lists Seq2Seq SR37.34→47.51, a 10.17 percentage-point difference; nearby prose says12.2 points, an arithmetic inconsistency. REVERIE supplementary Table6 shows higher navigation SR does not guarantee higher grounding: validation RGS35.76 is below AutoVLN36.58. These comparisons do not causally measure language reliance.')
+append('navillm','method','The released implementation differs materially from the paper’s uniform generation description: train.py229 creates CrossEntropyLoss(ignore_index, reduction=sum), and tasks/agents/mp3d_agent.py734–756 applies it to navigation candidate logits and teacher action indices. Separate QA and summarization branches apply language-model generation losses at865 and901. Therefore, the inspected released navigation branch is an LLM-conditioned graph classifier with separate generative tasks, not solely next-token generation of a view ID.')
+append('navillm','results','Supplement pp1–3 gives task history caps (15 for R2R/REVERIE,30 for CVDN,20 for SOON), excludes849 EQA examples, and supplies candidate(0)=STOP prompts. Its SOON count is27.8k in Table3 versus2780 in the text, an apparent factor-ten reporting discrepancy. Schema ablations aggregate heterogeneous metric units; that aggregate should not be interpreted as a calibrated universal navigation score.')
+code('navillm','tasks/agents/mp3d_agent.py','734–756;845–904','Navigation criterion over candidate logits is backpropagated separately from QA/summarization token-generation loss.')
+code('navillm','train.py','207–231','Constructs summed categorical cross entropy with ignored padding targets; driver uses task-specific agents.')
+code('navillm','tasks/datasets/r2r.py','10–60;108–129','Expands instructions into samples, truncates encodings and prepares fine-grained labels; evaluation flattens graph subpaths and uses final/nearest geodesic errors, path length and SPL.')
+append('roomtour3d','results','Conference slides8 and13 report1847 videos totaling243hours and a manual audit of100 action examples, of which87% pass the spatial-proximity/diversity criteria. This validates that limited annotation property; it does not validate physical executability, all instruction semantics, or human agreement. No uncertainty interval or inter-rater agreement is established by the slide.')
+append('marval','results','Conference slide22 contrasts a greater fraction of error-free MARVAL trajectories with lower eventual success than humans and motivates recovery from deviations. The visual plot is descriptive and does not establish a calibrated per-error recovery probability. Slide23 restates the DAgger rule: follow the reference when on it, otherwise take a shortest route back to it; this already couples recovery labels to route adherence. The Marky data link points to the official RxR data repository, not a complete executable MARVAL implementation.')
+append('reverie','implementation','Additional loss inspection: follower.py798 uses positive0.5×cross-entropy +0.5×MSE for the progress head. eval_release.py56–109 separates endpoint visibility success, any-visited-view oracle success, target-ID grounding and graph path length. Its target-ID correctness branch does not itself additionally gate on visibility; practical object-candidate construction is therefore part of the evaluation contract.')
+code('reverie','tasks/REVERIE/follower.py','304–305;685–712;798','Positive MSE and action CE, including an explicit equally weighted combined loss.')
+code('reverie','tasks/REVERIE/eval_release.py','56–109','Grounding target ID match; endpoint/anywhere target visibility for navigation and oracle success; graph-distance trajectory length.')
+append('hsgm','implementation','CODE FINDING: src/agent/agent.py1082–1094 records first_stop and then second_stop; first_stop is initialized at1070 and is not reset after movement anywhere in this pinned file. Thus the release does not enforce consecutivity if movement intervenes between the two STOP predictions. The 20-step no-movement guard1692–1701 can force second_stop independently. Rollback1742–1816 plans a path to the subtask origin rather than erasing executed travel. run_experiments.py445–529 computes success and SPL from the final position without an explicit STOP predicate; the loop1030–1084 saves at second_stop or the step budget, and on budget termination overwrites finish_status but retains distance-based goal_reached/SPL. This is a protocol-comparability caveat, not proof that published numbers used this exact snapshot or are incorrect.')
+code('hsgm','src/agent/agent.py','804–979;1082–1094;1646–1884','Instruction subtask state, persistent first/second STOP flags, no-movement guard, replanning and timeout rollback.')
+code('hsgm','src/run_experiments.py','445–529;979–1120','Final-distance success/SPL and Euclidean fast-DTW; stopping/saving occurs on second_stop or maximum steps.')
+code('hsgm','config/vlnce_test.yaml','camera and simulator configuration','Sensor FOV135 degrees, pitch−30 degrees, height1.2m, maximum200 steps and radius0.1m are part of the released operating conditions.')
+notes['ver']['implementation']='The pinned release contains actual volumetric perception training/inference code, but a complete navigation-policy rollout and evaluator were not located in its tree. Inspected the detector, voxel-query head, occupancy/detection losses, dataset evaluator, configuration and README. The README instructs external HAMT ViT feature extraction and downloading MP3D annotations; docs/prepare_dataset.md is inherited nuScenes guidance rather than a complete MP3D pipeline. Reproducing the paper’s navigation results therefore still requires missing integration details. No code was executed.'
+code('ver','projects/mmdet3d_plugin/bevformer/detectors/voxelformer.py','231–326','Loads six horizontal-view precomputed ViT patch feature tensors, ground-truth geometry/occupancy and invokes volumetric losses; HDF5 drops CLS to retain196×768 patch features.')
+code('ver','projects/mmdet3d_plugin/bevformer/dense_heads/voxelformer_occupancy_head.py','282–350;903–991;1505–1540','Learned voxel queries and positional embeddings; matched detection classification/L1 plus occupancy loss; focal-loss inference adds a0.25 empty-space threshold before argmax.')
+code('ver','projects/configs/verformer/vocc.py','9–20;55–207;209 onward','15×15×4 initial volume,768 channels,17 object and16 occupancy classes; focal-loss and L1 weights; external feature/annotation paths remain placeholders.')
+code('ver','projects/mmdet3d_plugin/datasets/mp3docc_dataset.py','304–345;485–579','Indoor box evaluation and occupancy IoU using sparse labels/optional invalid-voxel masks; these are perception metrics, not VLN SR/SPL.')
+
+for id,n in notes.items():
+    for k in ['problem','method','novelty','results','implementation','limitations','versions']:
+        if k not in n:continue
+        s=n[k]
+        # Restore spaces around prose quantities, preserving identifiers such as R2R, CLIP and tensor notation.
+        s=re.sub(r'(?<=[a-z])(?=\d)', ' ',s)
+        s=re.sub(r'(?<=\d)(?=[a-z]{2,}\b)', ' ',s)
+        s=re.sub(r'(?<=[,;])(?=[A-Za-z])',' ',s)
+        n[k]=s
+(ROOT/'evidence/01/notes.json').write_text(json.dumps(notes,ensure_ascii=False,indent=2),'utf-8')
+from write_dossiers import build
+build()

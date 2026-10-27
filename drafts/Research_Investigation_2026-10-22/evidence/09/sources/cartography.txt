@@ -1,0 +1,1322 @@
+===== PDF PAGE 1 =====
+                            Dataset Cartography:
+         Mapping and Diagnosing Datasets with Training Dynamics
+
+               Swabha Swayamdipta†  Roy Schwartz‡∗  Nicholas Lourie†
+         Yizhong Wang♦  Hannaneh Hajishirzi†♦  Noah A. Smith†♦   Yejin Choi†♦
+
+                     †Allen Institute for Artiﬁcial Intelligence, Seattle, WA, USA
+                          ‡The Hebrew University of Jerusalem, Israel
+♦Paul G. Allen School of Computer Science & Engineering, University of Washington, Seattle, WA, USA
+           {swabhas,nicholasl}@allenai.org roys@cs.huji.ac.il
+            {yizhongw,hannaneh,noah,yejin}@cs.washington.edu
+
+                    Abstract
+                                                                                                                      1.0
+
+                                                                                                                         easy-to-learn
+         Large datasets have become commonplace in
+                                                                                                        0.8
+       NLP research.  However, the increased em-                                                                                                    correct.
+          phasis on data quantity has made it challeng-                                                                                    0.0
+                                                                                                           0.6                                                                  0.2
+          ing to assess the quality of data. We intro-                                                                                        0.3
+                                                                                                                               ambiguous         0.5         duce Data Maps—a model-based tool to char-                                                                                                                                                                                                                                                                                                                                           confidence 0.4                                                                     0.7
+           acterize and diagnose datasets. We leverage                                                                                      0.8
+          a largely ignored source of information: the                                   hard-to-learn                                          1.0                                                                                                           0.2
+          behavior of the model on individual instances
+          during training (training dynamics) for build-
+                                                                                                       0.0
+          ing data maps. This yields two intuitive mea-
+                                                                                                            0.0        0.1       0.2       0.3       0.4        0.5
+          sures for each example—the model’s conﬁ-                                                 variability
+         dence in the true class, and the variability of
+            this conﬁdence across epochs—obtained in a                                                            Figure  1:  Data map  for SNLI  train  set,  based
+           single run of training.  Experiments across                                                    on a ROBERTA-large classiﬁer.  The x-axis shows
+          four datasets show that these model-dependent                                                         variability and y-axis, the conﬁdence;  the col-
+         measures reveal three distinct regions in the                                                               ors/shapes indicate correctness. The top-left corner
+          data map, each with pronounced character-                                                               of the data map (low variability, high conﬁdence)
+             istics.   First, our data maps show the pres-                                                            corresponds to easy-to-learn examples, the bottom-
+         ence of ambiguous regions with respect to                                                                               left corner (low variability, low conﬁdence) cor-
+           the model, which contribute the most towards                                                           responds to hard-to-learn examples, and examples
+           out-of-distribution generalization. Second, the                                                    on the right (with high variability) are ambiguous;
+         most populous regions in the data are easy to                                                                               all deﬁnitions are with respect to the ROBERTA-large
+          learn for the model, and play an important role                                                         model. The modal group in the data is formed by the
+           in model optimization. Finally, data maps un-                                                                 easy-to-learn regions.  For clarity we only plot 25K
+          cover a region with instances that the model                                                   random samples from the SNLI train set.  Fig. 8b in
+         ﬁnds hard to learn; these often correspond to                                                     App. §C shows the same map in greater relief.
+           labeling errors. Our results indicate that a shift
+           in focus from quantity to quality of data could
+          lead to robust models and improved out-of-
+           distribution generalization.                  (OOD) generalization remains a challenge (Yo-
+                                                 gatama et al., 2019; Linzen, 2020); and, while re-
+    1  Introduction                                 cent large pretrained language models help, they
+                                                                          fail to close this gap (Hendrycks et al., 2020). This
+    The creation of large labeled datasets has fueled
+                                                       urges a closer look at datasets, where not all ex-
+      the advance of AI (Russakovsky et al., 2015; An-
+                                                  amples might contribute equally towards learning
+       tol et al., 2015) and NLP in particular (Bowman
+                                                         (Vodrahalli et al., 2018). However, the scale of
+      et al., 2015; Rajpurkar et al., 2016). The common
+                                                        data can make this assessment challenging. How
+      belief is that the more abundant the labeled data,
+                                                   can we automatically characterize data instances
+      the higher the likelihood of learning diverse phe-
+                                                      with respect to their role in achieving good perfor-
+     nomena, which in turn leads to models that gener-
+                                               mance in- and out-of- distribution? Answering this
+      alize well. In practice, however, out-of-distribution
+                                                        question may take us a step closer to bridging the
+         ∗Work done at the Allen Institute for AI.              gap between dataset collection and broader task
+
+                                            9275
+
+             Proceedings of the 2020 Conference on Empirical Methods in Natural Language Processing, pages 9275–9293,
+                         November 16–20, 2020. c⃝2020 Association for Computational Linguistics
+
+===== PDF PAGE 2 =====
+objectives.                                   and higher resolution visualizations are publicly
+  Drawing analogies from cartography, we pro-    available.3
+pose to ﬁnd coordinates for instances within the
+                                        2  Mapping Datasets with Trainingbroader trends of a dataset. We introduce data
+                                        Dynamicsmaps: a model-based tool for contextualizing ex-
+amples in a dataset. We construct coordinates for                                          Our goal is to construct Data Maps for datasets to
+data maps by leveraging training dynamics—the                                                   help visualize a dataset with respect to a model, as
+behavior of a model as training progresses. We                                                 well as understand the contributions of different
+consider the mean and standard deviation of the                                               groups of instances towards that model’s learning.
+gold label probabilities, predicted for each exam-                                                            Intuitively, instances that a model always predicts
+ple across training epochs; these are referred to as                                                      correctly are different from those it almost never
+conﬁdence and variability, respectively (§2).                                                   does, or those on which it vacillates. For build-
+   Fig. 1 shows the data map for the SNLI dataset    ing such maps, each instance in the dataset must
+(Bowman  et  al., 2015) constructed using the   be contextualized in the larger set. We consider
+ROBERTA-large model (Liu et al., 2019). The map   one contextualization approach, based on statistics
+reveals three distinct regions in the dataset: a region    arising from the behavior of the training procedure
+with instances whose true class probabilities ﬂuctu-   across time, or the “training dynamics”. We for-
+ate frequently during training (high variability),   mally deﬁne our notations (§2.1) and describe our
+and are hence ambiguous for the model; a region    data maps (§2.2).
+with easy-to-learn instances that the model predicts
+correctly and consistently (high conﬁdence, low    2.1  Training Dynamics
+variability); and a region with hard-to-learn in-   Consider a training dataset of size N, D =
+stances with low conﬁdence, low variability,   {(x, y∗)i}Ni=1 where the ith instance consists of the
+many of which we ﬁnd are mislabeled during anno-   observation, xi and its true label under the task, y∗i .
+tation .1 Similar regions are observed across three   Our method assumes a particular model (family)
+other datasets: MultiNLI (Williams et al., 2018),   whose parameters are selected to minimize empiri-
+WinoGrande (Sakaguchi et al., 2020) and SQuAD    cal risk using a particular algorithm.4 We assume
+(Rajpurkar et al., 2016), with respect to respective    the model deﬁnes a probability distribution over
+ROBERTA-large classiﬁers.                          labels given an observation. We assume a stochas-
+  We further investigate the above regions by train-    tic gradient-based optimization procedure is used,
+ing models exclusively on examples from each re-   with training instances randomly ordered at each
+gion (§3). Training on ambiguous instances pro-   epoch, across E epochs.
+motes generalization to OOD test sets, with little     The training dynamics of instance i are deﬁned
+or no effect on in-distribution (ID) performance.2    as statistics calculated across the E epochs. The
+Our data maps also reveal that datasets contain a    values of these measures then serve as coordinates
+majority of easy-to-learn instances, which are not    in our map. The ﬁrst measure aims to capture how
+as critical for ID or OOD performance, but without    conﬁdently the learner assigns the true label to the
+any such instances, training could fail to converge    observation, based on its probability distribution.
+(§4). In §5, we show that hard-to-learn instances  We deﬁne conﬁdence as the mean model proba-
+frequently correspond to labeling errors. Lastly,    bility of the true label (y∗i ) across epochs:
+we discuss connections between our measures and
+                                                     E
+uncertainty measures (§6).                                     1
+                                                                                           ˆµi = X pθ(e)(y∗i  | xi)  Our ﬁndings indicate that data maps could serve            E
+                                                                  e=1
+as effective tools to diagnose large datasets, at the
+                                           where pθ(e) denotes the model’s probability withreasonable cost of training a model on them. Locat-
+ing different regions within the data might pave the   parameters θ(e) at the end of the eth epoch.5  In
+way for constructing higher quality datasets., and      3https://github.com/allenai/
+ultimately models that generalize better. Our code   cartography
+                                                                    4In this paper, the model is ROBERTA (Liu et al., 2019),
+    1All terms are deﬁned with respect to the model.              currently established as a strong performer across many tasks.
+   2We deﬁne out-of-distribution (OOD) test sets as those       5Note that ˆµi is with respect to the true label y∗i , not the
+which are collected independently of the original dataset, and     probability assigned to the model’s highest-scoring label (as
+ID test sets as those which are sampled from it.                used in active learning, for example).
+
+                                        9276
+
+===== PDF PAGE 3 =====
+                             WinoGrande-RoBERTa Data Map
+                                                                                                                     correct.
+       1.0                                                                                              15000
+                                                                                                   0.0
+                                                                                                       0.2
+                                                                                                       0.3          10000
+                               easy-to-learn                                                                                                         0.5                    density
+                                                                                                           0.7           5000
+      0.8                                                                                           0.8
+                                                                                                                 1.0              0
+                                                                                                                        0.0      0.5       1.0
+                                                                                                                        confidence
+
+                                                                                              8000
+      0.6
+                                                                                               6000
+
+                                                                                               4000                                                                       ambiguous                                     density       confidence
+                                                                                               2000
+      0.4
+                                                                                                0
+                                                                                                                        0.0     0.2     0.4
+                                                                                                                                             variability
+
+                                      hard-to-learn                                                         15000
+      0.2
+                                                                                                                                                                                                                                                                density 10000
+                                                                                                 5000
+      0.0
+                                                                                                0
+             0.0                  0.1                0.2                0.3                0.4                 0.5             0.00.20.30.50.70.81.0
+                                                            variability                                                             correctness
+
+
+Figure 2: Data map for the WinoGrande (Sakaguchi et al., 2020) train set, based on a ROBERTA-large classiﬁer,
+with the same axes as Fig. 1. Density plots for the three different measures based on training dynamics are shown
+towards the right. Hard-to-learn regions have lower density in WinoGrande, compared to SNLI, perhaps as a result
+of a rigorous validation of collected annotations. However, manual errors remain, which we showcase in Tab. 1 as
+well as in Section §5. The plot shows only 25K train examples for clarity, and is best viewed enlarged.
+
+
+some cases we also consider a coarser, and perhaps    rameter initializations.6 Training dynamics can be
+more intuitive statistic, the fraction of times the   computed at different granularities, such as steps
+model correctly labels xi across epochs, named    vs. epochs; see App. A.1.
+correctness; this score only has 1 + E possible
+values. Intuitively, a high-conﬁdence instance is    2.2  Data Maps
+“easier” for the given learner.               We construct data maps for four large datasets:
+   Lastly, we also consider variability, which   WinoGrande (Sakaguchi et al., 2020)—a cloze-
+measures the spread of pθ(e)(y∗i   |  xi) across    style task for commonsense reasoning, two NLI
+epochs, using the standard deviation:                 datasets (SNLI; Bowman  et  al., 2015;  and
+                                              MultiNLI; Williams et al., 2018), and QNLI, which
+                                            2             is a sentence-level question answering task derived                                             | xi) −ˆµi     sPEe=1  pθ(e)(y∗i
+          ˆσi =                                  from SQuAD (Rajpurkar et al., 2016). All data               E
+                                        maps are built with models based on ROBERTA-
+Note that variability also depends on the gold    large architectures.  Details on the model and
+label, y∗i . A given instance to which the model    datasets can be found in App. §A.2 and §A.3.
+assigns the same label consistently (whether ac-      Fig. 1 presents the data map for the SNLI dataset.
+curately or not) will have low variability; one   As is evident, the data follows a bell-shaped curve
+which the model is indecisive about across training,   with respect to conﬁdence and variability;
+will have high variability.
+                                                         6The average Pearson correlation coefﬁcient between ﬁve
+   Finally, we observe  that conﬁdence and                                                   random seeds’ resulting training runs is 0.75 or higher (for
+variability are fairly stable across different pa-    both measures, on WinoGrande).
+
+                                        9277
+
+===== PDF PAGE 4 =====
+        Instance                          Option1      Option2      four datasets, with respect to ROBERTA-large, in
+       The man chose to buy the roses in-      roses*        carnations      greater relief.
+         stead              of the                    carnations because the                             Different model architectures trained on a given       were           more                     beautiful.
+                                                      dataset could be effectively compared using data            easy-to-learn  We enjoyed the meeting tonight but     meeting        play*
+        not the play as the  was rather dull.                     maps, as an alternative to standard quantitative
+        Jason got into a deep ﬁnancial hole,    Jason+         Joel*       evaluation methods. App. §C includes data maps
+         unlike Joel, because  managed their                         for WinoGrande (Fig. 9b) and SNLI (Fig. 10 and
+         fortune poorly.
+                                                      Fig. 11) based on other (somewhat weaker) archi-
+        In the mornings, Aaron can hit the     Aaron*      Samuel−
+        snooze button a  lot, and Samuel                          tectures. While data maps based on similar archi-
+         can’t.   has to be at work at 10 am.                          tectures have similar appearance, the regions to            hard-to-learn
+       Amy’s handwriting was meticulous,    Amy*       Cynthia+     which a given instance belongs might vary. Data
+        while              Cynthia’s                       handwriting                              was of-                   maps for weaker architectures still display similar         ten sloppy,                   because                         was careless
+        about their work.                                      regions, but the regions are not as distinct as those
+       The dog ran up to Leslie and away     Leslie−     Lawrence*     in ROBERTA based data maps.
+       from            Lawrence                      because                              had soap                          Tab. 1 shows examples from WinoGrande be-         for the             dog to take                         a bath.
+                                                 longing to the different regions deﬁned above.        ambiguous   Kayla dated many more people at     Kayla*       Betty+
+       once than Betty, because  was in an                         easy-to-learn examples are straightforward for the
+         exclusive relationship.                             model, as well as for humans. In contrast, most
+                                                       hard-to-learn and some ambiguous examples couldTable 1: Examples from the WinoGrande train set from
+different regions in the data map, with gold standard*    be challenging for humans (see green highlights
+                                                       in Tab. 1), which might explain why the modellabels.  Our best assessment of the  correct+  and
+                                           shows lower conﬁdence on them. These cate-
+ equally plausible−labels are highlighted.
+                                                      gories could be harder for models either because of
+                                                      labeling errors (blue highlights) or simply because
+                                                      the model is indecisive about the correct label. See
+correctness further determines discrete regions                                            App. §A.4 for similar examples from SNLI.
+therein.  The vast majority of instances belong                                             The next four sections include a diagnosis of the
+to the high conﬁdence and low variability re-                                                         different data regions deﬁned above. The effect of
+gion of the map (Fig. 1, top-left).  The model                                                         training models on each region on both in- and out-
+consistently predicts such instances correctly with                                                       of-distribution performance is studied in §3. The
+high conﬁdence; thus, we refer to them as easy-to-                                                         effect of selecting decreasing amounts of data is
+learn (for the model). A second, smaller group is                                                  discussed in §4. We investigate the presence of
+formed by instances with low variability and low                                                 mislabeled instances in the hard-to-learn regions
+conﬁdence (Fig. 1, bottom-left corner). Since                                                   of the data maps in §5.  Lastly, we demonstrate
+such instances are seldom predicted correctly dur-                                                 connections between training dynamics measures
+ing training, we refer to them as hard-to-learn (for                                             and measures of uncertainty in §6.
+the model). The third notable group contains am-
+biguous examples, or those with high variability   3  Data Selection using Data Maps
+(Fig. 1, right-hand side); the model tends to be
+                                             Data maps reveal distinct regions in datasets; itindecisive about these instances, such that they
+                                                                is natural to wonder what roles do instances frommay or may not correspond to high conﬁdence
+                                                        different regions play in learning and generaliza-or correctness. We refer to such instances as
+                                                           tion. We answer this empirically by training mod-ambiguous (to the model).
+                                                          els exclusively on instances selected from distinct
+   Fig. 2 shows the data map for WinoGrande,
+                                                      regions, followed by standard in-distribution (ID),
+which exhibits high structural similarity to the
+                                                    as well as out-of-distribution (OOD) evaluation.
+SNLI data map (Fig. 1). The most remarkable
+                                           Our strategy is straightforward—we train the
+difference between the maps is in the density of
+                                            model from scratch on a subset of the training data
+the hard-to-learn region, which is much lower for
+                                                     selected by ranking instances based on the differ-
+WinoGrande, as is evident from the histograms
+                                                     ent training dynamics measures.7 We hypothesize
+below. One explanation for this might be that
+                                                         that ambiguous and hard-to-learn regions could
+WinoGrande labels were rigorously validated post
+annotation. App. §C includes data maps for all       7Hyperparameters are also tuned from scratch (App. §A.3).
+
+                                        9278
+
+===== PDF PAGE 5 =====
+                 WINOG. Val. (ID) WSC (OOD)    WinoGrande), or speciﬁcally to be adversarial to
+   100% train                79.70.2           86.00.1       the dataset (Adversarial SQuAD (Jia and Liang,
+                                              2017) for QNLI); see App. §A.2 for details.    random                   73.31.3           85.60.4
+                                                       Tab. 2 shows our results on WinoGrande.8 Train-    high-correctness       70.80.6           84.10.4
+    high-conﬁdence        69.40.5           83.90.5       ing on the most ambiguous data results in the best
+  train low-variability         70.11.0           83.71.4    OOD performance, exceeding that of 100% train,
+     forgetting                 75.51.3           84.80.7      even with just a third of the data. A similar effect
+ 33% AL-uncertainty            75.70.8           85.70.8         is seen with hard-to-learn, as well as its coarse-    AL-greedyK              74.20.4           86.50.5
+    AFLite                    76.80.8           86.60.6       grained counterpart, low-correctness. In each of
+    low-correctness        78.20.6           86.30.6       the three cases, ID performance is also higher than
+     hard-to-learn              77.91.3           87.20.7         all other 33% baselines, though we observe some
+    ambiguous                78.70.4           87.60.6       degradation compared to the full training set; this
+                                                                is expected as with larger amounts of data models
+Table 2: ID and OOD accuracies for ROBERTA-large
+                                                 tend to ﬁt the dataset distribution rather than themodels trained on different selections of WinoGrande.
+Reported values are averaged over 3 random seeds,    task (Torralba and Efros, 2011). The only selection
+with s.d. reported as a subscript. Selection of 33% train-   methods that underperform the random baseline
+ing instances with highest variability (ambiguous)    are forgetting, and the ones where we select data
+achieves the best OOD performance, outperforming all    the model is highly conﬁdent and decisive about
+other baselines from this work, as well as prior work.    (high-conﬁdence, high-correctness, and low-
+                                                 variability). The latter pattern, as well as our
+                                                       overall results, highlight the important role playedbe the most informative for learning, since these
+                                           by examples which are challenging for the model,examples are the most challenging for the model
+                                                                         i.e., ambiguous and hard-to-learn examples.(Shrivastava et al., 2016). We compare these two
+                                              Given that our selection methods outperformsettings to ROBERTA-large models trained on data
+                                                     baselines from prior work, we only report randomsubsets, selected using several other methods. All
+                                            and 100% train selection baselines on the remain-subsets considered contain 33% of the training data
+                                                  ing datasets, where we see similar trends. Tab. 3(to control for the effect of train data size on per-
+                                           shows results for SNLI and MultiNLI, where theformance).
+                                          random selection baseline is already within 1% of
+Baselines  The two most natural baselines are    the 100% train baseline.9 Selecting 33% of the
+those where all data is used (100% train), and   most ambiguous examples achieves even better
+where a 33% random sample is used (random).   ID performance, within 0.2% of the 100% train
+Our second set of baselines considers subsets which    baseline, while exceeding OOD performance sub-
+are the most easy-to-learn for the model (high-    stantially on each of the linguistic categories in the
+conﬁdence), and those that the model is most de-  NLI Diagnostics test set.10 While hard-to-learn
+cisive about (low-variability), which comprises   does not perform as well as ambiguous on most
+a mixture of easy-to-learn and hard-to-learn exam-   cases,  it still matches or outperforms the 100%
+ples. We also consider baselines based on high-    train baseline on OOD test sets. Tab. 4 shows a
+and low-correctness. Finally, we also compare    similar trend for QNLI, where we gain over 2%
+with our implementation of the following methods   performance on the OOD Adversarial SQuAD test
+for data selection from prior work (discussed in §7):    set, with minimal loss in ID accuracy.
+forgetting (Toneva et al., 2018), AFLite (LeBras      Overall, regions revealed by data maps provide
+et al., 2020), AL-uncertainty (Joshi et al., 2009),   ways to substantially improve OOD performance
+and AL-greedyK (Sener and Savarese, 2018).
+                                                          8The ofﬁcial test set for WinoGrande has been ﬁltered with
+Results We  test our selections on the same    AFLite, making ID evaluation more challenging than OOD.
+datasets from the previous section—WinoGrande,    However, we apply all our selection methods (including the
+                                                       AFLite selection) on WinoGrande’s unﬁltered training data.
+SNLI, MultiNLI and QNLI. We report ID val-      9The ID performance of all models exceeds human accu-
+idation performance, and OOD performance on     racy (88%) for SNLI. However, the difference in ID and OOD
+test sets either created independently of the dataset    performance in SNLI is quite high, showing that there is still
+                                                  room for improvement in the NLI task.
+(NLI Diagnostics (Wang et al., 2019) for SNLI and                                                            10While MultiNLI-mismatched  is  technically  out-of-
+MultiNLI, and WSC (Levesque et al., 2011) for    domain, performance is close to matched (ID).
+
+                                        9279
+
+===== PDF PAGE 6 =====
+                               SNLI                                     MultiNLI
+
+                   ID       NLI Diagnostics (OOD)         ID (Val.)         NLI Diagnostics (OOD)
+
+                       Test   Lex.  PAS   LS   Kno.    All   Mat.  MisM.   Lex.  PAS   LS   Kno.    All
+
+     100% train     92.0   54.6   67.9   62.7   52.1   61.8   90.2    90.1    59.9   68.4   67.3   57.8   65.0
+    train  random        91.3   53.0   66.8   59.7   50.7   60.4   89.8    89.2    59.3   69.6   66.5   56.3   64.6
+       hard-to-learn   91.8   55.2   69.1   63.2   51.7   62.0   89.5    89.7    59.3   68.9   69.5   58.8   65.3
+  33%  ambiguous     92.2   58.5   67.9   64.1   54.2   63.5   90.1    89.3    63.5   71.0   68.9   59.2   66.9
+
+Table 3: ID and OOD accuracies for ROBERTA-large models trained on different selections of SNLI and
+MultiNLI; we report the best performance over 3 random seeds (see Appendix §B for SNLI validation results).
+ambiguous and hard-to-learn subsets of data promote OOD generalization, at minimal degradation of ID perfor-
+mance. OOD performance improves across all ﬁne-grained linguistic categories in the NLI Diagnostics set.
+
+
+          WinoGrande Acc. (ID) at Train%           WSC Acc. (OOD) at Train%      WinoG. 17% Train with Easy-to-learn Replacements
+      0.80
+               Random                                                                                 0.85
+                 Top Ambiguous                        0.86
+       0.75                                                                                                       0.80                    Random (ID)
+    Acc.                                                                Acc. 0.84                                                          Acc.                          TopRandomAmbiguous(OOD) (ID)
+       0.70                                              0.82                                                 0.75                     Top Ambiguous (OOD)
+                                                                    Random
+                                                       0.80                     Top Ambiguous         0.70       0.65
+             1         10        25        50                   1         10        25        50             None   1/10    1/5    1/4    1/3    1/2
+               % Train                        % Train                                 Easy-to-learn Replacements
+
+
+Figure 3: ID (left) and OOD (centre) WinoGrande performance with increasing % of ambiguous (and randomly-
+sampled) training data. ROBERTA-large optimization fails when trained on small amounts (< 25%) of the most
+ambiguous data (results correspond to majority baseline performance and are not shown here, for better visibil-
+ity). (Right) Replacing small amounts of ambiguous examples from the 17% subset with easy-to-learn examples
+results in successful optimization and ID improvements, at the cost of decreased OOD accuracy.  All reported
+performances are averaged over 3 random seeds.
+
+
+                             In-dist.          Out-of-dist.       4  Role of Easy-to-Learn Instances
+
+                QNLI Val.   Adversarial SQuAD
+                                              Data maps uncover ambiguous regions, small sub-
+     100% train       93.70.3            81.70.6
+                                                        sets from which lead to improved OOD perfor-
+    train  random           92.70.3            78.30.4         mance, with minimal degradation of ID perfor-
+       hard-to-learn     93.30.2            83.30.6         mance (§3). We next investigate how performance   33%  ambiguous       93.80.3            83.90.2
+                                                                is affected as we vary the size of the ambiguous
+                                                        subsets. We retrain our model with subsets contain-Table 4: QNLI performance on ID validation and OOD
+test sets, showing substantial improvements in the latter    ing the top 50%, 33%, 25%, 17%, 10%, 5% and
+with a third of the original data. Reported values are  1% ambiguous instances of WinoGrande (Fig. 3,
+averaged over 3 random seeds, with s.d. as subscripts.     left and center). Large ambiguous subsets (25%
+                                                   or more) result in high ID and OOD performance.
+                                                    Surprisingly however, for smaller ambiguous sub-
+                                                        sets (17% or less), the model performs at chance
+                                                             level, despite random restarts.11 In contrast, a base-
+across datasets. Regional selections of data not
+                                                         line that randomly selects subsets of similar sizes
+only improve model generalization, but also do so
+                                                                is able to learn (while naturally performing worse
+using substantially less data, providing a method
+                                                   as data decreases, eventually failing at 1%). This
+to potentially speed up training. We note, however,
+                                                       indicates that ambiguous instances alone might be
+that discovering such examples requires comput-
+                                                     insufﬁcient for learning.
+ing training dynamics, which involves training a
+                                                Given that the model barely struggles with easy-
+model on the full dataset. Future directions involve
+building more efﬁcient data maps, to better fulﬁll                                                                   11This is common for large models trained on small datasets
+the training speedup potential.                           (Devlin et al., 2019; Phang et al., 2018; Dodge et al., 2020).
+
+                                        9280
+
+===== PDF PAGE 7 =====
+                                           To verify this hypothesis, we design an experi-
+                  Before Flips                                        Before Flips
+                    After Flips                                                103                    After Flips       mental setting where we artiﬁcially inject noise in    scale) 104                                                                                   scale)
+  log 102                                 log                          the training data, by ﬂipping the labels of 1% of
+  (in                                     (in 101
+      100                                               the training data for WinoGrande. Motivated by
+                                           10  1     Density 10 2                                                                            Density                        our qualitative analysis (Tab 1), we select the can-
+                                                      didates for ﬂipping from the easy-to-learn region—
+             0.0          0.5           1.0              0.0     0.2     0.4
+                  Confidence                                Variability             this minimizes the risk of selecting already misla-
+                                                 beled examples. We retrain ROBERTA with the
+Figure 4:  Retraining WinoGrande with 1% noised    partly noised data, and recompute conﬁdence
+(label-ﬂipped) data changes the training dynamics of                                            and variability of all instances.  Fig. 4 shows
+the noisy examples.  After retraining, there is a no-
+                                                    the training dynamics measures, before and after
+ticeable distributional shift towards lower conﬁdence,
+                                                         re-training. Flipped instances move to the lowerwith some shift towards higher variability as well.
+                                     conﬁdence regions after retraining, with some
+                                        movement towards higher variability. This in-
+to-learn instances (by deﬁnition), we next replace    dicates that perhaps the hard-to-learn region (low
+some ambiguous examples with easy-to-learn ex-   conﬁdence) of the map contains other mislabeled
+amples in the 17% most ambiguous subset.  In-    instances. We next explore a simple method to au-
+terestingly, replacing just a tenth of the ambigu-   tomatically detect such instances.
+ous data with easy-to-learn instances, the model
+                                            Automatic Noise Detection We train a linear
+not only successfully learns, but also outperforms
+                                            model to classify examples as mislabeled (noise) or
+the random selection baseline’s ID performance
+                                                        not, using a single feature: the conﬁdence score
+(Fig. 3 right). This indicates that for successful
+                                            from the retrained ROBERTA model on Wino-
+optimization, it is important to include easier-to-
+                                             Grande. This model is trained using a balanced
+learn instances. However, with too many replace-
+                                                      training set for this task by sampling equal num-
+ments, performance starts decreasing again; this
+                                                   bers of noisy (label-ﬂipped) and clean examples
+trend was seen in the previous section with the
+                                            from the original train set. This simple classiﬁer
+high-conﬁdence baseline (Tab. 2). OOD perfor-
+                                                                is quite effective—a sanity check evaluation on a
+mance shows a similar trend, but matches or is
+                                                       similarly constructed test set yields 100% F1.12
+worse than the baseline. Selection of the optimal
+                                                   Next, we run the trained noise classiﬁer on the
+balance of easy-to-learn and ambiguous examples
+                                                         entire original training set, with features extracted
+in low data regimes is an open problem; we defer
+                                             from the original training dynamics measures (com-
+this exploration to future work.
+                                                puted without added noise). We ﬁrst observe that
+                                                      despite training on a balanced dataset, our classiﬁer
+5  Detecting Mislabeled Examples
+                                                       predicts only a few examples as mislabeled—only
+                                          31 WinoGrande instances (out a total of 40K). ACrowdsourced datasets are often subject to noise
+                                                     similar experiment on SNLI results in 15K noisyattributed to incorrect labeled annotations (Sheng
+                                              examples (out of 500K). These results are encour-et al., 2008; Krishna et al., 2016; Ekambaram et al.,
+                                                 aging and follow our intuitions that most instances2017), which may lead to training models that are
+                                                      in data are indeed labeled “correctly”.  Indeed,not representative of the task at hand. Recent stud-
+                                          WinoGrande contains a lower portion of noisy ex-ies have shown that over-parameterized neural net-
+                                                 amples, as indicated by our data maps (Fig. 2).works can ﬁt the incorrect labels blindly (Zhang
+                                  We further investigated these trends via a hu-et al., 2017), which might hurt their generalization
+                                     man evaluation on the output of the classiﬁer. Weability (Hu et al., 2020). For large datasets, identi-
+                                                   created an evaluation set by randomly selectingfying mislabeled examples can be prohibitively ex-
+                                          50 instances from each predicted class as per ourpensive. Our data maps provide a semi-automated
+method to identify such mislabeled instances, with-    classiﬁer. Two of the authors re-annotated these
+out signiﬁcantly more effort than simply training   100 instances (without access to the original or pre-
+                                                    dicted labels); some instances were annotated asa model on the data. We hypothesize that hard-
+to-learn examples—those with low conﬁdence—   too ambiguous for the authors. After discussions
+might be mislabeled, as has also been suggested in                                                        12A similar experiment with only variability scores as
+prior work (Manning, 2011; Toneva et al., 2018).      features resulted in a much poorer classiﬁer—70% F1.
+
+                                        9281
+
+===== PDF PAGE 8 =====
+to resolve their differences, both annotators agreed
+                                                                                                                                       1.0on 96% of the instances in each dataset. Using our
+annotations as a new gold standard, we found that                          0.87                                           0.9
+                                                                                                                                       0.8for   WinoGrande,            67%                      of the instances                                       predicted
+                                                                                                                                                                                                                            humanas noisy       by the linear                       classiﬁer                                are indeed                                                                                                                                       0.7                                              either                          0.63
+mislabeled or ambiguous, compared to only 13%                                                                                                                                       0.6                                                                                                                                                                                                                                                                                  confidence
+of the ones predicted as correctly labeled. Similar                          0.38                                                                                                                                       0.5  agreement
+patterns are observed for SNLI (76% vs. 4%).
+                                                                                                                                       0.4
+  Our results demonstrate the potential of using                          0.13
+data maps as a tool to “clean-up” datasets, by iden-                        0.10    0.26    0.43    0.60        0.3
+                                                                                                                  variabilitytifying mislabeled or ambiguous instances.13 No-
+tably, our results were obtained using a simple                                                      Figure 5: Visualizing human agreement on the SNLI
+method; this encourages exploration of methods    (dev. set only) data map reveals its strong relationship
+that might lead to more accurate noise-detectors.      to conﬁdence. Each cell in the heatmap bins exam-
+                                                           ples based on conﬁdence and variability, then col-
+6  Training Dynamics as Uncertainty          ors the cell by the mean human agreement.
+   Measures
+
+We introduced data maps, and used training dynam-   tween human agreement and conﬁdence: high
+ics measures as coordinates for data points in §2.  conﬁdence indicates high agreement between an-
+We now take a closer look at these measures, and    notators, while low conﬁdence often indicates
+ﬁnd intuitive connections with measures of uncer-   disagreement on the example. In contrast, once
+tainty. When a model fails to predict the correct   conﬁdence is known, variability does not pro-
+label, the error may come from ambiguity inherent    vide much information about the agreement.
+to the example (intrinsic uncertainty), but it may     The connection between our second measure,
+also come from the model’s limitations (often re-   variability,  and model  uncertainty  is more
+ferred to as model uncertainty).14 To understand    straightforward: variability, by deﬁnition, cap-
+how examples contribute to a dataset, it is impor-    tures exactly the uncertainty of the model. See
+tant to separate these two sources of error.          App. B.1 for an additional discussion (with empiri-
+  We start by studying the relationship between in-    cal justiﬁcations) on connections between training
+trinsic uncertainty and our training dynamics mea-   dynamics measures and dropout-based (Srivastava
+sures. Human agreement can serve as a proxy for    et al., 2014), ﬁrst-principles uncertainty estimates.
+intrinsic uncertainty. We estimate human agree-     These relations are further supported by previ-
+ment using the multiple human annotations avail-   ous work, which showed that deep ensembles pro-
+able in SNLI’s development set.15 For each an-   vide well-calibrated uncertainty estimates (Laksh-
+notator, we compute whether they agree with the   minarayanan et al., 2017; Gustafsson et al., 2019;
+majority label from the other four, breaking ties   Snoek et al., 2019). Generally, such approaches
+randomly and then averaging over annotators.16,17   ensemble models trained from scratch; while en-
+   Fig. 5  visualizes  the  relation between our   sembles of training checkpoints lose some diversity
+training dynamics measures (conﬁdence and    (Fort et al., 2019), they offer a cheaper alternative
+variability) and human agreement, averaged over    capturing some of the beneﬁts (Chen et al., 2017a).
+the examples. We observe a strong relationship be-   Future work will involve investigation of such al-
+                                                        ternatives for building data maps.   13In preliminary experiments, retraining WinoGrande after
+removal of noise did not yield a large difference in perfor-
+mance, given the relatively small amount of noise.         7  Related Work
+   14These are also sometimes called the aleatoric and epis-
+temic uncertainty, respectively (Gal, 2016).              Our work builds data maps using training dynam-
+   15Only SNLI dev. and test set have multiple annotations on                                                           ics measures for scoring data instances. Loss land-
+all instances. We obtain training dynamics with ROBERTA-
+large run on train and dev. combined.                     scapes (Xing et al., 2018) are similar to training
+   16Normally, this provides the minimum-variance unbiased   dynamics, but also consider variables from the
+estimate, though SNLI’s development set throws away exam-    stochastic optimization algorithm. Toneva et al.
+ples without a majority, which introduces some bias.
+                                                (2018) also use training dynamics to ﬁnd train ex-   17Note that the model only has seen the majority vote, while
+we take into account all annotator labels to quantify agreement.   amples which are frequently “forgotten”, i.e., mis-
+
+                                        9282
+
+===== PDF PAGE 9 =====
+classiﬁed during a later epoch of training, despite   with more ambiguous examples (with respect to
+being classiﬁed correctly earlier; our correctness   a given model) could make it beneﬁcial for OOD
+metric provides similar discrete scores, and results    generalization.
+in models with better performance.  Variants of     Data error detection also involves instance scor-
+such approaches address catastrophic forgetting,    ing. Inﬂuence functions (Koh and Liang, 2017),
+and are useful for analyzing data instances (Pan    forgetting events (Toneva et al., 2018), cross valida-
+et al., 2020; Krymolowski, 2002).                     tion (Chen et al., 2019), Shapely values (Ghorbani
+   Prior work has proposed other criteria to score   and Zou, 2019), and the area-under-margin metric
+instances. AFLite (LeBras et al., 2020) is an ad-    (Pleiss et al., 2020) have all been used to identify
+versarial ﬁltering algorithm which ranks instances    mislabeled examples. Some approaches avoid hard
+based on their “predictability”, i.e. the ability of   examples altogether (Bottou et al., 2005; Northcutt
+simple linear classiﬁers to predict them correctly.    et al., 2017) to reduce ﬁt to noisy data. Our use of
+While AFLite, among others (Li and Vasconcelos,    training dynamics to locate mislabeled examples
+2019; Gururangan et al., 2018), advocate removing    involves minimal additional effort beyond training
+“easy” instances from the dataset, our work shows    a model on the dataset.
+that easy-to-learn instances can be useful. Similar
+                                        8  Conclusionintuitions have guided other work such as curricu-
+lum learning (Bengio et al., 2009) and self-paced                                 We presented data maps: an automatic method to
+learning (Kumar et al., 2010; Lee and Grauman,                                                        visualize and diagnose large datasets using training
+2011) where all examples are prioritized based on                                                 dynamics. Our data maps for four different datasets
+their “difﬁculty”.                                                     reveal similar terrains in each dataset: groups of
+  Other approaches have used training loss (Han   ambiguous instances useful for high performance,
+et al., 2018; Arazo et al., 2019; Shen and Sang-    easy-to-learn instances which aid optimization, and
+havi, 2019), conﬁdence (Hovy et al., 2013), and    hard-to-learn instances which often correspond
+meta-learning (Ren et al., 2018), to differentiate    to data errors.   While our maps are based on
+instances within datasets. Perhaps our measures   ROBERTA-large, the methods to build them are
+are the closest to those from Chang et al. (2017);   model-agnostic (App. §C.1). Our work shows the
+they propose prediction variance and threshold    effectiveness of simple training dynamics measures
+closeness—which correspond to variability and   based on mean and standard deviation; exploration
+conﬁdence, respectively.18 However, they use    of more sophisticated measures to build data maps
+these measures to reweight all instances, similar     is an exciting future direction.  Data maps not
+to sampling effective batches in online learning   only help diagnose and make better use of exist-
+(Loshchilov and Hutter, 2016). Our work, instead,   ing datasets, but also hold potential for guiding the
+does a hard selection for the purpose of studying    construction of new datasets. Moreover, data maps
+different groups within data.                       could facilitate comparison of different model ar-
+  Our methods are also reminiscent of active learn-   chitectures trained on a given dataset, resulting in
+ing methods (Settles, 2009; Peris and Casacuberta,    alternative evaluation methodologies. Our imple-
+2018; P.V.S and Meyer, 2019), such as uncertainty   mentation is publicly available to facilitate such
+sampling (Lewis and Gale, 1994) which selects    efforts.19
+(unlabeled) data points, which a model trained on
+a small labeled subset, has least conﬁdence in, or   Acknowledgements
+predicts as farthest (in vector space, based on co-
+                                                This research was supported in part by DARPA
+sine similarity) (Sener and Savarese, 2018; Wolf,
+                                               under the MCS program through NIWC Paciﬁc
+2011). Our approach uses labeled data for selec-
+                                              (N66001-19-2-4031) grant, and by the Allen Dis-
+tion, similar to core-set selection approaches (Wei
+                                                     tinguished Investigator Award. We thank the anony-
+et al., 2013). Active learning approaches could
+                                        mous reviewers, and our colleagues from AI2 and
+be used in conjunction with data maps to create
+                                   UWNLP, especially Ana Marasovi´c, and Suchin
+better datasets, similar to approaches proposed in
+                                                Gururangan, for their helpful feedback.
+Mishra et al. (2020). For instance, creating datasets
+
+   18They also consider conﬁdence intervals; our preliminary     19https://github.com/allenai/
+experiments, with and without, yielded similar results.        cartography
+
+                                        9283
+
+===== PDF PAGE 10 =====
+References                                       R. Ekambaram, D. B. Goldgof, and L. O. Hall. 2017.
+                                                        Finding label noise examples in large scale datasets.
+Stanislaw Antol, Aishwarya Agrawal, Jiasen Lu, Mar-                                                           In SMC, pages 2420–2424.
+   garet Mitchell, Dhruv Batra, C. Lawrence Zitnick,
+  and Devi Parikh. 2015. VQA: Visual Question An-                                                          Stanislav  Fort,  Huiyi  Hu,  and  Balaji  Lakshmi-
+   swering. In ICCV.                                                         narayanan. 2019. Deep ensembles: A loss landscape
+                                                              perspective. ArXiv preprint arXiv:1912.02757.
+Eric Arazo, Diego Ortego, Paul Albert, Noel O’Connor,
+  and Kevin Mcguinness. 2019.  Unsupervised label
+                                                      Yarin Gal. 2016. Uncertainty in Deep Learning. Ph.D.
+   noise modeling and loss correction. In ICML, pages
+                                                                    thesis, University of Cambridge.
+  312–321.
+
+                                                      Yarin Gal and Zoubin Ghahramani. 2016. Dropout as aYoshua Bengio, J´erˆome Louradour, Ronan Collobert,
+                                                        bayesian approximation: Representing model uncer-  and Jason Weston. 2009. Curriculum learning.  In
+                                                                 tainty in deep learning. In ICML, volume 48, pages  ICML.
+                                                    1050–1059. PMLR.
+L´eon Bottou, Jason Weston, and G¨okhan H Bakir. 2005.
+  Breaking SVM complexity with Cross-Training. In    Amirata Ghorbani and James Zou. 2019. Data shapley:
+  NeurIPS, pages 81–88. MIT Press.                       Equitable valuation of data for machine learning.
+
+Samuel R. Bowman, Gabor Angeli, Christopher Potts,   Suchin  Gururangan,  Swabha Swayamdipta, Omer
+  and Christopher D. Manning. 2015. A large anno-      Levy, Roy Schwartz, Samuel Bowman, and Noah A.
+   tated corpus for learning natural language inference.      Smith. 2018.  Annotation artifacts in natural lan-
+   In Proceedings of the 2015 Conference on Empiri-      guage inference data.  In Proceedings of the 2018
+   cal Methods in Natural Language Processing, pages      Conference of the North American Chapter of the
+  632–642, Lisbon, Portugal. Association for Compu-      Association for Computational Linguistics: Human
+   tational Linguistics.                               Language Technologies, Volume 2 (Short Papers),
+                                                      pages 107–112, New Orleans, Louisiana. Associa-
+Haw-Shiuan Chang, Erik Learned-Miller, and Andrew       tion for Computational Linguistics.
+  McCallum. 2017. Active bias: Training more accu-
+   rate neural networks by emphasizing high variance    Fredrik K Gustafsson, Martin Danelljan, and Thomas B
+   samples. In NeurIPS, pages 1002–1012.                   Sch¨on. 2019.  Evaluating scalable bayesian deep
+                                                            learning methods for robust computer vision. ArXiv
+Hugh Chen, Scott Lundberg, and Su-In Lee. 2017a.       preprint arXiv:1906.01620.
+  Checkpoint ensembles: Ensemble methods from a
+   single training process. ArXiv:1710.03282.         Bo Han, Quanming Yao,  Xingrui Yu, Gang Niu,
+                                               Miao Xu, Weihua Hu, Ivor W. Tsang, and Masashi
+Pengfei Chen, Benben Liao, Guangyong Chen, and                                                    Sugiyama. 2018.  Co-teaching: Robust training of
+  Shengyu Zhang. 2019. Understanding and utilizing                                                    deep neural networks with extremely noisy labels.
+  deep neural networks trained with noisy labels.  In                                                           In NeurIPS, pages 8536–8546.
+  ICML, volume 97 of Proceedings of Machine Learn-
+   ing Research, pages 1062–1070. PMLR.                                           Dan Hendrycks, Xiaoyuan Liu, Eric Wallace, Adam
+                                                          Dziedzic, Rishabh Krishnan, and Dawn Song. 2020.Qian Chen, Xiaodan Zhu, Zhen-Hua Ling, Si Wei,
+                                                            Pretrained transformers improve out-of-distribution  Hui Jiang, and Diana Inkpen. 2017b.  Enhanced
+                                                             robustness. ArXiv preprint arXiv:2004.06100.  LSTM for natural language inference.  In Proceed-
+   ings of the 55th Annual Meeting of the Association
+                                                    Dirk Hovy, Taylor Berg-Kirkpatrick, Ashish Vaswani,   for Computational Linguistics (Volume 1: Long Pa-
+                                                   and Eduard Hovy. 2013.  Learning whom to trust   pers), pages 1657–1668, Vancouver, Canada. Asso-
+                                                        with MACE. In Proceedings of the 2013 Conference   ciation for Computational Linguistics.
+                                                                of the North American Chapter of the Association
+                                                                for Computational Linguistics: Human LanguageJacob Devlin, Ming-Wei Chang, Kenton Lee, and
+                                                           Technologies, pages 1120–1130, Atlanta, Georgia.   Kristina Toutanova. 2019.  BERT: Pre-training of
+                                                         Association for Computational Linguistics.  deep bidirectional transformers for language under-
+   standing. In NAACL.
+                                             Wei Hu, Zhiyuan Li, and Dingli Yu. 2020. Simple and
+Jesse Dodge, Suchin Gururangan, Dallas Card, Roy       effective regularization methods for training on nois-
+  Schwartz, and Noah A. Smith. 2019.  Show your        ily labeled data with generalization guarantee.  In
+  work: Improved reporting of experimental results.     ICLR. OpenReview.net.
+   In EMNLP.
+                                                Robin Jia and Percy Liang. 2017.  Adversarial exam-
+Jesse Dodge,  Gabriel  Ilharco, Roy Schwartz,  Ali       ples for evaluating reading comprehension systems.
+   Farhadi, Hannaneh Hajishirzi, and Noah A. Smith.      In Proceedings of the 2017 Conference on Empiri-
+  2020.   Fine-tuning pretrained language models:       cal Methods in Natural Language Processing, pages
+  Weight initializations, data orders, and early stop-      2021–2031, Copenhagen, Denmark. Association for
+   ping. arXiv:2002.06305.                              Computational Linguistics.
+
+                                        9284
+
+===== PDF PAGE 11 =====
+Ajay  J  Joshi,  Fatih  Porikli,  and  Nikolaos  Pa-    Ilya Loshchilov and Frank Hutter. 2016. Online batch
+   panikolopoulos. 2009.  Multi-class active learning       selection for faster training of neural networks.  In
+   for image classiﬁcation.   In CVPR, pages 2372–     ICLR.
+  2379. IEEE.
+                                                       Christopher D. Manning. 2011.   Part-of-speech tag-
+Jared  Kaplan, Sam  McCandlish, Tom  Henighan,      ging from 97% to 100%:  Is it time for some lin-
+  Tom B. Brown, Benjamin Chess, Rewon Child,       guistics?  In CICLing, CICLing’11, page 171–189,
+   Scott Gray, Alec Radford, Jeffrey Wu, and Dario       Berlin, Heidelberg. Springer-Verlag.
+  Amodei. 2020.  Scaling laws for neural language
+  models.                                      Swaroop  Mishra,  Anjana  Arunkumar,  Bhavdeep
+                                                       Sachdeva, Chris Bryan, and Chitta Baral. 2020.
+Diederik   P.  Kingma  and  Jimmy   Ba.   2014.     DQI: Measuring Data Quality in NLP.
+  Adam:  A method  for  stochastic  optimization.
+  ArXiv:1412.6980.                                     Curtis G. Northcutt, Tailin Wu, and Isaac L. Chuang.
+                                                       2017.  Learning with conﬁdent examples: Rank
+Pang Wei Koh and Percy Liang. 2017.  Understand-                                                        pruning for robust classiﬁcation with noisy labels.
+   ing black-box predictions via inﬂuence functions. In
+  ICML, pages 1885–1894. JMLR. org.                                                  Pingbo Pan, Siddharth Swaroop, Alexander Immer,
+                                               Runa Eschenhagen, Richard E. Turner, and Moham-
+Ranjay A.  Krishna,  Kenji  Hata,  Stephanie Chen,
+                                           mad Emtiyaz Khan. 2020. Continual deep learning
+  Joshua Kravitz, David A. Shamma, Fei-Fei Li, and
+                                                 by functional regularisation of memorable past.
+  Michael S. Bernstein. 2016.  Embracing error to
+   enable rapid crowdsourcing.  In CHI, pages 3167–
+                                                            ´Alvaro Peris and Francisco Casacuberta. 2018. Active  3179. ACM.
+                                                            learning for interactive neural machine translation of
+Yuval Krymolowski. 2002.  Distinguishing easy and       data streams. In CoNLL, pages 151–160.
+  hard instances. In COLING.
+                                                     Jason Phang, Thibault F´evry, and Samuel R. Bow-
+M Pawan Kumar, Benjamin Packer, and Daphne Koller.     man. 2018. Sentence encoders on STILTs: Supple-
+  2010. Self-paced learning for latent variable models.      mentary training on intermediate labeled-data tasks.
+   In NeurIPS, pages 1189–1197.                          arXiv:1811.01088.
+
+Balaji  Lakshminarayanan,  Alexander  Pritzel,  and    Geoff Pleiss, Tianyi Zhang, Ethan R. Elenberg, and
+   Charles Blundell. 2017. Simple and scalable predic-      Kilian Q. Weinberger. 2020. Identifying mislabeled
+   tive uncertainty estimation using deep ensembles. In       data using the area under the margin ranking.
+  NeurIPS, pages 6402–6413.
+                                                   Avinesh P.V.S and Christian M. Meyer. 2019.  Data-
+Ronan LeBras, Swabha Swayamdipta, Chandra Bhaga-      efﬁcient neural text compression with interactive
+   vatula, Rowan Zellers, Matthew E. Peters, Ashish       learning. In NAACL, pages 2543–2554. Association
+  Sabharwal, and Yejin Choi. 2020. Adversarial ﬁlters       for Computational Linguistics.
+   of dataset biases. In ICML.
+                                                   Pranav Rajpurkar, Jian Zhang, Konstantin Lopyrev, and
+Yong Jae Lee and Kristen Grauman. 2011.  Learning                                                       Percy Liang. 2016. SQuAD: 100, 000+ questions
+   the easy things ﬁrst: Self-paced visual category dis-                                                                for machine comprehension of text. In EMNLP.
+   covery. CVPR, pages 1721–1728.
+                                           Mengye Ren, Wenyuan Zeng, Bin Yang, and Raquel
+Hector J Levesque, Ernest Davis, and Leora Morgen-
+                                                          Urtasun. 2018. Learning to reweight examples for
+   stern. 2011. The Winograd schema challenge.  In
+                                                            robust deep learning.
+  AAAI, volume 46, page 47.
+
+                                                 Olga Russakovsky, Jia Deng, Hao Su, Jonathan Krause,David D. Lewis and William A. Gale. 1994. A sequen-
+                                                       Sanjeev Satheesh, Sean Ma, Zhiheng Huang, An-   tial algorithm for training text classiﬁers. In SIGIR,
+                                                                drej Karpathy, Aditya Khosla, Michael Bernstein,  SIGIR ’94, page 3–12, Berlin, Heidelberg. Springer-
+                                                      Alexander C. Berg, and Li Fei-Fei. 2015. ImageNet   Verlag.
+                                                     Large Scale Visual Recognition Challenge. IJCV.
+Yi Li and Nuno Vasconcelos. 2019. REPAIR: Remov-
+   ing representation bias by dataset resampling. IEEE.   Keisuke Sakaguchi, Ronan Le Bras, Chandra Bhagavat-
+                                                                   ula, and Yejin Choi. 2020. Winogrande: An adver-
+Tal Linzen. 2020. How can we accelerate progress        sarial winograd schema challenge at scale. In AAAI.
+  towards human-like linguistic generalization?   In
+  ACL.                                       Ozan Sener and Silvio Savarese. 2018.  Active learn-
+                                                          ing for convolutional neural networks: A core-set
+Yinhan Liu, Myle Ott, Naman Goyal, Jingfei Du, Man-      approach. In ICLR.
+   dar S. Joshi, Danqi Chen, Omer Levy, Mike Lewis,
+  Luke S. Zettlemoyer, and Veselin Stoyanov. 2019.   Burr Settles. 2009.  Active learning literature survey.
+  RoBERTa: A robustly optimized BERT pretraining      Technical report, University of Wisconsin-Madison
+   approach. ArXiv:1907.11692.                        Department of Computer Sciences.
+
+                                        9285
+
+===== PDF PAGE 12 =====
+Yanyao Shen and Sujay Sanghavi. 2019. Learning with   Adina Williams, Nikita Nangia, and Samuel Bowman.
+  bad training data via iterative trimmed loss mini-      2018. A broad-coverage challenge corpus for sen-
+   mization. In ICML, pages 5739–5748.                    tence understanding through inference. In Proceed-
+                                                           ings of the 2018 Conference of the North American
+Victor S Sheng,  Foster Provost, and Panagiotis G      Chapter of the Association for Computational Lin-
+   Ipeirotis. 2008. Get another label? improving data       guistics: Human Language Technologies, Volume
+   quality and data mining using multiple, noisy label-     1 (Long Papers), pages 1112–1122, New Orleans,
+   ers. In SIGKDD, pages 614–622.                                                           Louisiana. Association for Computational Linguis-
+                                                                           tics.Abhinav Shrivastava, Abhinav Gupta, and Ross Gir-
+   shick. 2016. Training region-based object detectors                                                     Gert W Wolf. 2011. Facility location: concepts, mod-
+  with online hard example mining. In CVPR, pages                                                                         els, algorithms and case studies. series: Contribu-
+  761–769.                                                                tions to management science.  IJGIS, 25(2):331–
+                                                        333.Jasper Snoek, Yaniv Ovadia, Emily  Fertig,  Balaji
+  Lakshminarayanan, Sebastian Nowozin, D Sculley,
+                                            Thomas Wolf, Lysandre Debut, Victor Sanh, Julien
+  Joshua Dillon, Jie Ren, and Zachary Nado. 2019.
+                                                Chaumond, Clement Delangue, Anthony Moi, Pier-
+  Can you trust your model’s uncertainty?  evaluat-
+                                                                      ric Cistac, Tim Rault, R’emi Louf, Morgan Funtow-
+   ing predictive uncertainty under dataset shift.  In
+                                                                      icz, and Jamie Brew. 2019.  Huggingface’s trans-
+  NeurIPS, pages 13969–13980.
+                                                          formers:  State-of-the-art natural language process-
+Nitish Srivastava, Geoffrey Hinton, Alex Krizhevsky,       ing. ArXiv:1910.03771.
+   Ilya Sutskever, and Ruslan Salakhutdinov. 2014.
+                                             Chen Xing, Devansh Arpit, Christos Tsirigotis, and  Dropout: a simple way to prevent neural networks
+                                                  Yoshua Bengio. 2018. A walk with SGD.  from overﬁtting. The journal of machine learning
+   research, 15(1):1929–1958.                                                 Dani Yogatama, Cyprien de Masson d’Autume, Jerome
+                                                      Connor, Tomas Kocisky, Mike Chrzanowski, Ling-Alon  Talmor,  Yanai  Elazar,  Yoav Goldberg,  and
+                                                   peng Kong, Angeliki Lazaridou, Wang Ling, Lei  Jonathan Berant. 2019. olmpics - on what language
+                                                      Yu, Chris Dyer, et al. 2019. Learning and evaluat-  model pre-training captures. ArXiv:1912.13283.
+                                                          ing general linguistic intelligence.  ArXiv preprint
+Mariya Toneva, Alessandro Sordoni, Remi Tachet des      arXiv:1901.11373.
+  Combes, Adam Trischler, Yoshua Bengio, and Geof-
+   frey J Gordon. 2018. An empirical study of example    Chiyuan Zhang, Samy Bengio, Moritz Hardt, Ben-
+   forgetting during deep neural network learning. In      jamin Recht, and Oriol Vinyals. 2017. Understand-
+  ICLR.                                                  ing deep learning requires rethinking generalization.
+                                                           In ICLR. OpenReview.net.
+Antonio Torralba and Alexei A Efros. 2011. Unbiased
+  look at dataset bias.  In CVPR 2011, pages 1521–
+  1528. IEEE.
+
+Kailas Vodrahalli, Ke Li, and Jitendra Malik. 2018.
+  Are all training examples created equal? an empir-
+   ical study. ArXiv:1811.12569.
+
+Alex Wang,  Yada  Pruksachatkun,  Nikita  Nangia,
+  Amanpreet Singh, Julian Michael, Felix Hill, Omer
+  Levy, and Samuel R. Bowman. 2019. SuperGLUE:
+ A stickier benchmark for general-purpose language
+   understanding systems. In NeurIPS.
+
+Alex Wang, Amanpreet Singh, Julian Michael, Fe-
+   lix Hill, Omer Levy, and Samuel Bowman. 2018.
+  GLUE: A multi-task benchmark and analysis plat-
+  form for natural language understanding.  In Pro-
+   ceedings  of the 2018 EMNLP Workshop Black-
+  boxNLP: Analyzing and Interpreting Neural Net-
+  works for NLP, pages 353–355, Brussels, Belgium.
+  Association for Computational Linguistics.
+
+Kai Wei, Yuzong Liu,  Katrin Kirchhoff, and  Jeff
+  Bilmes. 2013. Using document summarization tech-
+   niques for speech data subset selection. In Proceed-
+   ings of the 2013 Conference of the North Ameri-
+  can Chapter of the Association for Computational
+   Linguistics: Human Language Technologies, pages
+  721–726.
+
+                                        9286
+
+===== PDF PAGE 13 =====
+A  Supplemental Material
+
+A.1  Training Dynamics Computation
+
+Both conﬁdence and variability are computed
+across epochs, but could alternatively be computed
+over other granularities, e.g. over every few steps
+of optimization. This might enable more efﬁcient
+computation of the same. However, care must be
+taken to ignore the ﬁrst few steps till optimization
+stabilizes. In our experiments, we considered all
+epochs including the ﬁrst to compute the training
+dynamics, since the ﬁrst epoch contains multiple    Figure 6: Pearson correlation coefﬁcient of instance
+steps of optimization for large training sets.          variability on WinoGrande between training dynam-
+                                                                ics when model is trained to convergence and when  Moreover, it is possible to stop training early, or
+                                               model is stopped early. The high correlation indicates
+before the training converges for computing train-
+                                                               that training till convergence is not required to compute
+ing dynamics. This early burn-out scheme results                                                     a good approximation of the training dynamics.
+in conﬁdence and variability measures which
+correlate well with conﬁdence and variability
+(see Fig. 6). For our experiments, we use later
+                                                experiment with the Stanford natural language in-burn-outs corresponding to model convergence.
+                                                    ference (SNLI) dataset (Bowman et al., 2015) and
+A.2  Datasets                                                its multi-genre counterpart, MultiNLI (Williams
+                                                           et al., 2018).20 Several challenge sets have beenThis appendix provides further details on datasets.
+                                              proposed to evaluate models OOD. As an OODWe perform our experimental evaluation on four
+                                                              test set, we consider NLI diagnostics (Wang et al.,large datasets, each with at least 10K instances.
+                                              2018) which contains a set of hand-crafted exam-Sizes of the different datasets are reported in Tab. 5.
+                                                     ples designed to demonstrate NLI model perfor-Instances in each of the original datasets are labeled
+                                          mance on several ﬁne-grained semantic categories,by crowdworkers, whereas the OOD test sets are
+                                                such as lexical semantics, logical reasoning, predi-either manually or semi-automatically created. The
+                                                     cate argument structure and commonsense knowl-performance in each case is reported as accuracy.
+                                                  edge. In addition, we also report performance on
+WinoGrande  This dataset contains a large scale    the OOD mismatched MultiNLI validation set. Fig-
+crowd-sourced collection of Winograd schema    ure 8a shows the data map for MultiNLI.
+challenge (WSC Levesque et al., 2011) style ques-
+tions. Commonsense reasoning is required to se-
+lect an entity from a pair of entities to complete  QNLI  Rajpurkar  et  al. (2016) proposed the
+a sentence.  Following Sakaguchi et al. (2020),  SQuAD dataset containing question and document
+we use the multiple choice architecture based on    pairs, where the answer to the question is a span
+ROBERTA (Liu et al., 2019). For OOD evalua-    in the document. The QNLI dataset, provided as
+tion, we use the validation set from the original    part of the GLUE benchmark (Wang et al., 2018)
+WSC as provided under the SuperGLUE bench-   reformulates this as a sentence-level binary clas-
+mark (Wang et al., 2019). We used a rule-based    siﬁcation task. Here, the goal is to determine if a
+method to convert WSC validation and training    candidate sentence from the document contains the
+data to the cloze-style format followed in Wino-   answer to the given question. As an OOD test set,
+Grande, removing all the repetitions included in   we consider the Adversarial SQuAD challenge set
+the training data. Figure 2 shows the data map for    (Jia and Liang, 2017) where distractor sentences
+WinoGrande.                                        are added to the document to confound the model.
+                                 We automatically convert this to the QNLI format.
+SNLI and MultiNLI  The task of natural lan-                                                  Figure 9a shows the data map for QNLI.
+guage inference involves prediction of the relation-
+ship between a premise and hypothesis sentence
+pair. The label determines whether the hypothesis         20                                                             For MultiNLI, we use the version released under the
+entails, contradicts or is neutral to the premise. We   GLUE benchmark (Wang et al., 2018).
+
+                                        9287
+
+===== PDF PAGE 14 =====
+                               In-dist.            Out-of-dist.     model uncertainty from the literature based on
+                    Train    Val.    Test           Test     dropout (Srivastava et al., 2014). Dropout can be
+                                                seen as variational Bayesian inference (Gal and  WinoGrande    40399   1268         -         424
+  SNLI         549368   9843   9825        1105     Ghahramani, 2016), with predictions from differ-
+  MultiNLI     392703   9816   9833        1105      ent dropout masks corresponding to predictions
+  QNLI        104744   5464         -        5324
+                                            sampled from the posterior. Thus, conﬁdence
+                                             and variability computed from sampled dropoutTable 5: Dataset sizes. ID test set in MultiNLI is the
+mismatched validation set, which we did not use for    predictions measure the average and standard de-
+validation, but as test. We did not use the provided test    viation of the gold label’s probability under the
+sets in WinoGrande and QNLI, rather report OOD per-   posterior—quantifying the intrinsic and model un-
+formance for both cases.                                certainty in a principled way.
+                                  We computed conﬁdence and variability
+                                             from both training dynamics and dropout on Wino-A.3  Experimental Settings
+                                              Grande’s development set.23 Figure 7 visualizes
+For each of our classiﬁers, we minimize cross en-
+                                                a regression analysis of the relationship between
+tropy with the Adam optimizer (Kingma and Ba,
+                                     conﬁdence and variability from training dy-
+2014) following the AdamW learning rate sched-
+                                             namics and dropout. conﬁdence from training
+ule from PyTorch21.  Each experiment is run
+                                              dynamics and dropout correlate between 0.450 and
+with 3 random seeds and a learning rate22 cho-
+                                                 0.452 for Pearson’s r at 95% conﬁdence. Likewise,
+sen using the AllenTune package (Dodge et al.,
+                                               variability from training dynamics and dropout
+2019). Initializations greatly affect performance,
+                                                    share a Pearson’s r from 0.390 to 0.393 at 95% con-
+as noted in Dodge et al. (2020). WinoGrande and
+                                               ﬁdence. Thus, the training dynamics empirically
+SNLI ROBERTA-large models are trained for 6
+                                                  demonstrate a positive, predictive relationship with
+epochs, and MultiNLI and QNLI are trained for 5
+                                                    these ﬁrst-principles estimates of the intrinsic and
+epochs each. Each experiment is performed on a
+                                            model uncertainty. Compared to dropout, however,
+single Quadro RTX 8000 GPU. Based on the avail-
+                                                      training dynamics have the pragmatic advantage
+able GPU memory, our experiments on all datasets
+                                                        that all information required to calculate them is
+use a batch size of 96, except for WinoGrande,
+                                                    already available from training, without additional
+where a batch size of 64 is used. Our implementa-
+                                          work or computation.
+tion uses the Huggingface Transformers
+library (Wolf et al., 2019). For the active learn-                                                                               confidence                     variability
+ing baselines, we train a acquisition model using                          1.00                                                           0.20
+ROBERTA-large on a randomly sampled 1% sub-                        0.95                                                                  0.15
+set of the full training set.                                                                                         0.90                                                               0.10                                                                                                                                                                                                                          dropout   0.85
+                                                                                                                                                                                                                                 0.05
+A.4  SNLI Qualitative Analysis                                                                 0.80                                                         0.00
+Qualitative samples from different regions of the                                 0.88    0.90    0.92    0.94    0.96  training0.98    dynamics0.025  0.050  0.075  0.100  0.125  0.150   0.175
+SNLI data map are provided in Tab. 6.                                                      Figure 7:  The conﬁdence (left) and variability
+                                                                 (right) from sampled dropout predictions correlate pos-
+B  Additional Results                                                                  itively with those from the training dynamics on Wino-
+                                                Grande (dev. set).  Shaded regions are bootstrappedResults on the SNLI validation set are provided in
+                                       95% conﬁdence intervals for the regression line.
+Tab. 7.
+
+B.1  Training Dynamics vs. Dropout
+                           C  Additional Data MapsTo empirically test the hypothesis that conﬁdence
+and variability from the training dynamics re-                                                    All the data maps have been provided in Fig. 8 and
+spectively quantify intrinsic and model uncertainty,                                                       Fig. 9.
+we compare conﬁdence and variability against
+an established method of capturing intrinsic and       23To compute training dynamics, we trained a model on the
+                                                     combined training and development sets for WinoGrande. In
+  21pytorch.org                                                contrast, the dropout model was trained only on WinoGrande’s
+   22Learning rate is chosen using a log-uniform sampling     training set then run on development, to avoid over-ﬁtting and
+strategy from the range (5e-6, 2e-5).                           provide higher quality uncertainty estimates.
+
+                                        9288
+
+===== PDF PAGE 15 =====
+      Premise                                  Hypothesis                   Gold Label    Our Assessment
+
+    A mom is feeding two babies.          A mom is giving her children    Contradiction−         Neutral
+                                                          carrots to eat.
+
+      Smiling woman in a blue apron standing in   The woman is wearing a red        Neutral      ambiguous        front of a pile of bags and boxes.                 dress.
+
+       Photographers take pictures of a girl sitting in   The photographer is taking a pic-    Entailment−       Contradiction
+       a street.                                           ture of a boy.
+
+    A group of men in a blue car driving on the  One woman is driving the blue     Entailment−       Contradiction
+        track.                                                 car.        hard-to-learn
+       Pedestrians walking down the street passing   The pedestrians are outside.       Contradiction−       Entailment
+      The Temple Bar.
+
+      Four musicians play their instruments on the   a kid in a car goes through a     Contradiction
+        street while a young man on a bike stands by   drive thru
+        to listen.
+
+    A girl sits with excavating tools examining a  Two men writing a draft of a     Contradiction        easy-to-learn
+       rock.                                          speech.
+
+Table 6: Examples from SNLI belonging to different regions in the data map. Cases where authors disagree with
+the gold standard are highlighted in blue−.
+
+
+
+                       SNLI Val. (In-dist.)
+
+          100% train            93.1
+                   train  random               92.1
+               hard-to-learn          92.6
+           33%  ambiguous            92.9
+
+Table 7: SNLI validation performance comparing dif-
+ferent selection methods.  Reported numbers are the
+best of 3 runs across different seeds.
+
+
+C.1  Effect of Encoder in building Data Maps
+
+While training dynamics are inherently model de-
+pendent, data maps can be built for any model,
+and might reveal similar structures. Since mod-
+els can be of varying capacities with respect to a
+task or dataset, instances might receive different
+co-ordinates on data maps built based on differ-
+ent models. For instance, BERT is known to be
+worse at reasoning than ROBERTA (Sakaguchi
+et al., 2020; Talmor et al., 2019), and ROBERTA
+being a larger model is likely very sample efﬁ-
+cient (Kaplan et al., 2020). However, the overall
+structure of data maps based on different models
+remains the same; Fig. 9b shows the data map built
+for WinoGrande using a BERT-large classiﬁer.
+  Four different architectures for the SNLI dataset
+are compared in Fig. 10 and Fig. 11.
+
+
+
+
+
+                                        9289
+
+===== PDF PAGE 16 =====
+                               MultiNLI-RoBERTa Data Map
+                                                                                                                              correct.
+      1.0                                                                                                          0.0           15000
+                                                                                                               0.2
+                                                                                                              0.4          10000                               easy-to-learn                                                                0.6                    density
+                                                                                                            0.8
+                                                                                                       5000                                                                                                                         1.0
+     0.8
+                                                                                                      0
+                                                                                                                                0.0       0.5        1.0
+                                                                                                                                confidence
+
+                                                                                                            15000
+     0.6
+
+                                                                                                         10000
+                                                                       ambiguous                                     density      confidence                                                                                                   5000
+     0.4
+
+                                                                                                      0
+                                                                                                                                0.0     0.2     0.4
+                                                                                                                                                       variability
+
+                                      hard-to-learn                                                        20000
+     0.2
+                                                                                                            15000
+
+                                                                                                         10000                                                                                                                                                                                                                                                                                 density
+
+                                                                                                       5000
+     0.0
+
+                                                                                                      0
+             0.0                    0.1                  0.2                  0.3                  0.4                  0.5             0.0 0.2 0.4 0.6 0.8 1.0
+                                                                variability                                                                  correctness
+
+(a) Data Map for MultiNLI (Williams et al., 2018) and density plots for different measures based on training dynamics (below).
+For clarity we only use 50K random samples from MultiNLI in the scatter plot. Trends are very similar to SNLI, even though
+MultiNLI contains samples from diverse genres.
+
+                               SNLI-RoBERTa Data Map
+                                                                                                                    correct.
+      1.0
+                                                                                                  0.0           15000
+                                                                                                      0.2
+                                                                                                      0.3          10000
+                               easy-to-learn                                                                                                        0.5                    density
+                                                                                                          0.7           5000
+     0.8                                                                                           0.8
+                                                                                                                1.0             0
+                                                                                                                       0.0      0.5       1.0
+                                                                                                                       confidence
+
+     0.6                                                                                             15000
+                                                                      ambiguous                                  density 10000      confidence                                                                                                5000
+     0.4
+                                                                                               0
+                                                                                                                       0.0     0.2     0.4
+                                                                                                                                            variability
+
+                                      hard-to-learn                                                    20000
+      0.2
+                                                                                                     15000
+
+                                                                                                 10000                                                                                                                                                                                                                                                             density
+
+                                                                                                5000     0.0
+                                                                                               0
+            0.0                  0.1                0.2                0.3                0.4                                0.00.20.30.50.70.81.0
+                                                            variability                                                             correctness
+
+(b) (Left) Data Map for SNLI, same as Fig. 1, provided here in greater relief again for comparison with other datasets. SNLI is
+larger than all other datasets, and thus has a higher density of easy-to-learn examples. (Right) Densities of the above statistics
+across the entire dataset; examples which are easy-to-learn (for ROBERTA) form the vast majority of SNLI.
+                                        9290
+
+             Figure 8: Data maps for *NLI datasets; each data map plots 25K instances, for clarity.
+
+===== PDF PAGE 17 =====
+                              QNLI-RoBERTa Data Map
+                                                                                                    20000
+                                                                                                                               correct.
+      1.0                                                                                                           0.0
+                                                                                                            15000
+                                                                                                               0.2
+                                                                                                              0.4
+                               easy-to-learn                                                                0.6                   density 10000
+                                                                                                            0.8
+                                                                                                                          1.0           5000
+     0.8
+                                                                                                      0
+                                                                                                                                0.0       0.5        1.0
+                                                                                                                                confidence
+
+
+                                                                                                            15000
+     0.6
+
+                                                                                                         10000
+                                                                       ambiguous                                     density      confidence                                                                                                       5000
+     0.4
+                                                                                                      0
+                                                                                                                                0.0     0.2     0.4
+                                                                                                                                                       variability
+
+                                      hard-to-learn                                                        20000
+     0.2
+                                                                                                            15000
+                                                                                                                                                                                                                                                                                 density 10000
+
+                                                                                                       5000
+     0.0
+
+                                                                                                      0
+             0.0                    0.1                  0.2                  0.3                  0.4                  0.5             0.0 0.2 0.4 0.6 0.8 1.0
+                                                                 variability                                                                  correctness
+
+(a) Data map for the sentence-level SQuAD dataset, QNLI (left) and density plots for different measures based on training
+dynamics (right). Unlike other datasets, QNLI has fewer instances with low variability and conﬁdence close to 0.5.
+
+                              WinoGrande-BERT Data Map
+                                                                                                                     correct.      20000
+      1.0
+                                                                                                   0.0
+                                                                                                       0.2           15000
+                                                                                                       0.3
+                                                                                                  10000                               easy-to-learn                                                                                                         0.5                   density
+                                                                                                           0.7                                                                                                5000
+     0.8                                                                                            0.8
+                                                                                                                 1.0             0
+                                                                                                                       0.0       0.5       1.0
+                                                                                                                       confidence
+
+
+                                                                                                  10000     0.6
+                                                                                                     7500
+                                                                             ambiguous                density 5000      confidence
+                                                                                                   2500
+     0.4
+                                                                                                0
+                                                                                                                        0.0     0.2     0.4
+                                                                                                                                             variability
+
+                                      hard-to-learn
+                                                                                              20000     0.2
+                                                                                                                                                                                                                                                               density 1000015000
+
+                                                                                                5000
+     0.0
+                                                                                                0
+            0.0                  0.1                0.2                0.3                0.4                0.5               0.00.20.30.50.70.81.0
+                                                            variability                                                             correctness
+
+(b) Data map for WinoGrande built based on a BERT-large (Devlin et al., 2019) model. While similar regions can be seen as
+a WinoGrande-ROBERTA data map (Fig. 2), the densities of different regions can be different. Moreover the same instances
+might be mapped to different regions across maps.
+                                        9291
+                   Figure 9: Additional data maps, each plotting 25K instances, for clarity.
+
+===== PDF PAGE 18 =====
+                                 SNLI-Bag-of-Words Data Map
+                                                                                               4000                                                                                                                      correct.
+      1.0
+                                                                                                   0.0
+                                                                                                3000
+                                                                                                       0.2
+                                                                                                        0.3                                                                                               2000                               easy-to-learn                                                                                                         0.5                     density
+                                                                                                           0.7           1000
+     0.8                                                                                            0.8
+                                                                                                                 1.0             0
+                                                                                                                        0.0      0.5       1.0
+                                                                                                                        confidence
+
+
+     0.6                                                                                       8000
+
+                                                                                               6000
+                                                                     ambiguous                                         density 4000      confidence
+                                                                                               2000     0.4
+                                                                                                0
+                                                                                                                        0.0        0.2
+                                                                                                                                             variability
+
+                                      hard-to-learn                                                                                                     15000     0.2
+                                                                                                                                                                                                                                                                density 10000
+                                                                                                 5000
+     0.0
+                                                                                                0
+           0.00        0.05         0.10          0.15         0.20         0.25        0.30         0.35                 0.00.20.30.50.70.81.0
+                                                            variability                                                              correctness
+
+                                SNLI-LSTM Data Map
+                                                                                                                      correct.       6000
+      1.0
+                                                                                                   0.0
+                                                                                                       0.2                                                                                               4000
+                                                                                                        0.3
+                               easy-to-learn                                                                                                         0.5                     density
+                                                                                                           0.7          2000
+     0.8                                                                                            0.8
+                                                                                                                 1.0             0
+                                                                                                                        0.0      0.5       1.0
+                                                                                                                        confidence
+
+
+     0.6                                                                                       8000
+
+                                                                                               6000
+                                                                     ambiguous                                         density 4000      confidence
+                                                                                               2000     0.4
+                                                                                                0
+                                                                                                                        0.0      0.2      0.4
+                                                                                                                                             variability
+
+                                      hard-to-learn
+     0.2                                                                                              15000
+                                                                                                                                                                                                                                                                density 10000
+                                                                                                 5000
+     0.0
+                                                                                                0
+           0.00       0.05        0.10        0.15       0.20       0.25       0.30       0.35       0.40               0.00.20.30.50.70.81.0
+                                                            variability                                                              correctness
+
+
+Figure 10: Data maps for SNLI based on non-ROBERTA (and weaker) architectures—bag of words (BoW; Top)
+and LSTMs (Bottom). Although these maps exhibit bell-shaped curves, similar to the ROBERTA data map for
+SNLI in 8b, the curvature is somewhat smaller. The spread of the data is larger across the regions, which are not as
+distinct as in the ROBERTA data map. These shapes could be attributed to these architectures being weaker (and
+hence unable to overﬁt to data) than those involving representations from large, pretrained language models. Each
+                                        9292data map plots 25K instances, for clarity, and are best viewed enlarged.
+
+===== PDF PAGE 19 =====
+                                   SNLI-eSIM Data Map
+                                                                                                                      correct.
+      1.0
+                                                                                                   0.0
+                                                                                                  10000
+                                                                                                       0.2
+                                                                                                       0.3
+                               easy-to-learn                                                                                                         0.5                    density                                                                                                 5000
+                                                                                                           0.7
+     0.8                                                                                            0.8
+                                                                                                                 1.0             0
+                                                                                                                        0.0      0.5       1.0
+                                                                                                                        confidence
+
+                                                                                                      15000
+     0.6
+
+                                                                                                  10000
+                                                                     ambiguous                                       density      confidence                                                                                             5000
+     0.4
+                                                                                                0
+                                                                                                                        0.0     0.2     0.4
+                                                                                                                                             variability
+
+                                      hard-to-learn                                                    20000
+      0.2
+                                                                                                      15000
+
+                                                                                                  10000                                                                                                                                                                                                                                                                density
+                                                                                                 5000
+     0.0
+                                                                                                0
+            0.0                    0.1                  0.2                  0.3                  0.4                          0.00.20.30.50.70.81.0
+                                                            variability                                                              correctness
+
+                                  SNLI-BERT-large Data Map
+                                                                                             40000
+                                                                                                                     correct.
+      1.0
+                                                                                                  0.0          30000
+                                                                                                      0.2
+                              easy-to-learn                                                          0.40.6                    density 20000
+                                                                                                   0.8           10000
+     0.8                                                                                                       1.0
+                                                                                                0
+                                                                                                                        0.0      0.5       1.0
+                                                                                                                       confidence
+
+      0.6                                                                                       30000
+                                                                             ambiguous                 density 20000      confidence                                                                                                  10000
+      0.4
+                                                                                                0
+                                                                                                                        0.0     0.2     0.4
+                                                                                                                                             variability
+                                     hard-to-learn                                                    40000      0.2
+
+                                                                                              30000
+                                                                                                                                                                                                                                                               density 20000
+
+                                                                                                  10000     0.0
+                                                                                                0
+            0.0                  0.1                0.2                0.3                0.4                 0.5            0.00.2 0.4 0.6 0.8 1.0
+                                                            variability                                                              correctness
+
+
+Figure 11: Data maps for SNLI based on other (weaker) architectures—bag of words eSim (Chen et al., 2017b)
+(Top) and BERT-large (Bottom). Although these maps exhibit bell-shaped curves, similar to the ROBERTA data
+map for SNLI in 8b, the curvature is somewhat smaller for eSIM. The spread of the data is larger across the regions,
+which are not as distinct as in the ROBERTA data map. Each data map plots 25K instances, for clarity, and are
+best viewed enlarged.
+                                        9293

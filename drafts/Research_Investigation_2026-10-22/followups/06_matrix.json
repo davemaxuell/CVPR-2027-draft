@@ -1,0 +1,613 @@
+[
+  {
+    "bottleneck_id": "06-W01",
+    "original_papers": [
+      "SC2-WM",
+      "NavMorph",
+      "HNR",
+      "UNeMo"
+    ],
+    "precise_failure": "Internal change, forecast error and probability of a bad navigation decision are different quantities.",
+    "followup_paper": [
+      "FU06-ua_nwm",
+      "FU06-vla_calibration"
+    ],
+    "mechanism": "Structured residual scoring; empirical success recalibration.",
+    "evidence_locator": "dossiers/sc2wm.md:02-sc2wm-calibration; FU06-ua_nwm §3/supplement G; FU06-vla_calibration §§3-4",
+    "repo_commit_and_files": [
+      {
+        "source_id": "FU06-ua_nwm",
+        "commit": "399960ce5fea5a3aa98084beaf44d92c2def9774",
+        "files": [
+          "uanwm/models/hep.py:1-154",
+          "uanwm/eval/scoring.py",
+          "uanwm/train_hep.py:35-132",
+          "uanwm/losses/post_training_losses.py",
+          "configs/ua_nwm.yaml",
+          "README.md"
+        ]
+      },
+      {
+        "source_id": "FU06-vla_calibration",
+        "commit": "ee1ad08266c803b90bd601cfa6618bdb87a2af79",
+        "files": [
+          "vla_calibration/calibration.py:1-265",
+          "notebooks/recalibration.ipynb:cell 2",
+          "README.md"
+        ]
+      }
+    ],
+    "comparable_setting": "Aerial image goals and manipulation do not match language-route navigation.",
+    "status": "partial",
+    "remaining_gap": "Test action ranking and risk after scene/policy shift under identical candidates and observable feedback.",
+    "confidence": "High distinction; medium gap breadth"
+  },
+  {
+    "bottleneck_id": "06-W02",
+    "original_papers": [
+      "Pathdreamer",
+      "DREAMWALKER",
+      "MonoDream",
+      "NWM"
+    ],
+    "precise_failure": "Longer prediction horizons can add expensive or decision-irrelevant error.",
+    "followup_paper": [
+      "FU06-adaptive_rollout",
+      "FU06-neubay",
+      "FU06-pijepa"
+    ],
+    "mechanism": "Adaptive training horizons; policy-guided planning.",
+    "evidence_locator": "dossiers/monodream.md; Adaptive Rollout Appendices C,F; NEUBAY §4; PiJEPA Tables1-3",
+    "repo_commit_and_files": [
+      {
+        "source_id": "FU06-pijepa",
+        "commit": "f38a265cbce4fac5aa5fd9b9f7b18c723bccb645",
+        "files": [
+          "scripts/eval_octo_mppi_cast.py:298-404,586-780,872-888",
+          "scripts/train_cast_wm.py:323-446",
+          "scripts/configs/train_cast_wm_config.py",
+          "README.md"
+        ]
+      }
+    ],
+    "comparable_setting": "Offline locomotion/RL prediction and recorded navigation goals differ from online VLN.",
+    "status": "shifted",
+    "remaining_gap": "Separate state-specific uncertainty value from a matched deterministic horizon schedule and candidate generator.",
+    "confidence": "High for control requirement"
+  },
+  {
+    "bottleneck_id": "06-W03",
+    "original_papers": [
+      "NWM",
+      "Look Before You Leap",
+      "PlaNet",
+      "Dreamer"
+    ],
+    "precise_failure": "Good recorded-goal trajectory agreement does not establish closed-loop route completion.",
+    "followup_paper": [
+      "FU06-pijepa",
+      "FU06-worldmap"
+    ],
+    "mechanism": "World-model candidate optimization; generated-map waypoint supervision.",
+    "evidence_locator": "PiJEPA eval_octo_mppi_cast.py:670-703; WorldMAP TablesII-III",
+    "repo_commit_and_files": [
+      {
+        "source_id": "FU06-pijepa",
+        "commit": "f38a265cbce4fac5aa5fd9b9f7b18c723bccb645",
+        "files": [
+          "scripts/eval_octo_mppi_cast.py:298-404,586-780,872-888",
+          "scripts/train_cast_wm.py:323-446",
+          "scripts/configs/train_cast_wm_config.py",
+          "README.md"
+        ]
+      }
+    ],
+    "comparable_setting": "Recorded future image goals or projected trajectory metrics; not a shared VLN-CE execution test.",
+    "status": "uncertain",
+    "remaining_gap": "Evaluate the same learned controller with true resets, identical goal access and collision/latency accounting.",
+    "confidence": "High protocol distinction"
+  },
+  {
+    "bottleneck_id": "06-W04",
+    "original_papers": [
+      "SGM",
+      "Pathdreamer",
+      "WMNav"
+    ],
+    "precise_failure": "Semantic priors can influence unseen-space decisions without calibrated support.",
+    "followup_paper": [
+      "FU06-schrodinger_nav",
+      "FU06-imaginenavpp"
+    ],
+    "mechanism": "Separate provenance buffers; discounted imagined semantics; selected history.",
+    "evidence_locator": "dossiers/sgm.md; dossiers/wmnav.md:02-wmnav-recovery; Schrodinger AppendixC.3/Table3; ImagineNav++ §IV.J",
+    "repo_commit_and_files": [
+      {
+        "source_id": "FU06-imaginenavpp",
+        "commit": "3803a563af97a1a0a2a6a176573a4a25c60c62a2",
+        "files": [
+          "README.md (release status only)"
+        ]
+      }
+    ],
+    "comparable_setting": "ObjectNav, with different low-level planners and observation access.",
+    "status": "partial",
+    "remaining_gap": "Measure false-prior correction and visibility-conditioned invalidation while retaining useful unknown-space hypotheses.",
+    "confidence": "Medium; no universal failure claim"
+  },
+  {
+    "bottleneck_id": "06-W05",
+    "original_papers": [
+      "WMNav"
+    ],
+    "precise_failure": "Ordinary minimum-map updates cannot reverse a false low value; identified goal cells are an exception.",
+    "followup_paper": [],
+    "mechanism": "Existing goal-mask override.",
+    "evidence_locator": "WMNav commit 57b74cee7a00b669733e8ca917f34a8aadfd6fd0; WMNav_agent.py:1263-1287",
+    "repo_commit_and_files": [
+      {
+        "commit": "57b74cee7a00b669733e8ca917f34a8aadfd6fd0",
+        "files": [
+          "src/WMNav_agent.py:1263-1287"
+        ],
+        "inspection_owner": "assignment02",
+        "record": "dossiers/wmnav.md"
+      }
+    ],
+    "comparable_setting": "Same released update rule.",
+    "status": "resolved-in-setting",
+    "remaining_gap": "Resolved only for identified goal cells; ordinary cells and physical performance remain separate.",
+    "confidence": "High source-level scope"
+  },
+  {
+    "bottleneck_id": "06-W06",
+    "original_papers": [
+      "SC2-WM"
+    ],
+    "precise_failure": "Ambiguity over whether any real next observation supplies correction.",
+    "followup_paper": [],
+    "mechanism": "Delayed actual-panorama residual adaptation.",
+    "evidence_locator": "dossiers/sc2wm.md; commit f2f2f5ff2e1f21a08f7d7c51fbbd5c17b0d6778b ss_trainer_ETP.py:2246-2308; supplement pp. 15-16",
+    "repo_commit_and_files": [
+      {
+        "commit": "f2f2f5ff2e1f21a08f7d7c51fbbd5c17b0d6778b",
+        "files": [
+          "vlnce_baselines/ss_trainer_ETP.py:2246-2308"
+        ],
+        "inspection_owner": "assignment02",
+        "record": "dossiers/sc2wm.md"
+      }
+    ],
+    "comparable_setting": "The inspected asynchronous release branch.",
+    "status": "resolved-in-setting",
+    "remaining_gap": "Do not propose observed residual correction as absent; evaluate alignment, update scope and actual decision risk.",
+    "confidence": "High source-level scope"
+  },
+  {
+    "bottleneck_id": "06-U01",
+    "original_papers": [
+      "KnowNo",
+      "Explore until Confident",
+      "AIUTA"
+    ],
+    "precise_failure": "Sequence/set coverage is often overread as conditional success or physical safety.",
+    "followup_paper": [
+      "FU06-cpnav"
+    ],
+    "mechanism": "Episode-level bottleneck-score admissible action sets.",
+    "evidence_locator": "KnowNo AppendixA3; Explore §V-B; CPNAV Eqs11-15; evidence/06/math_checks_results.json:M1,M5",
+    "repo_commit_and_files": [],
+    "comparable_setting": "Different scenario distributions, human help and local-control contracts.",
+    "status": "uncertain",
+    "remaining_gap": "Reconcile calibration unit and confidence direction; state search-budget, grounding and policy-shift assumptions.",
+    "confidence": "High for logical boundary; empirical calibration unknown"
+  },
+  {
+    "bottleneck_id": "06-U02",
+    "original_papers": [
+      "UAGM",
+      "CA-Nav",
+      "FSTTA",
+      "ATENA"
+    ],
+    "precise_failure": "Confidence may be low for recoverable states and high after irreversible failure.",
+    "followup_paper": [
+      "FU06-vla_calibration",
+      "FU06-safety_gating"
+    ],
+    "mechanism": "Temporal calibration analysis; policy/pause/fallback supervision.",
+    "evidence_locator": "VLA Calibration §4.2; Safety Gating §§4,6.2-6.4; dossiers/atena.md",
+    "repo_commit_and_files": [
+      {
+        "source_id": "FU06-vla_calibration",
+        "commit": "ee1ad08266c803b90bd601cfa6618bdb87a2af79",
+        "files": [
+          "vla_calibration/calibration.py:1-265",
+          "notebooks/recalibration.ipynb:cell 2",
+          "README.md"
+        ]
+      }
+    ],
+    "comparable_setting": "Adjacent manipulation evidence; not a matched navigation benchmark.",
+    "status": "partial",
+    "remaining_gap": "Estimate intervention benefit using observable progress and equal-cost alternatives, with held-out policy/scene tests.",
+    "confidence": "Medium; calibration alone already established"
+  },
+  {
+    "bottleneck_id": "06-M01",
+    "original_papers": [
+      "IVLN",
+      "GSA-VLN",
+      "HAMT",
+      "GridMM"
+    ],
+    "precise_failure": "Adding persistent history does not ensure task-relevant retrieval.",
+    "followup_paper": [
+      "FU06-memoir",
+      "FU06-dartvln",
+      "FU06-imaginenavpp"
+    ],
+    "mechanism": "Imagination-guided retrieval; read-side decay; keyframe selection.",
+    "evidence_locator": "Memoir TableV/§V.E; DART Eqs1-5; ImagineNav++ TableV; dossiers/ivln.md",
+    "repo_commit_and_files": [
+      {
+        "source_id": "FU06-memoir",
+        "commit": "ea7fb9066366eb2aff3eabbc87b227a567cc6b90",
+        "files": [
+          "utils/graph_utils.py:419-531",
+          "nav_src/iter_nav/agent_ir2r.py:998-1082",
+          "vlnbert/vilmodel.py:1171-1248",
+          "nav_src/iter_nav/parser.py",
+          "readme.md"
+        ]
+      },
+      {
+        "source_id": "FU06-dartvln",
+        "commit": "a8889cf27723f1ffaac96ee7a802657a0b8e371a",
+        "files": [
+          "map_nav_src/models/vilmodel.py:740-759,817-851",
+          "map_nav_src/r2r/agent.py:452-501",
+          "map_nav_src/r2r/parser.py",
+          "README.md"
+        ]
+      },
+      {
+        "source_id": "FU06-imaginenavpp",
+        "commit": "3803a563af97a1a0a2a6a176573a4a25c60c62a2",
+        "files": [
+          "README.md (release status only)"
+        ]
+      }
+    ],
+    "comparable_setting": "Different episode-order, training and controller contracts; only within-paper ablations are matched.",
+    "status": "partial",
+    "remaining_gap": "Hold memory bytes, vision calls and feedback fixed; test instruction-critical relations and harmful retrieval explicitly.",
+    "confidence": "High within-paper support; medium generalization"
+  },
+  {
+    "bottleneck_id": "06-M02",
+    "original_papers": [
+      "NavFoM",
+      "StreamVLN",
+      "NaVid",
+      "JanusVLN"
+    ],
+    "precise_failure": "Bounded visual context may discard instruction-critical evidence, but oldest-frame fallback exists.",
+    "followup_paper": [
+      "FU06-janusvln",
+      "FU06-reinsvln"
+    ],
+    "mechanism": "Geometric cache plus sampled RGB; fixed evidence revisits.",
+    "evidence_locator": "dossiers/navfom.md; Janus evaluation.py:179-198,369; ReInsVLN TablesI-II/IV",
+    "repo_commit_and_files": [
+      {
+        "source_id": "FU06-janusvln",
+        "commit": "8cfe3129f7af4ca276bd5e38f1fae7e5367a09ec",
+        "files": [
+          "src/evaluation.py:130-235,250-383",
+          "src/qwen_vl/model/modeling_qwen2_5_vl.py:1607-1691,1985-2040,2130-2156",
+          "src/qwen_vl/model/vggt/models/aggregator.py:195-297",
+          "README.md"
+        ]
+      }
+    ],
+    "comparable_setting": "Pretrained model/data and diagnostic checkpoint access differ.",
+    "status": "partial",
+    "remaining_gap": "Disentangle initial grounding, more inference and actual recovery of missing evidence at matched checkpoints.",
+    "confidence": "High attribution concern"
+  },
+  {
+    "bottleneck_id": "06-M03",
+    "original_papers": [
+      "PolarMem",
+      "HAM-VLN",
+      "Context-Nav",
+      "SGM"
+    ],
+    "precise_failure": "A failed route or unseen object does not establish a persistent negative fact.",
+    "followup_paper": [
+      "FU06-cmmrvln",
+      "FU06-memoir",
+      "FU06-schrodinger_nav"
+    ],
+    "mechanism": "Outcome memory; future retrieval; source-separated mapping.",
+    "evidence_locator": "dossiers/polarmem.md:POLAR-1; CMMR §III.C; Memoir §V.E; Schrodinger AppendixC.3",
+    "repo_commit_and_files": [
+      {
+        "source_id": "FU06-memoir",
+        "commit": "ea7fb9066366eb2aff3eabbc87b227a567cc6b90",
+        "files": [
+          "utils/graph_utils.py:419-531",
+          "nav_src/iter_nav/agent_ir2r.py:998-1082",
+          "vlnbert/vilmodel.py:1171-1248",
+          "nav_src/iter_nav/parser.py",
+          "readme.md"
+        ]
+      }
+    ],
+    "comparable_setting": "Visual RAG, persistent VLN and ObjectNav have different evidence semantics.",
+    "status": "unresolved-in-reviewed-scope",
+    "remaining_gap": "Test view/pose/time validity and failure-cause attribution before retracting a memory; compare tri-state and source-tag baselines.",
+    "confidence": "Medium; bounded literature, no universal absence claim"
+  },
+  {
+    "bottleneck_id": "06-M04",
+    "original_papers": [
+      "GridMM",
+      "DUET"
+    ],
+    "precise_failure": "Anti-loop rules can penalize necessary recovery and decay need not remove obsolete evidence.",
+    "followup_paper": [
+      "FU06-dartvln"
+    ],
+    "mechanism": "Finite next-hop penalties and relative memory priors.",
+    "evidence_locator": "DART agent.py:452-501, vilmodel.py:817-851; M4; DUET cached-stop/backtrack dossier",
+    "repo_commit_and_files": [
+      {
+        "source_id": "FU06-dartvln",
+        "commit": "a8889cf27723f1ffaac96ee7a802657a0b8e371a",
+        "files": [
+          "map_nav_src/models/vilmodel.py:740-759,817-851",
+          "map_nav_src/r2r/agent.py:452-501",
+          "map_nav_src/r2r/parser.py",
+          "README.md"
+        ]
+      }
+    ],
+    "comparable_setting": "Same-checkpoint discrete evaluation is relevant; continuous cost differs.",
+    "status": "partial",
+    "remaining_gap": "Construct necessary-return and stale-singleton cases; compare loop reduction against path-fidelity/goal loss.",
+    "confidence": "High algebra/source; benchmark effect untested"
+  },
+  {
+    "bottleneck_id": "06-A01",
+    "original_papers": [
+      "GSA-VLN",
+      "IVLN",
+      "NavMorph"
+    ],
+    "precise_failure": "Scene-persistent memory claims can be confused with label-free online weight adaptation.",
+    "followup_paper": [
+      "FU06-memoir",
+      "FU06-cmmrvln"
+    ],
+    "mechanism": "Cross-episode history retrieval.",
+    "evidence_locator": "dossiers/gsavln.md:training/reset protocol; dossiers/ivln.md:oracle phases; Memoir TableV; CMMR §III",
+    "repo_commit_and_files": [
+      {
+        "source_id": "FU06-memoir",
+        "commit": "ea7fb9066366eb2aff3eabbc87b227a567cc6b90",
+        "files": [
+          "utils/graph_utils.py:419-531",
+          "nav_src/iter_nav/agent_ir2r.py:998-1082",
+          "vlnbert/vilmodel.py:1171-1248",
+          "nav_src/iter_nav/parser.py",
+          "readme.md"
+        ]
+      }
+    ],
+    "comparable_setting": "Episode ordering, passive oracle transit and feedback access are not interchangeable.",
+    "status": "partial",
+    "remaining_gap": "Use a protocol vector and reset/order controls before claiming general autonomous lifelong adaptation.",
+    "confidence": "High distinction"
+  },
+  {
+    "bottleneck_id": "06-A02",
+    "original_papers": [
+      "FSTTA",
+      "FeedTTA",
+      "ATENA",
+      "SC2-WM"
+    ],
+    "precise_failure": "Confidence/feedback proxies can update parameters toward an incorrect policy.",
+    "followup_paper": [
+      "FU06-vla_calibration"
+    ],
+    "mechanism": "Empirical calibration offers a diagnostic, not an update guarantee.",
+    "evidence_locator": "dossiers/fstta.md,feedtta.md,atena.md; evidence/04/isolated_check_results.json; VLA Calibration §6",
+    "repo_commit_and_files": [
+      {
+        "source_id": "FU06-vla_calibration",
+        "commit": "ee1ad08266c803b90bd601cfa6618bdb87a2af79",
+        "files": [
+          "vla_calibration/calibration.py:1-265",
+          "notebooks/recalibration.ipynb:cell 2",
+          "README.md"
+        ]
+      }
+    ],
+    "comparable_setting": "Entropy-only, external feedback, self-label and observed-residual updates must be compared separately.",
+    "status": "uncertain",
+    "remaining_gap": "Test feedback precision and selection shift with frozen-policy, no-update and identical-budget controls.",
+    "confidence": "High need for controls; no new TTA method tested"
+  },
+  {
+    "bottleneck_id": "06-A03",
+    "original_papers": [
+      "SAME",
+      "M3E",
+      "Continual VLN"
+    ],
+    "precise_failure": "Joint expert routing and sequential supervised retention address different failure settings.",
+    "followup_paper": [],
+    "mechanism": "State routing versus supervised expert consolidation.",
+    "evidence_locator": "dossiers/same.md:Tables4-7; dossiers/m3e.md:Tables2,4 and Eqs9-14",
+    "repo_commit_and_files": [],
+    "comparable_setting": "SAME joint multi-task data; M3E labelled 80% new-domain train split.",
+    "status": "partial",
+    "remaining_gap": "Evaluate old-domain retention and false topology separately; workload is not causal parameter importance.",
+    "confidence": "High for protocol; 04 code audit defines release limits"
+  },
+  {
+    "bottleneck_id": "06-P01",
+    "original_papers": [
+      "Rethinking the Embodied Gap",
+      "NaVILA",
+      "Uni-NaVid",
+      "MapNav"
+    ],
+    "precise_failure": "Simulator navigation success need not survive morphology, tracking error and camera motion.",
+    "followup_paper": [
+      "FU06-humanoidvln"
+    ],
+    "mechanism": "Physics/embodiment benchmark.",
+    "evidence_locator": "HumanoidVLN TableIII/§VI.D; corresponding original dossiers",
+    "repo_commit_and_files": [],
+    "comparable_setting": "Morphology, controller and action interface co-vary; curated scenes.",
+    "status": "partial",
+    "remaining_gap": "Cross controller and perception perturbations while holding the high-level policy fixed.",
+    "confidence": "High benchmark gap; architecture cause unresolved"
+  },
+  {
+    "bottleneck_id": "06-P02",
+    "original_papers": [
+      "NWM",
+      "SGM",
+      "WMNav",
+      "SC2-WM"
+    ],
+    "precise_failure": "Planning evidence can depend on oracle geometry, offboard compute or different goal thresholds.",
+    "followup_paper": [
+      "FU06-schrodinger_nav",
+      "FU06-pijepa",
+      "FU06-ua_nwm"
+    ],
+    "mechanism": "Different closed/open-loop planning pipelines.",
+    "evidence_locator": "Schrodinger AppendixE.1; PiJEPA eval source; UA-NWM Tables1/3 and hardware appendix; originals code/config dossiers",
+    "repo_commit_and_files": [
+      {
+        "source_id": "FU06-pijepa",
+        "commit": "f38a265cbce4fac5aa5fd9b9f7b18c723bccb645",
+        "files": [
+          "scripts/eval_octo_mppi_cast.py:298-404,586-780,872-888",
+          "scripts/train_cast_wm.py:323-446",
+          "scripts/configs/train_cast_wm_config.py",
+          "README.md"
+        ]
+      },
+      {
+        "source_id": "FU06-ua_nwm",
+        "commit": "399960ce5fea5a3aa98084beaf44d92c2def9774",
+        "files": [
+          "uanwm/models/hep.py:1-154",
+          "uanwm/eval/scoring.py",
+          "uanwm/train_hep.py:35-132",
+          "uanwm/losses/post_training_losses.py",
+          "configs/ua_nwm.yaml",
+          "README.md"
+        ]
+      }
+    ],
+    "comparable_setting": "No cross-paper leaderboard ranking accepted without common information/control contract.",
+    "status": "shifted",
+    "remaining_gap": "Report true continuous path, collisions, sensing, stops and total wall time under one controller.",
+    "confidence": "High protocol concern"
+  },
+  {
+    "bottleneck_id": "06-P03",
+    "original_papers": [
+      "NavNuances",
+      "GELA",
+      "VLN-Trans",
+      "CA-Nav"
+    ],
+    "precise_failure": "Reliability language can hide repeated LLM calls and geometric disambiguation assumptions.",
+    "followup_paper": [
+      "FU06-reliablenav",
+      "FU06-reinsvln"
+    ],
+    "mechanism": "Instance masking and replanning; history reminder control.",
+    "evidence_locator": "ReliableNav map_handler.py:547-683; ReInsVLN §III; assignment05 review for instruction chains",
+    "repo_commit_and_files": [
+      {
+        "source_id": "FU06-reliablenav",
+        "commit": "5234e9f96292b319463df5ab2d10ab6340cced1e",
+        "files": [
+          "src/reliable_agent.py:90-203",
+          "src/mapping/map_handler.py:243-291,547-683",
+          "src/config/r2r_baselines/test.yaml:1-41",
+          "readme.md"
+        ]
+      }
+    ],
+    "comparable_setting": "ReliableNav full paper unavailable; code demonstrates mechanism only.",
+    "status": "uncertain",
+    "remaining_gap": "Match query budgets, landmark inventory, localization and reminder content.",
+    "confidence": "High code finding; low complete-paper coverage"
+  },
+  {
+    "bottleneck_id": "06-W07",
+    "original_papers": [
+      "SGM"
+    ],
+    "precise_failure": "The released hard detached IoU term cannot supply its advertised loss gradient.",
+    "followup_paper": [],
+    "mechanism": "Other BCE/MSE terms still train the map decoder.",
+    "evidence_locator": "dossiers/sgm.md:02-sgm-iou_gradient; models_mae_cross.py:254-295",
+    "repo_commit_and_files": [
+      {
+        "commit": "579982dae2fe040d2fa26e82778352d950e31a19",
+        "files": [
+          "SGM_train/models_mae_cross.py:254-295"
+        ],
+        "inspection_owner": "assignment02",
+        "record": "dossiers/sgm.md"
+      }
+    ],
+    "comparable_setting": "Only the inspected release branch.",
+    "status": "unresolved-in-reviewed-scope",
+    "remaining_gap": "A differentiable surrogate needs a matched training ablation before a benchmark benefit is claimed.",
+    "confidence": "High gradient structure; empirical effect unknown"
+  },
+  {
+    "bottleneck_id": "06-M05",
+    "original_papers": [
+      "Memoir",
+      "GSA-VLN"
+    ],
+    "precise_failure": "Persistent retrieval succeeds less often when task clauses require distinct but visually similar places.",
+    "followup_paper": [
+      "FU06-memoir",
+      "FU06-reinsvln"
+    ],
+    "mechanism": "Future-guided behavioral matching; diagnostic evidence revisit.",
+    "evidence_locator": "Memoir §V.E and TableV; graph_utils.py:419-531; ReInsVLN TablesI-II",
+    "repo_commit_and_files": [
+      {
+        "source_id": "FU06-memoir",
+        "commit": "ea7fb9066366eb2aff3eabbc87b227a567cc6b90",
+        "files": [
+          "utils/graph_utils.py:419-531",
+          "nav_src/iter_nav/agent_ir2r.py:998-1082",
+          "vlnbert/vilmodel.py:1171-1248",
+          "nav_src/iter_nav/parser.py",
+          "readme.md"
+        ]
+      }
+    ],
+    "comparable_setting": "Memory-persistent and episodic VLM diagnostics differ; no direct numerical comparison.",
+    "status": "partial",
+    "remaining_gap": "Use swapped relational/ordinal requirements at fixed views and match within-scene feedback history.",
+    "confidence": "Medium; promising measurable slice, novelty unestablished"
+  }
+]

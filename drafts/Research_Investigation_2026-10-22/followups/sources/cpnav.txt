@@ -1,0 +1,494 @@
+=== PDF PAGE 1 ===
+  CPNAV: Calibrated Vision–Language Navigation for Object-Goal
+                  Search in Unseen Environments
+
+                  Qizhao Chen1, Yuanhong Zeng2, Shoh Nishino1, and Anushri Dixit1
+
+
+  Abstract— Directing a robot to locate a target object in    benefits from reasoning about object–object and object–scene
+unseen environments remains a central challenge in embodied    relationships and from leveraging commonsense priors about
+AI. Vision–Language Model (VLM)–based methods provide                                                            given environment layouts. By integrating these semantic
+rich semantic reasoning but often produce uncalibrated and
+                                                                       priors, the robotic agent can effectively constrain the searchoverconfident action decisions. We introduce CPNAV, a navi-
+gation framework that combines collision-aware planning with    process, significantly reducing the branching factor of the
+statistically calibrated VLM action scoring for map-free object-   search tree and prioritizing paths that align with contextual
+goal navigation. From RGB-D  input, CPNAV  constructs a    expectations. Semantic information and common sense rea-
+navigability map, generates collision-free motion primitives, and                                                           soning also allow the agent to infer the probable locations
+queries two VLMs for goal detection and action scoring. The
+                                                              of goal objects even when they are not immediately presentresulting scores are calibrated offline via conformal prediction
+(CP) using oracle actions obtained from a modified tree search,   within the agent’s current field of view [8]–[10]. Recent
+providing finite-sample guarantees at a user-specified risk level.  VLMs (Gemini, LLaVA, GPT-4o) enable injection of com-
+The CP layer  is model-agnostic and can wrap any VLM   monsense and scene priors into navigation, bridging geomet-
+policy. Online, the calibrated threshold prunes the search tree                                                                          ric perception and high-level planning [11], [12]. Through
+by filtering unreliable actions with backtracking. Experiments
+                                                                  large-scale multimodal  pretraining,  these models acquireon the HM3D object-goal navigation benchmark show that
+CPNAV improves over the 4 Lets look at the main problem   semantic  priors  that support generalization  to previously
+of the baseline uncalibrated method. The agent is placed at a   unseen environments, reducing  reliance on environment-
+random location in an apartment, the goal is to find the plant    specific training [13]–[15].
+a baseline in both reliability and efficiency. In simulation, the                                                         Although pretrained VLMs supply strong semantic cues,
+proposed method achieves a relative improvement of 6.17% in
+                                                                       their internal heuristics, which are the learned rules thatthe success rate and 11.34% in the success weighted by path
+length (SPL) compared to the non-calibrated baselines. In real-   guide their behavior, are not calibrated for sequential de-
+world deployment on a modified Hiwonder MentorPi robot,    cision making [16]. VLM outputs are optimized for token
+CPNAV achieves relative improvements of 24.99% in Success    prediction or image–text alignment rather than long-horizon
+Rate and 15.20% in SPL compared to baselines.                                                                action selection under physical constraints. As a result, they
+                                                               often assign non-trivial confidence to unsafe, redundant, or                          I. INTRODUCTION
+                                                                   goal-irrelevant actions [17], [18]. In this work, we tackle the
+  Robotic navigation in complex unseen indoor environ-                                                       problem of unreliable high-level action scoring in unseen
+ments remains challenging because effective decision making                                                            environments. Without an explicit mechanism to quantify
+must tightly couple low-level path planning with high-level                                                      and control confidence, VLM-driven navigation can assign
+semantic understanding, while generalizing to novel layouts                                                                    non-trivial scores to semantically plausible but suboptimal or
+without prior maps or goal location information [1]. Tra-                                                            unsafe actions. Over long horizons, such miscalibration can
+ditional rule-based planners can handle geometric obstacle                                                            manifest as inefficient exploration, excessive backtracking,
+avoidance but rely on hand-tuned rules and expert knowl-                                                      and action loops.
+edge, making them brittle in unforeseen situations [2], [3].                                                        Conformal Prediction (CP) provides a principled statistical
+In contrast, learning-based navigation planners, particularly                                                   mechanism to address this issue by converting uncalibrated
+those based on reinforcement learning (RL), often require                                                    model scores into prediction sets [19], [20]. Rather than
+painstaking reward shaping and  large-scale  training data                                                                    trusting raw VLM confidences, CP uses a held-out calibration
+[4]. Such RL-based planning approaches  still struggle to                                                                      set to compute thresholds that control the error rate at a user-
+generalize across diverse and unseen environments [5], [6].                                                                  specified risk level. Under the assumption of exchangeability,
+ A key limitation of both rule-based and purely learning-                                                                        this ensures that the probability of excluding the correct
+based navigation methods is the absence of semantic un-                                                                action is bounded by the calibration threshold, independent
+derstanding, which  is essential for  efficient goal-directed                                                              of the VLM architecture or training process.
+behavior in realistic environments [7]. Object-goal navigation                                                              Building on this principle, we introduce CPNAV, illus-
+                                                                     trated in Fig. 1, a conformal prediction–augmented naviga-
+  1Qizhao Chen, Shoh Nishino, and Anushri Dixit are with the De-
+partment of Mechanical and Aerospace Engineering, University of Cal-    tion framework that integrates semantic reasoning with sta-
+ifornia, Los Angeles, Los Angeles, CA, USA. qizhaoc@ucla.edu,    tistically calibrated decision-making. The main contributions
+shohnishino@ucla.edu, anushridixit@ucla.edu             of this work are as follows: (1) We introduce a conformal
+  2Yuanhong Zeng  is with the Department of Electrical and Computer
+Engineering, University of California, Los Angeles, Los Angeles, CA, USA.    calibration  layer  that  converts  uncalibrated VLM  action
+yuanhongzeng@ucla.edu                                      scores into statistically valid safety sets, guaranteeing that at
+
+=== PDF PAGE 2 ===
+Fig. 1: Overview of the CPNAV pipeline. (a) The action proposer constructs candidate actions from RGB-D input, prioritizing
+unexplored regions while enforcing collision safety. (b) The threshold obtained via offline conformal calibration is used to
+filter out actions whose scores fall below the calibrated bound. (c) The highest-scoring untried action that satisfies the
+threshold is selected for expansion in the search tree and executed accordingly. (d) Hardware experiments are conducted on
+a modified Hiwonder MentorPi robot platform.
+
+
+risk level α, the oracle action is excluded with probability at    hallucinated semantic relevance or overconfident scores for
+most α under exchangeability. (2) An offline bottleneck path    physically inaccessible paths [16], [17]. This vulnerability
+search  is formulated to extract oracle-aligned trajectories,   underscores the critical need for a formal statistical mech-
+enabling conformal prediction for long-horizon embodied   anism to quantify and calibrate VLM uncertainty during
+navigation. (3) Calibrated safety sets are integrated into a    sequential decision-making.
+backtracking tree-search policy that prunes low-confidence
+branches and improves efficiency under fixed step budgets.   B. Conformal Prediction for Reliable Decision-Making
+(4) Extensive simulation and hardware experiments validate                                                        Conformal prediction (CP) provides a  distribution-free
+the approach. On HM3D, CPNAV improves Success Rate                                                      framework for uncertainty quantification with finite-sample
+by 6.17% and SPL by 11.34%; on a physical modified                                                          coverage guarantees [19], [20]. By converting model scores
+MentorPi robot platform,  it achieves 24.99% and 15.20%                                                                   into calibrated prediction sets, CP bounds the probability
+relative improvements in Success Rate and SPL, respectively.                                                              of excluding the correct label at a user-specified risk level,
+                                                    making it appealing for safety-critical robotics applications.                        II. RELATED WORK
+                                                              Building on these theoretical foundations, several recent
+A. VLM-Augmented Vision-Language Navigation                                                     works have successfully integrated conformal prediction into
+  Recent research has  shifted from reinforcement  learn-    the robotics pipeline to enhance safety and reliability. CP has
+ing toward leveraging the zero-shot reasoning of Vision-   been utilized in perception and object detection to transform
+Language Models (VLMs)  for embodied navigation  [1],   standard  classification outputs  into  class  prediction  sets,
+[11], [13]. Recent advancements in VLM-augmented nav-   preventing autonomous systems from making overconfident
+igation have expanded the paradigm of spatial integration   but incorrect categorical decisions [30]. Beyond perception,
+by utilizing large-scale pre-trained models for end-to-end  CP has been applied to motion prediction and trajectory
+navigational QA and spatial reasoning [21]–[24], as well as    forecasting, where it constructs uncertainty-aware prediction
+hierarchical world-model and long-horizon planning [25]–   tubes around learned dynamics models, enabling downstream
+[28]. These frameworks leverage diverse strategies such as   planners to account for bounded future-state uncertainty [31].
+task-preferenced grounding  for  flexible  objective  specifi-      Despite these successes, a significant gap remains in high-
+cation [12], [26] and zero-shot semantic localization that    level navigation decision-making for object-goal navigation.
+merges scene priors with frontier-based exploration policies   Existing research primarily focuses on uncertainty-aware
+[8], [13], [29]. Despite these gains, a persistent challenge   stopping criteria or confidence estimation for downstream
+remains: these methods often treat VLM outputs as abso-    tasks, rather than calibrating the sequential action-selection
+lute truths. As highlighted in recent  literature, this leads   process  itself [32]. While such methods determine when
+to catastrophic failure modes where agents are misled by   an agent should terminate exploration, they do not provide
+
+=== PDF PAGE 3 ===
+statistical guarantees over which navigation actions should be      2) VLM Scoring and Stopping: At each action step t,
+executed during long-horizon object-goal search. In contrast,    the agent queries a VLM to determine if the agent has found
+our work applies conformal prediction directly to VLM-    the desired goal and what action to take to move to the goal.
+based action scoring, constructing calibrated safety sets that        a) Goal Reaching Determination and Global Seman-
+govern  the navigation  policy throughout  the  exploration    tic Scoring: Given the current RGB observation IRGBt    and
+process.                                                        the object-goal description g, the stopping VLM outputs
+
+                           III. METHOD                                         (donet, sGSVt   ) = fstop(IRGBt    ,g),             (2)
+
+A. Problem Definition                                  where  fstop(·) denotes the stopping VLM query. donet ∈
+                                                      {0,1} indicates whether the agent sees the goal. sGSVt  ∈  We consider object-goal navigation in previously unseen
+                                                                   [0,1] represents the global semantic value (GSV) [32]. GSVindoor environments. An embodied agent  is initialized at
+                                                        measures how promising the current view is for exploration,an unknown 2D pose with position and orientation, x0 =
+                                                                     reflecting the availability of navigable free space. Higher(x0,y0,θ0), within a continuous environment. The goal is to
+                                                              values indicate stronger scene-level cues, and we use GSVnavigate to an instance of a target object category g (e.g.,
+                                                                   to weight per-action confidence scores.chair, bed, toilet) without prior knowledge of the map or
+goal location. At each time step t, the agent receives an RGB-        b) Action Selection and Confidence Scoring: For each
+D observation It = (IRGBt    ,Ideptht    ) and its estimated pose xt =   candidate motion primitive ai,t ∈At, the action VLM assigns
+(xt,yt,θt). Based on the current observation history, the agent   a semantic confidence score
+selects a continuous low-level polar action at = (θt,rt). Here
+θt denotes the heading angle of the action, and rt denotes                          sactioni,t  = faction(IRGBt    ,ai,t,g),              (3)
+the travel distance. By executing these actions, the agent
+aims to find the shortest path while following a semantically     where sactioni,t   ∈[0,1] reflects how likely executing ai,t will
+reasonable path to find the goal object.                        lead toward the goal under the current observation.
+                                                    To incorporate scene-level navigation potential, we fuse
+B. VLM-based Action Scoring                                the per-action confidence with the global semantic value:
+
+  CPNAV generates collision-aware motion primitives from                                                                                                                                            si,t = sGSVt     ·sactioni,t     .                   (4)
+RGB-D input and queries VLMs  for stopping decisions
+and per-action semantic confidences. The resulting scene-   The final confidence vector used for decision-making at an
+aware scores guide tree-based exploration and provide the   observation step is
+calibrated signals used by the conformal prediction layer.
+  1) Action proposer: The action proposer generates a set                           St = [s1,t,...,sNt,t].                   (5)
+of collision-aware motion primitives from the current RGB-D
+                                                  The fused score si,t is used for tree-based exploration, oracleobservation (Fig. 1a). Building upon the strategy of VLM-
+                                                            path search, and conformal  calibration. Concise versions
+Nav [21], we integrate a depth-based collision filter to ensure
+                                                              of  the prompts and  their corresponding JSON response
+safe exploration.  First, the agent generates a navigability
+                                                       examples are shown in Fig. 2.
+mask from the depth image, identifying traversable regions
+with heights below 5 cm. The agent then samples rays
+                                                         C. Tree-Based Exploration
+within the horizontal field of view, marching each ray to
+determine the maximum collision-free travel distance  di,t.   A tree-structured search policy is used to systematically
+This calculation accounts for the agent’s physical footprint,   explore candidate actions while enabling efficient backtrack-
+defined by its radius ragent and a safety clearance rclearance.     ing.
+  The resulting distances form a set of candidate motion      1) Search Tree Formulation: The agent’s exploration is
+primitives. To prioritize efficient exploration, we prune trivial   modeled as a dynamically growing  tree. Each node cor-
+or excessively long motions and filter out actions that lead   responds to a visited  state of the robot, and each edge
+to previously explored regions. Additionally, we include an    represents an executed action that connects a parent state
+auxiliary turn-around action a0,t = (π,0), which executes a    to a newly reached state. Branching occurs when multiple
+physical in-place rotation at the root step or serves as a   candidate actions are available from the same state.
+backtracking signal to the parent node. The final candidate     The robot maintains an exploration log:
+set is defined as:
+                                                                          Ht = {(xk,Ak,Sk)}tk=1,                 (6)
+               At = {ai,t = (θi,t,di,t)}Ni=1,               (1)
+                                                     where xk is the simulator state, Ak the candidate actions, and
+where N denotes the number of feasible motion primitives   Sk = {si,k} their VLM scores. When transitioning from xk to
+remaining after collision filtering and exploration prioriti-    xt, we assign the parent of node t to be k. The tree structure
+zation. These candidates are subsequently proposed to the    is defined by the parent link, while Ht stores the associated
+VLM for final selection.                                          data.
+
+=== PDF PAGE 4 ===
+                                                      D. Offline Best Path Search
+
+                                                                After the goal is reached for the first time, we build a
+                                                        nominal path to the goal. However, the  initial successful
+                                                                    trajectory may be circuitous or include low-confidence edges.
+                                                  To establish a robust baseline for calibration, we refine this
+                                                                  history into an optimal ”Oracle” path by solving for the max-
+                                                  min Path, whcih represent a sequence of edges (u,v) with
+                                                            confidence scores  su,v that maximizes the minimum edge
+                                                             weight:
+                                                P∗= argmax  min          .              (9)                                                                                  P    (u,v)∈Psu,v
+
+                                        We use the max–min criterion because calibration is per-
+                                                      formed over the whole trajectories. P∗yields the path’s bot-
+                                                               tleneck confidence, providing a conservative, trajectory-level
+                                                               threshold instead of per-step guarantees. We implement this
+                                                                via a search algorithm modified from Breadth-First Search,
+                                                     which prioritizes paths with higher bottleneck scores. The
+                                                                   resulting path P∗provides the minimum confidence threshold
+                                                           experienced during a successful goal-reaching mission.
+                                                    To further optimize the Oracle path, the agent re-enters a
+                                                              global backtracking phase where exploration is constrained
+                                                                   to untried actions  ai,k with scores  strictly exceeding the
+                                                                current bottleneck s(P∗):
+                                                                                        Rrefinet  = {ai,k ∈Rglobalt       | si,k >  min            (10)Fig.  2: Concise stopping and action prompts with  their                                                 (u,v)∈P∗su,v}.
+JSON responses. The stopping prompt queries the stopping
+                                                  The agent continues this search until  it reaches the goalcondition and GSV; the action prompt queries the per-action
+                                                                 again, triggers a turn-around, or converges to an existingconfidence score. The manually normalized confidence score
+                                                           node. In any such event, the search algorithm is re-executedis multiplied by GSV to form the final per-action score.
+                                                                       until the total step limit is met. If a higher bottleneck score
+                                                                              is found, P∗is updated. This iterative refinement ensures the
+  2) Local Backtrack:  If the VLM selects the turn-around    final threshold S∗used for Conformal Prediction represents
+action (index 0), the robot reverts to the parent node k∗of    the most reliable path discovered.
+current timestep t and retrieves its stored state and action set.
+                                                            E. Offline Calibration with Conformal Prediction
+The remaining untried actions are
+                                                    To provide rigorous guarantees in unseen environments,
+          Rk∗= {ai,k∗∈Ak∗| ai,k∗/∈Tk∗}.            (7)                                             we employ a calibration framework that aligns the VLM’s
+where Tk denote the set of actions already attempted from    internal confidence with actual success rates. This process
+step k.                                                      ensures that the robot is aware of its own uncertainty and
+   If Rk∗is nonempty, the remaining actions are sorted by   only executes actions when they fall within a statistically
+their semantic confidence scores and the highest-ranked un-   backed safety set.
+tried action is executed from the parent state xk∗. Otherwise,      1) Non-conformity Scoring: We begin by establishing a
+the agent initiates a global backtracking procedure. At the    calibration dataset consisting of 1000 independent and iden-
+root node of step  0, the turn-around action  is executed    tically distributed scenarios, where each scenario contains
+directly.                                                an environment observation and its corresponding ground-
+  3) Global Backtrack:  If local backtrack exhaust recent    truth action. For each scenario, we compute a non-conformity
+branches, a global backtrack searches the full history up to   score Ei, which quantifies the model’s error relative to the
+the current time step t for any node that still contains untried    oracle action a∗i identified during our offline path search:
+actions:
+                                                                                       Ei = 1−sa∗,i                   (11)
+               t[                               ai,k ∈Ak   ai,k /∈Tk, i ̸= 0  .       (8)          Rglobalt  =                                                     where sa∗,i is the semantic confidence score assigned by the
+                  k=1
+                                   VLM to the ground-truth action. The VLM is tasked to give
+If Rglobalt       is empty, exploration terminates. Otherwise, the   unnormalized scores, which reduces bias. We then normalize
+action with the highest semantic score among  Rglobalt       is    the scores for cross-step consistency. High Ei values indicate
+selected. The agent is restored to the corresponding state    that the model was ”surprised” by the correct action, while
+xk and resumes exploration by executing that action.         low values indicate high alignment.
+
+=== PDF PAGE 5 ===
+  2) Beta-Calibration for Uncertainty Alignment: Because    that parent  state. This same procedure  is triggered when
+the calibration set Dcal is finite, the empirical quantile alone    all admissible actions along the current branch have been
+may not guarantee the target success rate 1 −α on new   exhausted.
+data. To account for this finite-sample uncertainty, we use    When a branch of the search tree is fully explored, the
+a confidence level δ = 0.99. We define a ”stricter” adjusted   agent performs a global backtracking step. It traverses the
+risk level ˆα such that the following condition holds via the    tree to locate the closest ancestor node that  still contains
+Beta distribution:                                               untried admissible actions and selects the highest-scoring ac-
+                                                                   tion at that node. This strategy ensures systematic exploration
+            Beta−1(δ;n+1−v,v) ≥1−α           (12)                                                              of the search tree while prioritizing semantically confident
+where v = ⌊(n+1)ˆα⌋and Beta−1 is the quantile function of    decisions.
+the Beta distribution. This adjustment allows us to state with                                                                            IV. EXPERIMENTAL SETUP
+99% confidence that the robot will achieve at least a 1−α
+                                                            A. Simulation and Hardware Configuration
+success rate during online deployment.
+  3) Quantile Application: Using the adjusted risk ˆα, we    We evaluate CPNAV using the Habitat-Sim platform with
+compute the calibrated threshold  ˆq from our distribution of    the HM3D dataset [33], [34]. We consider two experimental
+non-conformity scores:                                             settings: a simulation setup and a hardware  setup. The
+                                                              simulation experiment  represents an  idealized  evaluation
+                          ⌈(n+1)(1−ˆα)⌉
+        ˆq = Quantile  {E1,...,En},                       (13)   within the Habitat simulator. The agent is equipped with a
+                                 n                                                      camera having a high horizontal field of view (HFoV), and a
+  The calibrated quantile  ˆq is then used to construct the  maximum budget of 200 steps is allowed. The hardware cali-
+admissible prediction set during online deployment.            bration experiment constrains the simulator to match physical
+                                                        hardware limitations. The agent uses a reduced camera HFoV
+F. Online Deployment with Calibrated Safety Sets          and is given a much lower step limit. In addition, we conduct
+  During  online  inference,  the  agent  uses  the  offline-   a simulation parameter sensitivity analysis to evaluate the
+calibrated threshold  ˆq to manage uncertainty. Instead of a   robustness of CPNAV with respect to sensing configuration
+greedy execution of the highest VLM-scored action, the   and model capacity. To ensure computational efficiency, we
+agent filters candidate actions into a ”safety set” to maintain   implement a parallelized execution pipeline on an NVIDIA
+the success guarantee.                          RTX 4090 GPU.
+  1) Prediction Set Construction: At each time step t, the     For the hardware validation, we employed a Hiwonder
+agent receives candidate actions At and their semantic scores   MentorPi M1 mobile platform equipped with a Mecanum
+St. It constructs a prediction set C(ξt) containing only actions    drivetrain for omnidirectional mobility. State estimation was
+that satisfy the safety threshold:                            performed using the SLAM Toolbox, which fused data from
+                                                           a 2D LiDAR  scanner, wheel odometry, and an  Inertial
+             C(ξt) = {ai,t ∈At | si,t ≥1−ˆq}          (14)   Measurement Unit (IMU) to provide robust localization. We
+                                                         used a ZED 2i stereo camera to obtain rectified RGB-DIf C(ξt) = /0, the agent triggers the turn-around action a0,t to
+                                                              data for environmental perception. The specific experimentalinitiate backtracking. Otherwise, the agent selects the action
+                                                           parameters and sensor configurations are detailed in Table I.with the highest semantic score within C(ξt) for execution.
+  Let a∗t denote the oracle action at time t from the offline or-                                                  TABLE I: Experimental Parameters
+acle path search. Under exchangeability between calibration
+and deployment episodes, the conformal threshold ˆq ensures        Parameter            Simulation        Hardware
+                                                                                                        ragent, rclearance                   0.1m, 0.05m
+                                                                                 Resolution                 640×480 RGB-D
+             P(a∗t ∈C(ξt),∀t > 0) ≥1−α           (15)        Camera Height                     0.9m
+                                                        HFoV / Down Pitch   131◦/0.45rad       101◦/0.4rad
+  Because calibration is performed over complete navigation      VLM Model                   GPT-5 Nano
+episodes using the bottleneck oracle path,  this guarantee         Step Limit               200               100
+                                                                                   Target Risk (α)            0.45                  0.3
+applies  at  the  trajectory  level. With  probability  at  least         Confidence (δ)                         0.99
+1−α, the oracle-consistent path is not pruned during online         Episodes (Cal/Eval)     500 / 200     500 / 24 (Real-world)
+exploration. The Beta correction further ensures this bound
+holds with confidence 1−δ.
+                                                            B. Baselines and Metrics  2) Tree-Search Exploration: The calibrated safety set
+governs which actions are eligible for execution. Among     To evaluate the effect of conformal calibration on action
+the admissible actions, the agent always selects the highest-    selection, we compare CPNAV against alternative action-
+scoring untried action with backtracking, forming a tree-    selection strategies that differ in how uncertainty is incor-
+structured search process (Fig. 1(c)).                          porated [16].
+   If the selected action corresponds to index 0 (the turn-       • No Calibration: The agent always executes the action
+around action), the agent rewinds to  its parent node and        with the highest raw VLM score si,t, and all actions are
+executes the next untried action with the highest score from        considered valid.
+
+=== PDF PAGE 6 ===
+   • Simple Set: Uses a fixed, manually-tuned threshold τ.
+   Any action where si,t > τ is considered valid.
+   • Ensemble Set: Estimates uncertainty by querying the
+   VLM multiple times and uses result frequency to con-
+     struct confidence vector St.
+   • Direct Set: The VLM is explicitly prompted to list all
+     feasible actions that could lead to the goal relying on
+     the model’s internal reasoning.
+  We evaluate each baseline over 200 runs, matching the
+online simulation deployment setting. Performance is mea-
+sured by Success Rate (SR) and Success weighted by Path
+Length (SPL) [35]. Success is manually verified: the target
+must be visible in the final observation with an unobstructed        (a) Simulation calibration histogram. The cutoff ˆq = 0.936.
+path; stopping at an incorrect target is counted as failure.
+For successful episodes, SPL is computed using the geodesic
+distance from the  start pose to the verified goal via the
+Habitat API. We additionally report SR and SPL under fixed
+step budgets, along with mean distance traveled, to further
+assess efficiency and exploration behavior.
+  For  the  hardware  experiments, we compare CPNAV
+against the no calibration baseline in two different apartment
+environments. Under the baseline, no confidence threshold is
+applied, and all proposed actions are considered admissible
+and executed in descending order of their raw VLM scores.
+For each  trial,  the agent  is randomly  initialized within
+the apartment, and the target object category is randomly
+                                                                               (b) Hardware calibration histogram. The cutoff ˆq = 0.94.
+selected from the same goal set used in simulation. The
+baseline is evaluated over 24 trials, matching the number    Fig. 3: Empirical distributions of nonconformity score used
+of hardware runs conducted for CPNAV. We also use SR,    for conformal calibration. The hardware calibration is done
+SPL, and mean distance traveled for evaluation.                in the simulation setting. Each panel shows the distribution
+                                                              of nonconformity scores Ei. The dashed red line indicates the
+                     V. RESULTS                           calibrated score threshold ˆq upper bound of 1−¯α, where ¯α
+A. Simulation Results                                                  is the Beta-distribution adjusted risk level.
+
+  1) Offline Calibration Threshold Analysis: We compute
+the conformal threshold from the VLM confidence assigned                                                               threshold ˆq determines the admissible action set through the
+to the oracle action in each calibration episode; these oracle-                                                                    safety-set construction defined in Eq. (14), thereby filtering
+action scores form the calibration  set. Fig. 3 shows the                                                             out low-confidence actions from execution.
+empirical distributions for the two regimes (simulation and                                                                 2) Simulation Results: Table II reports the online evalua-
+hardware), with the dashed red line marking the calibrated                                                                   tion results in the simulation setting. The CPNAV policy uses
+threshold ˆq (Sec. IV-F). With a Beta correction at confidence                                                                the offline-calibrated quantile ˆqsim = 0.94 to construct admis-
+δ = 0.99, the resulting thresholds are                                                                     sible action sets at every decision step, which corresponds
+                                                                   to a risk level of α = 0.3. The Simple Set and Ensemble Set                   ˆqsim = 0.060,        ˆqreal = 0.064,
+                                                                baselines instead use a fixed confidence bound of 1−α = 0.7.
+corresponding to adjusted quantile levels of approximately   The Prompt Set directly asks for the action set without using
+0.25.                                                      a bound.
+  Two observations follow. First, oracle-action scores are     Compared to all baselines, CPNAV achieves the highest
+positively skewed and frequently modest, indicating  that   Success Rate (SR) of 86.00%, corresponding to a relative
+even correct actions do not always receive high raw VLM   improvement of 6.17% over the no-calibration baseline. Path
+confidence in unseen environments. Second, because cal-    efficiency is also improved, with a relative SPL improvement
+ibration  is performed in the nonconformity space, larger   of 11.34% and a relative reduction in mean travel distance
+values of Ei correspond to lower semantic confidence. The   of 17.45%.
+calibrated threshold ˆq therefore lies in the upper tail of the Ei    Among  heuristic  threshold-based  methods,  the  best-
+distribution, meaning that conformal prediction removes only   performing variant achieves an SR of 76.67% and an SPL
+the highest nonconformity (i.e., lowest-confidence) fraction   of 0.3950. CPNAV surpasses this manually tuned approach
+of oracle-aligned actions while retaining the majority of   with a relative improvement of 12.17% in SR and a relative
+reliable decisions. During online deployment, the calibrated   improvement of 13.65% in SPL, demonstrating that data-
+
+=== PDF PAGE 7 ===
+       TABLE II: simulation online evaluation (200 episodes). SR<50 denotes Success Rate within 50 steps
+
+                Policy          Threshold    SR    SR<50   SR<100   SPL   SPL<50   SPL<100  Mean Dist (m)
+
+               Simple Set           0.7      76.67%   59.67%    72.33%    0.3950    0.3742      0.3919         32.79
+              Ensemble Set         0.7      74.00%   63.33%    70.00%    0.3908    0.3803      0.3879         28.01
+              Prompt Set        N/A      79.67%   58.33%    70.67%    0.3871    0.3564      0.3784         37.40
+           No Calibration       0.0      81.00%   60.33%    75.67%    0.4032    0.3771      0.3982         35.38
+
+           CPNAV            0.936     86.00%   73.00%   80.00%    0.4489    0.4323      0.4442         29.21
+
+
+
+driven conformal  calibration provides more  reliable and   occupancy map further enhances performance by preventing
+principled action filtering than fixed heuristic thresholds.      redundant revisits.
+  These improvements are consistent with the intended ef-
+                                                         C. Hardware Resultsfect of conformal calibration. By filtering out low-confidence
+actions, which often correspond to semantically plausible but    We evaluated CPNAV on a physical Hiwonder MentorPi
+suboptimal branches, the calibrated policy reduces unnec-  M1 platform across 24 randomized object-goal episodes in
+essary exploration and prioritizes higher-quality trajectories.   two residential apartment layouts. For hardware calibration
+Importantly, under a fixed step budget, this selective filtering  we used the threshold ˆq of 0.936, corresponding to a target
+prevents the agent from wasting steps on low-value detours    risk level of α = 0.30. Table IV summarizes the primary
+and preserves more of the available interaction budget for   metrics comparing the uncalibrated baseline to CPNAV with
+high-score actions. As a result, the policy is better able to    the calibrated threshold.
+allocate its limited steps toward trajectories that are more
+likely to successfully reach the goal, leading to improved            TABLE IV: Hardware results.
+Success Rate, higher path efficiency, and greater robustness.           Policy         SR     SPL   Mean Distance (m)
+                                                          No Calibration   66.67%   0.4204         9.0330
+B. Simulation Parameter Sensitivity Analysis                  CPNAV        83.33%   0.4843         6.2949
+
+  We analyze the sensitivity of CPNAV to sensing config-
+uration and model capacity by varying one parameter at a    CPNAV substantially improved reliability and efficiency
+time from the CPNAV setting, which is using GPT-5o-nano,   on the physical robot. The Success Rate increased from
+height = 0.9 m, FOV = 131◦, calibrated threshold ˆq = 0.064,   66.67% to 83.33%, corresponding to a relative improvement
+and voxel map is enabled to encourage exploration. Table III   of 24.99%. Path efficiency improved with a relative SPL
+reports Success Rate, SPL, and mean travel distance.          increase of 15.20%, while mean distance traveled decreased
+                                                           with a relative reduction of 30.31%. In both simulation and
+ TABLE III: Parameter sensitivity analysis in simulation.     hardware experiments, CPNAV consistently increased Suc-
+                                                              cess Rate and SPL while reducing unnecessary exploration.
+  Variant               SR     SPL    Mean Distance (m)    Under the stricter step budget and real-world execution noise
+ CPNAV (ˆq = 0.064)      86.00%   0.4489           29.21           of the hardware trials, these gains were more pronounced.
+ No Calibration (ˆq = 0.0)   81.00%    0.4032           35.38
+                                                      Conformal calibration systematically filters low-confidence
+  Height = 0.45 m         67.00%    0.3139           44.63           actions that are often semantically plausible but suboptimal,
+  Height = 1.70 m         79.33%    0.4053           30.40
+                                                          producing more direct trajectories and improved robustness
+ FOV = 69◦              40.00%    0.1871           44.82                                                                   to sensing and actuation uncertainty.
+ FOV = 101◦             72.67%    0.3048           40.92
+                                                                Differences between simulation and hardware results stem
+ Model = GPT-4o-mini     71.33%    0.3366           34.40         from deliberate configuration changes and environment com-
+ No Voxel Map           66.00%    0.3644           36.47            plexity. The hardware experiments used a rectified HFoV of
+                                                            101◦, whereas 131◦in simulation, and a modified camera
+  The table highlights four main trends. First, sensing geom-    pitch. This reduces visible semantic context and alters view-
+etry strongly influences performance. Lower camera height   ing geometry. In addition, state-estimation drift during long-
+or a narrower field of view substantially reduces SR and SPL   horizon backtracking can degrade voxel-map consistency in
+while increasing travel distance, reflecting less informative    the real system. Finally, the physical apartments tested were
+observations and less efficient exploration. Second, model ca-    structurally simpler and smaller than many HM3D scenes,
+pacity matters. Replacing GPT-5o-nano with a smaller VLM   which helps explain the higher hardware success rates despite
+degrades both reliability and path efficiency, indicating that   more constrained sensing and noisier odometry.
+calibration effectiveness depends on the semantic strength of
+                                                                 VI. CONCLUSION AND LIMITATIONSthe underlying model. Third, conformal calibration consis-
+tently outperforms the uncalibrated variant by filtering low-     Conclusion. In this work, we proposed CPNAV, a con-
+confidence actions and thereby improving both success rate   formal prediction-based calibration framework for vision-
+and trajectory efficiency. Finally, maintaining a voxel-based   language  navigation. By  filtering low-confidence  actions
+
+=== PDF PAGE 8 ===
+through data-driven conformal calibration, CPNAV improves    [16] A. Z. Ren et al., “Robots that ask for help: Uncertainty alignment for
+both reliability and path efficiency without modifying the          large language model planners,” in Proceedings of the Conference on
+                                                                         Robot Learning (CoRL), 2023.
+underlying policy architecture. Across simulation and real-    [17] M. Ahn et al., “Do as i can, not as i say: Grounding language models
+world experiments, CPNAV  consistently achieves higher           in robotic affordances,” in Proceedings of the 6th Conference on Robot
+Success Rate and SPL while reducing unnecessary explo-         Learning (CoRL), 2022.
+                                                                              [18]  S. Kadavath et al., “Language models (mostly) know what they know,”
+ration and  travel distance. The improvements are  partic-         arXiv preprint arXiv:2207.05221, 2022.
+ularly pronounced in hardware deployments, where  strict    [19] V. Vovk, A. Gammerman, and G. Shafer, Algorithmic Learning in a
+step budgets and real-world execution noise amplify the       Random World, ser. Springer Series in Statistics.  Springer, 2005.
+                                                                              [20] A. N. Angelopoulos and S. Bates, “A gentle introduction to conformal
+cost of suboptimal decisions. These results demonstrate that          prediction and distribution-free uncertainty quantification,” Founda-
+conformal calibration provides a principled and effective           tions and Trends in Machine Learning, vol. 16, no. 4, pp. 494–591,
+mechanism for action filtering.                                          2023.
+                                                                              [21] D. Goetting, H. G. Singh, and A. Loquercio, “End-to-end navigation
+  Limitations. Despite  its  effectiveness, two  limitations         with vision-language models: Transforming  spatial reasoning  into
+remain. First, during offline calibration with the refined tree          question-answering,” in arXiv preprint arXiv:2411.05755, 2024.
+search, nodes are defined solely based on spatial proximity    [22] D. Shah, B. Osinski, B. Ichter, and S. Levine, “Lm-nav: Robotic
+                                                                                   navigation with large pre-trained models of language, vision, and
+without accounting for  orientation, which may introduce           action,” in Conference on Robot Learning (CoRL), 2023.
+poor estimation. Second, the method relies on scores from    [23] G. Zhou, Y. Hong, and Q. Wu, “Navgpt: Explicit reasoning in vision-
+a vision-language model accessed via the ChatGPT API;         and-language navigation with large language models,” in Proceedings
+                                                                                         of the AAAI Conference on Artificial Intelligence, 2024, pp. 7641–
+its inherent stochasticity and occasional inconsistencies can         7649.
+introduce variability in action scoring and affect calibration    [24] G. Zhou, Y. Hong, Z. Wang, X. E. Wang, and Q. Wu, “Navgpt-2:
+stability. Future work will explore orientation-aware state         Unleashing navigational reasoning capability for large vision-language
+                                                                               models,” arXiv preprint arXiv:2407.12366, 2024.
+representations and improved robustness to VLM variability.    [25]  T. Wang, X. Li, F. Lu, T. Gong, J. Dong, W. Xue, S. Qu, C. Bai, and
+                                                                        G. Chen, “Conavbench: Collaborative long-horizon vision-language
+                                                                                   navigation benchmark,” in Proceedings of the International Confer-
+                 REFERENCES                                   ence on Learning Representations (ICLR), 2026.
+                                                                              [26]  S. Li, D. Huang, Y. He, Y. Fu, Y.-G. Jiang, and X. Xue, “Tp-mddn:
+ [1] R. Alqobali, M. Alshmrani, R. Alnasser, A. Rashidi, T. Alhmiedat,         Task-preferenced multi-demand-driven navigation with autonomous
+     and O. M. Alia, “A survey on robot semantic navigation systems for          decision-making,” in Proceedings of the Neural Information Process-
+     indoor environments,” Applied Sciences, vol. 14, no. 1, 2023.                 ing Systems (NeurIPS), 2025.
+ [2] C. Cadena et al., “Past, present, and future of simultaneous localization    [27] L. Zhang et al., “Mem2ego: Empowering vision-language models with
+     and mapping: Toward the robust-perception age,” IEEE Transactions          global-to-ego memory for long-horizon embodied navigation,” arXiv
+     on Robotics, vol. 32, no. 6, pp. 1309–1332, 2016.                              preprint arXiv:2502.14254, 2025.
+ [3]  S. Tellex et al., “Understanding natural language commands for robotic    [28] Y.  Cai,  X.  He, M. Wang,  H.  Guo,  W.-Y.  Yau,  and  C.  Lv,
+     navigation and manipulation,” in National Conference on Artificial          “Cl-cotnav: Closed-loop hierarchical chain-of-thought for zero-shot
+      Intelligence (AAAI), 2011.                                                     object-goal navigation with vision-language models,” arXiv preprint
+ [4] G. Dulac-Arnold, D. Mankowitz, and  T.  Hester, “Challenges  of         arXiv:2504.09000, 2025.
+      real-world reinforcement learning,” arXiv preprint arXiv:1904.12901,    [29] N. Yokoyama, S. Ha, D. Batra, J. Wang, and B. Bucher, “VLFM:
+     2019.                                                                     vision–language frontier maps for zero-shot semantic navigation,” in
+ [5] E. Wijmans, A. Kadian, A. Morcos, S. Lee,  I. Essa, D. Parikh,         Proceedings of the IEEE International Conference on Robotics and
+    M. Savva, and D. Batra, “Dd-ppo: Learning near-perfect pointgoal         Automation (ICRA).  IEEE, 2024, pp. 42–48.
+      navigators from 2.5 billion frames,” in International Conference on    [30] Z. Mei, A. Dixit, M. Booker, E. Zhou, M. Storey-Matsutani, A. Z. Ren,
+     Learning Representations (ICLR), 2020.                                 O. Shorinwa, and A. Majumdar, “Perceive with confidence: Statistical
+ [6] X. Zhao et  al., “On evaluation of embodied navigation agents in          safety assurances for navigation with learning-based perception,” in
+    new environments,” in Proceedings of the IEEE/CVF Conference on         Proceedings of the IEEE International Conference on Robotics and
+     Computer Vision and Pattern Recognition (CVPR), 2021.                   Automation (ICRA), 2024, pp. 14 150–14 157.
+ [7]  F. Giustra, S. Fontana, G. Mongardi, and A. Giusti, “Semantic nav-    [31] L. Lindemann, M. Cleaveland, G. Shim, and G.  J. Pappas, “Safe
+      igation: A survey of methods and challenges,” Frontiers in Robotics         planning in dynamic environments using conformal prediction,” IEEE
+     and AI, vol. 10, 2023.                                                      Robotics and Automation Letters, vol. 8, no. 8, pp. 5116–5123, 2023.
+ [8] D. S. Chaplot, D. Gandhi, A. Gupta, and R. Salakhutdinov, “Object    [32] A. Z. Ren, J. Clark, A. Dixit, M. Itkina, A. Majumdar, and D. Sadigh,
+     goal navigation using goal-oriented semantic exploration,” in Neural         “Explore until confident: Efficient exploration for embodied question
+     Information Processing Systems (NeurIPS), 2020.                            answering,” in Robotics: Science and Systems (RSS), 2024.
+ [9] E. Deng et al., “Grounded language models for robotic navigation,”    [33] M. Savva et al., “Habitat: A platform for embodied ai research,” in
+                                                                             Proceedings of the IEEE/CVF International Conference on Computer     arXiv preprint arXiv:2305.12345, 2023.
+                                                                                    Vision (ICCV), 2019, pp. 9339–9347.[10] A. Cowley et al., “Searching for objects with semantic search spaces,”
+                                                                              [34] K. Yadav et al., “Habitat-matterport 3d semantics dataset,” in Proceed-      in IEEE/RSJ  International Conference on  Intelligent Robots and
+                                                                                    ings of the IEEE/CVF Conference on Computer Vision and Pattern     Systems (IROS), 2022.
+                                                                               Recognition (CVPR), 2023, pp. 4927–4936.
+[11] H. Ha and S. Song, “Semantic abstraction: Open-world 3d scene
+                                                                              [35]  P. Anderson, A. X. Chang, D. S. Chaplot, A. Dosovitskiy, S. Gupta,     understanding from 2d vision-language models,” in Conference on
+                                                                                   V. Koltun, J. Kosecka, J. Malik, R. Mottaghi, M. Savva, and A. R.     Robot Learning (CoRL), 2023.
+                                                                               Zamir, “On evaluation of embodied navigation agents,” arXiv preprint
+[12] Y. Zhang  et  al., “A survey of vision-language-action models  for
+                                                                              arXiv:1807.06757, 2018.
+     embodied manipulation,” in arXiv preprint arXiv:2510.24795, 2025.
+[13]  S. Y. Gadre, M. Wortsman, G. Ilharco, L. Schmidt, and S. Song,
+     “Clip on wheels: Zero-shot object navigation as object localization
+     and exploration,” in Proceedings of the IEEE/CVF Conference on
+     Computer Vision and Pattern Recognition (CVPR), 2023.
+[14] D. Hendrycks, S. Basart et al., “The many faces of robustness: A
+       critical analysis of out-of-distribution generalization,” ICCV, 2021.
+[15] R. Gandikota et  al., “Distilling vision-language models for robust
+     embodied generalization,” arXiv preprint arXiv:2310.15878, 2023.

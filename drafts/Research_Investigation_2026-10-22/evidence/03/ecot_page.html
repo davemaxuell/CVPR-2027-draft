@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Robotic Control via Embodied Chain-of-Thought Reasoning</title>
+  <meta name="description" content="Robotic Control via Embodied Chain-of-Thought Reasoning">
+  <meta name="keywords" content="ECoT">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta property="og:title" content="Robotic Control via Embodied Chain-of-Thought Reasoning">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Robotic Control via Embodied Chain-of-Thought Reasoning">
+  <meta property="og:image" content="https://embodied-cot.github.io/images/ecot_teaser/ecot_teaser-1.png" />
+  <!-- todo -->
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1082" />
+  <meta property="og:image:height" content="639" />
+  <meta property="og:url" content="https://embodied-cot.github.io" />
+  <meta property="og:description" content="Project page for Embodied Chain-of-Thought Reasoning" />
+  <meta name="twitter:title" content="Robotic Control via Embodied Chain-of-Thought Reasoning" />
+  <meta name="twitter:description" content="Project page for Embodied Chain-of-Thought Reasoning" />
+  <meta name="twitter:image" content="https://embodied-cot.github.io/images/ecot_teaser/ecot_teaser-1.png" />
+
+  <!-- Google Tag Manager -->
+  <script>(function (w, d, s, l, i) {
+      w[l] = w[l] || []; w[l].push({
+        'gtm.start':
+          new Date().getTime(), event: 'gtm.js'
+      }); var f = d.getElementsByTagName(s)[0],
+        j = d.createElement(s), dl = l != 'dataLayer' ? '&l=' + l : ''; j.async = true; j.src =
+          'https://www.googletagmanager.com/gtm.js?id=' + i + dl; f.parentNode.insertBefore(j, f);
+    })(window, document, 'script', 'dataLayer', 'GTM-PFJ2DFW');</script>
+  <!-- End Google Tag Manager -->
+  <!-- <script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'G-PYVRSFMDRL');
+  </script> -->
+
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro" rel="stylesheet">
+
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-carousel.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-slider.min.css">
+  <link rel="stylesheet" href="./static/css/fontawesome.all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="./static/css/index.css">
+  <link rel="icon" href="./static/images/vlmaps_icon.svg">
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script defer src="./static/js/fontawesome.all.min.js"></script>
+  <script src="./static/js/bulma-carousel.min.js"></script>
+  <script src="./static/js/bulma-slider.min.js"></script>
+  <script src="./static/js/index.js"></script>
+</head>
+
+<body>
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-PFJ2DFW" height="0" width="0"
+      style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
+
+
+  <section class="hero">
+    <div class="hero-body">
+      <div class="container is-max-desktop">
+        <div class="columns is-centered">
+          <div class="column has-text-centered">
+            <h1 class="title is-1 publication-title">Robotic Control via Embodied Chain-of-Thought Reasoning</h1>
+            <div class="is-size-5 publication-authors">
+              <span class="author-block">
+                <a href="https://michalzawalski.github.io/
+                ">Michał Zawalski</a>*<sup>1, 3</sup>,</span>
+              <span class="author-block">
+                <a href="https://verityw.github.io/">William Chen</a>*<sup>1</sup>,</span>
+              <span class="author-block">
+                <a href="https://kpertsch.github.io/">Karl Pertsch</a><sup>1, 2</sup>,</span>
+              <span class="author-block">
+                <a href="https://www.oiermees.com/">Oier Mees</a><sup>1</sup>,</span>
+              <span class="author-block">
+                <a href="https://ai.stanford.edu/~cbfinn/">Chelsea Finn</a><sup>2</sup>,
+              </span>
+              <span class="author-block">
+                <a href="https://people.eecs.berkeley.edu/~svlevine/">Sergey Levine</a><sup>1</sup>,
+              </span>
+            </div>
+
+            <div class="is-size-5 publication-authors">
+              <span class="author-block"><sup>1</sup>UC Berkeley,</span>
+              <span class="author-block"><sup>2</sup>Stanford University</span>
+              <span class="author-block"><sup>3</sup>University of Warsaw</span>
+            </div>
+            <div class="is-size-6 publication-authors">
+              <span class="author-block">*Equal contribution
+              </span>
+            </div>
+
+            <div class="column has-text-centered">
+              <div class="publication-links">
+                <!-- PDF Link. -->
+                <span class="link-block"> <!-- TODO -->
+                  <a href="https://arxiv.org/pdf/2407.08693" class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                      <i class="fas fa-file-pdf"></i>
+                    </span>
+                    <span>Paper</span>
+                  </a>
+                </span>
+                <!-- Video Link. -->
+                <!-- TODO 
+                <span class="link-block"> 
+                  <a href="" class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                      <i class="fab fa-youtube"></i>
+                    </span>
+                    <span>Video</span>
+                  </a>
+                </span>
+                -->
+                <!-- Code Link. -->
+                <span class="link-block">
+                  <a href="https://github.com/MichalZawalski/embodied-CoT/"
+                    class="external-link button is-normal is-rounded is-dark"> <!-- TODO -->
+                    <span class="icon">
+                      <i class="fab fa-github"></i>
+                    </span>
+                    <span>Code</span>
+                  </a>
+                </span>
+
+                <!-- Colab Link. -->
+                <span class="link-block">
+                  <a href="https://colab.research.google.com/drive/1CzRKin3T9dl-4HYBVtuULrIskpVNHoAH?usp=sharing"
+                    class="external-link button is-normal is-rounded is-dark"> <!-- TODO -->
+                    <span class="icon">
+                      <img src="static/images/colab_logo.svg" />
+                    </span>
+                    <span>Colab</span>
+                  </a>
+                </span>
+
+                <!-- Model Link. -->
+                <span class="link-block">
+                  <a href="https://huggingface.co/Embodied-CoT"
+                    class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                      <img src="static/images/hf_icon.svg" />
+                    </span>
+                    <span>Models</span>
+                  </a>
+                </span>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="hero teaser">
+    <div class="container is-max-desktop">
+      <div class="hero-body">
+        <video id="teaser" autoplay controls muted loop playsinline height="100%">
+          <source src="static/videos/Teaser.mp4" type="video/mp4">
+        </video>
+        <h2 class="subtitle has-text-centered">
+          Embodied Chain-of-Thought Reasoning enables robots to textually reason about their task, observations, and
+          actions.
+        </h2>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container is-max-desktop">
+      <!-- Abstract. -->
+      <div class="columns is-centered has-text-centered">
+        <div class="column is-four-fifths">
+          <h2 class="title is-3">Abstract</h2>
+          <div class="content has-text-justified">
+            <p>
+              A key limitation of learned robot control policies is their inability to generalize outside their training
+              data. Recent works on vision-language-action models (VLAs) have shown that the use of large, internet
+              pre-trained vision-language models as the backbone of learned robot policies can substantially improve
+              their robustness and generalization ability. Yet, one of the most exciting capabilities of large
+              vision-language models in other domains is their ability to reason iteratively through complex problems.
+              Can that same capability be brought into robotics to allow policies to improve performance by reasoning
+              about a given task before acting? Naive use of "chain-of-thought" (CoT) style prompting is significantly
+              less effective with standard VLAs because of the relatively simple training examples that are available to
+              them. Additionally, purely semantic reasoning about sub-tasks, as is common in regular CoT, is
+              insufficient for robot policies that need to ground their reasoning in sensory observations and the robot
+              state. To this end, we introduce Embodied Chain-of-Thought Reasoning (ECoT) for VLAs, in which we train
+              VLAs to perform multiple steps of reasoning about plans, sub-tasks, motions, and visually grounded
+              features like object bounding boxes and end effector positions, before predicting the robot action. We
+              design a scalable pipeline for generating synthetic training data for ECoT on large robot datasets. We
+              demonstrate, that ECoT increases the absolute success rate of OpenVLA, the current strongest open-source
+              VLA policy, by 28% across challenging generalization tasks, without any additional robot training data.
+              Additionally, ECoT makes it easier for humans to interpret a policy's failures and correct its behavior
+              using natural language.
+            </p>
+          </div>
+        </div>
+      </div>
+  </section>
+
+
+
+  <section class="section">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column is-full-width">
+          <h2 class="title is-3">Approach</h2>
+          <div class="content has-text-justified has-text-centered">
+            <!--
+            <div class="columns is-vcentered interpolation-panel">
+              <div class="column  has-text-centered">
+                <video autoplay controls muted loop playsinline height="100%">
+                  <source src="static/videos/SummaryVid.mp4" type="video/mp4">
+                </video>
+              </div>
+            </div>
+            -->
+            <h3 class="title is-4">Embodied Chain-of-Thought Reasoning (ECoT)</h3>
+
+            <img src="static/images/ecot_schematic/ecot_schematic-1.png" />
+            <p style="text-align: center;"><small>Schematic illustrating the reasoning steps produced by our embodied
+                chain-of-thought policy. Pink boxes represent embodied reasoning steps.</small></p>
+
+            <p>
+              We train a vision-language-action policy (VLA) to autoregressively generate textual reasoning (the
+              "embodied chain of thought," or ECoT) in response to commands and observations before it chooses a robot
+              action. Such reasoning contains high-level reasoning steps (task, plan, and sub-task) to encourage the
+              model to "think carefully" and low-level features (movement, gripper position, and labeled object bounding
+              boxes) to get the model to "look carefully."
+            </p>
+
+            <p>
+              <b>We provide a <a
+                  href="https://colab.research.google.com/drive/1CzRKin3T9dl-4HYBVtuULrIskpVNHoAH?usp=sharing">Colab
+                  notebook</a> that showcases our model generating an example reasoning chain for the task "place
+                the watermelon on the towel." This can be run using Colab's provided free T4 GPU.</b>
+            </p>
+
+            <p>
+              <b>Additionally, we also provide instructions for <a
+                  href="https://github.com/rail-berkeley/tensorrt-openvla">converting, compiling, and running inference
+                  with our ECoT VLA using TensorRT-LLM.</a></b> This enables drastic inference time speedups with
+              minimal changes to policy performance.
+            </p>
+            <p>
+              Our ECoT policy is built atop <a href="https://openvla.github.io/">OpenVLA</a>, which fine-tunes a <a
+                href="https://github.com/TRI-ML/prismatic-vlms">Prismatic VLMs</a> to take in images
+              and instructions to output actions.
+            </p>
+            <h3 class="title is-4">Data Generation Pipeline</h3>
+            <img src="static/images/ecot_data_gen/ecot_data_gen-1.png" />
+            <p style="text-align: center;"><small>We use various foundation models as submodules for our embodied
+                chain-of-thought data generation pipeline.</small></p>
+            <p>
+              To train our policies to perform embodied chain-of-thought reasoning, we create a synthetic data
+              generation pipeline that leverages numerous foundation models to extract features from robot
+              demonstrations to put into corresponding textual reasoning chains.
+              We use this pipeline on
+              the <a href="https://github.com/rail-berkeley/bridge_data_v2">Bridge V2</a> robot demonstration dataset to
+              produce the embodied chain-of-thought data for training our policy.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <section class="section">
+        <div class="container is-max-desktop">
+
+          <div class="columns is-centered">
+
+
+            <!-- Animation. -->
+            <div class="columns is-centered">
+              <div class="column is-full-width">
+                <h2 class="title is-3">Experiments</h2>
+
+                <!-- Interpolating. -->
+
+                <h3 class="title is-4">Primary Comparisons</h3>
+                <div class="content has-text-justified">
+                  <div class="columns is-vcentered interpolation-panel">
+                    <div class="column  has-text-centered">
+                      <video autoplay controls muted loop playsinline height="100%">
+                        <source src="static/videos/demos/put-the-mushroom-in-the-metal-pot.mp4" type="video/mp4">
+                      </video>
+                      <p>"Put the mushroom in the metal pot"</p>
+                      <video autoplay controls muted loop playsinline height="100%">
+                        <source src="static/videos/demos/put-the-carrot-on-the-plate.mp4" type="video/mp4">
+                      </video>
+                      <p>"Put the carrot on the plate"</p>
+                      <video autoplay controls muted loop playsinline height="100%">
+                        <source src="static/videos/demos/put-the-rightmost-object-on-the-middle-object.mp4"
+                          type="video/mp4">
+                      </video>
+                      <p>"Put the rightmost object on the middle object"</p>
+                      <video autoplay controls muted loop playsinline height="100%">
+                        <source src="static/videos/demos/put-the-mushroom-in-the-rightmost-container.mp4"
+                          type="video/mp4">
+                      </video>
+                      <p>"Put the mushroom in the rightmost container"</p>
+                    </div>
+
+                    <div class="column  has-text-centered">
+                      <video autoplay controls muted loop playsinline height="100%">
+                        <source src="static/videos/demos/place-the-watermelon-on-the-towel.mp4" type="video/mp4">
+                      </video>
+                      <p>"Place the watermelon on the towel"</p>
+                      <video autoplay controls muted loop playsinline height="100%">
+                        <source src="static/videos/demos/move-the-mushroom-to-the-measuring-tape.mp4" type="video/mp4">
+                      </video>
+                      <p>"Move the mushroom the the measuring tape"</p>
+                      <video autoplay controls muted loop playsinline height="100%">
+                        <source src="static/videos/demos/put-the-edible-object-in-the-bowl.mp4" type="video/mp4">
+                      </video>
+                      <p>"Put the edible object in the bowl"</p>
+                      <video autoplay controls muted loop playsinline height="100%">
+                        <source src="static/videos/demos/put-the-object-used-for-drinking-on-the-towel.mp4"
+                          type="video/mp4">
+                      </video>
+                      <p>"Put the object used for drinking on the towel"</p>
+                    </div>
+
+
+                  </div>
+
+                  <p>
+                    We construct a suite of 14 evaluation tasks to test how well ECoT deals with
+                    novel objects,
+                    instructions, and spatial relations. We
+                    compare our policy against several baselines: <a href="https://octo-models.github.io/">Octo</a>, <a
+                      href="https://openvla.github.io/">OpenVLA</a>, and <a
+                      href="https://deepmind.google/discover/blog/scaling-up-learning-across-many-different-robot-types/">RT-2-X</a>.
+                  </p>
+
+                  <img src="static/images/ecot_success_rates/ecot_success_rates-1.png" />
+                  <p style="text-align: center;"><small>Evaluation success rates of our ECoT policy compared against
+                      several popular generalist robot policies.</small></p>
+                  <p>
+                  <p>
+                    After running <b>over 300 real-world evaluation trials per policy</b>, we find that our embodied
+                    chain-of-thought policy yields the best performance, especially on tasks that require spatial
+                    understanding and semantic generalization.
+                  </p>
+                  <img src="static/images/ecot_quali_examples/ecot_quali_examples-1.png" />
+                  <p style="text-align: center;"><small>Some example ECoT generations. Left and middle are
+                      from successful trajectories, while right is from a failed one.</small></p>
+                  <p>
+                    We also find that the generated reasonings can give qualitative interpretability
+                    insights into why the policy succeeds or fails at a given task, such as correctly rephrasing a vague
+                    task to a concrete one or misidentifying relevant scene objects.
+                  </p>
+
+                </div>
+
+                <h3 class="title is-4">Human Interventions via Natural Language Corrections</h3>
+                <div class="content has-text-justified">
+                  <div class="columns is-vcentered interpolation-panel">
+                    <div class="column  has-text-centered">
+                      <video autoplay controls muted loop playsinline height="100%">
+                        <source src="static/videos/CorrectionVid.mp4" type="video/mp4">
+                      </video>
+                    </div>
+                  </div>
+                  <p>
+                    Embodied chain-of-thought reasoning opens a new approach for human-robot interaction: human
+                    operators
+                    can interpret
+                    and debug the robot's "thought process" by issuing natural language hints
+                    or corrections, which a large language model (like <a
+                      href="https://openai.com/chatgpt/">ChatGPT</a>) can format into an ECoT reasoning text. The ECoT
+                    policy can then condition on this fixed reasoning to pick actions.
+                  </p>
+                  <img src="static/images/ecot_interventions/ecot_interventions-1.png" />
+                  <p style="text-align: center;"><small>Embodied chain-of-thought reasoning enables policies to accept
+                      natural language corrections and hints.</small></p>
+                  <p>
+                    Using such interventions, our policy is able to solve tasks it previously failed on. This
+                    improvement boosts our policy's performance on difficult tasks beyond that of OpenVLA and RT-2-X,
+                    both with or without modified instruction prompts.
+                  </p>
+                </div>
+
+                <h3 class="title is-4">Transfer to Other Robot Embodiments</h3>
+                <div class="content has-text-justified">
+
+                  <img src="static/images/ecot_other_embs/ecot_other_embs-1.png" />
+                  <p style="text-align: center;"><small>Example of our policy generating reasoning for novel robot
+                      embodiments.</small></p>
+                  <p>
+                  <p>
+                    Finally, we find that fine-tuning an OpenVLA policy on our ECoT Bridge V2 data <b>allows it to
+                      generalize its reasoning capabilities to other robot as well -- despite not seeing any
+                      reasoning annotations for these other embodiments!</b> We observe that the policy can even produce
+                    highly robot-dependent embodied features, such as the gripper position.
+                  </p>
+
+                  <!--
+                  <div class="columns is-vcentered interpolation-panel">
+                    <div class="column  has-text-centered">
+                      <video autoplay controls muted loop playsinline height="100%">
+                        <source src="static/videos/simpler_demos/open_drawer.mp4" type="video/mp4">
+                      </video>
+                      <video autoplay controls muted loop playsinline height="100%">
+                        <source src="static/videos/simpler_demos/close_drawer.mp4" type="video/mp4">
+                      </video>
+                    </div>
+                    <div class="column  has-text-centered">
+                      <video autoplay controls muted loop playsinline height="100%">
+                        <source src="static/videos/simpler_demos/sponge.mp4" type="video/mp4">
+                      </video>
+                      <video autoplay controls muted loop playsinline height="100%">
+                        <source src="static/videos/simpler_demos/pick_coke_can.mp4" type="video/mp4">
+                      </video>
+                    </div>
+                  </div>
+
+                  <p>
+                    Said policy can likewise perform reasoning to complete tasks on a virtual Google Robot platform in
+                    the <a href="https://simpler-env.github.io/">SIMPLER</a> simulated robot evaluation environment.
+                    Based on these findings, we believe embodied chain-of-thought to be a promising recipe for scaling
+                    and transfering robot reasoning capabilities.
+                  </p>
+                  -->
+                </div>
+
+                <!--
+                <h3 class="title is-4">Code</h3>
+                <div class="content has-text-justified">
+                  <p>
+                    TODO
+                  </p>
+                  <pre><code>
+Example Code
+                  </code></pre>
+                  <p>
+                    TODO
+                  </p>
+                </div>
+                -->
+
+
+
+
+              </div>
+            </div>
+
+
+          </div>
+      </section>
+
+
+      <section class="section" id="BibTeX">
+        <div class="container is-max-desktop content">
+          <h2 class="title">BibTeX</h2>
+          <pre><code> @article{Zawalski24-ecot,
+    title={Robotic Control via Embodied Chain-of-Thought Reasoning},
+    author={Michał Zawalski and William Chen and Karl Pertsch and Oier Mees and Chelsea Finn and Sergey Levine},
+    journal={arXiv preprint arXiv:2407.08693},
+    year={2024}
+} </code></pre>
+        </div>
+      </section>
+
+
+
+
+
+      <footer class="footer">
+        <div class="container">
+          <div class="content has-text-centered">
+            <a class="icon-link" href="https://arxiv.org/pdf/2407.08693.pdf">
+              <i class="fas fa-file-pdf"></i>
+            </a>
+            <a class="icon-link" href="" class="external-link" disabled>
+              <i class="fab fa-github"></i>
+            </a>
+          </div>
+          <div class="columns is-centered">
+            <div class="column is-8">
+              <div class="content">
+                <p> Website borrowed from <a href="https://github.com/nerfies/nerfies.github.io">NeRFies</a> under a <a
+                    href="https://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0
+                    International</a>
+                </p>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </footer>
+
+</body>
+
+</html>

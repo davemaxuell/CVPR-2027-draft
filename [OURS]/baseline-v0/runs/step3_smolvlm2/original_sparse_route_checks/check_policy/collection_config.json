@@ -1,0 +1,90 @@
+{
+  "group": "A",
+  "split": "train",
+  "controller": "policy",
+  "beta": 0.0,
+  "episodes_per_dataset": 4,
+  "seed": 1,
+  "workers": 4,
+  "perturb_steps": 0,
+  "recovery_rule": {
+    "name": "ordered_reference_waypoints_v1",
+    "route": "episode.reference_path, followed by episode.goals[0].position",
+    "progress": "advance only consecutive reached waypoints; never regress or jump to a later nearest point",
+    "waypoint_radius_m": 0.5,
+    "goal_radius_m": 1.0,
+    "max_navmesh_snap_m": 0.5,
+    "follower": "Habitat ShortestPathFollower; reset each query because expert actions may not be executed",
+    "errors": "invalid label, excluded from SFT; never convert follower failure to STOP",
+    "privileged_inputs": "reference route, goal, simulator pose and navigation mesh; labels only"
+  },
+  "selection": "seeded scene-balanced selection, no success filtering",
+  "jpeg_quality": 95,
+  "frames": "T actions and T+1 actual RGB frames; prefix uses executed actions",
+  "simulator": {
+    "habitat_sim": "0.2.4 headless withbullet",
+    "habitat_lab": "v0.2.4",
+    "env": "conda `rolevln` (env/setup_env.sh)",
+    "rgb": {
+      "width": 640,
+      "height": 480,
+      "hfov": 79
+    },
+    "depth": {
+      "width": 640,
+      "height": 480,
+      "hfov": 79,
+      "min": 0.0,
+      "max": 10.0
+    },
+    "rgb_sensor_position_m": [
+      0.0,
+      1.25,
+      0.0
+    ],
+    "forward_step_m": 0.25,
+    "turn_angle_deg": 15,
+    "allow_sliding": true,
+    "success_distance_m": 3.0,
+    "max_episode_steps": {
+      "r2r": 500,
+      "rxr": 700
+    },
+    "gt_replay_check": "logs/check_ce_replay_r2r.json",
+    "rxr_expert_turn_angle_deg": 30,
+    "rxr_turn_handling": "unified_15",
+    "render_gpu": 0
+  },
+  "source_sha256": {
+    "tools/collect_dagger.py": "81a167807ede350e89b68c9c07438af3d539820b1f0c0a8e092e58c51f4a35c3",
+    "sim/recovery.py": "b3c9bea356436440bd047c70fcc04bd187b17365c6b424b4df9d9a49a32bcbc3",
+    "sim/config.py": "c345359be6f06d8cbfcd993673c29a9f24df5669b50ade09f15de6a722ca3787",
+    "sim/episodes.py": "a80e05d3c3cf740095a5afaf115a8f8d87ec310a7ec3355118b1783e4ea27ef1",
+    "sim/rxr_dataset.py": "2b5fe06551eeed52b6dbdb3030c9e9c1cfbb884efe99d5a0c530592fd2187bcd",
+    "policy/smolvlm2.py": "2dc097c0f3bd09eacd94cb5a438e15635a62b1a9215a0c66f7c2655b437c1a96",
+    "policy/common.py": "fa30de03d782dae761b2444a2d1dcdb853dd756d25cd76cee84ce6b69c5b474e",
+    "policy/online.py": "763dd6e8873953cc82e427d196fba32aa2ba1d9bc0a5d64ade187d33d7481ac2",
+    "manifest/scene_partition.json": "8ee6a37535c92f953fe509f9cfa38e1ce2ac069656d4b443fbdfd4b13f54d2d7"
+  },
+  "checkpoint": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/step2_smolvlm2/train/checkpoints/step_003072",
+  "adapter_sha256": "6d552697e8b6c273aa6ec0de92a46939395f80fe43b366e788fd3656af86efad",
+  "policy_config": {
+    "backbone": "smolvlm2",
+    "repo": "HuggingFaceTB/SmolVLM2-500M-Video-Instruct",
+    "revision": "7b375e1b73b11138ff12fe22c8f2822d8fe03467",
+    "past_frames": 7,
+    "frame_sampling": "uniform",
+    "recent_actions": 16,
+    "forward_step_m": 0.25,
+    "turn_angle_deg": 15,
+    "action_words": [
+      "STOP",
+      "FORWARD",
+      "LEFT",
+      "RIGHT"
+    ],
+    "decoding": "argmax over the first token of each action word",
+    "image_splitting": false,
+    "max_length": 4096
+  }
+}

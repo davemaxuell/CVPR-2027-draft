@@ -1,0 +1,212 @@
+=== PDF PAGE 1 ===
+JEONG ET AL.: CONTINUAL VISION-AND-LANGUAGE NAVIGATION
+1
+Continual Vision-and-Language Navigation
+Supplementary Material
+SeongJun Jeong1
+jsj4968@snu.ac.kr
+Gi-Cheon Kang2
+chonkang@snu.ac.kr
+Seongho Choi3
+seongho.choi@sk.com
+Joochan Kim4
+joochan.k@kist.re.kr
+Byoung-Tak Zhang1,2*
+btzhang@snu.ac.kr
+1 Interdisciplinary Program in Artificial
+Intelligence, Seoul National University
+2 AI Institute for
+Seoul National University
+3 SK Telecom
+4 Korea Institute of Science
+and Technology
+1
+Dataset Analysis
+We examine the existence of distribution shifts across scene domains by calculating the
+Fréchet Inception Distance (FID) between visual and textual features across scene domains
+[6]. In Initial-instruction based CVLN (I-CVLN), 10 out of 20 scene domains are selected
+randomly, and in Dialogue based CVLN (D-CVLN), 10 out of 11. We use Resnet-152 trained
+on Place365 for visual feature extraction in I-CVLN [2, 9], and ViT-B/16 for D-CVLN [4].
+These analyses are visualized as heatmaps in Figure 1, confirming significant visual feature
+distribution shifts in both datasets. For textual features in both I-CVLN and D-CVLN, we
+utilize BERT for extraction [3], with differences across scene domains examined through
+FID, visualized in Figure 2.
+Figure 1: Heatmaps illustrating the distribution shifts between visual features across scene
+domains for the I-CVLN and D-CVLN.
+© 2025. The copyright of this document resides with its authors.
+It may be distributed unchanged freely in print or electronic forms.
+
+
+=== PDF PAGE 2 ===
+2
+JEONG ET AL.: CONTINUAL VISION-AND-LANGUAGE NAVIGATION
+Figure 2: Heatmaps representing the distribution shifts between textual features across scene
+domains within the I-CVLN and D-CVLN datasets.
+To further investigate textual distribution differences, we generate word clouds from texts
+associated with five scene domains for I-CVLN and D-CVLN, visualized in Figure 3. These
+word clouds highlight the lexical commonalities and limited diversity within navigation-
+related texts.
+2
+Training Details
+For training I-CVLN and D-CVLN, we adhere to training methodologies from previous
+works, mixing Reinforcement Learning (RL) and Imitation Learning (IL) objectives [1, 7].
+A3C is employed for RL [8], and for IL, the agent calculates cross-entropy loss for each
+action by following teacher actions to traverse the ground-truth trajectory.
+3
+Implementation Details
+We utilize transformer-based models, VLN-BERT for I-CVLN [7] and HAMT for D-CVLN
+[1], with training on NVIDIA A100 GPUs. Batch size is set at 8, with 4,000 iterations per
+scene domain for I-CVLN and 5,000 for D-CVLN. Image encoding employs ResNet-152
+and ViT-B/16 for I-CVLN and D-CVLN, respectively [4, 5, 9].
+Figure 3: Word clouds for five selected scene domains from the D-CVLN datasets.Word
+clouds depicting the textual distribution within five selected scene domains of the I-CVLN
+dataset.
+
+
+=== PDF PAGE 3 ===
+JEONG ET AL.: CONTINUAL VISION-AND-LANGUAGE NAVIGATION
+3
+4
+Additional Method Details
+4.1
+Perplexity Replay Algorithm Pseudocode
+Algorithm 1 Perplexity Replay Memory Update
+1: Input: Replay memory M, replay memory size |M|, set of episodes from the last scene
+domain Elast, agent parameters θ, the number of trained scene domains s
+2: Output: Updated replay memory M
+3: Calculate Action Perplexity (AP) for each episode in Elast and M
+4: Elast ←sort(Elast,by=AP, descending)
+5: M ←sort(M,by=AP, ascending)
+6: ns ←|M|/(s+1)
+7: for s = 1 to s do
+8:
+Remove episodes with the lowest AP from M for domain s until only ns episodes
+remain
+9: end for
+10: Add episodes from Elast to M until |M| equals fixed size
+11: return M
+
+
+=== PDF PAGE 4 ===
+4
+JEONG ET AL.: CONTINUAL VISION-AND-LANGUAGE NAVIGATION
+4.2
+Episodic Self-Replay Algorithm Pseudocode
+Algorithm 2 Episodic Self-Replay
+Require: Dataset Ds, Memory M, Learning rate η, Agent fθ, GetObservation(t),
+ActionExecuter(at), λ1, λ2
+1: Sample (I,A∗) ∼Ds
+2: LDc ←0, Z ←[], t ←1
+3: vt ←GetObservation(t);
+4: while at does not predict stop do
+5:
+zt ←fθ(I,vt); Z.append(zt)
+6:
+at ←argmax(zt)
+7:
+a∗
+t ←A∗(t)
+//Get true action
+8:
+LDc ←LDc +ℓ(at,a∗
+t )
+9:
+vt+1 ←ActionExecuter(at)
+10:
+t ←t +1
+11: end while
+12: LDc ←LDc/t
+13: Update M ←Random(M,(I,A∗,Z))
+14: Sample (I′,A′∗,Z′∗) ∼M
+15: LESR ←0, LM ←0, t ←1
+16: vt ←GetObservation(t);
+17: while at does not predict stop do
+18:
+zt ←fθ(I′,vt)
+19:
+at ←argmax(zt)
+20:
+a′∗
+t ←A′∗(t)
+//Get true action
+21:
+LM ←LM +ℓ(at,a′∗
+t )
+22:
+z′∗
+t ←Z′∗(t)
+//Get replay logit
+23:
+LESR ←LESR +∥zt −z′∗
+t ∥2
+F
+//Logit distillation
+24:
+a∗
+t ←argmax(z′∗
+t )
+//Get replay logit’s action
+25:
+vt+1 ←ActionExecuter(a∗
+t )
+26:
+t ←t +1
+27: end while
+28: LESR ←LESR/t
+29: LM ←LM/t
+30: LESR_total ←LDc +λ1LESR +λ2LM
+31: θ ←θ −η∇θLESR_total
+5
+Limitation and Future Work
+The Continual Vision-and-Language Navigation (CVLN) paradigm represents a initial step
+forward in mitigating catastrophic forgetting through simple yet effective methods like Per-
+plexity Replay and Episodic Self-Replay. However, it faces limitations in its current focus
+on indoor environments and the static approach to replay memory construction and exploita-
+tion. Future work should aim to expand the environmental scope to include complex out-
+door settings, requiring the development of new datasets and models capable of navigating
+
+
+=== PDF PAGE 5 ===
+JEONG ET AL.: CONTINUAL VISION-AND-LANGUAGE NAVIGATION
+5
+the unpredictable and variable nature of outdoor spaces. Additionally, exploring dynamic
+and intelligent replay memory management strategies could enhance the balance between
+knowledge retention and adaptation to new information, making the models more efficient
+and scalable.
+
+
+=== PDF PAGE 6 ===
+6
+JEONG ET AL.: CONTINUAL VISION-AND-LANGUAGE NAVIGATION
+References
+[1] Shizhe Chen, Pierre-Louis Guhur, Cordelia Schmid, and Ivan Laptev. History aware
+multimodal transformer for vision-and-language navigation. Advances in neural infor-
+mation processing systems, 34:5834–5847, 2021.
+[2] Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li, and Li Fei-Fei. Imagenet: A
+large-scale hierarchical image database. In 2009 IEEE conference on computer vision
+and pattern recognition, pages 248–255. Ieee, 2009.
+[3] Jacob Devlin, Ming-Wei Chang, Kenton Lee, and Kristina Toutanova.
+Bert: Pre-
+training of deep bidirectional transformers for language understanding. arXiv preprint
+arXiv:1810.04805, 2018.
+[4] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov, Dirk Weissenborn, Xiaohua
+Zhai, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg Heigold, Syl-
+vain Gelly, et al. An image is worth 16x16 words: Transformers for image recognition
+at scale. arXiv preprint arXiv:2010.11929, 2020.
+[5] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
+Deep residual learning
+for image recognition. In Proceedings of the IEEE conference on computer vision and
+pattern recognition, pages 770–778, 2016.
+[6] Martin Heusel, Hubert Ramsauer, Thomas Unterthiner, Bernhard Nessler, and Sepp
+Hochreiter. Gans trained by a two time-scale update rule converge to a local nash equi-
+librium. Advances in neural information processing systems, 30, 2017.
+[7] Yicong Hong, Qi Wu, Yuankai Qi, Cristian Rodriguez-Opazo, and Stephen Gould. A
+recurrent vision-and-language bert for navigation. arXiv preprint arXiv:2011.13922,
+2020.
+[8] Volodymyr Mnih, Adria Puigdomenech Badia, Mehdi Mirza, Alex Graves, Timothy
+Lillicrap, Tim Harley, David Silver, and Koray Kavukcuoglu. Asynchronous methods
+for deep reinforcement learning. In International conference on machine learning, pages
+1928–1937. PMLR, 2016.
+[9] Bolei Zhou, Agata Lapedriza, Aditya Khosla, Aude Oliva, and Antonio Torralba. Places:
+A 10 million image database for scene recognition. IEEE transactions on pattern anal-
+ysis and machine intelligence, 40(6):1452–1464, 2017.

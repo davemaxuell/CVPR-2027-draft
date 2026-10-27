@@ -1,0 +1,543 @@
+=== PDF PAGE 1 ===
+      DRIVE-Nav: Directional Reasoning, Inspection, and Verification for
+                          Efficient Open-Vocabulary Navigation
+
+                  Maoguo Gao1,  Zejun Zhu2,  Zhiming Sun2,  Zhengwei Ma1,  Longze Yuan1
+                         Zhongjing Ma1,3,  Zhigang Gao1,3,   Jinhui Zhang1,3,  and Suli Zou1,3,∗
+
+
+                     Open-Vocabulary                                      Object                                               Navigation (OVON)            Abstract—                                                                             re-        Frontier-based           quires               an embodied                             agent to locate                                         a language-specified                                                                      target
+            in unknown environments. Many zero-shot methods rely on         Exploration
+           frontier-candidate reasoning under incomplete observations,
+           while topology-aware methods reduce candidate redundancy
+          but may  still introduce panoramic inspection overhead and
+          repeated reconsideration. We present DRIVE-Nav, a structured
+         framework that organizes exploration around persistent di-2026    rections rather than raw frontiers. By inspecting encountered
+           directions more completely and restricting subsequent deci-
+           sions to still-relevant directions within a forward 240° viewJun    range, DRIVE-Nav reduces redundant revisits and improves
+          path efficiency. The framework extracts and tracks directional
+           candidates from  weighted  Fast Marching Method (FMM)27    paths, maintains representative views for semantic inspection,
+         and combines vision–language-guided prompt enrichment with
+          cross-frame verification to improve grounding reliability. Ex-
+          periments on HM3D-OVON, HM3Dv1, HM3Dv2, and MP3D
+          demonstrate strong overall performance and consistent  effi-
+           ciency gains. On HM3D-OVON, DRIVE-Nav achieves 50.2%
+        SR            and                32.6%                       SPL, improving                                           the                                              previous                                                          best                                                   method                                                           by
+         1.9%            SR                  and 5.6%                            SPL.  It also                                                  delivers                                                       the                                                             best                                               SPL                                                           on        Directional-based[cs.RO]
+        HM3Dv1, HM3Dv2, and MP3D and transfers to a physical          Exploration
+         humanoid robot. Real-world deployment also demonstrates its            effectiveness. Project page                                                              300°
+         Keywords: Open-Vocabulary Object Navigation, Embodied
+          Navigation, Mobile Robotics.                                                                     90°                                        I. INTRODUCTION                                            0°
+
+           Robust navigation  is a fundamental capability for au-
+         tonomous robots operating in real-world environments [1].                                                                                            330°          In  particular, object-goal navigation requires an agent to           Position and                                                                                                    orientation   180°          reach a target specified by its semantic category in previously         unseen scenes. The problem becomes even more challenging                         270°  30°           in open-vocabulary settings, where agents must generalize to             90°                                                                                                     300°
+          a wide and unconstrained range of object categories while ex-arXiv:2603.28691v2    ploring unfamiliar environments [2]. Conventional learning-              30°  0°    330°
+         based navigation methods often rely on extensive training              Motion trajectory            FMM Path Planning
+          data and struggle to generalize to new scenes [3], [4], [5].                                                                                                        Rotation direction and range            Friontier Pionts
+         Recent advances in large pre-trained models, including large
+          language models and vision–language models, provide new    Fig. 1: Comparison of exploration paradigms. Frontier-based
+           opportunities for zero-shot navigation by enabling agents to    exploration selects among frontier points without observing
+          leverage semantic knowledge to infer likely object locations    the unexplored regions beyond them  . Directional-based
+         and guide exploration [6], [7], [8], [9].                        exploration instead groups candidate directions around the
+            Current zero-shot exploration methods expose different    agent, where each inset image denotes the representative
+          decision interfaces. Frontier-candidate methods select dis-   view observed from the agent’s position along the corre-
+                                                                  sponding direction.
+              *Corresponding author. Email: sulizou@bit.edu.cn
+               1Beijing Institute of Technology
+             2DeepBlue College
+            3The National Key Laboratory of Autonomous Intelligent Unmanned
+           Systems (KAIUS), School of Automation                                crete points along the boundary of explored free space [7],
+
+=== PDF PAGE 2 ===
+[8], [9], [10]. For these interfaces, multiple candidates may   captured at these decision-relevant positions provide richer
+correspond to the same navigable direction, making model-   branch-level visual evidence for Qwen3-VL [14] to select the
+side decisions redundant. As illustrated in the frontier-based   next direction, judge target visibility, and generate target-
+exploration panel of Fig. 1, the four frontier points can lead   aware prompt refinements for SAM3 [15]  , followed by
+to the same navigable path, so choosing among them at the   cross-frame verification in a unified semantic loop.
+current position provides  little meaningful distinction [8],     Beyond exploration, open-vocabulary grounding remains
+[9]. In addition, point-level candidates provide only indirect   vulnerable to false positives caused by distractors, partial
+evidence  . The robot can observe the explored  side of   views, and semantic ambiguity. A candidate that appears
+a frontier, while the semantic content beyond the branch    plausible in a single frame may not correspond to the true
+remains unseen before route commitment. In Fig. 1, for    target once additional views are observed. We therefore
+example, frontier-based selection observes only the current    further introduce a cross-frame Qwen3-VL [14] verification
+forward view, leaving the side branches visually unknown,   module that cross-checks each detected candidate against
+whereas direction-based exploration inspects newly revealed    recent multi-view observations before writing it to the object
+branch directions before selecting the next direction. Even   map, so that only consistently confirmed targets are accepted
+when candidates are augmented with surrounding objects [8],   and spurious detections are suppressed early.
+frontier-side visual evidence  [9], or scene graphs [11]  ,     Experiments  on HM3D-OVON  [2], HM3Dv1  [16],
+the model still infers branch utility from geometric proxies  HM3Dv2 [17], and MP3D [18] demonstrate that DRIVE-Nav
+rather than directly maintained branch-level evidence  . In    consistently improves both success rate and path efficiency
+contrast, direction-based exploration moves the agent to a   over strong baselines. We further deploy DRIVE-Nav on a
+more informative decision position and performs sufficient   physical humanoid robot, confirming its real-world feasibil-
+rotation to inspect the outgoing directions before committing     ity.
+to the next route.                                                In summary, this work makes the following contributions:
+  Topology-aware methods mitigate these frontier-level lim-      • A direction-centric exploration interface for zero-shot
+itations. In particular, VoroNav [12] constructs a Reduced                                        OVON that replaces redundant point-level frontier de-
+Voronoi Graph, stops at informative Voronoi junction nodes,                                                                       cisions with temporally persistent, motion-grounded di-
+rotates  to  collect  surrounding  observations, and  selects                                                                       rection entities, and acquires representative views for
+among topological branches. This already moves beyond                                                          newly revealed forward directions.
+raw frontier points and validates the value of junction-level      • A unified semantic loop that uses direction-level repre-
+decision making. However, the observation policy  is  still                                                                        sentative views as shared evidence for exploration and
+tied to a  full 360◦look-around when the agent reaches                                                                          target grounding, enabling Qwen3-VL to select direc-
+an RVG node or mid-term goal, after which the current                                                                             tions, assess target visibility, and generate inspection-
+panoramic images are matched to neighboring nodes for                                                              guided SAM3 prompt refinements for weakly grounded
+farsight descriptions. Thus, even when only a subset of                                                                             targets.
+outgoing directions requires new visual evidence, the agent      • A cross-frame Qwen3-VL verification mechanism that
+still pays a fixed panoramic-inspection cost at that decision                                                                couples temporal semantic confirmation with naviga-
+location. As illustrated in the bottom panel of Fig. 1, an                                                                              tion, improving target-grounding reliability under open-
+agent may rotate 360◦at both junctions , although only 60◦                                                                vocabulary ambiguity.
+is needed at the first junction, and at the second junction      • Comprehensive validation on HM3D-OVON, HM3Dv1,
+only 30◦to the left followed by 120◦to the right.                                                HM3Dv2, and MP3D, showing strong performance and
+  Studies on human wayfinding suggest that intersections                                                                      consistent path-efficiency gains across diverse bench-
+are critical decision points that prompt information seeking                                                              marks.
+and spatial decision making before route commitment [13].
+Inspired by this perception–decision coupling , DRIVE-Nav                            II. RELATED WORK
+organizes exploration around persistent directions rather than
+                                                            A. Zero-Shot Object Navigationtransient frontier candidates or node-local branch observa-
+tions. Each direction is a stable group of frontiers sharing     Zero-Shot  Object  Navigation (ZSON) aims  to  locate
+a similar local bearing, where the bearing  is induced by   language-specified  target objects  in unseen environments
+the weighted FMM path from the robot to each frontier.   without  task-specific  training and  to generalize  to novel
+Once a direction is selected, the agent advances along its    object  categories.  Early methods improve  generalization
+farthest frontier until the evolving frontier structure exposes   through learned multimodal embeddings, modular explo-
+new forward exits at a more informative decision position.    ration  policies, or semantic  association  priors   [3],  [4],
+DRIVE-Nav then inspects these newly revealed forward    [5], [19], but  still rely on substantial task-specific  train-
+directions within the 240◦range by rotating only over the   ing or learned  priors. Recent studies reduce reliance on
+angular span needed to face them, rather than executing a    task-specific training by combining foundation models with
+fixed full-circle scan. The rear-facing range mainly corre-    explicit spatial or topological representations for semantic
+sponds to the path already traversed, so it is not treated as    exploration [6], [7], [8], [9], [12], [11], [20]. Building on this
+a new forward exploration choice. The representative views    trend, DRIVE-Nav further improves zero-shot exploration
+
+=== PDF PAGE 3 ===
+by organizing frontier candidates into persistent directions   a previously unseen scene without task-specific training or
+and using representative views for inspection and grounding    fine-tuning on the target categories. An episode is considered
+verification.                                                    successful if the agent reaches a target instance within the
+                                                              predefined success distance and issues STOP before the
+B. Scene Representation and Exploration Strategy                                                              navigation budget is exhausted.
+  Training-free zero-shot navigation methods differ mainly
+                                                                                   IV. METHOD
+in how they represent the observed scene and convert it into
+exploration goals. L3MVN [8] builds a semantic map and     The overview of DRIVE-Nav is shown in Fig. 2. From
+uses an LLM to identify target-related frontiers. VLFM [9]  RGB-D observations and odometry,  the agent maintains
+, InstructNav [21], and ApexNav [20] rank frontier or map   a frontier map and converts raw frontier waypoints into
+candidates with vision-language value maps or target-centric    persistent directions through weighted FMM path analysis
+semantic scores. Scene-graph methods such as SG-Nav [11],   and angular clustering (Sec. IV-A). At episode  start, the
+UniGoal [22], and MSGNav [23] encode object and spatial   agent performs an initial 360◦scan, acquires representative
+relations for LLM-based reasoning, while VoroNav [12] uses    direction views, and queries Qwen3-VL for the first explo-
+a topology-aware representation to select among Voronoi    ration direction. Thereafter, the low-level planner follows the
+branches.                                                           farthest frontier point in the currently selected direction until
+                                                       an inspection event occurs: when the evolving frontier layout  The frontier-oriented methods above enrich frontier se-
+                                                          exposes newly inspectable directions within the forward 240◦lection with semantic maps, value maps, or scene-graph
+                                                               range, the agent rotates to capture the missing representativecues, but still choose from frontier or map candidates. As
+                                                        views and Qwen3-VL selects the next direction (Sec. IV-discussed in the Introduction, this candidate-level interface
+                                                                 A(c)). If Qwen3-VL reports target visibility but SAM3 hascan be redundant and provides only indirect evidence about
+                                                             not yet produced an accepted grounding, prompt enrich-unexplored  branches. VoroNav  [12] moves  the  decision
+                                                    ment converts direction-level evidence into detector-orientedinterface  to topological branches, but  still  relies on  full
+                                       SAM3 queries (Sec. IV-B). Accepted detections are furtherpanoramic scans at junctions and may reconsider rearward
+                                                        checked by cross-frame  verification before being writtendirections along the already traversed  path. DRIVE-Nav
+                                                                   into the object map (Sec. IV-C). High-level reasoning  isinstead converts frontier candidates into persistent directions
+                                                              thus triggered at direction-level inspection events or target-and inspects newly observed forward directions within the
+                                                         grounding events, while ordinary steps continue with frontiernecessary angular range, enabling direction-level exploration
+                                                             following in the active direction.without repeated full 360◦scans.
+                                                            A. Directional Reasoning over Persistent Directions
+C. Target Identification for ZSON
+                                         We formulate exploration as directional reasoning over
+  Reliable target identification is essential for zero-shot Ob-
+                                                                    persistent directions, which convert raw frontier waypoints
+jectNav, because both missed detections and false detections
+                                                                   into stable directional representations and acquire representa-
+can terminate an otherwise effective exploration process.
+                                                                       tive views for inspectable directions within the forward 240◦
+Recent methods therefore introduce verification or fusion
+                                                           range for semantic exploration.
+mechanisms to improve grounding reliability. SG-Nav [11]
+                                                                   a)  Path-induced direction candidates: At each map-
+uses graph-based re-perception to reject low-credibility target
+                                                           ping step, raw frontier waypoints are obtained from depth
+candidates, and UniGoal [22] applies scene-graph correction
+                                                              observations using a standard frontier-map pipeline [10],
+and goal verification after graph matching. ApexNav [20]
+                                                                         [9]. Instead of grouping these points directly by Euclidean
+instead performs target-centric semantic fusion, aggregating
+                                                                   position, we derive candidate directions from weighted paths
+multi-frame observations and confidence updates to suppress
+                                                     computed by the Fast Marching Method (FMM) [24]. We
+noisy false positives. These mechanisms mainly reduce false
+                                                              solve the Eikonal equation ∥∇T(x)∥F(x) = 1 with T(xr) =
+positives after a candidate has been detected, but do not
+                                                    0 at the robot position, using a spatially varying speed field
+recover targets that are visible yet missed by the detec-
+tor. DRIVE-Nav addresses both cases: Qwen3-VL-guided                 F(x) = Fobs(x)Fvor(x),                (1)
+prompt enrichment helps ground such missed targets with
+                                                     where Fobs and Fvor encode obstacle avoidance and medial-
+SAM3, while cross-frame verification filters false detections
+                                                               skeleton preference, adapted from distance-based FMM plan-
+before map insertion.
+                                                           ning in VoroNav [12]:
+                 III. PROBLEM FORMULATION                                                                       Fobs(x) = 1 −λ exp(−dobs(x)/robs),         (2)
+  We consider zero-shot open-vocabulary object navigation
+                                                                         Fvor(x) = 1 + β exp(−dvor(x)/rvor),         (3)
+in an unseen environment. At the beginning of each episode,
+the agent  starts from an  initial pose p0 and  is given a   with dobs and dvor the distances to the nearest obstacle and
+language-specified target category g ∈N. At each time   medial skeleton, respectively; λ = 0.65, robs = 0.8 m, β =
+step t, the agent receives an egocentric RGB-D observation    3.0, and rvor = 0.5 m. For each frontier, the path is recovered
+together with its estimated pose pt and predicts an action.   by gradient backtracking; the resulting reachable paths are
+The goal  is to navigate to an instance of category g in   then converted into local bearings in the next step.
+
+=== PDF PAGE 4 ===
+                               Input                                                              Direction Abstraction
+
+
+                                                                               Weighte FMM                     Cluster & track                      Active inspection
+                               RGB
+
+
+                        Update                                           Frontier Map          FMM Paths                     Direction Cues              Representative Views
+                                       Depth
+
+                                      Odom.                                        Frontier point    FMM path       Robot-centered radius       Current agent pose       Angular gap > 45°          Direction-supporting frontiers       Grouped FMM paths
+
+
+                                                                                    Prompt Enhancement
+                           Object                                Goal                                          Qwen3-VL-8B
+                                       hanger                  Env        clothes                                                rods                       Central                                                                                   Reasoning Engine                 Qwen3-VL recognizes target, but SAM3 fails to ground it.
+
+
+                           Local Policy                    Target Check     No SAM3                                                               Initial phrase
+                               & Direction Selection     mask                                                         clothes hanger rods      SAM3      No mask
+
+
+                                                     SAM3 grounded                                                                                                Repeat
+                                                                                                                                      Qwen3-VL repairs prompt             (up to 5 attempts)
+                                                   Cross-frame Verification                               clothes hanger rods
+                         Action
+                                                                                           Definitely_not                                                           Completely_sure                                                                                                                           Reject mask                                                          Final accepted phrase                                                                            Accept                                                                          mask immediately                                                                                                                                      SAM3
+                                                                                                                                                (updated after each            white clothes hanger rods
+                                                     Frontier goal or                             Uncertain                                              failed SAM3 test)
+                                                    Verified target                                   Continue to next frame
+
+
+Fig. 2: Overview of the proposed closed-loop navigation pipeline. RGB-D observations are converted into persistent exits
+for direction selection, prompt enhancement, and cross-frame target verification. The robot-centered radius used for bearing
+extraction is defined in Sec. IV-A(b).
+
+
+     b) Direction clustering and temporal association: We   rank pairs by increasing ∆, and greedily match unused
+next convert each recovered FMM path into a local bearing   ones; matches retain ℓk and update  ¯θtk, unmatched current
+measured in the episode world frame anchored at the robot’s    directions receive new ℓk, and unmatched previous ones
+initial pose. For frontier fi, we define its local directional    are removed. The resulting tracked directions provide the
+point pi as the first intersection between the FMM path and a    identities used by the representative-view module.
+robot-centered circle of radius Re = 0.8 m. This point is not         c) Tracked-direction view acquisition and semantic se-
+a navigation goal, but only a geometric carrier for computing    lection.:  Representative-view  acquisition operates on the
+the path-induced bearing θi from the robot position rt to pi.   tracked directions from Sec. IV-A(b). After the initial 360◦
+Each mapping step, the θi are normalized to [0, 2π), sorted    scan, the agent follows the farthest frontier in the selected
+circularly, and clustered by angular gaps: starting after the    direction until new branch directions become inspectable,
+largest gap, bearings are greedily grouped while the span   then  interrupts  to acquire  representative views  for these
+remains below τθ = 45◦. This replaces Euclidean frontier   newly revealed directions within the forward 240◦range. At
+grouping and handles the 0◦/360◦boundary. From Fig. 3(4)   an inspection event, we measure how far each representative
+to Fig.  3(5), the blue and red  exits change from being   bearing  ¯θtk  deviates from the current robot heading ψt.
+separated by more than 45◦to falling within the threshold   Denote this signed turn angle by αk = (¯θtk −ψt), mapped
+and are therefore grouped into one direction, while the yellow    to (−π, π] so that |αk| is the smallest rotation needed to
+direction reveals an additional bearing that forms a new pink   face direction k. Directions with |αk| ≤120◦form the
+direction. Each current-frame direction is                    forward 240◦inspectable set. As shown in Fig. 3, directions
+                                                                   in this set that lack valid representative views are arranged by
+                Dtk = (ℓk, ¯θtk),                     (4)                                                            signed offset and swept from the side requiring the smaller
+where ¯θtk is the circular mean of member bearings and ℓk is    initial turn; directions with existing views do not trigger
+a persistent label assigned at first appearance.                  extra rotation, but their views are updated if the current yaw
+  Because  clustering  is recomputed  as  the map grows,   provides a smaller angular error. A representative view for
+temporal association maintains stable direction labels before  Dtk is recorded once the camera yaw differs from ¯θtk by less
+view acquisition is performed. It has two stages. (1) Position-   than 15◦. Qwen3-VL then performs semantic selection over
+based merge: if a new cluster’s frontier waypoints co-occur    the acquired representative views, and the low-level planner
+at the same world-frame locations as those from two or more   continues toward the farthest frontier point in the selected
+prior directions, the prior labels are removed and the merged    direction.
+cluster receives a fresh ℓk. (2) Angular association: for the   B. Direction-Guided Prompt Enrichment
+remaining directions, we match representative bearings by
+                                                         During navigation, SAM3 continuously attempts to seg-
+circular distance
+                                                    ment the Habitat target category in the current RGB frame.
+       ∆(θa, θb) = min(|θa −θb|, 2π −|θa −θb|),     (5)    Direction-level semantic inspection (Sec. IV-A(c)) plays a
+
+=== PDF PAGE 5 ===
+                           (1)                                    (2)                                    (3)                                    (4)
+
+
+
+
+
+                                    initialize — rotate 360°             explore — new direction              rotate — new visual                  rotate — new visual
+                           (8)                                    (7)                                    (6)                                    (5)
+
+
+
+
+
+                                   rotate — new visual              explore — new direction                rotate — new visual             explore — new direction
+
+                                        Direction-supporting frontiers          Grouped FMM paths              Robot-centered radius          Current agent pose                 Angular gap > 45°
+
+
+Fig. 3: Directional abstraction during a representative exploration episode. As the agent moves, local path-induced bearings
+are re-clustered into direction-supporting frontier sets shown by color. Panels (4)–(5) illustrate a dynamic update in which
+previously separate exits merge and a newly revealed bearing forms an additional direction.
+
+
+complementary role: after representative views are acquired,                      V. EXPERIMENTS
+Qwen3-VL selects the next exploration direction and checks                                                            A. Experimental Setup
+whether the target is visible. If no target is reported, the agent
+                                                               Datasets. We evaluate our method in the Habitat simulatorfollows the selected direction . If the target is visible, Qwen3-
+                                                    on four benchmarks. HM3D-OVON serves as the primaryVL returns the target-bearing direction , and the robot turns
+                                                     benchmark for open-vocabulary evaluation , while HM3Dv1,toward that direction for closer inspection.
+                                         HM3Dv2 and MP3D provide additional closed-set Object-
+  Prompt enrichment  is activated only when Qwen3-VL
+                                               Nav comparisons.
+has identified the target semantically but SAM3 has not
+                                                          Evaluation Metrics. We report two standard ObjectNav
+yet  returned an  accepted mask. The module  alternates
+                                                                 metrics: Success Rate (SR) and Success weighted by Path
+between prompt proposal and grounding  for up  to  five
+                                                       Length (SPL). For the analytical study (Sec. V-C), we addi-
+rounds: Qwen3-VL inspects the target-facing RGB view,
+                                                                    tionally report average executed steps and a revisit statistic
+the stored direction-level description, and previously failed
+                                                                   to quantify action overhead and redundant re-exploration
+prompts, then proposes a concise detector-oriented noun
+                                                     beyond what SPL captures.
+phrase; SAM3 immediately tests it on the current frame. An
+                                                       Implementation Details. All experiments are conducted
+accepted mask initiates navigation toward the target, and the
+                                                                   in Habitat with RGB-D observations and a maximum episode
+successful phrase is cached for later SAM3 calls.
+                                                              length of 500  steps. Instead of using a separate object
+                                                                    detector, we directly adopt SAM3 as an open-vocabulary
+                                                            phrase segmentation model to produce target masks. For
+C. Cross-frame Verification                                   vision-language reasoning, including exit analysis, prompt
+                                                            enrichment, and semantic verification, we use Qwen3-VL-
+  To improve grounding reliability, we verify SAM3 tar-  8B served in bfloat16 with a maximum model length of
+get candidates with Qwen3-VL over at most three target-   30,720 tokens and at most 30 images per prompt (video
+approach frames collected during normal navigation. For    disabled). Main results use SAM3; grounding-backbone sen-
+each frame, Qwen3-VL receives the RGB image, a mask    sitivity  in Sec. V-D  additionally  evaluates OWLv2 [25]
+overlay, and previous verification frames, and outputs one of   with MobileSAM [26] under the same directional-reasoning
+three judgments:  completely sure, uncertain, or  definitely    configuration without prompt enrichment or verification. All
+not. A completely sure judgment immediately accepts the   Habitat simulation experiments are conducted on a worksta-
+candidate, uncertain requests another approach frame, and    tion equipped with four NVIDIA RTX 4090D GPUs.
+definitely not immediately rejects  it. If no rejection occurs
+                                                            B. Comparison with State-of-the-artwithin three frames, the candidate  is accepted. Accepted
+masks are projected from RGB-D observations into the ob-      Table I compares DRIVE-Nav with state-of-the-art object
+ject map and can replace the frontier goal, whereas rejected   navigation methods on HM3D-OVON, HM3Dv1, HM3Dv2,
+detections are removed and stored as failed-position memory.   and MP3D. Blank  cells  indicate  that  the corresponding
+
+=== PDF PAGE 6 ===
+TABLE I: Comparison with state-of-the-art methods on HM3D-OVON, HM3Dv1, HM3Dv2, and MP3D. Zero-shot indicates
+no task-specific training on navigation data. The Detection, Segmentation, and Reasoning Model columns report the models
+used for target grounding, mask generation, and high-level reasoning, respectively, according to the corresponding method
+papers cited in the Method column. G-DINO denotes Grounding DINO [27]; “–” denotes not used. VoroNav reports HM3Dv1
+only. Dark-blue/light-blue cells mark best/second-best per column.
+
+
+                                                                 HM3D-OVON  HM3Dv1   HM3Dv2   MP3D
+ Method               Venue     Zero-shot      Detection      Segmentation  Reasoning Model
+                                                                        SR↑  SPL↑  SR↑SPL↑SR↑SPL↑SR↑SPL↑
+
+ SemExp [3]         CVPR’20   ×      Mask R-CNN   Mask R-CNN        –         –      –      –     –     –     –    36.0  14.4
+ PONI [4]           CVPR’22   ×            –           RedNet           –         –      –      –     –     –     –    31.8  12.1
+ ZSON [5]           NeurIPS’22   ×            –              –             –         –      –     25.5  12.6   –     –    15.3   4.8
+ ActPept [19]         RAL’24    ×            –              –        GCN        –      –      –     –     –     –    39.8  17.4
+
+ CoW [6]           CVPR’23   ✓       OWL-ViT          –             –         –      –      –     –     –     –     7.4    3.7
+ ESC [7]             ICML’23   ✓         GLIP-L           –        DeBERTa-v3     –      –     39.2  22.3   –     –    28.7  14.2
+ L3MVN [8]          IROS’23   ✓            –           RedNet     RoBERTa-large    –      –     50.4  23.1  36.3  15.7   –     –
+ OpenFMNav [28]   NAACL-F’24  ✓       G-DINO      SAM        GPT-4V       –      –     54.9  24.4   –     –    37.2  15.7
+ InstructNav [21]      CoRL’24   ✓        GLEE        GLEE        GPT-4V       –      –      –     –    58.0  20.9   –     –
+ SG-Nav [11]         NeurIPS’24   ✓      GLIP/G-DINO     SAM         GPT-4       –      –     54.0  24.9  49.6  25.5  40.2  16.0
+ UniGoal [22]        CVPR’25   ✓      GLIP/G-DINO     SAM         GPT-4       –      –     54.5  25.1   –     –    41.0  16.4
+ ApexNav [20]        RAL’25    ✓    YOLOv7+G-DINO  MobileSAM         –         –      –     59.6  33.0  76.2  38.0  39.2  17.8
+ VoroNav [12]        ICML’24   ✓       G-DINO      SAM         GPT-3.5       –      –     42.0  26.0   –     –     –     –
+ VLFM [9], [2]        ICRA’24   ✓    OWLv2/G-DINO   MobileSAM         –         35.2    19.6    52.5  30.4  63.6  32.5  36.4  17.5
+ MSGNav [23]       CVPR’26   ✓      YOLO-World     SAM         GPT-4o      48.3    27.0    –     –     –     –     –     –
+
+ DRIVE-Nav (Ours)    Ours    ✓       SAM3       SAM3     Qwen3-VL-8B   50.2    32.6    55.5  35.9  72.4  41.3  41.8  22.6
+
+
+                                          TABLE  II: Analytical comparison on common successfulmethod was not evaluated on a given benchmark. Backbone
+                                                            episodes with start-to-goal distance > 10 m . Lower is better.differences are summarized in the Detection, Segmentation,
+and Reasoning Model columns, while matched module and                                                                  Method                          Average steps   Avg. revisits
+grounding-backbone ablations are provided in Sec. V-D.
+                                                 VLFM [9]                            163.5          0.364
+  On the primary HM3D-OVON benchmark, DRIVE-Nav        Nearest-edge-point greedy              164.8          0.200
+achieves the best overall result (50.2% SR; 32.6% SPL),        Direction inspection + 360◦scan       222.1          0.200
+outperforming MSGNav [23] by 1.9 points in SR and 5.6      DRIVE-Nav (Ours)                   133.4          0.132
+points in SPL. On HM3Dv1, DRIVE-Nav achieves 55.5%
+SR and 35.9% SPL, improving over the closest topology-  TABLE  III: Directional-reasoning component ablation on
+aware baseline VoroNav [12] (42.0%/26.0%) by 13.5 SR and  HM3D-OVON.
+9.9 SPL points. On HM3Dv2,  it achieves the best SPL of
+                                                                       Method                        SR↑   SPL↑
+41.3%, exceeding ApexNav [20] and VLFM [9] by 3.3 and
+8.8 points, respectively, while maintaining 72.4% SR. On            w/o Weighted FMM                    44.5    26.2
+                                                                         w/o 240◦Inspection View              45.5    26.8
+MP3D, DRIVE-Nav again delivers the best overall result              Full Directional Reasoning Pipeline   46.3    27.5
+(41.8% SR; 22.6% SPL), improving the best prior SPL from
+ApexNav [20] by 4.8 points and from SG-Nav [11] by 6.6
+points. These consistent SPL gains validate the efficiency
+                                                 As shown in Table  II, DRIVE-Nav requires the fewest
+of our directional-reasoning and inspection-driven navigation
+                                                                 steps (133.4 ) and revisits (0.132). Compared with VLFM
+strategy.                                                      and the full 360◦inspection baseline, the results show that
+                                                                  direction tracking and forward-range inspection reduce both
+C. Analytical Study                                                                   rotation overhead and redundant re-exploration.
+  Standard SPL normalizes path length by geodesic distance,
+                                                      D. Ablation Studybut it does not reveal action waste from in-place rotations or
+repeated traversal. We therefore compare episodes with start-    We ablate DRIVE-Nav on the full HM3D-OVON valida-
+to-goal distance above 10 m that are successfully completed    tion set (3000 episodes) to isolate directional components,
+by all methods.                                           grounding-backbone effects, and the final semantic modules.
+  We compare VLFM, a nearest-edge-point greedy policy,      Directional reasoning components. Table III shows that
+a  direction-aware  policy with  full 360◦inspection, and   weighted FMM and 240◦inspection are complementary:
+DRIVE-Nav. Average steps counts all executed actions, in-   removing either component lowers SR/SPL, with weighted
+cluding rotations. Average revisits counts a frontier-selection  FMM causing the larger SR drop and full 360◦inspection
+segment as a revisit if it accumulates at least 5 m of travel    increasing unnecessary rotations.
+within 0.5 m of the previously traversed 2D trajectory; this     Grounding-backbone sensitivity. Under the directional-
+threshold avoids counting brief overlaps caused by normal   reasoning-only setting, replacing OWLv2+MobileSAM with
+room entry and exit.                          SAM3 yields only a modest gain (+0.7 SR; +1.2 SPL),
+
+=== PDF PAGE 7 ===
+TABLE IV: Grounding comparison under matched modules                                                                are fused by FAST-LIO2 [29] and projected into a 2D occu-
+on HM3D-OVON.                                                       pancy grid . To match the Habitat sensing setup, where the
+                                          RGB-D camera has a horizontal FOV of 79◦, only LiDAR           Grounding                 SR↑   SPL↑
+                                                                  returns within the same forward-facing 79◦range centered on
+        OWLv2 [25]+MobileSAM [26]   45.6    26.3
+        SAM3 [15]                      46.3    27.5               the camera are used for occupancy projection; raw frontier
+                                                         waypoints are then extracted and converted into persistent
+                                                                    directions. The high-level pipeline runs on a single RTX
+TABLE V: Module ablation on HM3D-OVON with fixed
+                                                    4090 through ROS2-ZMQ; Qwen3-VL-4B is used instead of
+SAM3 and Qwen3-VL-8B backbones. Higher is better.
+                                                                the 8B simulation model so that direction selection, prompt
+                    Module                                   enrichment, verification, and SAM3 grounding can run on
+                                           SR↑   SPL↑    the same GPU.Frontier    Directional   Prompt Enrich.    Verification
+                                                       Computational analysis. Table VI profiles the deploy-
+ ✓                                                     42.1    22.4
+ ✓      ✓                                        46.3    27.5   ment workstation. SAM3 dominates synchronous per-step
+ ✓      ✓       ✓                        48.0    28.9    cost (∼270 ms), while computing the FMM path-induced
+ ✓      ✓                ✓        48.8    30.8                                                                  direction  for one  frontier  point  takes ∼15 ms on CPU.
+ ✓      ✓       ✓       ✓        50.2    32.6
+                                               Qwen3-VL-4B  is invoked only at sparse decision points,
+                                                           so the deployed system  is perception-limited rather than
+                                                                reasoning-limited.
+indicating  that  the  full-system gain mainly comes from
+prompt enrichment and verification.                     TABLE VI: Runtime on the real-world workstation.
+  Module ablation. Table V uses fixed SAM3 and Qwen3-
+VL-8B backbones. Directional reasoning improves the fron-   Module                               Latency         Invocation
+tier baseline from 42.1%/22.4% to 46.3%/27.5%, and prompt   SAM3 (detection + semantic map)     ∼270 ms       every step
+enrichment plus verification further raise the full system to  FMM candidate generation          ∼15 ms         per solve
+                                                                             Direction selection               ∼8 s          few per episode
+50.2% /32.6% .                                                  Prompt enrichment              ∼3 s             optional, sparse
+                                                                        Cross-frame verification           ∼3 s          up to 3 frames
+E. Real-world Deployment
+
+  DRIVE-Nav is deployed on a Unitree G1 humanoid robot     Experimental results. Representative real-world demon-
+with onboard sensing and offboard computation. A Re-    strations cover five target categories: toilet, elevator, plant,
+alSense D455 on a head-mounted two-axis gimbal provides    fire extinguisher, and vending machine. In these demonstra-
+forward RGB-D observations , while LiDAR and IMU data    tions, the robot successfully locates and reaches each target.
+
+
+
+
+
+                          360° view images(initialization)                      240° view images            verification views                240° view images           verification views
+                     t=17s (Direction Decision)                           t=49s (Verification)                           t=64s (Direction Decision)
+
+
+
+
+
+                   240° view images            verification views                240° view images           verification views               240° view images           verification views
+                     t=84s (Direction Decision)                            t=91s (Verification)                        t=110s (Navigate to the Target)
+
+
+Fig. 4: Real-world deployment of DRIVE-Nav for finding an elevator. The sequence shows the full navigation episode,
+including 360◦initialization, successive 240◦direction decisions, cross-frame verification, and final approach to the target,
+with colored boxes indicating candidate directions in the same color and solid lines marking the selected direction.
+
+=== PDF PAGE 8 ===
+We also observe that real LiDAR-based boundary estimation    [10] B. Yamauchi, “A frontier-based approach for autonomous exploration,”
+may require short sensing stabilization, which can introduce           in Proceedings of the 1997 IEEE International Symposium on Com-
+                                                                                     putational Intelligence in Robotics and Automation.  IEEE, 1997, pp.
+transient frontier changes and temporarily trigger direction         146–151.
+reconsideration. Larger-scale real-robot benchmarking and    [11] B. Lin et al., “SG-Nav: Online 3D scene graph prompting for LLM-
+baseline deployment remain future work. Fig. 4 shows a         based zero-shot object navigation,” in Advances in Neural Information
+                                                                               Processing Systems, 2024.
+representative elevator trial.                                            [12]  P. Wu, Y. Mu, B. Wu, Y. Hou, J. Ma, S. Zhang, and C. Liu, “VoroNav:
+                                                                              Voronoi-based zero-shot object navigation with large language model,”
+                  VI. CONCLUSION                                 arXiv preprint arXiv:2401.02695, 2024.
+                                                                              [13]  T. T. Bruny´e, A. L. Gardony, A. Holmes, and H. A. Taylor, “Spatial de-
+                                                                                       cision dynamics during wayfinding: Intersections prompt the decision-
+  This  paper  presented DRIVE-Nav,  a  zero-shot open-        making process,” Cognitive Research: Principles and Implications,
+vocabulary  navigation framework  that  unifies  directional           vol. 3, no. 13, 2018.
+reasoning, inspection, and verification in a single decision    [14]  S. Bai, Y. Cai, R. Chen, K. Chen, X. Chen, Z. Cheng, L. Deng,
+                                                               W. Ding, C. Gao, C. Ge, et al., “Qwen3-VL technical report,” arXiv
+loop. By organizing exploration around  persistent  direc-          preprint arXiv:2511.21631, 2025.
+tions rather than dense frontier points, DRIVE-Nav enables    [15] N. Carion, L. Gustafson, Y.-T. Hu, S. Debnath, R. Hu, D. Suris,
+more stable route selection, more efficient inspection, and         C. Ryali, K. V. Alwala, H. Khedr, A. Huang, et al., “SAM 3: Segment
+                                                                                anything with concepts,” arXiv preprint arXiv:2511.16719, 2025.
+more reliable target grounding through prompt enrichment    [16]  S. K. Ramakrishnan, A. Gokaslan, E. Wijmans, O. Maksymets,
+and cross-frame verification. Experiments on HM3D-OVON,        A. Clegg, J. Turner, E. Undersander, W. Galuba, A. Westbury, A. X.
+HM3Dv1, HM3Dv2, and MP3D show consistent improve-         Chang, M. Savva, Y. Zhao, and D. Batra, “Habitat-Matterport 3d
+                                                                                        dataset (HM3D): 1000 large-scale 3d environments for embodied ai,”
+ments in overall navigation performance, including strong         arXiv preprint arXiv:2109.08238, 2021.
+gains in SPL across  all four benchmarks. The analytical    [17] K. Yadav, R. Ramrakhya, S. K. Ramakrishnan, T. Gervet, J. Turner,
+study further indicates that the actual efficiency advantage        A. Gokaslan, N. Maestre, A. X. Chang, D. Batra, M. Savva, et al.,
+                                                                                   “Habitat-Matterport 3D semantics  dataset,”  in Proceedings  of the
+of DRIVE-Nav is more substantial than suggested by SPL        IEEE/CVF Conference on Computer Vision and Pattern Recognition,
+alone. Proof-of-concept deployment on a physical humanoid         2023, pp. 4927–4936.
+robot suggests practical transfer beyond simulation . Future    [18] A. Chang, A. Dai, T. Funkhouser, M. Halber, M. Niessner, M. Savva,
+                                                                                      S. Song, A. Zeng, and Y. Zhang, “Matterport3D: Learning from RGB-
+work will extend DRIVE-Nav to dynamic scenes, larger-      D data in indoor environments,” arXiv preprint arXiv:1709.06158,
+scale real-robot benchmarking, and episodic memory for         2017.
+revisitation-aware planning.                                            [19] Y. Guo et al., “An object-driven navigation strategy based on active
+                                                                                  perception and semantic association,” IEEE Robotics and Automation
+                                                                                            Letters, vol. 9, no. 8, pp. 7110–7117, 2024.
+                 REFERENCES                                 [20] M. Zhang, Y. Du, C. Wu,  J. Zhou, Z. Qi,  J. Ma, and B. Zhou,
+                                                                       “ApexNav: An adaptive  exploration  strategy  for  zero-shot  object
+ [1] D. Batra, A. Gokaslan, A. Kembhavi, O. Maksymets, R. Mottaghi,          navigation with target-centric semantic fusion,” IEEE Robot. Autom.
+    M. Savva, A. Toshev, and E. Wijmans, “ObjectNav revisited: On            Lett., 2025.
+      evaluation of embodied agents navigating to objects,” arXiv preprint    [21] Y. Long, W. Cai, H. Wang, G. Zhan, and H. Dong, “InstructNav:
+     arXiv:2006.13171, 2020.                                                    Zero-shot system for generic instruction navigation in unexplored
+                                                                                environment,” arXiv preprint arXiv:2406.04882, 2024. [2] N. Yokoyama, R. Ramrakhya, A. Das, D. Batra, and S. Ha, “HM3D-
+                                                                              [22] H. Yin, X. Xu, L. Zhao, Z. Wang, J. Zhou, and J. Lu, “UniGoal:    OVON: A dataset and benchmark for open-vocabulary object goal
+      navigation,” in 2024 IEEE/RSJ International Conference on Intelligent        Towards universal zero-shot goal-oriented navigation,” in Proceedings
+                                                                                         of the IEEE/CVF Conference on Computer Vision and Pattern Recog-     Robots and Systems (IROS).  IEEE, 2024, pp. 5543–5550.
+                                                                                              nition, 2025, pp. 19 057–19 066. [3] D. S. Chaplot, D. P. Gandhi, A. Gupta, and R. R. Salakhutdinov,
+                                                                              [23] X. Huang, S. Zhao, Y. Wang, X. Lu, W. Zhang, R. Qu, W. Li,     “Object goal navigation using goal-oriented semantic exploration,”
+                                                                                   Y. Wang, and C. Wen, “MSGNav: Unleashing the power of multi-     Advances in Neural Information Processing Systems, vol. 33, pp.
+                                                                      modal 3D scene graph for zero-shot embodied navigation,” arXiv     4247–4258, 2020.
+                                                                                      preprint arXiv:2511.10376, 2025. [4]  S. K. Ramakrishnan et  al., “PONI: Potential functions for Object-
+                                                                              [24]  J. A. Sethian, “A fast marching level set method for monotonically     Goal navigation with interaction-free learning,” in Proceedings of the
+                                                                             advancing fronts,” Proceedings of the National Academy of Sciences,    IEEE/CVF Conference on Computer Vision and Pattern Recognition,
+                                                                                            vol. 93, no. 4, pp. 1591–1595, 1996.     2022.
+                                                                              [25] M. Minderer, A. Gritsenko, and N. Houlsby, “Scaling open-vocabulary
+ [5] A. Majumdar, G. Aggarwal, B. Devnani,  J. Hoffman, and D. Ba-
+                                                                                     object  detection,”  in Advances  in Neural Information Processing
+       tra, “ZSON: Zero-shot object-goal navigation using multimodal goal
+                                                                                  Systems, 2023.
+     embeddings,” Advances in Neural Information Processing Systems,
+                                                                              [26] C. Zhang, D. Han, Y. Qiao, J. U. Kim, S.-H. Bae, S. Lee, and C. S.
+      vol. 35, pp. 32 340–32 352, 2022.
+                                                                      Hong, “Faster segment anything: Towards lightweight SAM for mobile
+ [6]  S. Y. Gadre, M. Wortsman, G. Ilharco, L. Schmidt, and S. Song, “Cows
+                                                                                         applications,” arXiv preprint arXiv:2306.14289, 2023.
+     on pasture: Baselines and benchmarks for language-driven zero-shot
+                                                                              [27]  S. Liu, Z. Zeng, et  al., “Grounding DINO: Marrying DINO with
+      object navigation,” in Proceedings of the IEEE/CVF Conference on
+                                                                          grounded pre-training for open-set object detection,” in European
+     Computer Vision and Pattern Recognition, 2023, pp. 23 171–23 181.
+                                                                            Conference on Computer Vision.  Springer, 2024, pp. 38–55.
+ [7] K. Zhou, K. Zheng, C. Pryor, Y. Shen, H. Jin, L. Getoor, and X. E.                                                                              [28] Y. Kuang, H. Lin, and M. Jiang, “OpenFMNav: Towards open-set
+    Wang, “ESC: Exploration with  soft commonsense  constraints  for                                                                                    zero-shot object navigation via vision-language foundation models,”
+      zero-shot object navigation,” in International Conference on Machine                                                                              arXiv preprint arXiv:2402.10670, 2024.
+     Learning.  PMLR, 2023, pp. 42 829–42 842.                                                                              [29] W. Xu, Y. Cai, D. He, J. Lin, and F. Zhang, “FAST-LIO2: Fast direct
+ [8] B. Yu, H. Kasaei, and M. Cao, “L3MVN: Leveraging large language                                                                                LiDAR-inertial odometry,” IEEE Transactions on Robotics, vol. 38,
+     models for visual target navigation,” in 2023 IEEE/RSJ International                                                                                    no. 4, pp. 2053–2073, 2022.
+     Conference on Intelligent Robots and Systems (IROS).  IEEE, 2023,
+     pp. 3554–3560.
+ [9] N. Yokoyama, S. Ha, D. Batra, J. Wang, and B. Bucher, “VLFM:
+     Vision-language frontier maps for zero-shot semantic navigation,” in
+     2024 IEEE International Conference on Robotics and Automation
+     (ICRA).  IEEE, 2024, pp. 42–48.

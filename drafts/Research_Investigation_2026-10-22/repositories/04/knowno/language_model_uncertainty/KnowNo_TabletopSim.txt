@@ -1,0 +1,1426 @@
+=== CELL 0 (markdown) ===
+##### Copyright 2023 Google LLC. SPDX-License-Identifier: Apache-2.0
+
+=== CELL 1 (markdown) ===
+Copyright 2023 Google LLC. SPDX-License-Identifier: Apache-2.0
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at
+
+https://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+
+=== CELL 2 (markdown) ===
+# **Robots That Ask For Help: Uncertainty Alignment for Large Language Model Planners** Tabletop Rearrangement
+
+[KnowNo](https://robot-help.github.io) is a framework for measuring and aligning the uncertainty of LLM-based planners, such that they know when they don't know, and ask for help when needed. KnowNo builds on the theory of conformal prediction to provide statistical guarantees on task completion while minimizing human help.
+
+This colab runs an example of KnowNo for tabletop rearrangement in simulation (first experiment setting in the paper):
+
+<img src="https://robot-help.github.io/img/robot-help-teaser.png" height="280px">
+
+Note:
+* We use [GPT-3.5](https://arxiv.org/abs/2005.14165) (text-davinci-003) as the language model here.
+* For convenience, we will assume known locations of the objects on the table. Alternatively, one can use open-vocab object detectors such as [Owl-ViT](https://arxiv.org/abs/2205.06230) for perception as done in the paper.
+* The calibration invoves running LLM inference for calibration data. We recommend 200 data for good calibration results. You can also skip the calibration and directly test in new scenarios at the last block based on provided calibration result, or check out this colab.
+
+This colab is modified from the Socratic Models - Robot Perception & Planning [colab](https://colab.research.google.com/drive/1jAyhumd7DTxJB2oZufob9crVxETAEKbV?usp=sharing).
+
+=== CELL 3 (code) ===
+openai_api_key = "your-api-key"
+
+=== CELL 4 (markdown) ===
+## **Setup**
+
+
+
+=== CELL 5 (code) ===
+#@markdown This installs a few things like PyBullet (simulator) and MoviePy (videos), imports a few Python packages, and downloads PyBullet assets. Then we set up a simple tabletop pick-and-place environment in PyBullet.
+
+!pip install ftfy regex tqdm fvcore imageio==2.4.1 imageio-ffmpeg==0.4.5
+!pip install -U --no-cache-dir gdown --pre
+!pip install pybullet moviepy
+!pip install openai
+!pip install easydict
+
+import collections
+import datetime
+import os
+import random
+import threading
+import time
+
+import cv2  # Used by ViLD.
+from easydict import EasyDict
+import imageio
+import IPython
+import matplotlib.pyplot as plt
+from moviepy.editor import ImageSequenceClip
+import numpy as np
+import openai
+import pickle
+from PIL import Image
+import pybullet
+import pybullet_data
+import tqdm.notebook as tqdm
+
+#Download PyBullet assets.
+if not os.path.exists('ur5e/ur5e.urdf'):
+  !gdown --id 1Cc_fDSBL6QiDvNT4dpfAEbhbALSVoWcc
+  !gdown --id 1yOMEm-Zp_DL3nItG9RozPeJAmeOldekX
+  !gdown --id 1GsqNLhEl9dd4Mc3BM0dX3MibOI1FVWNM
+  !unzip ur5e.zip
+  !unzip robotiq_2f_85.zip
+  !unzip bowl.zip
+
+# Set OpenAI API key.
+openai.api_key = openai_api_key
+
+=== CELL 6 (code) ===
+#@markdown **LLM API call:** completion and scoring optionally
+import signal
+class timeout:
+    def __init__(self, seconds=1, error_message='Timeout'):
+        self.seconds = seconds
+        self.error_message = error_message
+
+    def handle_timeout(self, signum, frame):
+        raise TimeoutError(self.error_message)
+
+    def __enter__(self):
+        signal.signal(signal.SIGALRM, self.handle_timeout)
+        signal.alarm(self.seconds)
+
+    def __exit__(self, type, value, traceback):
+        signal.alarm(0)
+
+# OpenAI only supports up to five tokens (logprobs argument) for getting the likelihood.
+# Thus we use the logit_bias argument to force LLM only consdering the five option
+# tokens: A, B, C, D, E
+def lm(prompt,
+       max_tokens=256,
+       temperature=0,
+       logprobs=None,
+       stop_seq=None,
+       logit_bias={
+          317: 100.0,   #  A (with space at front)
+          347: 100.0,   #  B (with space at front)
+          327: 100.0,   #  C (with space at front)
+          360: 100.0,   #  D (with space at front)
+          412: 100.0,   #  E (with space at front)
+      },
+       timeout_seconds=20):
+  max_attempts = 5
+  for _ in range(max_attempts):
+      try:
+          with timeout(seconds=timeout_seconds):
+              response = openai.Completion.create(
+                  model='text-davinci-003',
+                  prompt=prompt,
+                  max_tokens=max_tokens,
+                  temperature=temperature,
+                  logprobs=logprobs,
+                  logit_bias=logit_bias,
+                  stop=list(stop_seq) if stop_seq is not None else None,
+              )
+          break
+      except:
+          print('Timeout, retrying...')
+          pass
+  return response, response["choices"][0]["text"].strip()
+
+=== CELL 7 (code) ===
+#@markdown **Global constants:** pick and place objects, colors, workspace bounds.
+
+PICK_TARGETS = {
+  'blue block': None,
+  'red block': None,
+  'green block': None,
+  'orange block': None,
+  'yellow block': None,
+  'purple block': None,
+  'pink block': None,
+  'cyan block': None,
+  'brown block': None,
+  'gray block': None,
+}
+
+COLORS = {
+  'blue':   (78/255,  121/255, 167/255, 255/255),
+  'red':    (255/255,  87/255,  89/255, 255/255),
+  'green':  (89/255,  169/255,  79/255, 255/255),
+  'orange': (242/255, 142/255,  43/255, 255/255),
+  'yellow': (237/255, 201/255,  72/255, 255/255),
+  'purple': (176/255, 122/255, 161/255, 255/255),
+  'pink':   (255/255, 157/255, 167/255, 255/255),
+  'cyan':   (118/255, 183/255, 178/255, 255/255),
+  'brown':  (156/255, 117/255,  95/255, 255/255),
+  'gray':   (186/255, 176/255, 172/255, 255/255),
+}
+
+PLACE_TARGETS = {
+  'blue block': None,
+  'red block': None,
+  'green block': None,
+  'orange block': None,
+  'yellow block': None,
+  'purple block': None,
+  'pink block': None,
+  'cyan block': None,
+  'brown block': None,
+  'gray block': None,
+
+  'blue bowl': None,
+  'red bowl': None,
+  'green bowl': None,
+  'orange bowl': None,
+  'yellow bowl': None,
+  'purple bowl': None,
+  'pink bowl': None,
+  'cyan bowl': None,
+  'brown bowl': None,
+  'gray bowl': None,
+
+  'top left corner':     (-0.3 + 0.05, -0.2 - 0.05, 0),
+  'top side':            (0,           -0.2 - 0.05, 0),
+  'top right corner':    (0.3 - 0.05,  -0.2 - 0.05, 0),
+  'left side':           (-0.3 + 0.05, -0.5,        0),
+  'middle':              (0,           -0.5,        0),
+  'right side':          (0.3 - 0.05,  -0.5,        0),
+  'bottom left corner':  (-0.3 + 0.05, -0.8 + 0.05, 0),
+  'bottom side':         (0,           -0.8 + 0.05, 0),
+  'bottom right corner': (0.3 - 0.05,  -0.8 + 0.05, 0),
+}
+
+PIXEL_SIZE = 0.00267857
+BOUNDS = np.float32([[-0.3, 0.3], [-0.8, -0.2], [0, 0.15]])  # (X, Y, Z)
+
+=== CELL 8 (code) ===
+#@markdown **Gripper class:** adds a gripper to the robot and runs a parallel thread to simulate single-actuator behavior.
+
+class Robotiq2F85:
+  """Gripper handling for Robotiq 2F85."""
+
+  def __init__(self, robot, tool):
+    self.robot = robot
+    self.tool = tool
+    pos = [0.1339999999999999, -0.49199999999872496, 0.5]
+    rot = pybullet.getQuaternionFromEuler([np.pi, 0, np.pi])
+    urdf = 'robotiq_2f_85/robotiq_2f_85.urdf'
+    self.body = pybullet.loadURDF(urdf, pos, rot)
+    self.n_joints = pybullet.getNumJoints(self.body)
+    self.activated = False
+
+    # Connect gripper base to robot tool.
+    pybullet.createConstraint(self.robot, tool, self.body, 0, jointType=pybullet.JOINT_FIXED, jointAxis=[0, 0, 0], parentFramePosition=[0, 0, 0], childFramePosition=[0, 0, -0.07], childFrameOrientation=pybullet.getQuaternionFromEuler([0, 0, np.pi / 2]))
+
+    # Set friction coefficients for gripper fingers.
+    for i in range(pybullet.getNumJoints(self.body)):
+      pybullet.changeDynamics(self.body, i, lateralFriction=10.0, spinningFriction=1.0, rollingFriction=1.0, frictionAnchor=True)
+
+    # Start thread to handle additional gripper constraints.
+    self.motor_joint = 1
+    self.running = True
+    self.constraints_thread = threading.Thread(target=self.step)
+    self.constraints_thread.daemon = True
+    self.constraints_thread.start()
+
+  # Control joint positions by enforcing hard contraints on gripper behavior.
+  # Set one joint as the open/close motor joint (other joints should mimic).
+  def step(self):
+    while self.running:
+      try:
+        currj = [pybullet.getJointState(self.body, i)[0] for i in range(self.n_joints)]
+        indj = [6, 3, 8, 5, 10]
+        targj = [currj[1], -currj[1], -currj[1], currj[1], currj[1]]
+        pybullet.setJointMotorControlArray(self.body, indj, pybullet.POSITION_CONTROL, targj, positionGains=np.ones(5))
+      except:
+        return
+      time.sleep(0.001)
+
+  # Close gripper fingers.
+  def activate(self):
+    pybullet.setJointMotorControl2(self.body, self.motor_joint, pybullet.VELOCITY_CONTROL, targetVelocity=1, force=10)
+    self.activated = True
+
+  # Open gripper fingers.
+  def release(self):
+    pybullet.setJointMotorControl2(self.body, self.motor_joint, pybullet.VELOCITY_CONTROL, targetVelocity=-1, force=10)
+    self.activated = False
+
+  # If activated and object in gripper: check object contact.
+  # If activated and nothing in gripper: check gripper contact.
+  # If released: check proximity to surface (disabled).
+  def detect_contact(self):
+    obj, _, ray_frac = self.check_proximity()
+    if self.activated:
+      empty = self.grasp_width() < 0.01
+      cbody = self.body if empty else obj
+      if obj == self.body or obj == 0:
+        return False
+      return self.external_contact(cbody)
+  #   else:
+  #     return ray_frac < 0.14 or self.external_contact()
+
+  # Return if body is in contact with something other than gripper
+  def external_contact(self, body=None):
+    if body is None:
+      body = self.body
+    pts = pybullet.getContactPoints(bodyA=body)
+    pts = [pt for pt in pts if pt[2] != self.body]
+    return len(pts) > 0  # pylint: disable=g-explicit-length-test
+
+  def check_grasp(self):
+    while self.moving():
+      time.sleep(0.001)
+    success = self.grasp_width() > 0.01
+    return success
+
+  def grasp_width(self):
+    lpad = np.array(pybullet.getLinkState(self.body, 4)[0])
+    rpad = np.array(pybullet.getLinkState(self.body, 9)[0])
+    dist = np.linalg.norm(lpad - rpad) - 0.047813
+    return dist
+
+  def check_proximity(self):
+    ee_pos = np.array(pybullet.getLinkState(self.robot, self.tool)[0])
+    tool_pos = np.array(pybullet.getLinkState(self.body, 0)[0])
+    vec = (tool_pos - ee_pos) / np.linalg.norm((tool_pos - ee_pos))
+    ee_targ = ee_pos + vec
+    ray_data = pybullet.rayTest(ee_pos, ee_targ)[0]
+    obj, link, ray_frac = ray_data[0], ray_data[1], ray_data[2]
+    return obj, link, ray_frac
+
+=== CELL 9 (code) ===
+#@markdown **Gym-style environment class:** this initializes a robot overlooking a workspace with objects.
+
+class PickPlaceEnv():
+
+  def __init__(self):
+    self.dt = 1/480
+    self.sim_step = 0
+
+    # Configure and start PyBullet.
+    # python3 -m pybullet_utils.runServer
+    # pybullet.connect(pybullet.SHARED_MEMORY)  # pybullet.GUI for local GUI.
+    pybullet.connect(pybullet.DIRECT)  # pybullet.GUI for local GUI.
+    pybullet.configureDebugVisualizer(pybullet.COV_ENABLE_GUI, 0)
+    pybullet.setPhysicsEngineParameter(enableFileCaching=0)
+    assets_path = os.path.dirname(os.path.abspath(""))
+    pybullet.setAdditionalSearchPath(assets_path)
+    pybullet.setAdditionalSearchPath(pybullet_data.getDataPath())
+    pybullet.setTimeStep(self.dt)
+
+    self.home_joints = (np.pi / 2, -np.pi / 2, np.pi / 2, -np.pi / 2, 3 * np.pi / 2, 0)  # Joint angles: (J0, J1, J2, J3, J4, J5).
+    self.home_ee_euler = (np.pi, 0, np.pi)  # (RX, RY, RZ) rotation in Euler angles.
+    self.ee_link_id = 9  # Link ID of UR5 end effector.
+    self.tip_link_id = 10  # Link ID of gripper finger tips.
+    self.gripper = None
+
+  def reset(self, config):
+    pybullet.resetSimulation(pybullet.RESET_USE_DEFORMABLE_WORLD)
+    pybullet.setGravity(0, 0, -9.8)
+    self.cache_video = []
+
+    # Temporarily disable rendering to load URDFs faster.
+    pybullet.configureDebugVisualizer(pybullet.COV_ENABLE_RENDERING, 0)
+
+    # Add robot.
+    pybullet.loadURDF("plane.urdf", [0, 0, -0.001])
+    self.robot_id = pybullet.loadURDF("ur5e/ur5e.urdf", [0, 0, 0], flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL)
+    self.ghost_id = pybullet.loadURDF("ur5e/ur5e.urdf", [0, 0, -10])  # For forward kinematics.
+    self.joint_ids = [pybullet.getJointInfo(self.robot_id, i) for i in range(pybullet.getNumJoints(self.robot_id))]
+    self.joint_ids = [j[0] for j in self.joint_ids if j[2] == pybullet.JOINT_REVOLUTE]
+
+    # Move robot to home configuration.
+    for i in range(len(self.joint_ids)):
+      pybullet.resetJointState(self.robot_id, self.joint_ids[i], self.home_joints[i])
+
+    # Add gripper.
+    if self.gripper is not None:
+      while self.gripper.constraints_thread.is_alive():
+        self.constraints_thread_active = False
+    self.gripper = Robotiq2F85(self.robot_id, self.ee_link_id)
+    self.gripper.release()
+
+    # Add workspace.
+    plane_shape = pybullet.createCollisionShape(pybullet.GEOM_BOX, halfExtents=[0.3, 0.3, 0.001])
+    plane_visual = pybullet.createVisualShape(pybullet.GEOM_BOX, halfExtents=[0.3, 0.3, 0.001])
+    plane_id = pybullet.createMultiBody(0, plane_shape, plane_visual, basePosition=[0, -0.5, 0])
+    pybullet.changeVisualShape(plane_id, -1, rgbaColor=[0.2, 0.2, 0.2, 1.0])
+
+    # Load objects according to config.
+    self.config = config
+    self.obj_name_to_id = {}
+    obj_names = list(self.config['pick']) + list(self.config['place'])
+    obj_xyz = np.zeros((0, 3))
+    for obj_name in obj_names:
+      if ('block' in obj_name) or ('bowl' in obj_name):
+
+        # Get random position 15cm+ from other objects.
+        while True:
+          rand_x = np.random.uniform(BOUNDS[0, 0] + 0.1, BOUNDS[0, 1] - 0.1)
+          rand_y = np.random.uniform(BOUNDS[1, 0] + 0.1, BOUNDS[1, 1] - 0.1)
+          rand_xyz = np.float32([rand_x, rand_y, 0.03]).reshape(1, 3)
+          if len(obj_xyz) == 0:
+            obj_xyz = np.concatenate((obj_xyz, rand_xyz), axis=0)
+            break
+          else:
+            nn_dist = np.min(np.linalg.norm(obj_xyz - rand_xyz, axis=1)).squeeze()
+            if nn_dist > 0.15:
+              obj_xyz = np.concatenate((obj_xyz, rand_xyz), axis=0)
+              break
+
+        object_color = COLORS[obj_name.split(' ')[0]]
+        object_type = obj_name.split(' ')[1]
+        object_position = rand_xyz.squeeze()
+        if object_type == 'block':
+          object_shape = pybullet.createCollisionShape(pybullet.GEOM_BOX, halfExtents=[0.02, 0.02, 0.02])
+          object_visual = pybullet.createVisualShape(pybullet.GEOM_BOX, halfExtents=[0.02, 0.02, 0.02])
+          object_id = pybullet.createMultiBody(0.01, object_shape, object_visual, basePosition=object_position)
+        elif object_type == 'bowl':
+          object_position[2] = 0
+          object_id = pybullet.loadURDF("bowl/bowl.urdf", object_position, useFixedBase=1)
+        pybullet.changeVisualShape(object_id, -1, rgbaColor=object_color)
+        self.obj_name_to_id[obj_name] = object_id
+
+    # Re-enable rendering.
+    pybullet.configureDebugVisualizer(pybullet.COV_ENABLE_RENDERING, 1)
+
+    for _ in range(200):
+      pybullet.stepSimulation()
+    print('Environment reset: done.')
+    return self.get_observation()
+
+  def servoj(self, joints):
+    """Move to target joint positions with position control."""
+    pybullet.setJointMotorControlArray(
+      bodyIndex=self.robot_id,
+      jointIndices=self.joint_ids,
+      controlMode=pybullet.POSITION_CONTROL,
+      targetPositions=joints,
+      positionGains=[0.01]*6)
+
+  def movep(self, position):
+    """Move to target end effector position."""
+    joints = pybullet.calculateInverseKinematics(
+        bodyUniqueId=self.robot_id,
+        endEffectorLinkIndex=self.tip_link_id,
+        targetPosition=position,
+        targetOrientation=pybullet.getQuaternionFromEuler(self.home_ee_euler),
+        maxNumIterations=100)
+    self.servoj(joints)
+
+  def step(self, action=None):
+    """Do pick and place motion primitive."""
+    pick_xyz, place_xyz = action['pick'].copy(), action['place'].copy()
+
+    # Set fixed primitive z-heights.
+    hover_xyz = pick_xyz.copy() + np.float32([0, 0, 0.2])
+    pick_xyz[2] -= 0.02
+    pick_xyz[2] = max(pick_xyz[2], 0.03)
+    place_xyz[2] = 0.15
+
+    # Move to object.
+    ee_xyz = np.float32(pybullet.getLinkState(self.robot_id, self.tip_link_id)[0])
+    while np.linalg.norm(hover_xyz - ee_xyz) > 0.01:
+      self.movep(hover_xyz)
+      self.step_sim_and_render()
+      ee_xyz = np.float32(pybullet.getLinkState(self.robot_id, self.tip_link_id)[0])
+    while np.linalg.norm(pick_xyz - ee_xyz) > 0.01:
+      self.movep(pick_xyz)
+      self.step_sim_and_render()
+      ee_xyz = np.float32(pybullet.getLinkState(self.robot_id, self.tip_link_id)[0])
+
+    # Pick up object.
+    self.gripper.activate()
+    for _ in range(240):
+      self.step_sim_and_render()
+    while np.linalg.norm(hover_xyz - ee_xyz) > 0.01:
+      self.movep(hover_xyz)
+      self.step_sim_and_render()
+      ee_xyz = np.float32(pybullet.getLinkState(self.robot_id, self.tip_link_id)[0])
+
+    # Move to place location.
+    while np.linalg.norm(place_xyz - ee_xyz) > 0.01:
+      self.movep(place_xyz)
+      self.step_sim_and_render()
+      ee_xyz = np.float32(pybullet.getLinkState(self.robot_id, self.tip_link_id)[0])
+
+    # Place down object.
+    while (not self.gripper.detect_contact()) and (place_xyz[2] > 0.03):
+      place_xyz[2] -= 0.001
+      self.movep(place_xyz)
+      for _ in range(3):
+        self.step_sim_and_render()
+    self.gripper.release()
+    for _ in range(240):
+      self.step_sim_and_render()
+    place_xyz[2] = 0.2
+    ee_xyz = np.float32(pybullet.getLinkState(self.robot_id, self.tip_link_id)[0])
+    while np.linalg.norm(place_xyz - ee_xyz) > 0.01:
+      self.movep(place_xyz)
+      self.step_sim_and_render()
+      ee_xyz = np.float32(pybullet.getLinkState(self.robot_id, self.tip_link_id)[0])
+    place_xyz = np.float32([0, -0.5, 0.2])
+    while np.linalg.norm(place_xyz - ee_xyz) > 0.01:
+      self.movep(place_xyz)
+      self.step_sim_and_render()
+      ee_xyz = np.float32(pybullet.getLinkState(self.robot_id, self.tip_link_id)[0])
+
+    observation = self.get_observation()
+    reward = self.get_reward()
+    done = False
+    info = {}
+    return observation, reward, done, info
+
+  def step_sim_and_render(self):
+    pybullet.stepSimulation()
+    self.sim_step += 1
+
+    # Render current image at 8 FPS.
+    if self.sim_step % (1 / (8 * self.dt)) == 0:
+      self.cache_video.append(self.get_camera_image())
+
+  def get_camera_image(self):
+    image_size = (240, 240)
+    intrinsics = (120., 0, 120., 0, 120., 120., 0, 0, 1)
+    color, _, _, _, _ = env.render_image(image_size, intrinsics)
+    return color
+
+  def set_alpha_transparency(self, alpha: float) -> None:
+    for id in range(20):
+      visual_shape_data = pybullet.getVisualShapeData(id)
+      for i in range(len(visual_shape_data)):
+        object_id, link_index, _, _, _, _, _, rgba_color = visual_shape_data[i]
+        rgba_color = list(rgba_color[0:3]) +  [alpha]
+        pybullet.changeVisualShape(self.robot_id, linkIndex=i, rgbaColor=rgba_color)
+        pybullet.changeVisualShape(self.gripper.body, linkIndex=i, rgbaColor=rgba_color)
+
+  def get_camera_image_top(self,
+                           image_size=(240, 240),
+                           intrinsics=(2000., 0, 2000., 0, 2000., 2000., 0, 0, 1),
+                           position=(0, -0.5, 5),
+                           orientation=(0, np.pi, -np.pi / 2),
+                           zrange=(0.01, 1.),
+                           set_alpha=True):
+    set_alpha and self.set_alpha_transparency(0)
+    color, _, _, _, _ = env.render_image_top(image_size,
+                                             intrinsics,
+                                             position,
+                                             orientation,
+                                             zrange)
+    set_alpha and self.set_alpha_transparency(1)
+    return color
+
+  def render_image_top(self,
+                       image_size=(240, 240),
+                       intrinsics=(2000., 0, 2000., 0, 2000., 2000., 0, 0, 1),
+                       position=(0, -0.5, 5),
+                       orientation=(0, np.pi, -np.pi / 2),
+                       zrange=(0.01, 1.)):
+
+    # Camera parameters.
+    orientation = pybullet.getQuaternionFromEuler(orientation)
+    noise=True
+
+    # OpenGL camera settings.
+    lookdir = np.float32([0, 0, 1]).reshape(3, 1)
+    updir = np.float32([0, -1, 0]).reshape(3, 1)
+    rotation = pybullet.getMatrixFromQuaternion(orientation)
+    rotm = np.float32(rotation).reshape(3, 3)
+    lookdir = (rotm @ lookdir).reshape(-1)
+    updir = (rotm @ updir).reshape(-1)
+    lookat = position + lookdir
+    focal_len = intrinsics[0]
+    znear, zfar = (0.01, 10.)
+    viewm = pybullet.computeViewMatrix(position, lookat, updir)
+    fovh = (image_size[0] / 2) / focal_len
+    fovh = 180 * np.arctan(fovh) * 2 / np.pi
+
+    # Notes: 1) FOV is vertical FOV 2) aspect must be float
+    aspect_ratio = image_size[1] / image_size[0]
+    projm = pybullet.computeProjectionMatrixFOV(fovh, aspect_ratio, znear, zfar)
+
+    # Render with OpenGL camera settings.
+    _, _, color, depth, segm = pybullet.getCameraImage(
+        width=image_size[1],
+        height=image_size[0],
+        viewMatrix=viewm,
+        projectionMatrix=projm,
+        shadow=1,
+        flags=pybullet.ER_SEGMENTATION_MASK_OBJECT_AND_LINKINDEX,
+        renderer=pybullet.ER_BULLET_HARDWARE_OPENGL)
+
+    # Get color image.
+    color_image_size = (image_size[0], image_size[1], 4)
+    color = np.array(color, dtype=np.uint8).reshape(color_image_size)
+    color = color[:, :, :3]  # remove alpha channel
+    if noise:
+      color = np.int32(color)
+      color += np.int32(np.random.normal(0, 3, color.shape))
+      color = np.uint8(np.clip(color, 0, 255))
+
+    # Get depth image.
+    depth_image_size = (image_size[0], image_size[1])
+    zbuffer = np.float32(depth).reshape(depth_image_size)
+    depth = (zfar + znear - (2 * zbuffer - 1) * (zfar - znear))
+    depth = (2 * znear * zfar) / depth
+    if noise:
+      depth += np.random.normal(0, 0.003, depth.shape)
+
+    intrinsics = np.float32(intrinsics).reshape(3, 3)
+    return color, depth, position, orientation, intrinsics
+
+  def get_reward(self):
+    return 0  # TODO: check did the robot follow text instructions?
+
+  def get_observation(self):
+    observation = {}
+
+    # Render current image.
+    color, depth, position, orientation, intrinsics = self.render_image()
+
+    # Get heightmaps and colormaps.
+    points = self.get_pointcloud(depth, intrinsics)
+    position = np.float32(position).reshape(3, 1)
+    rotation = pybullet.getMatrixFromQuaternion(orientation)
+    rotation = np.float32(rotation).reshape(3, 3)
+    transform = np.eye(4)
+    transform[:3, :] = np.hstack((rotation, position))
+    points = self.transform_pointcloud(points, transform)
+    heightmap, colormap, xyzmap = self.get_heightmap(points, color, BOUNDS, PIXEL_SIZE)
+
+    observation["image"] = colormap
+    observation["xyzmap"] = xyzmap
+    return observation
+
+  def render_image(self, image_size=(720, 720), intrinsics=(360., 0, 360., 0, 360., 360., 0, 0, 1)):
+
+    # Camera parameters.
+    position = (0, -0.85, 0.4)
+    orientation = (np.pi / 4 + np.pi / 48, np.pi, np.pi)
+    orientation = pybullet.getQuaternionFromEuler(orientation)
+    zrange = (0.01, 10.)
+    noise=True
+
+    # OpenGL camera settings.
+    lookdir = np.float32([0, 0, 1]).reshape(3, 1)
+    updir = np.float32([0, -1, 0]).reshape(3, 1)
+    rotation = pybullet.getMatrixFromQuaternion(orientation)
+    rotm = np.float32(rotation).reshape(3, 3)
+    lookdir = (rotm @ lookdir).reshape(-1)
+    updir = (rotm @ updir).reshape(-1)
+    lookat = position + lookdir
+    focal_len = intrinsics[0]
+    znear, zfar = (0.01, 10.)
+    viewm = pybullet.computeViewMatrix(position, lookat, updir)
+    fovh = (image_size[0] / 2) / focal_len
+    fovh = 180 * np.arctan(fovh) * 2 / np.pi
+
+    # Notes: 1) FOV is vertical FOV 2) aspect must be float
+    aspect_ratio = image_size[1] / image_size[0]
+    projm = pybullet.computeProjectionMatrixFOV(fovh, aspect_ratio, znear, zfar)
+
+    # Render with OpenGL camera settings.
+    _, _, color, depth, segm = pybullet.getCameraImage(
+        width=image_size[1],
+        height=image_size[0],
+        viewMatrix=viewm,
+        projectionMatrix=projm,
+        shadow=1,
+        flags=pybullet.ER_SEGMENTATION_MASK_OBJECT_AND_LINKINDEX,
+        renderer=pybullet.ER_BULLET_HARDWARE_OPENGL)
+
+    # Get color image.
+    color_image_size = (image_size[0], image_size[1], 4)
+    color = np.array(color, dtype=np.uint8).reshape(color_image_size)
+    color = color[:, :, :3]  # remove alpha channel
+    if noise:
+      color = np.int32(color)
+      color += np.int32(np.random.normal(0, 3, color.shape))
+      color = np.uint8(np.clip(color, 0, 255))
+
+    # Get depth image.
+    depth_image_size = (image_size[0], image_size[1])
+    zbuffer = np.float32(depth).reshape(depth_image_size)
+    depth = (zfar + znear - (2 * zbuffer - 1) * (zfar - znear))
+    depth = (2 * znear * zfar) / depth
+    if noise:
+      depth += np.random.normal(0, 0.003, depth.shape)
+
+    intrinsics = np.float32(intrinsics).reshape(3, 3)
+    return color, depth, position, orientation, intrinsics
+
+  def get_pointcloud(self, depth, intrinsics):
+    """Get 3D pointcloud from perspective depth image.
+    Args:
+      depth: HxW float array of perspective depth in meters.
+      intrinsics: 3x3 float array of camera intrinsics matrix.
+    Returns:
+      points: HxWx3 float array of 3D points in camera coordinates.
+    """
+    height, width = depth.shape
+    xlin = np.linspace(0, width - 1, width)
+    ylin = np.linspace(0, height - 1, height)
+    px, py = np.meshgrid(xlin, ylin)
+    px = (px - intrinsics[0, 2]) * (depth / intrinsics[0, 0])
+    py = (py - intrinsics[1, 2]) * (depth / intrinsics[1, 1])
+    points = np.float32([px, py, depth]).transpose(1, 2, 0)
+    return points
+
+  def transform_pointcloud(self, points, transform):
+    """Apply rigid transformation to 3D pointcloud.
+    Args:
+      points: HxWx3 float array of 3D points in camera coordinates.
+      transform: 4x4 float array representing a rigid transformation matrix.
+    Returns:
+      points: HxWx3 float array of transformed 3D points.
+    """
+    padding = ((0, 0), (0, 0), (0, 1))
+    homogen_points = np.pad(points.copy(), padding,
+                            'constant', constant_values=1)
+    for i in range(3):
+      points[Ellipsis, i] = np.sum(transform[i, :] * homogen_points, axis=-1)
+    return points
+
+  def get_heightmap(self, points, colors, bounds, pixel_size):
+    """Get top-down (z-axis) orthographic heightmap image from 3D pointcloud.
+    Args:
+      points: HxWx3 float array of 3D points in world coordinates.
+      colors: HxWx3 uint8 array of values in range 0-255 aligned with points.
+      bounds: 3x2 float array of values (rows: X,Y,Z; columns: min,max) defining
+        region in 3D space to generate heightmap in world coordinates.
+      pixel_size: float defining size of each pixel in meters.
+    Returns:
+      heightmap: HxW float array of height (from lower z-bound) in meters.
+      colormap: HxWx3 uint8 array of backprojected color aligned with heightmap.
+      xyzmap: HxWx3 float array of XYZ points in world coordinates.
+    """
+    width = int(np.round((bounds[0, 1] - bounds[0, 0]) / pixel_size))
+    height = int(np.round((bounds[1, 1] - bounds[1, 0]) / pixel_size))
+    heightmap = np.zeros((height, width), dtype=np.float32)
+    colormap = np.zeros((height, width, colors.shape[-1]), dtype=np.uint8)
+    xyzmap = np.zeros((height, width, 3), dtype=np.float32)
+
+    # Filter out 3D points that are outside of the predefined bounds.
+    ix = (points[Ellipsis, 0] >= bounds[0, 0]) & (points[Ellipsis, 0] < bounds[0, 1])
+    iy = (points[Ellipsis, 1] >= bounds[1, 0]) & (points[Ellipsis, 1] < bounds[1, 1])
+    iz = (points[Ellipsis, 2] >= bounds[2, 0]) & (points[Ellipsis, 2] < bounds[2, 1])
+    valid = ix & iy & iz
+    points = points[valid]
+    colors = colors[valid]
+
+    # Sort 3D points by z-value, which works with array assignment to simulate
+    # z-buffering for rendering the heightmap image.
+    iz = np.argsort(points[:, -1])
+    points, colors = points[iz], colors[iz]
+    px = np.int32(np.floor((points[:, 0] - bounds[0, 0]) / pixel_size))
+    py = np.int32(np.floor((points[:, 1] - bounds[1, 0]) / pixel_size))
+    px = np.clip(px, 0, width - 1)
+    py = np.clip(py, 0, height - 1)
+    heightmap[py, px] = points[:, 2] - bounds[2, 0]
+    for c in range(colors.shape[-1]):
+      colormap[py, px, c] = colors[:, c]
+      xyzmap[py, px, c] = points[:, c]
+    colormap = colormap[::-1, :, :]  # Flip up-down.
+    xv, yv = np.meshgrid(np.linspace(BOUNDS[0, 0], BOUNDS[0, 1], height),
+                         np.linspace(BOUNDS[1, 0], BOUNDS[1, 1], width))
+    xyzmap[:, :, 0] = xv
+    xyzmap[:, :, 1] = yv
+    xyzmap = xyzmap[::-1, :, :]  # Flip up-down.
+    heightmap = heightmap[::-1, :]  # Flip up-down.
+    return heightmap, colormap, xyzmap
+
+def xyz_to_pix(position):
+  """Convert from 3D position to pixel location on heightmap."""
+  u = int(np.round((BOUNDS[1, 1] - position[1]) / PIXEL_SIZE))
+  v = int(np.round((position[0] - BOUNDS[0, 0]) / PIXEL_SIZE))
+  return (u, v)
+
+=== CELL 10 (code) ===
+#@markdown Initialize environment and render images.
+
+if 'env' in locals():
+  # Safely exit gripper threading before re-initializing environment.
+  env.gripper.running = False
+  while env.gripper.constraints_thread.isAlive():
+    time.sleep(0.01)
+env = PickPlaceEnv()
+
+# Define and reset environment.
+config = {'pick':  ['yellow block', 'green block', 'blue block'],
+          'place': ['yellow bowl', 'green bowl', 'blue bowl']}
+
+np.random.seed(42)
+obs = env.reset(config)
+
+plt.subplot(1, 2, 1)
+img = env.get_camera_image()
+plt.title('Perspective side-view')
+plt.imshow(img)
+plt.subplot(1, 2, 2)
+img = env.get_camera_image_top()
+img = np.flipud(img.transpose(1, 0, 2))
+plt.title('Orthographic top-view')
+plt.imshow(img)
+plt.show()
+
+# Note: orthographic cameras do not exist. But we can approximate them by
+# projecting a 3D point cloud from an RGB-D camera, then unprojecting that onto
+# an orthographic plane. Orthographic views are useful for spatial action maps.
+plt.title('Unprojected orthographic top-view')
+plt.imshow(obs['image'])
+plt.show()
+
+=== CELL 11 (markdown) ===
+## **Scenario distribution**
+Here we define the distribution of possible scenarios. For example, a scenario include:
+* Environment: three blocks and bowls of color blue, green, and yellow on the table
+* User instruction (possibly ambiguous): "put the block in the green bowl"
+* Goal: put the blue block in the green bowl
+
+We will use a relatively simple setup here --- please refer to Appendix A6 in the paper for the full-scale distribution used in experiments.
+
+* Environment distribution: the same set of three blocks and bowls of color blue, green, and yellow on the table
+* User instruction distribution: uniform over
+  * "put the block in the {color} bowl" (ambiguous in block color)
+  * "put the {color} block in the bowl" (ambiguous in bowl color)
+  * "put the {color} block in the {color} bowl" (unambiguous)
+  * "put the {color} block close to the {color} bowl" (ambiguous in spatial relation)
+  * "put the {color} block to the {direction} of the {color} bowl" (unambiguous).
+* Goal: uniform over the possible ambiguities
+<!-- (e.g., "put the block in the {color} bowl", and the goal distribution is uniform over the three colors). -->
+
+=== CELL 12 (code) ===
+#@markdown **Set up distribution**
+
+blocks = ['green block', 'blue block', 'yellow block']
+bowls = ['green bowl', 'blue bowl', 'yellow bowl']
+
+instruction_ambiguities = {
+    'put the block in the {color} bowl': 'block color',
+    'put the {color} block in the bowl': 'bowl color',
+    'put the {color} block in the {color} bowl': None,
+    'put the {color} block close to the {color} bowl': 'direction',
+    'put the {color} block to the {direction} of the {color} bowl': None
+}
+instruction_templates = list(instruction_ambiguities.keys())
+
+colors = ['green', 'blue', 'yellow']
+directions = ['front', 'back', 'left', 'right']
+
+=== CELL 13 (code) ===
+#@markdown **Specify number of calibration data**: with more calibration data, the guarantee from conformal prediction would be tighter and precise. We recommend at least 200 scenarios (400 used in the paper), but you can use a small number first to save the number of API calls.
+
+num_calibration = 100  #@param {type: "number"} {form-width: "10%"}
+
+=== CELL 14 (code) ===
+#@markdown **Sample from the distribution**
+
+dataset = []
+for i in range(num_calibration):
+  data = {}
+  instruction_orig = random.choice(instruction_templates)
+  instruction = instruction_orig
+
+  # sample colors if needed
+  num_color_in_instruction = instruction.count('{color}')
+  if num_color_in_instruction > 0:
+    color_instruction = random.choices(colors, k=num_color_in_instruction)
+    for color in color_instruction:
+      instruction = instruction.replace('{color}', color)
+
+  # sample didrection if needed
+  if '{direction}' in instruction:
+    direction = random.choice(directions)
+    instruction = instruction.replace('{direction}', direction)
+
+  # sample goal based on ambiguities
+  ambiguity = instruction_ambiguities[instruction_orig]
+  if ambiguity and 'color' in ambiguity:
+    true_color = random.choice(colors)
+  elif ambiguity and 'direction' in ambiguity:
+    true_direction = random.choice(directions)
+
+  # determine the goal in the format of [pick_obj, relation (in, left, right, front, back), target_obj]
+  instruction_split = instruction.split()
+  block_attr = instruction_split[instruction_split.index('block')-1]
+  if 'the' == block_attr: # ambiguous
+    pick_obj = true_color + ' block'
+  else:
+    pick_obj = block_attr + ' block'
+  bowl_attr = instruction_split[instruction_split.index('bowl')-1]
+  if 'the' == bowl_attr: # ambiguous
+    target_obj = true_color + ' bowl'
+  else:
+    target_obj = bowl_attr + ' bowl'
+  if 'close to' in instruction:
+    relation = true_direction
+  elif 'in' in instruction:
+    relation = 'in'
+  else:
+    relation = instruction_split[instruction_split.index('of')-1] # bit hacky
+
+  # fill in data
+  data['environment'] = blocks + bowls # fixed set
+  data['instruction'] = instruction
+  data['goal'] = [pick_obj, relation, target_obj]
+  dataset.append(data)
+
+# print a few
+print('Showing the first five sampled scenarios')
+for i in range(5):
+  data = dataset[i]
+  print(f'==== {i} ====')
+  print('Instruction:', data['instruction'])
+  print('Goal (pick_obj, relation, target_obj):', data['goal'])
+
+=== CELL 15 (markdown) ===
+
+## **LLM Calibration with Conformal Prediction**
+Given the calibration dataset, now we calibrate the LLM with conformal prediction. After calibration, KnowNo can generate a prediction set that includes the correct action in an ambiguous scenario with a user-specified probability! For example:
+
+* Instruction: "put the block in the green bowl"
+* Goal: put the blue block in the green bowl
+* Prediction set: ["put the green block in the green bowl", "put the blue block in the green bowl", "put the yellow block in the green bowl"]
+
+
+=== CELL 16 (markdown) ===
+
+## **Multiple Choice Question Answering**
+For calibration, we need to access the uncertainty of the LLM given the user instruction and the environment description. In KnowNo, we formulate the LLM planning as Multiple Choice Question Answering (MCQA): for each scenario, KnowNo first applies few-shot prompting to generate plausible options to take, and then queries the likelihood of predicting the choice token (A, B, C, D, E). These likelihood values reveal the LLM uncertainty.
+
+=== CELL 17 (code) ===
+#@markdown **Prompt LLM to generate multiple choices**
+
+# prompt for MC generation
+mc_gen_prompt_template = """
+We: You are a robot, and you are asked to move objects to precise locations on the table. Our instructions can be ambiguous.
+
+We: On the table there are these objects: blue block, yellow bowl, yellow block, green bowl, green block, blue bowl.
+We: Now, put the grass-colored bowl at the right side of the blue round object
+You: These are some options:
+A) put blue bowl at the right side of blue block
+B) put green bowl at the right side of blue bowl
+C) put green block at the right side of blue bowl
+D) put yellow bowl at the right side of blue bowl
+
+We: On the table there are these objects: yellow bowl, green bowl, green block, yellow block, blue block, blue bowl.
+We: Now, put the yellow square object near the green box
+You: These are some options:
+A) put yellow block in front of green block
+B) put yellow block behind green block
+C) put yellow block to the left of green block
+D) put yellow block to the right of green block
+
+We: On the table there are these objects: blue bowl, yellow block, green bowl, blue block, green block, yellow bowl.
+We: Now, put the yellow bowl along the horizontal axis of the grass-colored block
+You: These are some options:
+A) put yellow bowl at the front of the green block
+B) put yellow bowl at the left side of the green block
+C) put yellow bowl at the left side of the blue block
+D) put yellow bowl at the right side of the green block
+
+We: On the table there are these objects: green bowl, yellow block, blue bowl, yellow bowl, green block, blue block.
+We: Now, {instruction}
+You: These are some options:
+"""
+
+for i in tqdm.trange(len(dataset)):
+  data = dataset[i]
+  instruction = data['instruction']
+  mc_gen_prompt = mc_gen_prompt_template.replace('{instruction}', instruction).strip()
+  if i == 0:
+    print('===== Prompt for generating multiple choices for the first scenario =====')
+    print(mc_gen_prompt)
+
+  # call LLM API
+  _, mc_gen_output = lm(mc_gen_prompt, logit_bias={})
+  if i == 0:
+    print('\n===== Result =====')
+    print(mc_gen_output)
+  data['mc_gen_output'] = mc_gen_output
+  dataset[i] = data
+
+=== CELL 18 (code) ===
+#@markdown **Post-process the multiple choices and prompt LLM to predict**
+
+# heuristics for extracting the multiple choices
+def process_mc_raw(mc_raw, add_mc='an option not listed here'):
+  mc_processed_all = []
+  mc_all = mc_raw.split('\n')
+  for mc in mc_all:
+      mc = mc.strip()
+
+      # skip nonsense
+      if len(mc) < 5 or mc[0] not in [
+          'a', 'b', 'c', 'd', 'A', 'B', 'C', 'D', '1', '2', '3', '4'
+      ]:
+          continue
+
+      mc = mc[2:]  # remove a), b), ...
+      mc = mc.strip().lower().split('.')[0]
+      mc_processed_all.append(mc)
+  if len(mc_processed_all) < 4:
+      raise 'Cannot extract four options from the raw output.'
+
+  # Check if any repeated option - use do nothing as substitute
+  mc_processed_all = list(set(mc_processed_all))
+  if len(mc_processed_all) < 4:
+      num_need = 4 - len(mc_processed_all)
+      for _ in range(num_need):
+          mc_processed_all.append('do nothing')
+  prefix_all = ['A) ', 'B) ', 'C) ', 'D) ']
+  if add_mc is not None:
+      mc_processed_all.append(add_mc)
+      prefix_all.append('E) ')
+  random.shuffle(mc_processed_all)
+
+  # combines the multiple choices into a single string
+  mc_prompt = ''
+  for mc_ind, (prefix, mc) in enumerate(zip(prefix_all, mc_processed_all)):
+      mc_prompt += prefix + mc
+      if mc_ind < len(mc_processed_all) - 1:
+          mc_prompt += '\n'
+  add_mc_prefix = prefix_all[mc_processed_all.index(add_mc)][0]
+  return mc_prompt, mc_processed_all, add_mc_prefix
+
+mc_score_prompt_template = """
+We: You are a robot, and you are asked to move objects to precise locations on the table. Our instructions can be ambiguous.
+
+We: On the table there are these objects: green bowl, yellow block, blue bowl, yellow bowl, green block, blue block.
+We: Now, {instruction}
+You: These are some options:
+{mc}
+We: Which option is correct? Answer with a single letter.
+You:
+"""
+
+for i in tqdm.trange(len(dataset)):
+  data = dataset[i]
+  instruction = data['instruction']
+  mc_gen_output = data['mc_gen_output']
+
+  # process multiple choices
+  mc_gen_full, mc_gen_all, add_mc_prefix = process_mc_raw(mc_gen_output)
+
+  # get new prompt
+  mc_score_prompt = mc_score_prompt_template.replace('{instruction}', instruction).replace('{mc}', mc_gen_full).strip()
+  data['mc_score_prompt'] = mc_score_prompt
+  if i == 0:
+    print('==== Prompt for LLM predicting next-token ====')
+    print(mc_score_prompt)
+
+  # call LLM API
+  mc_score_response, _ = lm(mc_score_prompt, max_tokens=1, logprobs=5)
+  top_logprobs_full = mc_score_response["choices"][0]["logprobs"]["top_logprobs"][0]
+  top_tokens = [token.strip() for token in top_logprobs_full.keys()]
+  top_logprobs = [value for value in top_logprobs_full.values()]
+  if i == 0:
+    print('\n===== Result =====')
+    print('Tokens:', top_tokens)
+    print('Log probabilities:', top_logprobs)
+
+  # save
+  data['mc_gen_full'] = mc_gen_full
+  data['mc_gen_all'] = mc_gen_all
+  data['add_mc_prefix'] = add_mc_prefix
+  data['mc_score_response'] = mc_score_response
+  data['top_logprobs_full'] = top_logprobs_full
+  data['top_tokens'] = top_tokens
+  data['top_logprobs'] = top_logprobs
+  dataset[i] = data
+
+=== CELL 19 (markdown) ===
+You may notice how sharp the probability distribution is. This is the result of applying RLHF in LLM training that kills the entropy. The beauty of conformal prediction is to generate set-based predictions that come with statistical coverage guarantee even with such miscalibrated probabilities!
+
+=== CELL 20 (markdown) ===
+## **Specify Target Success Level**
+
+=== CELL 21 (code) ===
+#@markdown This is $1-\epsilon$ in the paper, the probability that the prediction set contains the true option at test time.
+target_success = 0.8  #@param {type: "number"} {form-width: "10%"}
+epsilon = 1-target_success
+print('Epsilon:', epsilon)
+
+=== CELL 22 (markdown) ===
+## **Determine Score Threshold**
+We now perform calibration based on the next-token prediction results from the calibration set and the target error level $ϵ$. The result is a threshold $1-\widehat{q}$ that at test time, if the prediction set includes all options with likelihood higher than $1-\widehat{q}$, then the set is guaranteed to include the **true** option with $1-\epsilon$ probability.
+
+=== CELL 23 (code) ===
+#@markdown First, we use simple heuristics to determine the true labels, i.e., the correct option from the multiple choices.
+for i, data in enumerate(dataset):
+  mc_gen_all = data['mc_gen_all']
+  goal = data['goal']
+
+  # go through all mc
+  token_all = ['A', 'B', 'C', 'D', 'E']
+  true_options = []
+  for mc_ind, mc in enumerate(mc_gen_all):
+    if 'not listed here' in mc or 'do nothing' in mc: continue
+    if 'block ' not in mc: continue  # no object to be picked
+
+    # extract pick_obj from mc
+    mc_split = mc.split()
+    mc_pick_obj_attr = mc_split[mc_split.index('block')-1]
+    mc_pick_obj = mc_pick_obj_attr + ' block'
+
+    # extract target_obj from mc
+    try: # try bowl first
+      mc_target_obj_attr = mc_split[mc_split.index('bowl')-1]
+    except:
+      mc_target_obj_attr = mc_split[mc_split.index('block', -1)-1]
+    mc_target_obj = mc_target_obj_attr + ' bowl'
+
+    # extract spatial relation from mc
+    if 'left' in mc:
+      relation = 'left'
+    elif 'right' in mc:
+      relation = 'right'
+    elif 'front' in mc:
+      relation = 'front'
+    elif 'back' in mc or 'behind' in mc:
+      relation = 'back'
+    else:
+      relation = 'in'
+
+    # check with goal
+    if mc_pick_obj == goal[0] and relation == goal[1] and mc_target_obj == goal[2]:
+      true_options.append(token_all[mc_ind])
+
+  # if none correct
+  if len(true_options) == 0:
+    true_options = [data['add_mc_prefix']]
+
+  # save
+  dataset[i]['true_options'] = true_options
+
+  if i == 2:
+    print('==== Sample scenario ====')
+    print(data['mc_score_prompt'])
+    print('True options:', true_options)
+    print('probs:', data['top_tokens'], data['top_logprobs'])
+
+=== CELL 24 (code) ===
+#@markdown Then, get the non-conformity scores from the calibration set, which is 1 minus the likelihood of the **true** option, $1-f(x)_{y_\text{true}}$.
+def temperature_scaling(logits, temperature):
+    logits = np.array(logits)
+    logits /= temperature
+
+    # apply softmax
+    logits -= logits.max()
+    logits = logits - np.log(np.sum(np.exp(logits)))
+    smx = np.exp(logits)
+    return smx
+
+non_conformity_score = []
+for data in dataset:
+  top_logprobs = data['top_logprobs']
+  top_tokens = data['top_tokens']
+  true_options = data['true_options']
+
+  # normalize the five scores to sum of 1
+  mc_smx_all = temperature_scaling(top_logprobs, temperature=5)
+
+  # get the softmax value of true option
+  true_label_smx = [mc_smx_all[token_ind]
+                    for token_ind, token in enumerate(top_tokens)
+                    if token in true_options]
+  true_label_smx = np.max(true_label_smx)
+
+  # get non-comformity score
+  non_conformity_score.append(1 - true_label_smx)
+
+=== CELL 25 (code) ===
+#@markdown Find $\widehat{q}$ as the $\frac{\lceil (N+1)(1-\epsilon) \rceil}{N}$ quantile of the non-conformity scores, where $N$ is number of calibration data. Also plot the histogram of the scores and the quantile.
+q_level = np.ceil((num_calibration + 1) * (1 - epsilon)) / num_calibration
+qhat = np.quantile(non_conformity_score, q_level, method='higher')
+print('Quantile value qhat:', qhat)
+print('')
+
+# plot histogram and quantile
+plt.figure(figsize=(6, 2))
+plt.hist(non_conformity_score, bins=30, edgecolor='k', linewidth=1)
+plt.axvline(
+    x=qhat, linestyle='--', color='r', label='Quantile value'
+)
+plt.title(
+    'Histogram of non-comformity scores in the calibration set'
+)
+plt.xlabel('Non-comformity score')
+plt.legend(); plt.show()
+print('')
+print('A good predictor should have low non-comformity scores, concentrated at the left side of the figure')
+
+=== CELL 26 (markdown) ===
+You may see there is a number of data with large non-comformity scores, which means the prediction is badly wrong. This is due to the inherent bias in the GPT3.5 model such as biasing "left" over other directions when the direction is under-specified.
+
+We also applied temperature scaling=5 to smooth the probability distribution a bit.
+
+
+=== CELL 27 (markdown) ===
+## **Specify your own instruction**
+You can specify your own instruction here. If you did not run calibration above, you can choose `skip_calibration` here and applies calibration result based on target success level=0.8. Running the block will show the prediction set!
+
+=== CELL 28 (code) ===
+instruction = "put the yellow block next to the green bowl." #@param {type:"string"}
+skip_calibration = False #@param {type:"boolean"}
+verbose = False #@param {type:"boolean"}
+if skip_calibration: qhat = 0.927 # based on epsilon=0.2
+
+import random
+def process_mc_raw(mc_raw, add_mc='an option not listed here'):
+  mc_processed_all = []
+  mc_all = mc_raw.split('\n')
+  for mc in mc_all:
+      mc = mc.strip()
+
+      # skip nonsense
+      if len(mc) < 5 or mc[0] not in [
+          'a', 'b', 'c', 'd', 'A', 'B', 'C', 'D', '1', '2', '3', '4'
+      ]:
+          continue
+
+      mc = mc[2:]  # remove a), b), ...
+      mc = mc.strip().lower().split('.')[0]
+      mc_processed_all.append(mc)
+  if len(mc_processed_all) < 4:
+      raise 'Cannot extract four options from the raw output.'
+
+  # Check if any repeated option - use do nothing as substitute
+  mc_processed_all = list(set(mc_processed_all))
+  if len(mc_processed_all) < 4:
+      num_need = 4 - len(mc_processed_all)
+      for _ in range(num_need):
+          mc_processed_all.append('do nothing')
+  prefix_all = ['A) ', 'B) ', 'C) ', 'D) ']
+  if add_mc is not None:
+      mc_processed_all.append(add_mc)
+      prefix_all.append('E) ')
+  random.shuffle(mc_processed_all)
+
+  # combines the multiple choices into a single string
+  mc_prompt = ''
+  for mc_ind, (prefix, mc) in enumerate(zip(prefix_all, mc_processed_all)):
+      mc_prompt += prefix + mc
+      if mc_ind < len(mc_processed_all) - 1:
+          mc_prompt += '\n'
+  add_mc_prefix = prefix_all[mc_processed_all.index(add_mc)][0]
+  return mc_prompt, mc_processed_all, add_mc_prefix
+
+def temperature_scaling(logits, temperature):
+    logits = np.array(logits)
+    logits /= temperature
+
+    # apply softmax
+    logits -= logits.max()
+    logits = logits - np.log(np.sum(np.exp(logits)))
+    smx = np.exp(logits)
+    return smx
+
+demo_mc_gen_prompt_template = """
+We: You are a robot, and you are asked to move objects to precise locations on the table. Our instructions can be ambiguous.
+
+We: On the table there are these objects: blue block, yellow bowl, yellow block, green bowl, green block, blue bowl.
+We: Now, put the grass-colored bowl at the right side of the blue round object
+You: These are some options:
+A) put blue bowl at the right side of blue block
+B) put green bowl at the right side of blue bowl
+C) put green block at the right side of blue bowl
+D) put yellow bowl at the right side of blue bowl
+
+We: On the table there are these objects: yellow bowl, green bowl, green block, yellow block, blue block, blue bowl.
+We: Now, put the yellow square object near the green box
+You: These are some options:
+A) put yellow block in front of green block
+B) put yellow block behind green block
+C) put yellow block to the left of green block
+D) put yellow block to the right of green block
+
+We: On the table there are these objects: blue bowl, yellow block, green bowl, blue block, green block, yellow bowl.
+We: Now, put the yellow bowl along the horizontal axis of the grass-colored block
+You: These are some options:
+A) put yellow bowl at the front of the green block
+B) put yellow bowl at the left side of the green block
+C) put yellow bowl at the left side of the blue block
+D) put yellow bowl at the right side of the green block
+
+We: On the table there are these objects: green bowl, yellow block, blue bowl, yellow bowl, green block, blue block.
+We: Now, {instruction}
+You: These are some options:
+"""
+
+demo_mc_score_prompt_template = """
+We: You are a robot, and you are asked to move objects to precise locations on the table. Our instructions can be ambiguous.
+
+We: On the table there are these objects: green bowl, yellow block, blue bowl, yellow bowl, green block, blue block.
+We: Now, {instruction}
+You: These are some options:
+{mc}
+We: Which option is correct? Answer with a single letter.
+You:
+"""
+
+# Get prompt for generating multiple choices
+demo_mc_gen_prompt = demo_mc_gen_prompt_template.replace('{instruction}', instruction).strip()
+if verbose:
+  print('===== Prompt for generating multiple choices =====')
+  print(demo_mc_gen_prompt)
+
+# Generate multiple choices
+_, demo_mc_gen_output = lm(demo_mc_gen_prompt, logit_bias={})
+if verbose:
+  print('\n===== Result =====')
+  print(demo_mc_gen_output)
+demo_mc_gen_full, demo_mc_gen_all, add_mc_prefix = process_mc_raw(demo_mc_gen_output)
+
+# get new prompt
+demo_mc_score_prompt = demo_mc_score_prompt_template.replace('{instruction}', instruction).replace('{mc}', demo_mc_gen_full).strip()
+if verbose:
+  print('\n==== Prompt for LLM predicting next-token ====')
+  print(demo_mc_score_prompt)
+
+# call LLM API
+demo_mc_score_response, _ = lm(demo_mc_score_prompt, max_tokens=1, logprobs=5)
+top_logprobs_full = demo_mc_score_response["choices"][0]["logprobs"]["top_logprobs"][0]
+top_tokens = [token.strip() for token in top_logprobs_full.keys()]
+top_logprobs = [value for value in top_logprobs_full.values()]
+
+# get the softmax value of true option
+mc_smx_all = temperature_scaling(top_logprobs, temperature=5)
+
+true_label_smx = [mc_smx_all[token_ind]
+                  for token_ind, token in enumerate(top_tokens)
+                  if token in true_options]
+true_label_smx = np.max(true_label_smx)
+
+# get non-comformity score
+non_conformity_score.append(1 - true_label_smx)
+
+# include all options with score >= 1-qhat
+prediction_set = [
+          token for token_ind, token in enumerate(top_tokens)
+          if mc_smx_all[token_ind] >= 1 - qhat
+      ]
+
+# print
+print('\n===== Multiple choices generated =====')
+print(demo_mc_gen_full)
+print('\n===== Prediction set =====')
+print(prediction_set)
+if len(prediction_set) == 1:
+  print('Singleton set. No help needed!')
+else:
+  print('Set with multiple options. Help needed!')
+
+=== CELL 29 (code) ===
+#@markdown If the prediction set has more than one option, human help is triggered. In that case, put the true option as a single capital letter here.
+user_chosen_option = 'D' #@param {type:"string"}
+tokens = ['A', 'B', 'C', 'D', 'E']
+action_option = demo_mc_gen_all[tokens.index(user_chosen_option)]
+
+if len(prediction_set) > 1:
+  print('Option chosen by user:', action_option)
+else:
+  print('Option from prediction set without user intervention', )
+
+# extract pick and place locations
+if 'not listed here' in action_option or 'do nothing' in action_option or 'block ' not in action_option:
+  print('Invalid option! Cannot execute.')
+else:
+  # extract pick_obj from mc
+  action_option_split = action_option.split()
+  pick_obj_attr = action_option_split[action_option_split.index('block')-1]
+  pick_obj = pick_obj_attr + ' block'
+
+  # extract target_obj from mc
+  target_obj_attr = action_option_split[action_option_split.index('bowl')-1]
+  target_obj = target_obj_attr + ' bowl'
+
+  # extract spatial relation from mc
+  if 'left' in action_option:
+    relation = 'left'
+  elif 'right' in action_option:
+    relation = 'right'
+  elif 'front' in action_option:
+    relation = 'front'
+  elif 'back' in action_option or 'behind' in action_option:
+    relation = 'back'
+  else:
+    relation = 'in'
+  print('\nPick object:', pick_obj)
+  print('Target object:', target_obj)
+  print('Spatial relation to target object:', relation)
+
+=== CELL 30 (code) ===
+#@markdown Set up scripted pick and place oracle policy
+class ScriptedPolicy():
+
+  def __init__(self, env):
+    self.env = env
+
+  def get_action(self, pick_target, place_target, relation):
+
+    pick_id = self.env.obj_name_to_id[pick_target]
+    pick_pose = pybullet.getBasePositionAndOrientation(pick_id)
+    pick_position = np.float32(pick_pose[0])
+
+    if place_target in self.env.obj_name_to_id:
+      place_id = self.env.obj_name_to_id[place_target]
+      place_pose = pybullet.getBasePositionAndOrientation(place_id)
+      place_position = np.float32(place_pose[0])
+    else:
+      place_position = np.float32(PLACE_TARGETS[place_target])
+
+    # Add offset for relation
+    if relation == 'left':
+      place_position[0] -= 0.10
+    elif relation == 'right':
+      place_position[0] += 0.10
+    elif relation == 'front':
+      place_position[1] -= 0.10
+    elif relation == 'back':
+      place_position[1] += 0.10
+
+    act = {'pick': pick_position, 'place': place_position}
+    return act
+
+=== CELL 31 (code) ===
+#@markdown Reset environment
+config = {'pick':  ['yellow block', 'green block', 'blue block'],
+          'place': ['yellow bowl', 'green bowl', 'blue bowl']}
+
+np.random.seed(42)
+obs = env.reset(config)
+img = env.get_camera_image()
+fig = plt.figure(figsize=(3, 3))
+plt.imshow(img)
+plt.show()
+
+=== CELL 32 (code) ===
+#@markdown Run action!
+policy = ScriptedPolicy(env)
+act = policy.get_action(pick_obj, target_obj, relation)
+print(act)
+
+# Step environment.
+# act = {'pick': pick_xyz, 'place': place_xyz}
+before = env.get_camera_image()
+prev_obs = obs['image'].copy()
+obs, _, _, _ = env.step(act)
+
+# Show video of environment rollout.
+debug_clip = ImageSequenceClip(env.cache_video, fps=25)
+display(debug_clip.ipython_display(autoplay=1, loop=1, center=False))
+env.cache_video = []
+
+# Show camera image after pick and place.
+plt.subplot(1, 2, 1)
+plt.title('Before')
+plt.imshow(before)
+plt.subplot(1, 2, 2)
+plt.title('After')
+after = env.get_camera_image()
+plt.imshow(after)
+plt.show()

@@ -1,0 +1,1446 @@
+Source: https://arxiv.org/html/2610.00921v1
+Accessed: 2026-10-23
+
+In CEM, a World Model Is Also a Proposal Mechanism
+Report GitHub Issue
+×
+Title:
+Content selection saved. Describe the issue below:
+Description:
+Submit without GitHub
+Submit in GitHub
+arXiv is now an independent nonprofit!
+Learn more
+×
+Back to arXiv
+Why HTML?
+Report Issue
+Back to Abstract
+Download PDF
+Abstract
+1 Introduction
+2 Related work
+3 Auditing a CEM update
+Candidates and elites.
+3.1 Comparing the two proposal refits
+The first action.
+4 Crossed audit and one-update splice
+Crossed audit.
+One-update splice.
+5 Experimental setting
+6 Results
+6.1 The proposal distance falls without better candidate ranking
+6.2 Scorer variation dominates on Cheetah
+6.3 Replacing the first elite set lowers final selected-sequence cost
+7 Discussion and limitations
+Conclusion.
+References
+A Follow-up rule and experiment chronology
+Original questions.
+Gate outcome.
+Precision extension and held-out splice.
+B Descriptive attribution calculation
+C Seed-level crossed matrices
+D Leave-one-state-out checks
+E Seed-level elite-splice results
+F Elite-set size
+G Clipping diagnostics
+H Random-elite reference
+I Reproducibility settings
+Compute required for reproduction.
+Code and data.
+License: CC BY 4.0
+arXiv:2610.00921v1 [cs.LG] 01 Oct 2026
+\workshoptitle
+World Models in Physical AI
+In CEM, a World Model Is Also a Proposal Mechanism
+Oliver Obst
+††thanks: o.obst@unsw.edu.au
+Affiliation: UNSW Sydney
+Frieder Stolzenburg
+††thanks: fstolzenburg@hs-harz.de
+Affiliation: UNSW Sydney
+Affiliation: Harz University of Applied Sciences
+Abstract
+The cross-entropy method (CEM) uses world-model scores to select action
+sequences and fit the distribution sampled in its next iteration. A scoring
+error can therefore change both the present decision and the candidates
+considered later. We evaluate these two roles separately. Four types of
+predictive model generate CEM traces, and every model rescores every saved
+candidate pool. Executing the same candidates in the environment provides a reference
+elite set and proposal update.
+Across twelve independently trained task-seed units on Walker and Cheetah,
+the pre-specified proposal distance falls from the first to the final
+CEM iteration in every unit.
+Proposal widths contract and fitted means separate relative to the remaining
+search width. Pairwise ranking agreement stays near chance on Walker and
+declines on Cheetah; elite-set agreement does not improve. This comparison shows greater
+variation between scorers than between pool sources on Cheetah; Walker has
+variation in both and in their pairings. We use the original six units to
+select Random nonlinear for a one-update intervention, without inspecting
+intervention outcomes. Replacing its first model-ranked update with an
+environment-ranked update lowers final realised selected-sequence cost in
+those six units and in six further units held out from the selection.
+1 Introduction
+A world model used for planning determines which actions receive further
+consideration. In model-predictive control (MPC), the planner predicts the
+outcomes of candidate action sequences, selects a sequence, and executes its
+first action before replanning. The cross-entropy method (CEM) performs this
+search by repeatedly sampling candidates and fitting a new sampling
+distribution to those with the lowest predicted
+cost [Bharadhwaj et al., 2020]. We call that distribution the proposal
+and the retained candidates the elite set.
+As an illustrative example, consider two candidate pools for the same physical state and cost objective.
+Pool A contains a sequence with realised cost 1, but the scorer selects one
+with realised cost 5. This is a selection error: a lower-cost sequence was
+available. Pool B contains only sequences with realised cost 8 or higher. Its scorer orders
+every candidate correctly and selects the cost-8 sequence. Earlier CEM
+updates could have left the planner searching this second region. Correct
+ordering within that pool still produces a higher-cost choice than the
+misranked choice from pool A.
+A fixed-pool comparison with environment executions can measure ranking
+errors, elite membership, proposal-refit disagreement, and selection regret
+among the available candidates. In the example, it can expose the error in
+pool A and confirm the ordering in pool B. It cannot show which lower-cost
+sequences another proposal would have sampled. Correct within-pool ordering
+does not ensure that the pool contains low-cost actions.
+Evaluation also depends on where the candidates came from. Logged rollouts
+use a data-collection policy; actor-centred ranking tests perturb a reference
+action sequence. These tests can measure prediction or ordering on their
+chosen action distributions. CEM changes its own distribution after each
+elite decision. We call this planner-induced query shift: model
+scores change the optimiser’s future queries. The physical system need not
+change.
+Rank agreement measured along a CEM trace already captures how ordering
+changes during search [Wang et al., 2026]. Our comparison adds
+pools produced by other models’ update histories. Applying the same scorer
+to those pools tests whether its disagreement depends on pool source;
+applying different scorers to one pool compares their decisions on identical
+actions. Realised candidate costs separately record which pools contain
+lower-cost sequences.
+Our comparison uses four predictors fitted over frozen Dreamer
+contexts [Hafner et al., 2020]. A context is the backbone’s internal
+representation of the observation history. Each predictor replaces the full
+Dreamer dynamics during planning, so we call it a surrogate. It
+predicts future contexts under a candidate action sequence. A fixed readout
+maps those contexts to the task variables used in the planning cost. The
+four surrogates share data, transition form, cost, and CEM settings; their
+feature maps differ.
+Each surrogate first runs its own CEM search. We save the candidate pool at
+every iteration, execute its candidates from the same restored simulator
+state, and then score that pool with every surrogate. This separates two
+roles: the generator produced the pool through its earlier updates;
+the scorer ranks the saved pool now. We call this a crossed design
+because each of the four generators is paired with each of the four scorers,
+giving all 16 combinations. A column follows one
+scorer across pool sources. A row holds the pool fixed and compares scorers.
+The matrix describes proposal disagreement associated with generators,
+scorers, and their pairings. It does not assign causal effects to those
+components.
+The intervention tests a consequence that rescoring alone cannot establish.
+At the first update, we fit one proposal from model-ranked elites and another
+from environment-ranked elites in the same pool. Both branches then continue
+with the original scorer and matched random samples. This one-update
+splice changes how later candidates are generated through one earlier
+decision. Its endpoint is the realised cost of the sequence selected after
+the remaining CEM iterations. Figure 1 shows the audit
+and intervention together.
+One model-driven traceCrossed trace auditOne-update elite splicescore\widehat{J}_{f}J^f\widehat{J}_{f}retainE^{M}EME^{M}pool from q_{i}qiq_{i}fit q_{i+1}qi+1q_{i+1}q_{i+1}qi+1q_{i+1} sets the centre and scaleof the next query pool.pool source gggg_{1}g1g_{1}f_{1}f1f_{1}g_{2}g2g_{2}f_{2}f2f_{2}g_{3}g3g_{3}f_{3}f3f_{3}g_{4}g4g_{4}f_{4}f4f_{4}self tracecross scoreRows: pool source; columns: scorer.Environment costs are reused.commonpool \mathcal{A}_{0}𝒜0\mathcal{A}_{0}\mathcal{A}_{1}^{M}𝒜1M\mathcal{A}_{1}^{M}\mathcal{A}_{1}^{E}𝒜1E\mathcal{A}_{1}^{E}(\mu_{1}^{M},\sigma_{1}^{M})(μ1M,σ1M)(\mu_{1}^{M},\sigma_{1}^{M})(\mu_{1}^{E},\sigma_{1}^{E})(μ1E,σ1E)(\mu_{1}^{E},\sigma_{1}^{E})matched base noisecontinue with fffcontinue with fffAfter the first update, scorer fffcontrols both branches.
+Figure 1: CEM feedback, crossed rescoring, and the one-update splice. Left:
+a model’s elite set fits the next proposal, changing the source of later
+candidates. Centre: each row holds an executed pool fixed across scorers;
+each column holds a scorer fixed across pool sources. The diagonal is the
+usual model-driven search. Right: the splice replaces only the first elite
+set, then matches the scorer and base random samples in both branches.
+The crossed comparison measures disagreement on existing pools; the splice
+changes which pools are sampled next.
+2 Related work
+Model evaluation has long depended on the decisions that use the model.
+Value-aware model learning weights errors through downstream value
+functions [Farahmand et al., 2017]. DeepMDP connects reward and latent
+transition prediction to the properties of the learned
+representation [Gelada et al., 2019]. Value equivalence compares models
+through their effects on specified value functions and
+policies [Grimm et al., 2020]. Lambert et al. [2020] examine the mismatch between
+one-step prediction likelihood and downstream control performance. These
+works give distinct reasons to evaluate a model through its intended use.
+We hold the predictors fixed and examine the finite candidate decisions
+made by CEM.
+Yu et al. [2026] make a broader case for evaluating world models by
+interventional action fidelity, policy ranking, and optimisation utility.
+Their proposed reset-matched action branches are directly relevant to our
+environment reference: every candidate starts from the same physical state.
+Bhamidipaty et al. [2026] define model exploitation through a reversal
+of policy preference between the model and the environment, and analyse when
+such reversals can occur. Our elite and ranking measurements examine finite
+candidate disagreements; they do not estimate the worst-case exploitability
+of a model over a policy class.
+The closest CEM diagnostic is the CEM-stage Spearman analysis of
+Wang et al. [2026]. It measures agreement between model and realised
+cost rankings as search moves from initial candidates towards concentrated
+and elite populations. This already evaluates the model on queries made
+during search. Our crossed design compares a scorer’s own pools with pools
+generated by other surrogates. Holding the scorer fixed tests how its
+disagreement varies with pool source. Holding the pool fixed compares
+scorers without changing candidates. We also compare the means and widths
+fitted from the two elite sets, because these parameters determine the next
+queries. A rank correlation alone does not specify that refit.
+Li et al. [2026] execute all candidates in saved proposal pools to
+distinguish failed selection from the absence of a feasible candidate.
+Their adjacent-set method then reconstructs an action sequence from a
+neighbourhood of low-cost candidates. We use the same basic control of
+executing candidates from a common initial state. Our intervention changes
+an earlier elite refit and follows its consequence through later pools. This
+tests how the proposal history changes the candidates available at final
+selection.
+Several recent methods change components that our audit keeps fixed.
+Chahe et al. [2026] train a cost-ranking objective that penalises
+increasing action perturbations. Huang et al. [2026] add a
+trajectory-level cost to endpoint scoring, and Singh [2026]
+change the planning objective without retraining the predictor.
+Sommer and Schilling [2026] learn a plan-improvement operator through
+imagined rollouts. These methods change candidate scores or proposal updates.
+Applying the crossed comparison before and after such a change would test
+which measured disagreements it reduces.
+3 Auditing a CEM update
+The audit begins with a fixed planning problem: one saved simulator state and
+its matching Dreamer context. We run CEM from that context, save each sampled
+pool, and compare the decisions obtained from model predictions with those
+obtained from executing the same candidates. Restoring the simulator state
+before every execution prevents one candidate from changing the starting
+point of another. Realised cost supplies the reference ordering within that
+pool.
+Candidates and elites.
+The proposal is a diagonal Gaussian: each action coordinate has its own mean
+and standard deviation, with no fitted correlations between coordinates.
+Here a candidate contains 15 actions, each with six coordinates. We flatten
+this 15\times 615×615\times 6 array by listing its entries in one vector of dimension
+d=90d=90d=90. The index rrr identifies an action coordinate at one planning step;
+flattening does not discard or average any actions.
+Write the current proposal mean and standard deviation as \muμ\mu and
+\sigmaσ\sigma. A candidate jjj is sampled as
+A_{j}=\operatorname{clip}(\mu+\sigma\odot\epsilon_{j}),\qquad\epsilon_{j}\sim\mathcal{N}(0,I_{d}),\qquad j=1,\ldots,256.Aj=clip(μ+σ⊙ϵj),ϵj∼𝒩(0,Id),j=1,…,256.A_{j}=\operatorname{clip}(\mu+\sigma\odot\epsilon_{j}),\qquad\epsilon_{j}\sim\mathcal{N}(0,I_{d}),\qquad j=1,\ldots,256.
+(1)
+The product \odot⊙\odot scales each noise coordinate by its proposal standard
+deviation. Clipping enforces the action bounds after sampling. All later
+comparisons use these bounded candidates, including the environment refit.
+The scorer fff assigns a predicted cost to each sequence. Its 32 lowest-cost
+sequences form E^{f}EfE^{f}. The 32 sequences with lowest realised cost form the
+environment elite set E^{E}EEE^{E}. Both sets contain candidates from the same pool;
+the environment reference supplies their realised ordering.
+Elite precision records the fraction of model elites also present in the
+environment elite set:
+p=\frac{|E^{f}\cap E^{E}|}{32},\qquad p_{\mathrm{adj}}=\frac{p-32/256}{1-32/256}.p=|Ef∩EE|32,padj=p−32/2561−32/256.p=\frac{|E^{f}\cap E^{E}|}{32},\qquad p_{\mathrm{adj}}=\frac{p-32/256}{1-32/256}.
+(2)
+Two independently selected random sets of size 32 have expected overlap
+four, giving expected precision 32/256=0.12532/256=0.12532/256=0.125. Subtracting that baseline and
+rescaling gives zero for chance overlap and one for identical sets. Negative
+values indicate less overlap than the chance baseline. This measurement
+focuses on which candidates CEM retains.
+Pairwise order agreement covers the rest of the pool. It counts the fraction
+of candidate pairs for which the scorer preserves the environment ordering,
+excluding pairs tied in realised cost. Selected-candidate regret instead
+subtracts the best realised cost in the pool from the realised cost of the
+scorer’s top candidate. It measures the cost of selection within the
+available pool. Neither measurement says what candidates the next proposal
+will produce. We retain Spearman agreement, Jaccard elite overlap, and
+alternative elite cuts as supporting records.
+3.1 Comparing the two proposal refits
+The elite indices alone do not determine the size of an update error. Two
+disjoint elite sets could contain very similar actions and fit similar
+proposals. Conversely, a small change in elite membership could move the
+proposal if the changed sequences lie far apart. We therefore apply CEM’s
+actual refit to both elite sets.
+For each coordinate, CEM fits the elite mean and standard deviation, flooring
+the standard deviation at 0.05. The model elites produce
+(\mu^{f},\sigma^{f})(μf,σf)(\mu^{f},\sigma^{f}); the environment elites produce
+(\mu^{E},\sigma^{E})(μE,σE)(\mu^{E},\sigma^{E}). These are next-proposal parameters. The symbol
+\sigmaσ\sigma without a superscript belongs to the current proposal that
+generated the pool.
+The mean distance D_{\mu}DμD_{\mu} compares the centres of the two refits. We first
+divide each difference by the corresponding current proposal width, then
+take a root mean square over the 90 coordinates:
+D_{\mu}=\sqrt{\frac{1}{d}\sum_{r=1}^{d}\left(\frac{\mu^{f}_{r}-\mu^{E}_{r}}{\sigma_{r}}\right)^{2}}.Dμ=1d​∑r=1d(μrf−μrEσr)2.D_{\mu}=\sqrt{\frac{1}{d}\sum_{r=1}^{d}\left(\frac{\mu^{f}_{r}-\mu^{E}_{r}}{\sigma_{r}}\right)^{2}}.
+(3)
+D_{\mu}=1Dμ=1D_{\mu}=1 means a root-mean-square separation of one current proposal
+standard deviation. The denominator makes the scale explicit: the same raw
+mean difference occupies more of the remaining search region when CEM has
+already narrowed its proposal. A rise in D_{\mu}DμD_{\mu} need not mean that the raw
+action difference rises.
+The width comparison uses a different convention. For each coordinate, we
+compare the two fitted standard deviations by their ratio:
+D_{\log\sigma}=\sqrt{\frac{1}{d}\sum_{r=1}^{d}\log^{2}\!\left(\frac{\sigma^{f}_{r}}{\sigma^{E}_{r}}\right)}.Dlog⁡σ=1d​∑r=1dlog2⁡(σrfσrE).D_{\log\sigma}=\sqrt{\frac{1}{d}\sum_{r=1}^{d}\log^{2}\!\left(\frac{\sigma^{f}_{r}}{\sigma^{E}_{r}}\right)}.
+(4)
+A doubling and a halving have equal log magnitude. Equal fitted widths give
+zero, regardless of how narrow they are. Our pre-specified distance combines
+the squared mean and log-width terms with equal weight:
+D=\sqrt{\frac{D_{\mu}^{2}+D_{\log\sigma}^{2}}{2}}.D=Dμ2+Dlog⁡σ22.D=\sqrt{\frac{D_{\mu}^{2}+D_{\log\sigma}^{2}}{2}}.
+(5)
+D=0D=0D=0 exactly when the two elite refits produce the same diagonal Gaussian.
+Its two terms measure different kinds of disagreement, so their trajectories
+must be read separately. A fall in DDD can come from widths becoming more
+similar in ratio even as the means separate in current-proposal units.
+We also compute a width difference in those same current-proposal units:
+D_{\sigma}=\sqrt{\frac{1}{d}\sum_{r=1}^{d}\left(\frac{\sigma^{f}_{r}-\sigma^{E}_{r}}{\sigma_{r}}\right)^{2}},\qquad D_{W}=\sqrt{D_{\mu}^{2}+D_{\sigma}^{2}}.Dσ=1d​∑r=1d(σrf−σrEσr)2,DW=Dμ2+Dσ2.D_{\sigma}=\sqrt{\frac{1}{d}\sum_{r=1}^{d}\left(\frac{\sigma^{f}_{r}-\sigma^{E}_{r}}{\sigma_{r}}\right)^{2}},\qquad D_{W}=\sqrt{D_{\mu}^{2}+D_{\sigma}^{2}}.
+(6)
+D_{W}DWD_{W} is the 2-Wasserstein distance between the two diagonal Gaussian refits
+after dividing coordinates by the current proposal widths, normalised by
+\sqrt{d}d\sqrt{d}. For diagonal Gaussians, the squared distance is the sum of squared
+mean and standard-deviation differences. Equation 6
+applies that expression coordinatewise. Comparing DDD with D_{W}DWD_{W} checks
+whether the interpretation depends on using width ratios or width
+differences. Neither distance alone measures candidate ordering or realised
+cost.
+The first action.
+MPC executes only the first of CEM’s 15 planned actions before replanning.
+A distance averaged over the full plan can conceal disagreement in that
+action. We therefore also compute DDD using only its six coordinates.
+We also compare the first actions of the scorer’s lowest-cost sequence and
+the environment’s lowest-cost sequence. Their root-mean-square gap is
+reported in raw action units and after division by the current first-action
+proposal widths. The raw gap records separation on the bounded action
+scale. The normalised gap records separation relative to the region CEM
+is still searching. A shrinking proposal can make these quantities move
+in opposite directions.
+Clipping and the standard-deviation floor provide two further checks on that
+interpretation. We record proposal width, floor occupancy, the clipping
+rate, and how far clipping displaces the sampled pool mean. These records
+distinguish contraction of the proposal from changes introduced by its
+bounds.
+4 Crossed audit and one-update splice
+Crossed audit.
+Every surrogate receives the same actor-centred proposal and random samples at
+iteration zero. Later pools inherit the elite decisions made along each trace.
+The generator ggg produced a pool through those preceding decisions; the
+scorer fff ranks that fixed, realised pool.
+All generator traces use the same standard-normal samples at every iteration.
+Their bounded candidates match at iteration zero because their proposal
+parameters also match. Later candidates differ when generators fit different
+means or standard deviations. Common samples remove independent Monte Carlo
+variation from the row comparison.
+Scoring every generator pool with every surrogate gives 16 distances at
+iteration iii, written D_{gfi}Dg​f​iD_{gfi}. Each row reuses one candidate pool across
+four scorers. Each column follows one scorer across four generated pools. The
+usual model-driven trace occupies the diagonal, where g=fg=fg=f.
+Each scorer has one baseline distance D_{f0}Df​0D_{f0} on the common iteration-zero
+pool. Alongside absolute distances, we show the change
+D_{gfi}-D_{f0}Dg​f​i−Df​0D_{gfi}-D_{f0}. Subtracting this baseline separates a scorer’s initial
+level of disagreement from the change observed after generator-specific
+updates. It does not remove the dependence on the distance definition.
+The matrix supports comparisons that a diagonal trace cannot provide.
+Suppose one scorer produces a larger distance on pools from all four
+generators. That appears as a high-distance column and associates the
+disagreement with current scoring. Suppose instead that all four scorers
+produce larger distances on one generator’s pool. That appears as a
+high-distance row and associates the disagreement with the queried actions.
+The physical state, task cost, and candidate count remain fixed in both
+comparisons.
+A particular cell may also depart from these row and column patterns.
+For cell (g,f)(g,f)(g,f), we subtract its row and column means and restore the matrix
+mean:
+\text{interaction}=\text{cell distance}-\text{row mean}-\text{column mean}+\text{matrix mean}.interaction=cell distance−row mean−column mean+matrix mean.\text{interaction}=\text{cell distance}-\text{row mean}-\text{column mean}+\text{matrix mean}.
+(7)
+We write this two-way residual as I_{gfi}Ig​f​iI_{gfi}. The matrix mean corrects for
+subtracting the overall level twice. On the diagonal, g=fg=fg=f: the same
+surrogate generated and scored the pool. A positive I_{ffi}If​f​iI_{ffi} means that its
+own-pool distance exceeds the value predicted by adding its row and column
+differences to the matrix mean. It describes a pairing discrepancy beyond
+those two averages.
+We summarise row, column, and residual variation by their shares of the
+matrix’s sum of squares. Each share is calculated within one task-seed
+matrix, then averaged over the six seeds for that task. Decomposing an
+already averaged matrix would discard between-seed differences in its
+structure. These percentages describe the four fixed families; they are
+not population variance estimates.
+Appendix B gives the exact calculation.
+Row differences alone do not show that an earlier elite decision caused
+harm. Rescoring measures disagreement on the inherited pool; an
+intervention is needed to test an update’s consequence.
+The distance matrix also does not measure the lowest cost available in a
+pool. Even perfect agreement with the environment elites can occur when
+every candidate has high realised cost. We retain realised candidate costs
+to distinguish that coverage problem from disagreement within the pool.
+At iteration zero, the four generator labels must point to identical
+candidate IDs and environment costs. We verify this before analysing later
+pools. Row differences can appear only after the first model-ranked update.
+One-update splice.
+To test an elite decision’s consequence, we fork the search at iteration
+zero. Every generator has the same proposal and candidates at this point.
+Using this common starting pool allows the two branches to differ in one
+elite set without inheriting an earlier difference in search history.
+Branch MMM fits its next proposal from model elites; branch EEE fits from
+environment elites. Both use the same mean and standard-deviation refit,
+including the width floor.
+From iteration one, the original surrogate scores both branches. Matched
+standard-normal samples are scaled and shifted by the two inherited proposal
+states. All subsequent elite sets are selected using the original surrogate.
+We reuse the model branch from the audit and execute the new candidates in
+branch EEE.
+After each iteration, the controller retains the lowest predicted-cost
+sequence seen so far, including candidates from earlier pools. This
+incumbent is the sequence that supplies its first action if planning
+stops at that point. We evaluate each branch’s incumbent after iterations
+one, two, and three. The primary endpoint is the branch-EEE realised cost
+minus the branch-MMM realised cost after iteration three, the final CEM
+iteration. A negative contrast favours the environment-elite branch.
+The intermediate endpoints show whether the contrast changes direction
+during the remaining search; they cannot replace the fixed final endpoint.
+We also record the lowest realised candidate cost reached by each branch.
+A branch can contain a lower-cost candidate without selecting it, so we
+compare the best available cost with the incumbent’s realised cost.
+Only the first update is replaced; later-stage interventions are not tested.
+Environment elites require realised costs for every candidate, so the splice
+is an oracle diagnostic rather than a deployable planner. Its endpoint
+measures a selected sequence’s finite-horizon cost, not closed-loop episode
+return.
+5 Experimental setting
+The crossed audit contains 12 task-seed units: six Walker seeds and six
+Cheetah seeds. Each unit has an independently trained Dreamer backbone and
+actor [Hafner et al., 2020]. We freeze both. The backbone maps observation
+history to a 1280-dimensional context c_{t}ctc_{t}; the actor supplies the initial CEM
+mean. Four separately fitted surrogates propagate c_{t}ctc_{t} under proposed actions.
+Each surrogate maps the current context into a feature space, propagates those
+features for 15 action-conditioned linear transitions, and decodes every
+predicted state back to Dreamer’s context space. The rollout receives no
+intermediate Dreamer states. Training minimises free-running decoded-context
+error at horizons 1, 3, 5, 8, and 15, plus reward and continuation losses. A
+separate validation split selects the checkpoint.
+The four families change the feature map \varphiφ\varphi and its decoder.
+Identity uses
+\varphi(c)=cφ⁡(c)=c\varphi(c)=c. Learned nonlinear uses a trainable multilayer
+perceptron. Anchored nonlinear concatenates trainable affine and
+nonlinear features. Random nonlinear uses fixed random nonlinear
+features. The three compressed families have width 256 and share the decoder
+architecture, auxiliary heads, optimiser, data, and training budget. Identity
+retains the 1280-dimensional context and is not width matched. All
+four use the same action-conditioned transition form.
+We use walker_walk and cheetah_run from the DeepMind
+Control Suite [Tassa et al., 2018, Tunyasuvunakool et al., 2020, Todorov et al., 2012].
+Seeds 0–2 form the original six-unit cohort used to decide which splice to
+run. The follow-up rule required a pattern in at least two of three seeds
+on each task, retained after omitting any one saved state. This limited
+dependence on a single seed or decision point. The original questions and
+rule were fixed before inspecting their outcomes. Later analyses of distance
+components, raw action gaps and clipping explain the results without
+changing the selected pairing. The rule governed follow-up computation;
+it was not a significance test.
+Appendix A gives its exact criteria and chronology.
+Seeds 3–5 were fixed before inspecting their audit outcomes to increase
+the precision of the same comparisons. They use the same state-selection,
+replay, model and CEM settings and cannot change the original selection.
+We also fixed the selected splice and its decision rule before inspecting
+these six units’ splice costs. This held-out test checks whether the same
+intervention lowers final selected-sequence cost on new units. It does not
+compare other families as intervention targets. We report the two cohorts
+separately as well as the combined task means.
+Candidate scoring begins at a saved context and predicts 15 steps. A fixed
+ridge readout maps decoded contexts to the task variables in the cost. Walker
+tracks a fixed goal; Cheetah tracks the frozen actor’s reference trajectory.
+Predicted and realised costs use the same task variables, reference targets
+and cost weights. Each CEM
+run has four iterations, 256 candidates, and 32 elites. The proposal width
+starts at 0.35 and has a floor of 0.05. Surrogate parameters stay frozen and
+training-time stochasticity is disabled.
+Appendix Table 9 lists the remaining model,
+training, readout, and task-cost settings.
+For each unit, we export 64 simulator-state/context pairs from the frozen actor.
+The audit uses one state from each of four pre-selected episode bins after a
+replay check. The bins spread decision points across an episode without
+selecting states for their audit outcome. We restore the exact state before
+every candidate execution and verify repeated costs. Each generator trace
+uses the same standard-normal samples at every iteration; differences in
+its proposal parameters produce differences in its later bounded actions.
+The complete crossed audit executes 196,608 candidates; the original six-unit
+cohort accounts for 98,304. Each pool is executed once and then scored by all four
+surrogates, so the off-diagonal cells add model evaluations without adding
+simulator rollouts. We average states within each task-seed unit before
+comparing seeds. The diagonal trajectories also average the four model
+families; crossed matrices retain every generator-scorer cell. Candidate
+sequences, matrix cells, and saved states are repeated measurements within
+a unit, not independent replicates.
+6 Results
+6.1 The proposal distance falls without better candidate ranking
+Figure 2: Diagonal audit measurements over four CEM iterations. Thin lines
+show six task-seed units per task after averaging the four surrogates; heavy
+lines show task means. The model bank, candidate count, elite cut, and horizon
+are fixed. From iteration zero to three, DDD and the raw first-action gap
+decrease with proposal width. Pairwise order agreement stays near chance
+on Walker and declines on Cheetah.
+The dotted line in (c) marks chance agreement.
+The pre-specified proposal distance decreases from iteration zero to three
+in all original and extension units. In the combined 12-unit result,
+Walker’s task mean falls from
+D=0.254D=0.254D=0.254 at iteration zero to
+0.2350.2350.235 at iteration three; Cheetah falls from
+0.2520.2520.252 to 0.2350.2350.235
+(Figure 2). Every task-seed contrast is negative.
+They range from -0.035−0.035-0.035 to
+-0.009−0.009-0.009 on Walker and from
+-0.023−0.023-0.023 to -0.004−0.004-0.004 on Cheetah.
+The two components of DDD move in opposite directions
+(Table 1). The mean term D_{\mu}DμD_{\mu} rises on both
+tasks, so the two elite refits separate relative to the current proposal
+width. The log-width term falls. Its reduction accounts for the lower DDD
+despite the rise in mean disagreement. The alternative distance D_{W}DWD_{W}
+rises by 25\%25%25\%
+on Walker and 33\%33%33\% on Cheetah. A falling
+DDD records a reduction in its ratio-based width term. It does not establish
+that CEM retains more of the environment elites or selects a lower-cost
+sequence.
+The first-action gap gives the same warning about scale. The scorer’s
+selected action and the environment’s selected action become closer in raw
+action units, yet farther apart relative to the current proposal width.
+CEM’s search region contracts faster than their separation. This scale
+dependence is already present at the first planned step.
+Walker
+Cheetah
+Measurement
+Iter. 0
+Iter. 3
+Iter. 0
+Iter. 3
+Mean distance D_{\mu}DμD_{\mu}
+0.200
+0.288
+0.184
+0.292
+Log-width distance D_{\log\sigma}Dlog⁡σD_{\log\sigma}
+0.293
+0.165
+0.303
+0.156
+Linear-width distance D_{\sigma}DσD_{\sigma}
+0.165
+0.147
+0.160
+0.138
+Whitened distance D_{W}DWD_{W}
+0.260
+0.324
+0.244
+0.324
+First-action proposal distance DDD
+0.349
+0.326
+0.261
+0.252
+First-action gap (action units)
+0.349
+0.218
+0.273
+0.184
+First-action gap (proposal SD)
+0.998
+1.321
+0.779
+1.258
+Table 1: Components of the proposal refit and first-action disagreement.
+Values average diagonal model traces and states within task-seed units,
+then the six seeds per task. The candidate count, elite cut, and horizon
+remain fixed. Fitted means separate in current-proposal units as width
+disagreement falls. Raw first-action gaps shrink, but width-normalised
+gaps grow. These quantities cannot be read as interchangeable measures of
+elite agreement.
+At iteration three,
+only 1.2\%1.2%1.2\% of Walker coordinates and
+1.4\%1.4%1.4\% of Cheetah coordinates are at the
+width floor. Most widths therefore contract without reaching the minimum.
+The mean displacement from clipping also decreases.
+Table 8 gives its endpoints, and
+Figure 8 records clipping rates along the traces.
+Pairwise order agreement changes from
+0.5030.5030.503 to 0.5030.5030.503 on
+Walker and from 0.5350.5350.535 to
+0.5230.5230.523 on Cheetah. Chance-adjusted elite precision
+changes from 0.0000.0000.000 to
+-0.001−0.001-0.001 on Walker and from
+0.0710.0710.071 to
+0.0400.0400.040 on Cheetah. On the original seeds
+0–2, the neighbouring elite cuts keep task-mean adjusted precision below 0.10.
+Figure 7 reports these cuts.
+6.2 Scorer variation dominates on Cheetah
+Figure 3: Final-iteration crossed proposal distance, averaged over six seeds
+per task. The attribution percentages instead average the six within-seed
+decompositions described in Section 4. A row fixes the
+surrogate that generated
+a pool; each column rescores that executed pool with Identity, Learned
+nonlinear, Anchored nonlinear, or Random nonlinear. The right panels
+subtract each scorer’s value on the common initial pool. Cheetah has greater
+variation between scorers than between pool sources in all six seeds.
+Walker divides variation across pool source, scorer, and pairing.
+At iteration three, scorer columns account for
+66.2\%66.2%66.2\% of the descriptive sum of squares on
+Cheetah; pool-source rows account for 10.0\%10.0%10.0\% and
+pairings for 23.8\%23.8%23.8\%. Walker is mixed: the
+corresponding fractions are 28.7\%28.7%28.7\%,
+31.6\%31.6%31.6\%, and
+39.7\%39.7%39.7\% (Figure 3).
+Scorer variation exceeds pool-source variation in
+666 of
+666 Cheetah seeds, compared with
+222 of
+666 Walker seeds. Thus the Cheetah column
+structure is present within individual seeds, rather than appearing only
+after their matrices are averaged.
+Random nonlinear has a positive own-pool residual in all six original units.
+Its distance on its own generated pool exceeds the additive value from
+its row and column averages. Every one-state omission preserves the sign.
+Appendix A gives the seed-level residuals, and
+Table 4 gives the omitted-state results.
+In the combined audit, the residual is positive in
+5 of
+6 Walker seeds and
+5 of
+6 Cheetah seeds. The original
+decision rule therefore selected Random nonlinear for the splice. No
+pool-source row met the cross-task criterion.
+6.3 Replacing the first elite set lowers final selected-sequence cost
+The pre-specified Random nonlinear splice replaces the first model-elite
+update with the environment-elite update and then returns both branches to the
+same surrogate. Before averaging within a task-seed unit, we divide each
+state-level cost contrast by the difference between the 90th and 10th
+percentiles of realised cost in its shared initial pool. This is the pool’s
+interdecile range. A value of -0.5−0.5-0.5, for example, means that the
+environment-elite branch selects a sequence whose realised cost is lower by
+half of that initial-pool range.
+The final contrast is negative in all 6
+selection units. The task means are
+-0.405 on Walker and
+-0.912 on Cheetah.
+The direction repeats in all 6 held-out
+units. Their task means are -0.253 on
+Walker and -0.620 on Cheetah. The fixed
+cross-task rule survives all 4 one-state
+omissions. At least two of three seeds per task retain a negative contrast after each
+omission. Omitting one state makes Walker seed 5 slightly positive.
+Table 6 records the exception.
+Across both cohorts, all 12
+task-seed contrasts are negative; the combined descriptive means are
+-0.329 and
+-0.766 (Figure 4).
+The best realised candidate also has lower cost in every task-seed unit. Its
+combined contrast is -0.053 initial-pool
+ranges on Walker and -0.442 on
+Cheetah. The Cheetah splice therefore reaches pools containing lower-cost
+sequences. Walker’s best-candidate change is smaller than its selected-cost
+change, indicating that coverage alone does not describe the selected-cost
+contrast. Later model selection also differs between the branches. Several
+held-out units have a positive contrast after iteration one. Replacing the
+first elite set does not improve every intermediate endpoint; its benefit
+appears at the fixed final endpoint.
+Figure 4: Effect of replacing the first Random nonlinear elite set on selected
+cost over iterations one to three. Both branches share the initial pool,
+later scorer, and base random samples; only the first elite set differs.
+Environment-elite minus model contrasts are scaled by the initial pool’s
+realised-cost interdecile range. Dashed circles show selection units, solid
+squares show held-out units, and lines show cohort means. Every final
+contrast is negative, including all six held-out units; intermediate
+contrasts can be positive.
+Table 5 reports all 12
+task-seed trajectories.
+7 Discussion and limitations
+A proposal audit needs an explicit reference scale. Mean separation in raw
+action units answers a different question from separation relative to the
+remaining search width. Width ratios answer another. Reporting those
+components alongside elite recovery prevents contraction alone from being
+read as improved decision agreement. Realised selected-sequence cost is
+still needed to test whether an update changes the outcome of search.
+The crossed comparison guides the next controlled test. On Cheetah, a scoring
+change can be tested across several fixed pool sources, because the observed
+differences follow scorer columns in every seed. On Walker, a score-only
+account omits row and pairing variation. A proposal constraint could be
+tested with the scorer held fixed, or a scoring change could be tested on
+the same saved pools. The matrix makes these comparisons available without
+additional off-diagonal simulator executions. It does not choose a remedy
+or guarantee that one will work.
+The Random nonlinear splice shows that one elite decision can affect the
+selected cost after three further CEM iterations. Its direction
+repeats on units held out from pairing selection. Other surrogates might
+also benefit from an environment-elite update: we have not compared splices
+across all four families. The result therefore establishes the consequence
+of the selected update, without establishing that the residual identified
+the best intervention target.
+The experiment covers two tasks, six independently trained Dreamer
+backbones per task, four states per backbone, one horizon, and one CEM
+configuration. The shared transition form controls part of the model
+comparison; other dynamics classes may produce different matrices.
+Identity also retains a wider context than the three compressed families,
+so family differences cannot be assigned to feature type alone. The four
+states sample a restricted part of each actor’s experience, and state
+omissions check dependence on those points rather than coverage of all
+reachable states.
+The audit requires a resettable environment and execution of every
+candidate. It is suited to diagnosing a model-planner loop in simulation.
+The splice uses information unavailable to an ordinary deployed planner,
+and lower finite-horizon selected-sequence cost does not establish higher
+closed-loop return. A method motivated by the audit must be evaluated
+without that oracle and under receding-horizon control.
+Conclusion.
+A world model used by CEM determines both the ordering of current candidates
+and the distribution of later queries. Crossed rescoring describes these
+roles separately; a matched one-update splice tests whether an elite
+decision changes the final selected-sequence cost.
+Acknowledgements
+This research includes computations using the computational cluster
+Katana [PVC , UNSW Sydney(2010), Research Infrastructure] supported by Research Technology Services
+at UNSW Sydney.
+References
+Bhamidipaty et al. [2026]
+Logan Mondal Bhamidipaty, Esmeralda S. Whitammer, David Abel, Mykel J.
+Kochenderfer, and Subramanian Ramamoorthy.
+Imperfect world models are exploitable.
+arXiv preprint arXiv:2605.15960, 2026.
+doi: 10.48550/arXiv.2605.15960.
+URL https://arxiv.org/abs/2605.15960.
+Bharadhwaj et al. [2020]
+Homanga Bharadhwaj, Kevin Xie, and Florian Shkurti.
+Model-predictive control via cross-entropy and gradient-based
+optimization.
+In Proceedings of the 2nd Conference on Learning for Dynamics
+and Control, volume 120 of Proceedings of Machine Learning Research,
+pages 277–286. PMLR, 2020.
+URL https://proceedings.mlr.press/v120/bharadhwaj20a.html.
+Chahe et al. [2026]
+Amirhosein Chahe, Siwei Cai, and Lifeng Zhou.
+Latent world models with monotone planning costs for image-goal
+navigation.
+arXiv preprint arXiv:2608.09073, 2026.
+doi: 10.48550/arXiv.2608.09073.
+URL https://arxiv.org/abs/2608.09073.
+Farahmand et al. [2017]
+Amir-Massoud Farahmand, Andre Barreto, and Daniel Nikovski.
+Value-aware loss function for model-based reinforcement learning.
+In Proceedings of the 20th International Conference on
+Artificial Intelligence and Statistics, volume 54 of Proceedings of
+Machine Learning Research, pages 1486–1494. PMLR, 2017.
+URL https://proceedings.mlr.press/v54/farahmand17a.html.
+Gelada et al. [2019]
+Carles Gelada, Saurabh Kumar, Jacob Buckman, Ofir Nachum, and Marc G.
+Bellemare.
+DeepMDP: Learning continuous latent space models for representation
+learning.
+In Proceedings of the 36th International Conference on Machine
+Learning, volume 97 of Proceedings of Machine Learning Research,
+pages 2170–2179. PMLR, 2019.
+URL https://proceedings.mlr.press/v97/gelada19a.html.
+Grimm et al. [2020]
+Christopher Grimm, Andre Barreto, Satinder P. Singh, and David Silver.
+The value equivalence principle for model-based reinforcement
+learning.
+In Advances in Neural Information Processing Systems,
+volume 33, pages 5541–5552. Curran Associates, Inc., 2020.
+URL
+https://proceedings.neurips.cc/paper_files/paper/2020/hash/3bb585ea00014b0e3ebe4c6dd165a358-Abstract.html.
+Hafner et al. [2020]
+Danijar Hafner, Timothy Lillicrap, Jimmy Ba, and Mohammad Norouzi.
+Dream to control: Learning behaviors by latent imagination.
+In International Conference on Learning Representations, 2020.
+URL https://openreview.net/forum?id=S1lOTC4tDS.
+Huang et al. [2026]
+Xiaodi Huang, Ziyi Ding, Jingtian Wan, Yuchen Liu, Yuan Zhang, Xiao-Ping Zhang,
+Jiayu Chen, Zhang Zhang, and Tao Huang.
+Traj-LeWM: Path-aware world-model planning via latent trajectory
+cost.
+arXiv preprint arXiv:2608.14125, 2026.
+doi: 10.48550/arXiv.2608.14125.
+URL https://arxiv.org/abs/2608.14125.
+Lambert et al. [2020]
+Nathan Lambert, Brandon Amos, Omry Yadan, and Roberto Calandra.
+Objective mismatch in model-based reinforcement learning.
+In Proceedings of the 2nd Conference on Learning for Dynamics
+and Control, volume 120 of Proceedings of Machine Learning Research,
+pages 761–770. PMLR, 2020.
+URL https://proceedings.mlr.press/v120/lambert20a.html.
+Li et al. [2026]
+Liangyu Li, Qingwen Liu, Mingqing Liu, and Wen Fang.
+Action from adjacent set in physical space outperforms the best
+prediction in world models.
+arXiv preprint arXiv:2607.23602, 2026.
+URL https://arxiv.org/abs/2607.23602.
+PVC , UNSW Sydney(2010) [Research Infrastructure]
+PVC (Research Infrastructure), UNSW Sydney.
+Katana, 2010.
+URL https://doi.org/10.26190/669x-a286.
+Singh [2026]
+Joyjeet Singh.
+The objective is the bottleneck: Latent world models encode what
+their planners cannot use.
+arXiv preprint arXiv:2608.12959, 2026.
+doi: 10.48550/arXiv.2608.12959.
+URL https://arxiv.org/abs/2608.12959.
+Sommer and Schilling [2026]
+Armin Sommer and Jannik Schilling.
+Reinforced planning with latent world models.
+arXiv preprint arXiv:2608.18669, 2026.
+doi: 10.48550/arXiv.2608.18669.
+URL https://arxiv.org/abs/2608.18669.
+Tassa et al. [2018]
+Yuval Tassa, Yotam Doron, Alistair Muldal, Tom Erez, Yazhe Li, Diego
+de Las Casas, David Budden, Abbas Abdolmaleki, Josh Merel, Andrew Lefrancq,
+Timothy Lillicrap, and Martin Riedmiller.
+DeepMind control suite, 2018.
+URL https://arxiv.org/abs/1801.00690.
+Todorov et al. [2012]
+Emanuel Todorov, Tom Erez, and Yuval Tassa.
+MuJoCo: A physics engine for model-based control.
+In 2012 IEEE/RSJ International Conference on Intelligent Robots
+and Systems, pages 5026–5033. IEEE, 2012.
+doi: 10.1109/IROS.2012.6386109.
+Tunyasuvunakool et al. [2020]
+Saran Tunyasuvunakool, Alistair Muldal, Yotam Doron, Siqi Liu, Steven Bohez,
+Josh Merel, Tom Erez, Timothy Lillicrap, Nicolas Heess, and Yuval Tassa.
+dm_control: Software and tasks for continuous control.
+Software Impacts, 6:100022, 2020.
+ISSN 2665-9638.
+doi: 10.1016/j.simpa.2020.100022.
+URL
+https://www.sciencedirect.com/science/article/pii/S2665963820300099.
+Wang et al. [2026]
+Jiawei Wang, Ke Rui, Yushen Zuo, Yichun Feng, and Minglei Li.
+Decision-metric alignment in latent world models: Diagnostics and
+action-conditioned objectives for MPC planning.
+arXiv preprint arXiv:2608.18746, 2026.
+doi: 10.48550/arXiv.2608.18746.
+URL https://arxiv.org/abs/2608.18746.
+Yu et al. [2026]
+Yang Yu, Shiyuan Zhang, Yifei Sheng, Haoxiang Ren, and Haoxin Lin.
+How should world models be evaluated for embodied decision-making? a
+decision-making-centric position.
+arXiv preprint arXiv:2606.15032, 2026.
+URL https://arxiv.org/abs/2606.15032.
+Appendix A Follow-up rule and experiment chronology
+The original audit used Walker and Cheetah seeds 0–2, with four saved
+states, four surrogate families, and four CEM iterations per task-seed
+unit. Its gate was a rule fixed before outcome inspection for deciding
+whether to extend the audit and run an intervention. It was not a significance test.
+Original questions.
+The first question tested whether the family-mean diagonal distance DDD
+increased from iteration zero to three. The second tested whether pool
+source or an own-pool pairing produced a replicated pattern at iteration
+three. A pool-source pattern required at least three of four scorer columns
+to name the same highest-distance generator within a task; that generator
+could differ between tasks. A pairing pattern required the same surrogate
+to have a positive diagonal residual I_{ff3}If​f​3I_{ff3} on both tasks.
+A qualifying pattern needed the stated direction on Walker and Cheetah,
+at least two of three seeds per task, and the same outcome after each of
+the four one-state omissions. The omissions recomputed task-seed summaries
+from the remaining three states. This rule limited reliance on one seed or
+one saved state. It did not estimate the probability of replication on a
+new task or provide a multiple-testing correction. Only the second
+question could trigger the one-update splice.
+The original measurements included DDD, pairwise order agreement, and
+elite recovery. Selected-candidate regret, alternative elite cuts, and
+downstream family ordering did not enter the gate. We specified the
+change-from-baseline matrices, descriptive sums of squares, random-elite
+reference and D_{W}DWD_{W} after inspecting the Walker results, before inspecting
+the completed Cheetah summaries. The mean/width decomposition, raw-action
+gap, floor occupancy and clipping displacement followed inspection of the
+six-unit pilot and preceded completion of the extension cohort. These
+analyses could not change the original rule or the selected family.
+Gate outcome.
+DDD decreased, contrary to the original increasing-distance hypothesis.
+No pool-source pattern qualified under the seed
+and state-omission checks. Random nonlinear’s positive own-pool residual
+qualified and selected its splice. At iteration three, I_{ff3}If​f​3I_{ff3} is
+0.00230.00230.0023,
+0.00210.00210.0021, and
+0.00350.00350.0035 in Walker seeds 0, 1, and 2;
+the Cheetah values are
+0.00900.00900.0090,
+0.00180.00180.0018, and
+0.00500.00500.0050. Every one-state omission
+preserves their positive sign
+(Table 4). No splice cost was used for this
+selection.
+Precision extension and held-out splice.
+Seeds 3–5 were fixed as an audit precision extension before their audit
+outcomes were inspected. They use the same model, state-selection, replay,
+and CEM settings. They do not reopen the original gate. After Random
+nonlinear was selected on seeds 0–2, the same first-update splice and its
+held-out decision rule were fixed before inspecting seeds 3–5 splice
+costs. The rule requires a negative final selected-cost contrast in at
+least two of three seeds on each task, including after every one-state
+omission. All six full-state contrasts are negative. The rule also passes
+under every omission, although omitting bin 3 makes Walker seed 5 slightly
+positive (Table 6).
+The first update is the intervention point because all traces then share
+the same pool. Iteration three is the primary endpoint because it ends
+the fixed four-iteration search. Intermediate contrasts are reported at
+iterations one and two, including positive contrasts. We did not select
+an intervention stage or endpoint by its realised gain. This experiment
+tests the selected update’s consequence and its repetition on held-out
+units; it does not compare the four families as intervention targets.
+Appendix B Descriptive attribution calculation
+At iteration iii, the state-averaged task-seed matrix contains K=4K=4K=4
+generator rows and K=4K=4K=4 scorer columns. Write its row, column, and grand
+means as \bar{D}_{g\cdot i}D¯g⋅i\bar{D}_{g\cdot i}, \bar{D}_{\cdot fi}D¯⋅f​i\bar{D}_{\cdot fi}, and
+\bar{D}_{\cdot\cdot i}D¯⋅⋅i\bar{D}_{\cdot\cdot i}. Define the row and column deviations from the
+grand mean by
+R_{gi}=\bar{D}_{g\cdot i}-\bar{D}_{\cdot\cdot i},\qquad C_{fi}=\bar{D}_{\cdot fi}-\bar{D}_{\cdot\cdot i}.Rg​i=D¯g⋅i−D¯⋅⋅i,Cf​i=D¯⋅f​i−D¯⋅⋅i.R_{gi}=\bar{D}_{g\cdot i}-\bar{D}_{\cdot\cdot i},\qquad C_{fi}=\bar{D}_{\cdot fi}-\bar{D}_{\cdot\cdot i}.
+(8)
+The remaining cell residual is
+I_{gfi}=D_{gfi}-\bar{D}_{\cdot\cdot i}-R_{gi}-C_{fi}Ig​f​i=Dg​f​i−D¯⋅⋅i−Rg​i−Cf​iI_{gfi}=D_{gfi}-\bar{D}_{\cdot\cdot i}-R_{gi}-C_{fi}, equivalent to
+Equation 7. The sums of squares are
+\displaystyle{\rm SS}_{\rm row}SSrow\displaystyle{\rm SS}_{\rm row}
+\displaystyle=K\sum_{g}R_{gi}^{2},=K​∑gRg​i2,\displaystyle=K\sum_{g}R_{gi}^{2},
+\displaystyle{\rm SS}_{\rm col}SScol\displaystyle{\rm SS}_{\rm col}
+\displaystyle=K\sum_{f}C_{fi}^{2},=K​∑fCf​i2,\displaystyle=K\sum_{f}C_{fi}^{2},
+(9)
+\displaystyle{\rm SS}_{\rm res}SSres\displaystyle{\rm SS}_{\rm res}
+\displaystyle=\sum_{g,f}I_{gfi}^{2},=∑g,fIg​f​i2,\displaystyle=\sum_{g,f}I_{gfi}^{2},
+\displaystyle{\rm SS}_{\rm tot}SStot\displaystyle{\rm SS}_{\rm tot}
+\displaystyle=\sum_{g,f}(D_{gfi}-\bar{D}_{\cdot\cdot i})^{2}.=∑g,f(Dg​f​i−D¯⋅⋅i)2.\displaystyle=\sum_{g,f}(D_{gfi}-\bar{D}_{\cdot\cdot i})^{2}.
+(10)
+They satisfy
+{\rm SS}_{\rm tot}={\rm SS}_{\rm row}+{\rm SS}_{\rm col}+{\rm SS}_{\rm res}SStot=SSrow+SScol+SSres{\rm SS}_{\rm tot}={\rm SS}_{\rm row}+{\rm SS}_{\rm col}+{\rm SS}_{\rm res}.
+For each component xxx, we compute
+100\,{\rm SS}_{x}/{\rm SS}_{\rm tot}100​SSx/SStot100\,{\rm SS}_{x}/{\rm SS}_{\rm tot} within each task-seed matrix, then
+average the six shares for a task. We do not decompose the six-seed mean
+matrix to obtain the reported percentages. The families are fixed test
+models, so the shares describe this matrix rather than population
+variance components or causal effects.
+Appendix C Seed-level crossed matrices
+Walker
+Cheetah
+Metric
+Iter. 0
+Iter. 3
+Iter. 0
+Iter. 3
+Proposal distance DDD
+0.254
+0.235
+0.252
+0.235
+Proposal width
+0.350
+0.159
+0.350
+0.131
+Whitened distance D_{W}DWD_{W}
+0.260
+0.324
+0.244
+0.324
+First-action gap (action units)
+0.349
+0.218
+0.273
+0.184
+First-action gap (proposal SD)
+0.998
+1.321
+0.779
+1.258
+Pairwise order agreement
+0.503
+0.503
+0.535
+0.523
+Adjusted elite precision
+0.0000.0000.000
+-0.001−0.001-0.001
+0.071
+0.040
+Table 2: Task means at the common initial pool and final CEM iteration. The
+horizon, candidate count, elite cut, and four-surrogate average are fixed.
+DDD and the raw first-action gap decrease; D_{W}DWD_{W} and the width-normalised
+action gap increase. Pairwise order agreement stays near chance on Walker
+and declines on Cheetah. Chance-adjusted elite precision does not improve.
+Figures 5
+and 6 retain each of the six original gate
+units before task averaging. The main figures add the six extension
+units. Rows and columns follow Identity, Learned nonlinear, Anchored nonlinear,
+and Random nonlinear; the axes use the first word of each name.
+Figure 5: Final-iteration crossed proposal distance for the six seed 0–2
+gate units. A row fixes the generator pool and columns rescore its executed
+candidates; candidate sets are never pooled across seeds. Cheetah is
+scorer-dominated in all three gate units. Identity has the lowest column
+mean in seeds 0 and 2;
+Learned nonlinear has the lowest in seed 1.
+Figure 6: Change in crossed proposal distance for the six gate units. Each
+cell holds its scorer fixed and subtracts that scorer’s value on the common
+iteration-zero pool. Most cells are negative at iteration three. This
+comparison records the ratio-based distance DDD and does not determine
+candidate order agreement.
+Appendix D Leave-one-state-out checks
+Each task–seed unit contains four saved states drawn from fixed replay time
+bins. We repeat the gate and crossed attribution after omitting one bin at a
+time. We average the remaining three states within each task–seed unit
+before comparing seeds.
+Omitted bin
+Task
+Seed 0
+Seed 1
+Seed 2
+n_{+}n+n_{+}
+Pass
+All states
+Walker walk
+-0.009
+-0.035
+-0.015
+0
+no
+All states
+Cheetah run
+-0.023
+-0.022
+-0.016
+0
+no
+-1−1-1
+Walker walk
+-0.011
+-0.027
+-0.011
+0
+no
+-1−1-1
+Cheetah run
+-0.030
+-0.025
+-0.019
+0
+no
+-3−3-3
+Walker walk
+-0.000
+-0.040
+-0.020
+0
+no
+-3−3-3
+Cheetah run
+-0.020
+-0.017
+-0.025
+0
+no
+-5−5-5
+Walker walk
+-0.018
+-0.035
+-0.021
+0
+no
+-5−5-5
+Cheetah run
+-0.018
+-0.028
+-0.011
+0
+no
+-7−7-7
+Walker walk
+-0.007
+-0.039
+-0.008
+0
+no
+-7−7-7
+Cheetah run
+-0.023
+-0.019
+-0.007
+0
+no
+Table 3: Leave-one-state-out check for the proposal-distance gate. Each
+column is a task–seed contrast after averaging model families; n_{+}n+n_{+} counts
+contrasts above zero. The task, seeds, CEM settings, and remaining three
+states are fixed within an omission. Every omission preserves a negative
+iteration-three minus iteration-zero contrast on both tasks.
+Omitted bin
+Walker support
+Cheetah support
+Cross-task self interaction
+Support
+Interaction
+All states
+none
+none
+Identity; Random nonlinear
+no
+yes
+-1−1-1
+none
+none
+Random nonlinear
+no
+yes
+-3−3-3
+none
+none
+Identity; Random nonlinear
+no
+yes
+-5−5-5
+none
+none
+Identity; Random nonlinear
+no
+yes
+-7−7-7
+Random nonlinear
+none
+Random nonlinear
+no
+yes
+Table 4: Leave-one-state-out check for the two attribution triggers. A
+support trigger requires at least three scorer columns to select the same
+highest-distance generator within each task. An interaction trigger requires
+the same surrogate’s own-pool residual to be positive on both tasks. Random
+nonlinear passes under all four omissions; no generator passes the support
+trigger.
+Appendix E Seed-level elite-splice results
+The main paper plots the paired normalised contrasts.
+Table 5 retains the fixed raw endpoint and
+every task–seed trajectory for the selection and held-out cohorts.
+The environment-elite branch differs only in the first update; iterations one
+to three again use Random nonlinear scores in both branches.
+Cohort
+Task
+Seed
+\Delta_{1}/s_{0}Δ1/s0\Delta_{1}/s_{0}
+\Delta_{2}/s_{0}Δ2/s0\Delta_{2}/s_{0}
+\Delta_{3}Δ3\Delta_{3}
+\Delta_{3}/s_{0}Δ3/s0\Delta_{3}/s_{0}
+\Delta^{\mathrm{best}}_{3}/s_{0}Δ3best/s0\Delta^{\mathrm{best}}_{3}/s_{0}
+Selection
+Walker walk
+0
+-0.029−0.029-0.029
+-0.558−0.558-0.558
+-1409.812−1409.812-1409.812
+-0.438−0.438-0.438
+-0.018−0.018-0.018
+1
+-0.514−0.514-0.514
+-0.644−0.644-0.644
+-1304.868−1304.868-1304.868
+-0.396−0.396-0.396
+-0.052−0.052-0.052
+2
+-0.473−0.473-0.473
+-0.185−0.185-0.185
+-801.631−801.631-801.631
+-0.381−0.381-0.381
+-0.049−0.049-0.049
+Cheetah run
+0
+-0.356−0.356-0.356
+-0.774−0.774-0.774
+-3124.093−3124.093-3124.093
+-0.834−0.834-0.834
+-0.379−0.379-0.379
+1
+-0.649−0.649-0.649
+-0.814−0.814-0.814
+-2880.493−2880.493-2880.493
+-1.055−1.055-1.055
+-0.431−0.431-0.431
+2
+-0.165−0.165-0.165
+-0.777−0.777-0.777
+-1852.621−1852.621-1852.621
+-0.846−0.846-0.846
+-0.494−0.494-0.494
+Held-out
+Walker walk
+3
+-0.055−0.055-0.055
+-0.613−0.613-0.613
+-710.564−710.564-710.564
+-0.208−0.208-0.208
+-0.139−0.139-0.139
+4
++0.013+0.013+0.013
+-0.487−0.487-0.487
+-1776.227−1776.227-1776.227
+-0.456−0.456-0.456
+-0.051−0.051-0.051
+5
+-0.073−0.073-0.073
+-0.232−0.232-0.232
+-760.797−760.797-760.797
+-0.093−0.093-0.093
+-0.008−0.008-0.008
+Cheetah run
+3
++0.094+0.094+0.094
+-0.331−0.331-0.331
+-1345.455−1345.455-1345.455
+-0.489−0.489-0.489
+-0.528−0.528-0.528
+4
+-0.542−0.542-0.542
+-0.890−0.890-0.890
+-3394.181−3394.181-3394.181
+-0.898−0.898-0.898
+-0.500−0.500-0.500
+5
++0.064+0.064+0.064
+-0.107−0.107-0.107
+-1125.465−1125.465-1125.465
+-0.471−0.471-0.471
+-0.318−0.318-0.318
+Table 5: Paired realised-cost contrasts for the 12 Random nonlinear splice
+units. Seeds 0–2 selected the pairing without using splice costs; seeds
+3–5 test the fixed intervention without using their splice outcomes for
+selection. Both branches hold the initial pool, later scorer, and base
+samples fixed. \Delta_{i}Δi\Delta_{i} is environment-elite branch minus model branch
+after iteration iii, \Delta^{\mathrm{best}}_{3}Δ3best\Delta^{\mathrm{best}}_{3} compares the best realised
+candidates reached, and s_{0}s0s_{0} is the realised-cost interdecile range in the
+shared initial pool. Every iteration-three selected-cost contrast is
+negative.
+Omitted bin
+W3
+W4
+W5
+C3
+C4
+C5
+Rule
+None
+-0.208−0.208-0.208
+-0.456−0.456-0.456
+-0.093−0.093-0.093
+-0.489−0.489-0.489
+-0.898−0.898-0.898
+-0.471−0.471-0.471
+Pass
+1
+-0.228−0.228-0.228
+-0.523−0.523-0.523
+-0.250−0.250-0.250
+-0.548−0.548-0.548
+-1.003−1.003-1.003
+-0.302−0.302-0.302
+Pass
+3
+-0.170−0.170-0.170
+-0.381−0.381-0.381
++0.001+0.001+0.001
+-0.478−0.478-0.478
+-0.651−0.651-0.651
+-0.484−0.484-0.484
+Pass
+5
+-0.164−0.164-0.164
+-0.315−0.315-0.315
+-0.006−0.006-0.006
+-0.542−0.542-0.542
+-1.025−1.025-1.025
+-0.561−0.561-0.561
+Pass
+7
+-0.269−0.269-0.269
+-0.606−0.606-0.606
+-0.119−0.119-0.119
+-0.391−0.391-0.391
+-0.915−0.915-0.915
+-0.539−0.539-0.539
+Pass
+Table 6: Leave-one-state-out check for the held-out splice. Entries
+are final normalised selected-cost contrasts for Walker (W) and Cheetah (C).
+The family, CEM settings, and remaining three states are fixed. Omitting bin
+3 makes Walker seed 5 slightly positive, but the pre-specified rule still
+passes with two negative Walker seeds and three negative Cheetah seeds. All
+other omissions retain six negative contrasts.
+Audit pattern
+Reading and next check
+Scorer columns dominate
+Test a score change or ranking loss against realised pairwise order and elite recovery.
+Pool-source rows dominate
+Test a proposal constraint or actor-anchored sampling.
+Positive diagonal residual
+Run a targeted model–planner intervention.
+Metrics split as width contracts
+Report width, ranking, and action-level fidelity.
+Table 7: Matrix patterns and possible controlled follow-ups. The
+candidate pool is fixed across scorer columns, and the scorer is fixed down a
+column. Row, column, and diagonal patterns therefore direct the next test to
+a different component; none establishes that a proposed response will work.
+Appendix F Elite-set size
+The primary CEM update uses 32 elites. We recompute the final diagonal
+measurements with 8, 16, and 64 elites from the saved candidate pools for
+the original seeds 0–2. These are alternative refits of existing pools;
+they do not generate new CEM traces.
+Figure 7: Final-iteration proposal distance and chance-adjusted elite
+precision for 8, 16, 32, and 64 elites on the original seeds 0–2,
+recomputed from the same saved pools.
+Grey lines are task–seed units, black lines are task means, and the dotted
+line marks the fixed cut of 32. Distance decreases as more candidates
+enter the refit; task-mean adjusted precision stays below 0.10 at every cut.
+Appendix G Clipping diagnostics
+Candidate actions are clipped to the environment bounds after Gaussian
+sampling. Table 8 records the raw displacement
+of the pool mean caused by clipping and the final proportion of proposal
+coordinates at the width floor. Figure 8 records the
+fraction of candidates with at least one clipped coordinate along each
+generator trace for the original seeds 0–2. The displacement and clipping rate measure different
+effects: many clipped coordinates can produce little mean displacement
+when their shifts cancel.
+Measurement
+Walker
+Cheetah
+Initial mean displacement (action units)
+0.116
+0.137
+Final mean displacement (action units)
+0.005
+0.006
+Final width-floor occupancy (%)
+1.2
+1.4
+Table 8: Bound-related diagnostics for the combined six-seed audit.
+Clipping displacement compares each pool’s means before and after clipping,
+in root-mean-square action units. Measurements average model families and
+states within task-seed units, then seeds within tasks. Mean displacement
+decreases, and most final proposal coordinates remain above the width
+floor. The action bounds and floor are fixed across the traces.
+Figure 8: Fraction of candidates with at least one clipped action coordinate,
+separated by task and pool generator for the original seeds 0–2.
+CEM settings and base samples are fixed
+across generators. Every task–generator mean decreases at each update, from
+0.48–0.50 at iteration zero to below 0.10 at iteration three.
+Appendix H Random-elite reference
+The magnitude of DDD depends on the proposal and the finite candidate pool. As
+a reference, we draw 4,096 random subsets of 32 candidates from each saved
+pool in the original seeds 0–2, sampling without replacement within each
+subset. Fitting each subset produces a pool-specific
+distribution of proposal distances from the environment-elite update.
+Figure 9: Observed diagonal proposal distances against 32-candidate random
+refits from the same saved pools for the original seeds 0–2.
+The upper row compares task–seed values
+with the mean random median and poolwise 5–95% interval; the lower row gives
+each surrogate’s random-reference percentile. The observed refit lies above
+the random median in 28 of 32 task–surrogate–iteration summaries; Cheetah
+Identity supplies the four exceptions. The reference scales DDD within a
+finite pool and does not measure realised cost.
+Appendix I Reproducibility settings
+Item
+Setting
+Runtime
+Python 3.11.3; PyTorch 2.10.0; dm_control 1.0.37;
+MuJoCo 3.5.0; CUDA 12.8.0.
+Dreamer architecture
+Encoder channels 32–64–128–256; categorical RSSM with deterministic
+width 256 and 32\times 3232×3232\times 32 stochastic categories; context width 1280;
+actor and critic hidden width 256.
+Dreamer training
+500k environment steps per task–seed; five prefill episodes; replay
+capacity 500k; Adam with learning rates 3\times 10^{-4}3×10−43\times 10^{-4} (world model)
+and 10^{-4}10−410^{-4} (actor, critic), no weight decay; batches of eight
+length-16 sequences; one update per environment step; gradient clip
+100. KL, reconstruction, reward, and continuation weights are 1;
+free nats is 1. The imagination horizon is 15, with
+\gamma=0.99γ=0.99\gamma=0.99, \lambda=0.95λ=0.95\lambda=0.95, and actor entropy weight
+3\times 10^{-4}3×10−43\times 10^{-4}. The final latest.pt checkpoint is frozen.
+Surrogate data
+32 deterministic frozen-actor episodes per task–seed, shuffled with
+NumPy seed 0 and split 26/3/3 for training/validation/holdout; length-32
+sequences; mean latent inference; rollout targets through horizon 15.
+Lift networks
+Identity: width 1280. Learned nonlinear:
+1280\!:\!512\!:\!512\!:\!256:::2561280\!:\!512\!:\!512\!:\!256. Anchored nonlinear: affine
+1280\!:\!96:961280\!:\!96 concatenated with
+1280\!:\!480\!:\!512\!:\!160:::1601280\!:\!480\!:\!512\!:\!160. Random nonlinear: fixed
+1280\!:\!512\!:\!512\!:\!256:::2561280\!:\!512\!:\!512\!:\!256. MLP hidden layers use SiLU; outputs
+are linear.
+Shared surrogate layers
+Transition z_{t+1}=Az_{t}+Ba_{t}+bzt+1=A​zt+B​at+bz_{t+1}=Az_{t}+Ba_{t}+b. Compressed-family decoder
+256\!:\!512\!:\!512\!:\!1280:::1280256\!:\!512\!:\!512\!:\!1280; Identity uses the identity decoder.
+Reward and continuation heads are d_{z}\!:\!256\!:\!256\!:\!1dz:::1d_{z}\!:\!256\!:\!256\!:\!1.
+Surrogate optimisation
+AdamW; learning rate 3\times 10^{-4}3×10−43\times 10^{-4}; weight decay 10^{-5}10−510^{-5};
+batch size 128; gradient clip 100; 100 epochs without early stopping.
+Validation runs each epoch; the retained checkpoint minimises validation
+decoded-context prior-rollout loss.
+Surrogate loss
+Horizons \{1,3,5,8,15\}{1,3,5,8,15}\{1,3,5,8,15\}, each weighted 1. Latent-state rollout has
+weight 1; the summed posterior and prior decoded-context terms have
+weight 1. Reward MSE and continuation binary cross-entropy have weight
+0.25 each. Direct context reconstruction, variance, and covariance terms
+have weight 0.
+Task readout
+Linear ridge regression with intercept from decoded context to task
+variables; coefficient 10^{-3}10−310^{-3}, intercept unregularised. Four
+deterministic actor episodes use seeds 120000–120003.
+Planning cost
+Discount \gamma=1γ=1\gamma=1, terminal scale \lambda_{T}=2.5λT=2.5\lambda_{T}=2.5, action weight
+R=0.01I_{6}R=0.01​I6R=0.01I_{6}, and actor-deviation weight 0. Predicted and realised costs
+use the same weighted squared tracking error.
+Elite and pairwise ties
+Elite ties use candidate index order. Pairwise agreement excludes
+realised-cost differences of at most 10^{-12}10−1210^{-12}; a model tie
+against a strict realised ordering receives no agreement credit.
+Walker weights
+Q=\operatorname{diag}([8,1^{\times 14},2^{\times 9}])Q=diag⁡([8,1×14,2×9])Q=\operatorname{diag}([8,1^{\times 14},2^{\times 9}]) on height,
+orientations, and velocity, against the fixed actor-visited target.
+Cheetah weights
+Q=\operatorname{diag}([1^{\times 8},3^{\times 9}])Q=diag⁡([1×8,3×9])Q=\operatorname{diag}([1^{\times 8},3^{\times 9}]) on position and
+velocity, against the matched frozen-actor reference trajectory.
+Table 9: Settings needed to reproduce the frozen models, surrogate fits,
+readouts, and costs used by the audit. Architecture strings list layer
+widths from input to output.
+Compute required for reproduction.
+Training the twelve backbones, fitting the 48 surrogates and running the
+reported audits and splices requires approximately 179 GPU-hours in total.
+The breakdown is 133 hours for the twelve 500k-step Dreamer backbones,
+4.6 hours for data exports and surrogate fits, and 41 hours for the crossed
+audit and twelve splice units. The first two estimates allocate 12/4812/4812/48 of
+the corresponding 48-unit training budgets to the units used here.
+The audit and splice use four CPU cores, 32 GB RAM and one NVIDIA L40S
+per unit. Walker and Cheetah crossed units take approximately 1.5 and
+3.1 hours, respectively. The six held-out splice units account for
+18,432 candidate executions and 2.6 of the 41 GPU-hours.
+These figures sum wall-clock device time on H200, H100, A100, L40S and
+V100 GPUs without adjusting for their different speeds. They estimate the
+cost of reproducing the reported experiment and exclude unused tasks,
+other evaluations, failed jobs and exploratory runs.
+Code and data.
+The code, trained checkpoints and saved simulator states are not public
+with this preprint. We plan to release the code and reproduction
+instructions with an archival publication.
+Experimental support, please
+view the build logs
+for errors. Generated by
+L
+A
+T
+E
+xml
+.
+Instructions for reporting errors
+We are continuing to improve HTML versions of papers, and your feedback helps enhance accessibility and mobile
+support. To report errors in the HTML that will help us improve conversion and rendering, choose any of the
+methods listed below:
+Click the "Report Issue" (
+) button, located in the page header.
+Tip: You can select the relevant text first, to include it in your report.
+Our team has already identified the following issues. We appreciate your time reviewing and reporting rendering errors we
+may not have found yet. Your efforts will help us improve the HTML versions for all readers, because disability
+should not be a barrier to accessing research. Thank you for your continued support in championing open access for
+all.
+Have a free development cycle? Help support accessibility at arXiv! Our collaborators at LaTeXML maintain a list of packages that need conversion, and welcome developer contributions.
+We gratefully acknowledge support from
+our major funders,
+member institutions, ,
+and all contributors.
+About
+·
+Help
+·
+Contact
+·
+Subscribe
+·
+Copyright
+·
+Privacy
+·
+Accessibility
+·
+Operational Status (opens in new tab)
+Major funding support from

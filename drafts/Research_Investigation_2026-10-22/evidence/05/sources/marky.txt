@@ -1,0 +1,897 @@
+=== PDF PAGE 1 ===
+       Less is More: Generating Grounded Navigation Instructions from Landmarks
+
+
+
+                 Su Wang   Ceslee Montgomery   Jordi Orbay   Vighnesh Birodkar   Aleksandra Faust
+                      Izzeddin Gur   Natasha Jaques   Austin Waters   Jason Baldridge   Peter Anderson
+
+                                          Google Research
+
+
+                        Abstract
+2022    We study the automatic generation of navigation instruc-
+          tions from 360◦images captured on indoor routes. Existing
+         generators suffer from poor visual grounding, causing themApr   to rely on language priors and hallucinate objects. Our
+4  MARKY-MT5 system addresses this by focusing on visual
+         landmarks; it comprises a ﬁrst stage landmark detector and
+        a second stage generator–a multimodal, multilingual, mul-
+           titask encoder-decoder. To train it, we bootstrap grounded
+        landmark annotations on top of the Room-across-Room
+        (RxR) dataset. Using text parsers, weak supervision from[cs.CV]   RxR’s pose traces, and a multilingual image-text encoder
+          trained on 1.8b images, we identify 971k English, Hindi and
+         Telugu landmark descriptions and ground them to speciﬁc
+         regions in panoramas. On Room-to-Room, human wayﬁnd-
+          ers obtain success rates (SR) of 71% following MARKY-
+        MT5’s instructions, just shy of their 75% SR following hu-
+       man instructions—and well above SRs with other genera-
+           tors. Evaluations on RxR’s longer, diverse paths obtain 61-
+      64% SRs on three languages. Generating such high-quality                                                                            Figure 1. We generate grounded navigation instructions from a
+         navigation instructions in novel environments is a step to-     sequence of 360◦images captured along a route in a previously
+        wards conversational navigation tools and could facilitate     unseen building. Our two-stage approach ﬁrst detects landmarks
+          larger-scale training of instruction-following agents.           and then generates instructions conditioned on these landmarks.
+
+
+                                                                             instructions directly from visual inputs [21,38,59]. Progress
+         1. Introduction                                        toward this goal will enable navigation aids that are conver-arXiv:2111.12872v4                                                                      sational rather than map-based—and it could provide a vir-
+           Wayﬁnding–navigating to a destination–is an everyday      tually unlimited supply of high-quality synthetic navigation
+           task. We study the automatic generation of navigation in-      instructions for training instruction-following robots. De-
+          structions that effectively guide people.  Template-based      scribing navigation paths is also a key capability for human-
+         language generators that use cardinal directions and street     robot communication, equipping robots to answer questions
+        names are commonly used in outdoor mapping applica-     such as where did you go? or where should I meet you?.
+           tions, and some more ﬂexible generation approaches rely     We seek to generate accurate and ﬂuent navigation
+        on databases containing information about maps, roads and      instructions–in  multiple  languages–directly from  visual
+        landmarks [16, 50, 51]. In contrast, instructions for indoor      representations and actions taken to traverse a path. Previ-
+        wayﬁnding require egocentric movement guidance and ref-     ous work assumed that the input to the instruction generator
+         erence to the visual environment (e.g. notable objects).            is a sequence of 360◦panoramic (henceforth, pano) images
+           Systems for generating indoor wayﬁnding instructions     captured at intervals on a path, typically training on instruc-
+        assume access to pre-existing ﬂoorplans and landmark      tions from Room-to-Room (R2R) [5] using Matterport3D
+         databases [41], but recent work attempts to generate novel     environments [9]. These models’ instructions have proven
+=== PDF PAGE 2 ===
+valuable as additional training data for vision-and-language      for our model trained on full 360◦panos. When it comes
+navigation (VLN) agents [21]. However, people struggle      to selecting visual inputs for the generator, less is more. On
+to follow them [66]: human wayﬁnding success rates on      the more challenging RxR paths, human wayﬁnders obtain
+R2R are 36% for Speaker-Follower [21] and 42% for En-     a 62% SR using MARKY-MT5 vs. 78% for human instruc-
+vDrop [59] in unseen environments. The generated text is      tions. We release our silver landmark data and over one
+stylistically correct, but frequently references non-existent     million navigation instructions generated by MARKY-MT5,
+objects and confuses spatial terms such as left and right.        as data augmentation for training VLN agents.2
+  A challenge for visually-oriented instruction generators
+is dealing with irrelevant visual inputs.  In many other     2. Related Work
+image-to-text generation tasks  (e.g., image captioning),
+                                               Wayﬁnding with landmarks. We wish to produce in-much of the visual information in the input is reﬂected in the
+                                                                   structions that people can follow, and are inspired by re-output text. This is not the case when generating navigation
+                                                             search on the importance of landmarks for human naviga-instructions. Human annotators look at less than 30% of
+                                                                   tion [8, 17, 20, 65]. Landmarks are not just spatial featuresthe environment [35], and the instructions reference only a
+                                                    – they encode a relation between the feature (e.g. object) it-fraction of the objects that they look at. This makes learning
+                                                                             self, its nearby environment, and wayﬁnders’ point of viewa precise mapping between visual inputs and text outputs
+                                                                         [7]. Our landmark detector is trained on data bootstrappedmuch harder.  Perversely, access to more information can
+                                                     from RxR’s human-referenced landmarks. This allows ourdegrade performance [14], as models happily learn spuri-
+                                                         approach to exploit such features of landmark saliency,ous correlations that cause hallucinations during inference.
+                                                           without designing for them explicitly (as in [18,26]).  To solve this, we exploit the spatiotemporal grounding
+                                                 Hong et al. [28] show that modeling relationships amongin the Room-across-Room (RxR) dataset [35].  Instead of
+writing instructions, RxR annotators spoke while traversing      the scene, its objects, and directional clues is effective for
+paths. Every RxR instruction thus comes with pose traces     improving VLN wayﬁnding performance.  This points to
+                                                          a potentially virtuous cycle between agents for wayﬁndingthat align the words spoken (and later transcribed) with
+                                                      and those for guiding–or, better, using such landmark un-what annotators were looking at. We use these pose traces
+and instructions to derive a new silver annotated dataset1     derstanding for both capabilities within individual agents.
+that contains bounding boxes over visual landmarks com-     Navigation instruction generation. Previous work on gen-
+bined with their multilingual descriptions (English, Hindi      erating synthetic VLN instructions employs the Speaker-
+and Telugu). Speciﬁcally, we bootstrap landmark annota-     Follower framework [22, 59]: A Speaker model learns
+tions using text parsers to identify landmark phrases in in-     from R2R annotations (English only) to produce instruc-
+structions. We then use powerful image-text co-embedding      tions conditioned on sequences of path panoramas, while
+models [31] combined with weak supervision from pose     a Follower model learns to wayﬁnd (i.e.  construct paths)
+traces to ground those landmarks in the environment.           conditioned on human instructions and the same visual in-
+  Our   two-stage  MARKY-MT5   (landmark   and      puts. The Speaker’s output can be used as augmented data
+multilingual  T5  [64])  system  enhances   instruction      for training the Follower, and the Speaker is used to rerank
+generation by improving how visual landmarks are selected     paths generated by the Follower during inference (a form of
+and mentioned.   Given a path-connected sequence of     pragmatic reasoning). These models indiscriminately use
+panoramic views, the ﬁrst stage landmark detector infers      entire panos as visual context, whereas we select key vi-
+a sequence of landmarks that a person might select for      sual landmarks from each pano for the generator to talk
+describing the path.  E.g., in Fig. 1 eight landmarks are     about. We build on the multitask, multilingual T5 model
+selected, each represented by an image. This sequence, plus      architecture [48, 64], a uniﬁed text-to-text framework that
+interleaved descriptions of navigation actions, is passed to     enables transfer learning by mixing many NLP tasks simul-
+the second stage instruction generator – a multimodal      taneously. This additionally allows us to explore pretraining
+extension of the multilingual T5 (mT5) model [64] similar      tasks, including multimodal tasks like image captioning, to
+to VL-T5 [12] – to produce the instruction in Fig. 1.           improve generalization on unseen environments.
+   In human wayﬁnding  experiments on R2R  paths,       Agarwal et al. [1] previously proposed a landmark-based
+MARKY-MT5 trained with silver landmarks (a subset of      generator, but relied on RL training rather than silver data
+the visual inputs from the full environment) almost elimi-      to induce landmark groundings. Pashevich et al. [44] use
+nates the gap between model-generated and human-written      synthetic instructions like goto bed pickup cellphone as an
+instructions – achieving a 71% success rate (SR) vs. 75%      additional source for training VLN agents for the ALFRED
+for human instructions, 42% for previous models, and 58%     benchmark [55]. These are akin to the simple directional
+                                                             expressions we use in our multimodal encoder, but they are
+   1The term silver data refers to high-quality annotations–not created by
+people–that are derived by combining models and constraints [25,49,63].          2github.com/google-research-datasets/RxR/tree/main/marky-mT5
+=== PDF PAGE 3 ===
+used both for data augmentation and as an additional decod-
+ing task. They seek to optimize VLN agent performance,
+whereas we seek to produce instructions that can be fol-
+lowed by people.
+  Kojima et al. [34] explore collaborative, human-agent in-
+struction generation in the CEREALBAR game [58]. They
+deﬁne a human-in-the-loop instruction generation frame-
+work, where the generator is iteratively improved with sig-
+nals collected while interacting with people. The instruc-
+tions cover both navigation and game tactics.
+   Their multimodal→text generator is a blackbox, whereas
+our approach includes an interpretable intermediate repre-
+sentation based on selected visual landmarks (compared to
+a formal abstraction, e.g. [13]).  This work complements
+ours—which only uses static human annotations—and sug-
+gests future interactive settings that could allow our instruc-
+tion generators to adapt to human wayﬁnders.
+Multimodal generation. Our use of landmarks and ﬁne-      Figure 2. Bootstrapped landmarks illustrated as image-text pairs.
+grained connections between language and visual elements
+has parallels in image captioning. In particular, Pont-Tuset      ual annotation would be at scale, we instead opt to bootstrap
+et al. [45] show that controlled image captioning using      silver data, a term used in natural language processing when
+mouse traces produces better image descriptions.  Zhou      high-quality annotations – not created by people – are de-
+et al. [68] use a pre-trained text-image matcher to learn      rived by combining models and constraints [25,49,63].
+keyword-bbox alignments, which are used to condition their    RxR. To automatically identify and annotate landmarks, we
+caption generator (similar to our detection and use of visual     use Room-across-Room (RxR) [35]. RxR builds on the core
+landmarks). Huber et al. [29] provide a two-stage image-      task formulation deﬁned by Room-to-Room (R2R) [5]. Both
+grounded dialogue model that extracts sentiment informa-      are set in Matterport3D environments [9], but RxR is mul-
+tion from images to imbue emotion into generated texts.      tilingual (English, Hindi, Telugu), its paths are longer and
+Specialized datasets, akin to our silver landmark data, are    more varied, and it has roughly six times more instructions.
+used to train an image feature extractor to improve scene un-      Importantly, while both R2R and RxR include navigation
+derstanding and handling of sentiment and facial features.       paths, RxR includes two key additional annotations:
+  Our generator itself falls within the growing collection                                                                             • Pose traces. A pose trace records an annotator’s vir-
+of approaches that encode multimodal inputs and decode                                                                           tual pose as they move along a navigation path while
+to text, including VL-T5 [12], MAnTiS [56] and SimVLM                                                                  recording spoken navigation instructions for others to
+[62], often in a multitask setting. Our inputs are different                                                                       follow. From a pose trace we can render a timestamped
+in that we encode multiple, connected images that are inter-                                                               video of everything the annotator looked at.
+leaved with action descriptions. Our model outputs are eval-                                                                             • Text timestamps.  Every word in RxR’s text instruc-
+uated with respect to downstream task performance using                                                                        tions is timestamped, and thus aligned to the pose trace
+human evaluators, rather than automatic metrics and down-                                                                    video. This provides a noisy, approximate grounding
+stream tasks based on the learned representations.                                                                   of words in the navigation instructions to video frames.
+                                                      Using RxR, we construct landmark annotations in three
+3. Bootstrapping a Landmark Dataset
+                                                                    steps: (1) extracting landmark phrases; (2) grounding land-
+  MARKY-MT5’s ﬁrst stage identiﬁes visual landmarks as    mark phrases to pose trace frames; and (3) reﬁning selected
+input to a second stage instruction generator. This requires     frames to better align with the landmark object. Text times-
+training data of navigation instructions with landmark an-     tamps provide a key source of weak supervision for step
+notations.  Here, a landmark annotation is an instruction      2, since an annotator would generally utter “white couch”
+text span that mentions an object (e.g., white couch), and     soon after seeing the couch.  However, text timestamps
+the aligned perspective image containing that object (see     alone are insufﬁcient for grounding to pose trace frames as
+Fig. 2). Unfortunately, navigation instruction datasets with     annotators may talk about a landmark without looking at it.
+annotated landmarks do not exist.3 Given how costly man-     Extracting landmark phrases. The ﬁrst step to create sil-
+                                                              ver landmark data is extracting temporally-ordered lists of   3While Matterport3D contains 3D bounding box annotations for many
+objects (potential landmarks), these are not aligned to navigation instruc-     landmark phrases – noun phrases describing objects in the
+tions (which typically refer to a much broader set of landmarks than these).     environment – from RxR’s human instructions.  For this,
+=== PDF PAGE 4 ===
+Figure 3.  Example CTC alignment between pose trace frames
+(top) and landmark phrases (left). Every landmark is aligned to
+a contiguous subsequence of frames. The BLANK label is used for      Figure 4. A full bootstrapped landmark annotation for a navigation
+frames that do not contain a landmark.                                   instruction from RxR Val-Unseen. Nine of ten landmarks (1-9) are
+                                                                      strongly aligned. Landmark 10 kitchen is misaligned (despite the
+we use an mBERT-based [15] dependency parser trained      visual resemblance), perhaps due to a violation of our assump-
+on multilingual Wikipedia data [24] to identify all entity      tion that annotators mention landmarks in their observation order
+                                                          – here, the mention of kitchen harks back to an earlier observation.mentions, including their parts-of-speech, which we con-
+solidate with their non-clausal dependents into a single text
+                                                          use Connectionist Temporal Classiﬁcation (CTC) loss [23].
+span (see supplementary for further details). To improve
+                                                  Our motivation  is  similar  to uses  of CTC  in speech
+results, in each language we manually curate a stop list of
+                                                               recognition and optical character recognition [19], where
+common landmark phrases that are discarded as too difﬁcult
+                                                                the sequence of output labels  is known, but the align-
+to accurately localize (e.g., ‘the room’, ‘your destination’).
+                                                    ment to the inputs is not. We treat the frame sequence
+The output is a text span sequence t = [t1, t2, . . . , tm], e.g.
+                                                        r=[r1, r2, . . . , rn] as the input.  The set of output  la-
+     You are standing in front of a brown chair. Take a left           bels {t1, t2, . . . , tm, BLANK} includes the landmark phrases
+      to enter the bathroom, you will see a sink in front of           in the instruction plus a BLANK label (to accommodate
+     you. Now take a step to the right at stop at the foot         frames without a landmark). The ordered landmark phrases
+     mat, you will have reached your destination.                   t=[t1, t2, . . . , tm] provide the target output sequence, i.e.,
+    →[brown chair, bathroom, sink, foot mat].              we assume that the order in which annotators mention land-
+                                                     marks is the order in which they are observed. CTC’s loss
+In total, we extract 971k landmark phrases from the 102k                                                      maximizes the probability that predicting a landmark phrase
+instructions in the RxR Train, Val-Seen and Val-Unseen                                                                   for each frame (or BLANK) produces a valid output sequence:
+splits (9.55 landmarks per instruction on average). There                              n
+are 84,237 unique phrases; the percentage of phrases that                  p(t | r) = X Y p(Ai,j | rj)           (2)
+appear more than 3/5/10 times is 20.8%/13.1%/7.4%.                                          A(r,t) j=1
+Landmark grounding matrix.   For an instruction,  to
+                                                     where A(r,t) marginalizes over all valid alignments, and
+ground landmark phrases t=[t1, t2, . . . , tm] to pose trace
+                                                                the right-hand side item computes the probability of single
+video frames r=[r1, r2, . . . , rn], we construct an m×n
+                                                             alignment.  Intuitively, CTC performs training by encour-
+logit matrix A, where Ai,j represents the compatibility of
+                                                          aging each frame to be assigned to a landmark phrase such
+landmark phrase ti and frame rj.  Logits are computed
+                                                                     that the order of landmarks in the instruction is preserved.
+by combining signals from MURAL-large [31] – a high-
+                                    A valid CTC alignment is demonstrated in Figure 3.
+performing multilingual, multimodal dual encoder trained
+                                                    Decoding landmark alignments. After ﬁnetuning, we per-
+on a mixture of 1.8b noisy image-text pairs and 6b transla-
+                                                     form greedy CTC decoding on the logit matrix A which
+tion pairs – and the RxR text timestamps, i.e.:
+                                                                 aligns each landmark phrase with a sequence of one or more
+        Ai,j = X(ti) · Y (rj) −λ(T(ti) −T(rj))2     (1)     frames. For each landmark phrase ti we then ﬁnd the best
+                                                                 single alignment by selecting the frame in that sequence that
+where X computes a MURAL text embedding, Y computes     assigns ti the highest probability. This generates image-text
+a MURAL image embedding, T returns a timestamp in sec-      pairs where each text span is a landmark phrase from an in-
+onds, and λ is a weighting factor set to 1.                         struction, and each image is a perspective projection from
+  To ﬁnetune MURAL on RxR, we add an additional     a 360◦pano with known heading, pitch, and horizontal and
+trainable layer to each pretrained and frozen encoder and      vertical ﬁeld of view (derived from the original pose trace).
+=== PDF PAGE 5 ===
+Evaluation.  As the text-image alignment task above is
+weakly-supervised (i.e., we know a landmark phrase se-
+quence and a pose trace video are paired, but we do not
+know how landmark phrases are aligned with video frames),
+we also perform a small-scale human evaluation of align-
+ment quality. We manually annotated 100 instructions from
+RxR Val-Unseen, evaluating our approach in various con-
+ditions using alignment precision. We observe: 1) gains
+with adding timestamp-based bias (i.e. the squared term in
+Eq. (2)): 49.6 w/o bias vs. 56.5 w/ bias; 2) The bias alone
+(i.e. no input from MURAL) does not work: 23.4 precision.                                                                  Figure 5. Pano input format for the landmark detector. Both the
+Landmark reﬁnement. We observe that the pose trace     inbound and outbound directions are drawn on the image to pro-
+frames selected in the previous steps typically contain the      vide route context. The detector outputs bounding boxes in the
+landmark phrase, but it is not always centered. This is be-      equirectangular image, which are converted to perspective projec-
+cause annotators do not necessarily need to look directly      tions of the detected landmark(s).
+at a landmark to notice  it.  To further reﬁne the land-
+mark grounding, we generate a large number of alternative     model (see Fig. 5). To avoid edge discontinuities, we also
+groundings (deﬁned by heading, pitch and ﬁeld of view)     add 90◦of circular padding to each side of the pano. Images
+that overlap with the selected frame. The ﬁnal silver land-      are prepared consistently for both training and inference.
+mark image for each landmark phrase is the grounding     Training.  As outlined in Sec. 3, each landmark image
+among these candidates with the highest MURAL align-       is a perspective projection from a 360◦pano. To obtain
+ment score with the landmark phrase. This results in very      training targets we map these projections to their minimum
+high quality landmark annotations, as shown in Fig. 4 for a     enclosing bounding box in the equirectangular pano im-
+complete set of landmark annotations for one instruction.        age. We initialize the model with an Hourglass-104 back-
+                                                     bone [39, 42] pretrained on the COCO 2017 dataset [40],
+4. Landmark Detection                             and train for 20k iterations on silver landmarks from RxR
+                                                                   training set using a batch size of 128, an equirectangular
+   Using navigation paths from RxR and silver landmark
+                                                     image size of 512×256, and a single landmark object class.
+annotations (Sec. 3), we train a landmark detector that se-
+                                                             Inference. During inference, we pool together the top 3
+lects visual landmarks to be mentioned. The input to the
+                                                                detections from each pano in the path, and return the top T
+model is a sequence of 360◦panos I1:T captured at regu-
+                                                                detections from this pool as the detected landmarks (where
+lar intervals along a route, along with the inbound and out-
+                                            T is the path length).4 These values (at most 3 landmarks
+bound direction. The model detects landmarks in 360◦im-
+                                                     from a single pano and one landmark per pano on average)
+ages as an object detection problem, using a CenterNet [67]
+                                                                closely correspond to averages in the training set.
+object detector.  The detector is intended for identifying
+landmarks in unseen environments. Although not all land-
+                                                          5. Instruction Generationmarks are objects in the traditional sense (e.g. open area,
+laundry room), previous work demonstrates that object de-                                                    The instruction generator converts a representation of se-
+tectors can learn to successfully detect and featurize amor-                                                                 lected landmarks and the route connecting them into a tex-
+phous image regions such as sky and water [4].                                                                     tual navigation instruction. Our model is based on the mT5
+Input format. Given a sequence of panoramic images I1:T ,                                                                       text-to-text encoder-decoder transformer architecture [64],
+each pano It is input to CenterNet in equirectangular for-                                                     which is itself a multilingual variant of T5 [48] (hence,
+mat.  Though equirectangular images suffer from distor-                                              MARKY-MT5). In all experiments we use the mT5 base size
+tion, most landmarks are located close to the horizon, where                                                    model and the standard mT5 vocabulary which supports up
+equirectangular distortion is minimal.  Previous work on                                                                   to 101 languages using a SentencePiece [37] model trained
+landmark salience for human navigation suggests that land-                                                    on mC4 to encode text as WordPiece [52] tokens.
+marks located closer to the next route segment are more im-
+                                                      Input format. We formulate the input to the model by in-
+portant than landmarks further away (e.g. behind the ob-
+                                                                   serting visual representations of selected landmarks into a
+server) [7, 33]. We therefore provide route context to the
+                                                               templatic English text sequence describing the orientation
+model, by rotating each input pano so that the direction to
+                                                              of each landmark and the actions required to traverse the
+the next pano (the outbound direction) is centered in the im-
+                                                                    route. Speciﬁcally, each visual landmark feature appears in
+age. Since the direction faced on arrival from the previous
+pano (the inbound direction) is also important, we draw col-        4The 1:1 #landmarks / path length ratio is selected based on BLEU and
+ored pixel blocks on the input image indicating both to the     CIDEr scores: also experimented with 1.2:1, 1.5:1, 1.75:1 and 2:1 ratios.
+=== PDF PAGE 6 ===
+                                                                the landmark detector (detected landmarks), at each pano
+                                             we include an additional outbound landmark, deﬁned as the
+                                                      view from the current pano in the direction of the next pano
+                                                            (bordered in orange in Fig. 6).  Including outbound land-
+                                                     marks gives a small boost in automatic evaluations.  All
+                                                        landmarks are represented using 640-dimension image em-
+                                                          beddings from MURAL-large [31].
+                                                      Rewrite task. To improve the performance of the instruc-
+                                                                   tion generator, we propose an auxiliary rewrite task. In the
+                                                                 rewrite task, we modify the input template during training
+                                                    by replacing the image feature for each silver landmark with
+                                                                the landmark phrase, e.g. ‘commode’. As before, the train-
+                                                             ing target is a full navigation instruction containing all the
+                                                       landmark phrases in context. We hypothesize that this auxil-
+                                                                   iary task helps train the attention mechanisms in the model
+                                                                   to correctly associate input landmark representations with
+                                                                       their output realization in the text (noting that this is the
+                                                          only way we make direct use of the landmark phrase anno-
+                                                                    tations from the silver dataset).
+                                                            Pretraining. We investigate pretraining the instruction gen-
+                                                                   erator on an equally weighted mixture of image-caption
+                                                                   pairs from the CC3M [53] and CC12M [10] datasets. Since
+                                                                the captions are all in English, we translate them into Hindi
+                                                      and Telugu using an MT service.5 We consider it impor-
+Figure 6. Input template and multilingual outputs from the instruc-      tant to introduce both text and visual inputs to our model
+tion generator. The input template encapsulates the visual land-     during pretraining. We therefore formulate the pretraining
+marks to be mentioned along the route, along with their relative      task as machine translation of image captions using a pivot
+orientation and the navigation actions connecting them.                                                     image [57], e.g. (English + image) →Hindi and so on. To
+                                                         encourage the model to make full use of the visual informa-
+order of its appearance on the route, preceded by its rela-      tion only the ﬁrst half of the input caption is provided.
+tive orientation to an observer, e.g. ahead is..., slight right     Finetuning and inference. We ﬁnetune mT5 on all three
+is.... In between each landmark, the relative motion required     languages in the RxR train split using silver landmark inputs
+to approach the next landmark is encoded with an action      for 200k iterations with batch size 128. During inference
+phrase, e.g. go hard left, turn 180 (refer Fig. 6). There are    we use argmax decoding and evaluate using both silver and
+12 possible relative orientation phrases and 12 possible ac-     predicted landmarks from the landmark detector.
+tion phrases, with each one representing an arc of 30◦. Us-
+ing this approach, our instruction generator can be trained
+                                                          6. Experimentsor evaluated using any set of landmark images that can be
+oriented along a 3D route. To identify the desired output                                                              Baselines. We train our multilingual MARKY-MT5 model
+language, the input is preceded by the appropriate prompt:                                                    on RxR and evaluate using paths from both RxR [35] and
+‘Translate placeholder template to English/Hindi/Telugu:’.                                          R2R [6], comparing to the following prior work:
+Landmarks. To train the model we use the RxR dataset          • SpkFol  and  EnvDrop:    Instruction  generators
+augmented with the silver landmarks described in Sec. 3.         from the Speaker-Follower [21] and Environmental
+Since instructions often mention the same landmark several         Dropout [59] papers.  Both models are LSTM [27]
+times (e.g. from Fig. 4 ‘You are standing in a washroom,          encoder-decoder models that take full panoramic im-
+turn right and exit the washroom...’), the same landmark          ages as input, with each pano represented by 36 image
+image can appear multiple times in succession in the sil-           features representing different viewing directions.
+ver data. This leaks information about the surface realiza-          • SpkFol-RxR: We re-implement SpkFol and optimize
+tion of the instruction which will not be available from our          hyperparameters for the longer instructions in the RxR
+landmark detector. We therefore de-duplicate landmarks by           dataset, training separate monolingual models for En-
+removing any landmark with heading, elevation and ﬁeld of            glish, Hindi and Telugu using the mT5 vocabulary.
+view within 5◦of a previous landmark from the same pano.
+   In addition to the landmarks provided by silver data or       5https://cloud.google.com/translate
+=== PDF PAGE 7 ===
+                                                                                                       Visual Search %
+
+            Model              Landmarks  Training Data WC NE ↓SR ↑SPL ↑Quality ↑Start ↓  Other ↓ Time (s) ↓
+
+           1  SpkFol [21]               Full Panos     R2R       24.6   6.0   42.0   35.8      4.1      39.8     23.6       54.2
+           2  EnvDrop [59]             Full Panos     R2R       24.5   6.0   41.7   35.3      4.0      40.7     23.5       54.0
+               (en) 3  SpkFol-RxR [21]         Full Panos     RxR       61.8   3.9   57.8   48.7      4.2      36.0     23.7       67.5
+           R2R 4 Marky-mT5            Outbound      RxR       57.5   3.6   64.9   54.1      4.2      36.2     23.8       72.5           5 Marky-mT5               Predicted      RxR       58.2   2.9   70.8   59.8      4.3      35.5     23.2       70.1
+           6 Human                             -                  -        25.6   2.8   74.9   66.4      4.5      37.8     23.0       52.2
+
+Table 1. R2R Val-Unseen human wayﬁnding performance (N = 783 for each model). Combining the larger RxR dataset with landmark
+modeling and our bootstrapped landmark dataset, we almost eliminate the gap between model-generated and human-written instructions
+on paths of R2R-level difﬁculty – achieving a 70.8% success rate vs. 74.9% for human instructions and 42% for previous models.
+
+
+                                                                                                      Visual Search %
+
+             Model             Landmarks WC NE ↓ SR ↑ SDTW ↑ NDTW ↑  Quality ↑  Start ↓  Other ↓  Time (s) ↓
+
+           1  Marky-mT5            Outbound   67.3   5.3   53.3     37.4       52.1        4.1       38.9     26.9      146.8
+                  (all)  2  Marky-mT5              Predicted   71.1   4.4   61.5     43.9       56.2        4.2       37.6     26.5      154.4
+           RxR  34  Marky-mT5Human                      Silver-       72.276.2   4.32.7   63.378.4     45.461.3       57.069.2        4.34.6       37.836.5     26.625.7      149.8147.4
+
+Table 2. RxR Val-Unseen human wayﬁnding performance (N = 4,551 for each model). On longer and more challenging RxR-style paths,
+human wayﬁnders obtain a 61.5% success rate using our model vs. 78.4% for human instructions. The higher 63.3% success rate using
+silver landmarks suggests improved landmark selection is one way to narrow that gap.
+
+
+To evaluate modeling choices and opportunities, we report     centage of the available panoramic visual ﬁeld that the an-
+results for the following variations of our model:                notator observes at each viewpoint (Visual Search ↓), with
+   • Outbound:  Training and evaluation with outbound     higher values indicating greater effort spent looking for the
+     landmarks, but no detected landmarks (refer Sec. 5).        correct route or landmarks.6 Time ↓represents the aver-
+   • Predicted: Our full model, trained on silver landmark     age time taken in seconds to complete the task, WC is word
+     data and evaluated using predicted landmarks gener-     count and N is the number of instructions evaluated.
+     ated by our landmark detector.                        Automatic Metrics. For model development and ablations,
+   • Silver: As above, evaluated with silver landmarks.    we use automatic evaluation metrics. SPICE [3] is the only
+    This allows us to assess a quasi-upperbound on perfor-     metric found to correlate with human wayﬁnding perfor-
+    mance on landmarks derived from human annotations    mance [66]; however, SPICE needs an English dependency
+    and does not represent deployed system performance.      parser [32], so we also report BLEU [43] and CIDEr [61].
+   • Ablations: Results without pretraining on CC3M and      Further, since SPICE was designed for evaluating individual
+   CC12M, and without the Rewrite auxiliary task.            sentences, not multi-sentence paragraphs, when calculating
+Human Wayﬁnding.  We consider human evaluations to    SPICE we separate both candidate and reference instruc-
+be essential for this task. Using PanGEA [36], an open-      tions into individual sentences (details in Supplementary).
+source annotation toolkit for panoramic graph environ-   We compute CIDEr and SPICE with ofﬁcial evaluation code
+ments, we immerse annotators in a simulated ﬁrst-person     from COCO captions [11]. For BLEU, we use the sacre-
+environment backed by the Matterport3D dataset [9] and   BLEU implementation [46]. CIDEr and BLEU scores are
+ask them to follow the provided text navigation instructions.     macro-averaged over languages.
+In total, we conduct 20k wayﬁnding evaluations involving     Results. We present human evals on R2R’s Val-Unseen
+70 annotators. All annotators are based in India and are ﬂu-     paths in Tab. 1 and RxR’s Val-Unseen paths in Tab. 2; au-
+ent in the language they were tasked with.                    tomated evaluations on RxR are in Tab. 3. We align our
+Human Wayﬁnding Metrics. We report the following      results discussion to speciﬁc questions and themes.
+standard metrics [2, 30] to evaluate the similarity between        Dataset choice: Training on the larger RxR dataset in-
+the route generated by our annotators and the intended                                                               stead of R2R noticeably improves human wayﬁnding per-
+route (and hence, the quality of the generated instruc-                                                       formance in English, increasing success rate (42.0% →
+tions): navigation error (NE ↓) success rate (SR ↑), suc-                                                     57.8%) and SPL (35.8% →48.7%) while lowering navi-
+cess weighted by inverse path length (SPL ↑), normalized                                                              gation error (6.0m →3.9m) using the same model – see
+dynamic time warping (NDTW ↑), and success weighted                                                              Tab. 1 row 3 vs. row 1. We note that the word count (WC)
+DTW (SDTW ↑). Arrows indicate improving performance.
+Following [66], we also report instruction quality assessed          6Start and Other refer to ﬁrst and other viewpoints, reported separately
+by annotators on a 1–5 Likert scale (Quality ↑), and the per-      because wayﬁnders usually look around to orient themselves at the start.
+=== PDF PAGE 8 ===
+                                                                  Val-Seen                         Val-Unseen
+
+           Model            Landmark Rewrite PT  BLEU CIDEr SPICE (en)  BLEU CIDEr SPICE (en) SR ↑NDTW ↑
+
+          1 SpkFol-RxR [21]       Full Panos       -        -      5.9     8.9      13.9         5.7     8.4      13.0     29.6    41.6
+          2 Marky-mT5            Full Panos       -        -      5.8     8.3      11.8         5.6     9.6      14.0     50.7    60.1
+          3 Marky-mT5          Outbound       -        -      6.4    10.7      10.1         6.2    10.0      10.0     53.6    62.9
+          4 Marky-mT5              Silver          -        -     11.6    25.2      16.6       11.1    23.3      15.7     55.9    64.1           RxR
+          5 Marky-mT5              Silver    ✓       -     14.0    33.9      17.8       12.9    30.4      16.4     56.3    64.2
+          6 Marky-mT5              Silver    ✓  ✓    14.6    35.0      17.3       13.4    31.7      16.2     56.4    64.2
+          7 Marky-mT5            Predicted   ✓  ✓      6.2     8.4      13.7         5.8     7.5      13.5     55.7    63.3
+          8 Human                          -             -        -        -         -            -              -         -            -       56.5    62.9
+
+Table 3. Automatic evaluations on RxR. Results are aggregated across English, Hindi and Telugu except for SPICE which is English-only.
+SR and NDTW score the wayﬁnding performance of a state-of-the-art VLN agent [?]. PT refers to CC3M/12M PreTraining.
+
+
+of models trained on RxR is considerably longer than R2R      Pretraining (Tab. 3 row 6 vs. 5) improves BLEU (+0.6/+0.5)
+for the same paths; RxR annotations include more detailed     and CIDEr (+1.1/+1.3) scores, but not SPICE (-0.5/-0.2).
+descriptions and more state veriﬁcation [35].                      Trustworthiness of automatic evaluations: We note that
+  Do landmarks matter? Yes. On R2R, MARKY-MT5 in-     replacing silver landmarks with predicted landmarks (Tab. 3
+creases success rate (57.8% →70.8%) and SPL (48.7% →    row 7 vs. 6) dramatically reduces BLEU (-8.2/-7.6), CIDEr
+59.8%), and lowers navigation error (3.9m →2.9m) com-      (-26.6/-24.2) and SPICE (-3.6/-2.7) to the level of previous
+pared to prior work without landmarks – represented by     work. This is completely inconsistent with our human eval-
+SpkFol-RxR trained on the same dataset (Tab. 1, row 5 vs.      uations. We suggest only using automatic evaluations to
+3). We attribute our gains primarily to landmark modeling:     compare similar models, and attribute this reduction in tex-
+though MARKY-MT5 uses a transformer architecture and      tual similarity to differences in the choice of landmarks.
+stronger image features than SpkFol-RxR, these changes     Diverse generation. An appealing property of our two-
+have little impact without landmarks (Tab. 3, row 2 vs. 1).       stage approach is that diverse instructions can be generated
+  How useful are the silver landmarks? On RxR’s chal-     by sampling landmark predictions. Revisiting the Fig. 1 ex-
+lenging paths, training and evaluating with silver landmarks     ample, sampling the next highest ranked landmark predic-
+increases success rate (53.3% →63.3%), increases NDTW      tions produces the following–quite different–instruction:
+(52.1% →57.0%), and lowers navigation error (5.3m →
+4.3m) compared to using only outbound landmarks (Tab. 2,          You are standing in a bathroom facing a toilet. You are
+row 3 vs.  1). This conﬁrms our silver landmarks contain          going to turn to your right and exit the bathroom. You
+useful groundings and using them improves performance.               will come into a kitchen area. There will be a marble
+  Can landmark detection be improved? MARKY-MT5           counter top on your right and to your left a living room.
+performs better using silver landmarks instead of predicted          You are going to make a left into the living room. In
+landmarks, e.g. success rate of 63.3% vs. 61.5% (Tab. 2            front of you will be an arched entrance way with a table
+row 3 vs. 2), suggesting gains are possible.                        and chairs. You are going to stop right in front that
+  Comparison to human instructions:  Overall, using a           entrance way and you are done.
+combination of RxR data, silver landmarks and modeling
+improvements, we almost eliminate the gap between model-     7. Conclusion
+generated and human-written instructions on paths of R2R-
+level difﬁculty – with a 71% success rate vs. 75% for human     We propose a two-stage approach for generating navi-
+instructions and 42% for previous models (Tab. 1). How-     gation instructions directly from visual inputs. Supported
+ever, on the more challenging RxR-style paths, a gap re-     by a new bootstrapped dataset of 971k grounded land-
+mains – human wayﬁnders obtain a 62% success rate us-     marks, MARKY-MT5 almost eliminates the gap between
+ing MARKY-MT5 vs. 78% for human instructions (Tab. 2).     model-generated and human-written instructions on R2R
+While humans can still distinguish MARKY-MT5 instruc-      paths. Generating such high-quality navigation instructions
+tions from human, a state-of-the-art VLN agent [?] cannot      in novel environments is a step towards conversational nav-
+– achieving near identical success rates (56.5% vs. 55.7%)      igation tools and could facilitate larger-scale training of
+and NDTW (62.9% vs.  63.3%) for human and model-      instruction-following agents. However, the strength of our
+generated instructions respectively (Tab. 3 row 8 vs. 7).        approach–focusing on visual landmarks–is also it’s limita-
+   Rewrite  auxiliary  task and CC3M/12M  pretraining:      tion. MARKY-MT5 is blind to environment context when
+Training with the Rewrite task (Tab. 3 row 5 vs.  4) has      generating, making  it susceptible to pragmatic reasoning
+a large positive effect on Val-Seen and Val-Unseen BLEU      failures, e.g. generating ‘Leave the room’ in a room with
+(+2.4/+1.8), CIDEr (+8.7/+7,1) and SPICE (+1.2/+0.7).     multiple exits. Addressing this could lead to further gains.
+=== PDF PAGE 9 ===
+Acknowledgements                                              Microsoft COCO Captions: Data Collection and Evaluation
+                                                                              Server. arXiv preprint arXiv:1504.00325, 2015. 7
+We thank Ming Zhao, Subhashini Venugopalan, and Alex                                                                     [12] Jaemin Cho, Jie Lei, Hao Tan, and Mohit Bansal. Unifying
+Ku for early discussions and brainstorming; Yinfei Yang,           vision-and-language tasks via text generation.  In Proceed-
+Chao Jia and Aashi Jain for help with MURAL image fea-           ings of ICML 2021, 2021. 2, 3
+tures; Sebastian Goodman and Beer Changpinyo for assis-      [13] Andrea F. Daniele, Mohit Bansal, and Matthew R. Walter.
+tance with the multimodal mT5 implementation; and Igor           Navigational instruction generation as inverse reinforcement
+Karpov, Ming Zhao and the Google ML Data Operations            learning with neural machine translation. In Proceedings of
+team for support collecting human evaluations.                         the 2017 ACM/IEEE International Conference on Human-
+                                                                 Robot Interaction, HRI ’17, page 109–118, New York, NY,
+References                                            USA, 2017. Association for Computing Machinery. 3
+                                                                     [14] Pim de Haan, Dinesh Jayaraman, and Sergey Levine. Causal
+ [1] Sanyam Agarwal, Devi Parikh, Dhruv Batra, Peter Ander-           confusion in imitation learning. In NeurIPS, 2019. 2
+     son, and Stefan Lee.  Visual landmark selection for gener-      [15] Jacob Devlin, Ming-Wei Chang, Kenton Lee, and Kristina
+      ating grounded and interpretable navigation instructions. In           Toutanova. BERT: Pre-training of deep bidirectional trans-
+    CVPR workshop on Deep Learning for Semantic Visual Nav-           formers for language understanding. In NAACL, June 2019.
+      igation, 2019. 2                                                            4, 12
+ [2] Peter Anderson, Angel X. Chang, Devendra Singh Chaplot,      [16] Markus  Dr¨ager and Alexander  Koller.    Generation  of
+     Alexey Dosovitskiy, Saurabh Gupta, Vladlen Koltun, Jana          landmark-based navigation instructions from open-source
+     Kosecka, Jitendra Malik, Roozbeh Mottaghi, Manolis Savva,            data. In Proceedings of the 13th Conference of the European
+     and Amir Roshan Zamir. On evaluation of embodied navi-          Chapter of the Association for Computational Linguistics,
+     gation agents. CoRR, abs/1807.06757, 2018. 7                      pages 757–766, Avignon, France, Apr. 2012. Association for
+ [3] Peter Anderson,  Basura Fernando, Mark Johnson, and          Computational Linguistics. 1
+     Stephen Gould. SPICE: Semantic Propositional Image Cap-      [17] Russell A. Epstein and Lindsay K. Vass. Neural systems for
+      tion Evaluation. In ECCV, 2016. 7                                 landmark-based wayﬁnding in humans.  In Philos Trans R
+ [4] Peter Anderson, Xiaodong He,  Chris Buehler, Damien          Soc Lond B Biol Sci, 2014. 2
+     Teney, Mark Johnson, Stephen Gould, and Lei Zhang.      [18] Irene Fellner. Automatic generation of landmark-based in-
+     Bottom-up and top-down attention for image captioning and          door routing instructions. 2017. 2
+      visual question answering. In CVPR, 2018. 5                    [19] Xinjie Feng, Hongxun Yao, and Shengping Zhang. Focal ctc
+ [5] Peter Anderson, Qi Wu, Damien Teney, Jake Bruce, Mark            loss for chinese optical character recognition on unbalanced
+     Johnson, Niko S¨underhauf, Ian Reid, Stephen Gould, and            datasets. In Complexity, 2018. 4
+    Anton van den Hengel. Vision-and-language navigation: In-      [20] Patrick Foo, William H. Warren, Andrew Duchon, and
+      terpreting visually-grounded navigation instructions in real          Michael J. Tarr. Do humans integrate routes into a cogni-
+     environments.  In Proceedings of the IEEE Conference on             tive map? map- versus landmark-based navigation of novel
+    Computer Vision and Pattern Recognition (CVPR), 2018. 1,            shortcuts. In Journal of Experimental Psychology: Learning,
+    3                                                        Memory, and Cognition, 2005. 2
+ [6] Peter Anderson, Qi Wu, Damien Teney, Jake Bruce, Mark      [21] Daniel Fried, Ronghang Hu, Volkan Cirik, Anna Rohrbach,
+     Johnson, Niko S¨underhauf, Ian Reid, Stephen Gould, and          Jacob  Andreas,  Louis-Philippe Morency,  Taylor  Berg-
+    Anton van den Hengel.  Vision-and-Language Navigation:            Kirkpatrick, Kate Saenko, Dan Klein, and Trevor Darrell.
+      Interpreting visually-grounded navigation instructions in real           Speaker-follower models for vision-and-language naviga-
+     environments. In CVPR, 2018. 6                                           tion. In NeurIPS, 2018. 1, 2, 6, 7, 8
+ [7] David Caduff and Sabine Timpf. On the assessment of land-      [22] Daniel Fried, Ronghang Hu, Volkan Cirik, Anna Rohrbach,
+    mark salience for human navigation. Cognitive processing,          Jacob  Andreas,  Louis-Philippe Morency,  Taylor  Berg-
+     9(4):249–267, 2008. 2, 5                                              Kirkpatrick, Kate Saenko, Dan Klein, and Trevor Darrell.
+ [8] Edgar Chan, Oliver Baumann, Mark A. Bellgrove, and Ja-           Speaker-Follower Models for Vision-and-Language Naviga-
+     son B. Mattingley. From objects to landmarks: the function             tion. In Proceedings of NeurIPS, 2018. 2
+     of visual location information in spatial navigation. In Fron-      [23] Alex Graves, Santiago Fernandez, Faustino Gomez, and
+      tiers in Psychology, 2012. 2                                        Juergen Schmidhuber.  Connectionist Temporal Classiﬁca-
+ [9] Angel Chang, Angela Dai, Thomas Funkhouser, Maciej Hal-             tion: Labelling Unsegmented Sequence Data with Recurrent
+      ber, Matthias Niessner, Manolis Savva, Shuran Song, Andy          Neural Networks. In Proceedings of ICML, 2006. 4
+     Zeng, and Yinda Zhang. Matterport3D: Learning from RGB-      [24] Mandy Guo, Zihang Dai, Denny Vrandecic, and Rami Al-
+   D data in indoor environments. 3DV, 2017. 1, 3, 7                   Rfou. Wiki-40b: Multilingual language model dataset.  In
+[10] Soravit Changpinyo, Piyush Sharma, Nan Ding, and Radu        LREC 2020, 2020. 4, 12
+      Soricut. Conceptual 12m: Pushing web-scale image-text pre-      [25] Udo Hahn, Katrin Tomanek, Elena Beisswanger, and Erik
+      training to recognize long-tail visual concepts.  In CVPR,            Faessler. A proposal for a conﬁgurable silver standard. In
+     2021. 6                                                         Proceedings of the Fourth Linguistic Annotation Workshop,
+[11] Xinlei Chen, Tsung-Yi Lin Hao Fang, Ramakrishna Vedan-          pages 235–242, Uppsala, Sweden, July 2010. Association
+     tam, Saurabh Gupta, Piotr Dollar, and C. Lawrence Zitnick.            for Computational Linguistics. 2, 3
+=== PDF PAGE 10 ===
+[26] Harlan  Hile,  Radek  Grzeszczuk,  Alan  Liu,  Ramakr-      [39] Hei Law and Jia Deng.  Cornernet:  Detecting objects as
+     ishna Vedantham, Jana Koˇsecka, and Gaetano Borriello.           paired keypoints. In ECCV, 2018. 5
+     Landmark-based pedestrian navigation with enhanced spa-      [40] T.Y. Lin, M. Maire, S. Belongie, J. Hays, P. Perona, D. Ra-
+       tial reasoning. In Hideyuki Tokuda, Michael Beigl, Adrian          manan, P. Dollar, and C. L. Zitnick. Microsoft COCO: Com-
+      Friday, A. J. Bernheim Brush, and Yoshito Tobe, editors, Per-        mon Objects in Context. In ECCV, 2014. 5
+     vasive Computing, pages 59–76, Berlin, Heidelberg, 2009.      [41] Vivien Mast and Diedrich Wolter. A probabilistic frame-
+     Springer Berlin Heidelberg. 2                                 work for object descriptions in indoor route instructions. In
+[27] Sepp Hochreiter and J¨urgen Schmidhuber. Long Short-Term          Thora Tenbrink, John Stell, Antony Galton, and Zena Wood,
+    Memory. Neural Computation, 1997. 6                                   editors, Spatial Information Theory, pages 185–204, Cham,
+[28] Yicong Hong, Cristian Rodriguez, Yuankai Qi, Qi Wu, and           2013. Springer International Publishing. 1
+     Stephen Gould.  Language and visual entity relationship      [42] Alejandro Newell, Kaiyu Yang, and Jia Deng. Stacked hour-
+     graph for agent navigation.  In H. Larochelle, M. Ranzato,            glass networks for human pose estimation. In ECCV, 2016.
+     R. Hadsell, M. F. Balcan, and H. Lin, editors, Advances in         5
+     Neural Information Processing Systems, volume 33, pages      [43] Kishore Papineni, Salim Roukos, Todd Ward, and Wei-Jing
+     7685–7696. Curran Associates, Inc., 2020. 2                       Zhu.  Bleu: a method for automatic evaluation of machine
+[29] Bernd Huber, Daniel McDuff, Chris Brockett, Michel Gal-             translation. In ACL, 2002. 7
+      ley, and Bill Dolan.  Emotional dialogue generation using      [44] Alexander Pashevich,  Cordelia Schmid, and Chen Sun.
+     image-grounded language models. In CHI, 2018. 3                   Episodic Transformer for Vision-and-Language Navigation.
+                                                                           In ICCV, 2021. 2[30] Gabriel Ilharco, Vihan Jain, Alexander Ku, Eugene Ie, and
+                                                                     [45] Jordi Pont-Tuset, Jasper Uijlings, Soravit Changpinyo, Radu     Jason Baldridge.  Effective and general evaluation for in-
+                                                                               Soricut, and Vittorio Ferrari.  Connecting vision and lan-      struction conditioned navigation using dynamic time warp-
+      ing. NeurIPS Visually Grounded Interaction and Language          guage with localized narratives. In ECCV, 2020. 3
+     Workshop, 2019. 7                                              [46] Matt Post. A call for clarity in reporting BLEU scores. In
+                                                                     Proceedings of the Third Conference on Machine Transla-[31] Aashi Jain, Mandy Guo, Krishna Srinivasan, Ting Chen,
+                                                                                  tion: Research Papers, Brussels, Belgium, 2018. Association     Sneha Kudugunta, Chao  Jia,  Yinfei Yang,  and  Jason
+                                                                                for Computational Linguistics. 7     Baldridge. MURAL: Multimodal, multitask representations
+                                                                     [47] Peng Qi, Timothy Dozat, Yuhao Zhang, and Christopher D.     across languages.  In Findings of the Association for Com-
+                                                                Manning. Universal Dependency Parsing from Scratch. In     putational Linguistics: EMNLP 2021, pages 3449–3463,
+                                                                     Proceedings of CoNLL, 2018. 12     Punta Cana, Dominican Republic, Nov. 2021. Association
+                                                                     [48] Colin Raffel, Noam Shazeer, Adam Roberts, Katherine Lee,      for Computational Linguistics. 2, 4, 6, 12
+                                                                   Sharan Narang, Michael Matena, Yanqi Zhou, Wei Li, and
+[32] Dan Klein and Christopher D. Manning. Accurate unlexical-
+                                                                            Peter J. Liu. Exploring the limits of transfer learning with a
+     ized parsing. In ACL, 2003. 7
+                                                                   uniﬁed text-to-text transformer. Journal of Machine Learn-
+[33] Alexander Klippel and Stephan Winter.  Structural salience
+                                                                         ing Research, 21(140):1–67, 2020. 2, 5
+     of landmarks for route directions. In Anthony G. Cohn and
+                                                                     [49] Dietrich Rebholz-Schuhmann, Antonio Jos´e Jimeno Yepes,
+     David M. Mark, editors, Spatial Information Theory, 2005.
+                                                                        Erik M. van Mulligen, Ning Kang, Jan Kors, David Milward,
+    5
+                                                                            Peter Corbett, Ekaterina Buyko, Katrin Tomanek, Elena
+[34] Noriyuki Kojima, Alane Suhr, and Yoav Artzi.  Continual                                                                      Beisswanger, and Udo Hahn. The CALBC silver standard
+     learning for grounded instruction generation by observing                                                                      corpus for biomedical named entities — a study in harmo-
+    human following behavior. Transactions of the Association                                                                           nizing the contributions from four independent named entity
+      of Computational Linguistics, 2021. 3                                                                               taggers.  In Proceedings of the Seventh International Con-
+[35] Alexander Ku, Peter Anderson, Roma Patel, Eugene Ie,           ference on Language Resources and Evaluation (LREC’10),
+     and Jason Baldridge.  Room-Across-Room:  Multilingual             Valletta, Malta, May 2010. European Language Resources
+     Vision-and-Language Navigation with Dense Spatiotempo-           Association (ELRA). 2, 3
+      ral Grounding.  In Proceedings of EMNLP, 2020.  2, 3, 6,                                                                     [50] Kai-Florian Richter and Alexander Klippel.  A model
+    8                                                                                for context-speciﬁc route directions.  In Christian Freksa,
+[36] Alex Ku,  Peter Anderson,  Jordi Pont-Tuset, and Jason         Markus Knauff, Bernd Krieg-Br¨uckner, Bernhard Nebel, and
+     Baldridge. Pangea: The panoramic graph environment an-         Thomas Barkowsky, editors, Spatial Cognition IV. Reason-
+     notation toolkit. In 2nd Workshop on Advances in Language            ing, Action, Interaction, pages 58–78, Berlin, Heidelberg,
+    and Vision Research (ALVR) at NAACL, 2021. 7                     2005. Springer Berlin Heidelberg. 1
+[37] Taku Kudo and John Richardson.  Sentencepiece: A sim-      [51] Michael Roth and Anette Frank.  Computing EM-based
+     ple and language independent subword tokenizer and detok-           alignments of routes and route directions as a basis for nat-
+     enizer for neural text processing. In Proceedings of the 2018            ural language generation. In Proceedings of the 23rd Inter-
+     Conference on Empirical Methods in Natural Language Pro-           national Conference on Computational Linguistics (Coling
+     cessing: System Demonstrations, 2018. 5                            2010), pages 958–966, Beijing, China, Aug. 2010. Coling
+[38] Shuhei Kurita and Kyunghyun Cho.  Generative language-         2010 Organizing Committee. 1
+     grounded policy  in vision-and-language navigation with      [52] Rico Sennrich, Barry Haddow, and Alexandra Birch. Neu-
+     bayes’ rule. In ICLR, 2021. 1                                                ral machine translation of rare words with subword units.
+=== PDF PAGE 11 ===
+     In Proceedings of the 54th Annual Meeting of the Associa-      [65] Demet Yesiltepe, Ruth Dalton, and Ayse Torun. Landmarks
+      tion for Computational Linguistics (Volume 1: Long Papers),            in wayﬁnding: a review of the existing literature. In Cogni-
+     pages 1715–1725, Berlin, Germany, Aug. 2016. Association             tive Processing, 2021. 2
+      for Computational Linguistics. 5                                [66] Ming Zhao, Peter Anderson, Vihan Jain, Su Wang, Alex Ku,
+[53] Piyush Sharma, Nan Ding, Sebastian Goodman, and Radu           Jason Baldridge, and Eugene Ie. On the evaluation of vision-
+      Soricut. Conceptual captions: A cleaned, hypernymed, im-           and-language navigation instructions. In EACL, 2021. 2, 7
+     age alt-text dataset for automatic image captioning. In ACL,      [67] Xingyi Zhou, Dequan Wang, and Philipp Kr¨ahenb¨uhl. Ob-
+     2018. 6                                                                      jects as Points. In Proceedings of CVPR, 2019. 5
+[54] Noam Shazeer and Mitchell Stern.  Adafactor:  Adaptive      [68] Yuanen Zhou, Meng Wang, Daqing Liu, Zhenzhen Hu, and
+     learning rates with sublinear memory cost. In International         Hanwang Zhang. More grounded image captioning by dis-
+     Conference on Machine Learning, pages 4596–4604. PMLR,              tilling image-text matching model. In CVPR, 2021. 3
+     2018. 15
+[55] Mohit Shridhar, Jesse Thomason, Daniel Gordon, Yonatan
+     Bisk, Winson Han, Roozbeh Mottaghi, Luke Zettlemoyer,
+     and Dieter Fox. ALFRED: A Benchmark for Interpreting
+    Grounded Instructions for Everyday Tasks.  In The IEEE
+     Conference on Computer Vision and Pattern Recognition
+     (CVPR), 2020. 2
+[56] Michael Sollami and Aashish Jain. Multimodal conditional-
+      ity for natural language generation, 2021. 3
+[57] Lucia Specia, Stella Frank, Khalil Sima’an, and Desmond
+      Elliott. A shared task on multimodal machine translation
+     and crosslingual image description.  In Proceedings of the
+      First Conference on Machine Translation: Volume 2, Shared
+     Task Papers, pages 543–553, Berlin, Germany, Aug. 2016.
+     Association for Computational Linguistics. 6
+[58] Alane Suhr, Claudia Yan, Jack Schluger, Stanley Yu, Hadi
+     Khader, Marwa Mouallem, Iris Zhang, and Yoav Artzi. Ex-
+     ecuting instructions in situated collaborative interactions. In
+     Proceedings of the 2019 Conference on Empirical Methods
+      in Natural Language Processing and the 9th International
+      Joint Conference on Natural Language Processing (EMNLP-
+     IJCNLP), pages 2119–2130, Hong Kong, China, Nov. 2019.
+     Association for Computational Linguistics. 3
+[59] Hao Tan, Licheng Yu, and Mohit Bansal. Learning to nav-
+      igate unseen environments: Back translation with environ-
+     mental dropout. In NAACL, 2019. 1, 2, 6, 7
+[60] Yonglong Tian, Dilip Krishnan, and Phillip Isola.  Con-
+      trastive representation distillation. In ICLR, 2020. 12
+[61] Ramakrishna Vedantam, C. Lawrence Zitnick, and Devi
+     Parikh.  Cider: Consensus-based image description evalua-
+      tion. In CVPR, 2015. 7
+[62] Zirui Wang, Jiahui Yu, Adams Wei Yu, Zihang Dai, Yulia
+     Tsvetkov, and Yuan Cao. Simvlm: Simple visual language
+    model pretraining with weak supervision, 2021. 3
+[63] Qingrong Xia, Zhenghua Li, Rui Wang, and Min Zhang.
+     Stacked AMR parsing with silver data.  In Findings of the
+     Association for Computational Linguistics: EMNLP 2021,
+     pages 4729–4738, Punta Cana, Dominican Republic, Nov.
+     2021. Association for Computational Linguistics. 2, 3
+[64] Linting Xue, Noah Constant, Adam Roberts, Mihir Kale,
+    Rami Al-Rfou, Aditya Siddhant, Aditya Barua, and Colin
+      Raffel. mT5: A massively multilingual pre-trained text-to-
+      text transformer. In Proceedings of the 2021 Conference of
+     the North American Chapter of the Association for Compu-
+      tational Linguistics: Human Language Technologies, pages
+     483–498, Online, June 2021. Association for Computational
+      Linguistics. 2, 5
+=== PDF PAGE 12 ===
+SUPPLEMENTARY MATERIAL                                    BLEU  CIDEr
+                                                                                                  2-class       5.3      7.7
+  We present supplementary material with section titles                           10-class      4.8      7.2
+closely following the main paper.                                                       100-class     4.4      6.4
+
+8. Bootstrapping a Landmark Dataset                 Table 4.  Impact of training the landmark detector on clustered
+                                                             landmark classes. Automatic evaluation scores are reported for
+Extracting landmark phrases.  As outlined in Sec.  3,     Marky-mT5 without pretraining, using the RxR Val-Unseen split.
+the ﬁrst step to create silver landmark data is extracting
+temporally-ordered lists of landmark phrases from RxR’s
+human instructions. For this, we use a 3-layer distilled [60]      for this manual-alignment is illustrated in Fig. 9. To com-
+mBERT-based [15] dependency parser pretrained on mul-     pute the precision scores in the paper, whenever our auto-
+tilingual Wikipedia data [24] and outputting Universal De-     matic approach grounds a landmark phrase to a frame, it is
+pendencies [47]. Speciﬁcally, the steps are:                    a true positive if the frame is in the human-selected subse-
+                                                           quence, and a false positive otherwise. Results are averaged
+  1. Extracting all entity mentions (along with their part-     over all landmark phrases in an instruction and then all in-
+     of-speech) from an instruction;                               structions.
+  2. Centering around the mentions as the head N/NP, ab-
+     sorbing all of their non-clausal dependents. E.g. for ...                                                      Further analysis of the silver data.   Fig. 10 provides
+     at the large brown chair that sits next to the window                                                                   further examples of landmark annotations from our boot-
+        ..., the mention is chair, and the absorbed dependents                                                             strapped silver landmark dataset. Fig. 11 presents the dis-
+     are large and brown (but not the dependent clause that                                                                    tribution of landmark phrases, including the 20 most fre-
+      sits . . . );                                                          quent and least frequent landmark phrases. The distribution
+  3. Consolidating the head N/NP and its absorbed depen-      naturally has a long tail, although many unique landmark
+     dents into a single text span and recording the indices     phrases are semantically similar (e.g. brown chair vs. white
+     of the ﬁrst and last characters. In the example above,      chair). We also empirically conﬁrm the intuition that peo-
+   we produce large brown chair.                             ple tend to pick landmarks close to the outbound direction
+                                                                                    (i.e. the direction towards the next route segment). Fig. 12
+While the method identiﬁes most desired landmark text
+                                                                         illustrates the distribution of landmark centers in equirect-
+spans, inevitable errors do occur, sometimes due to the im-
+                                                             angular image coordinates aligned to the outbound direc-
+perfection of the human-written instructions, e.g.
+                                                                   tion of each pano. On the horizontal dimension (heading),
+   • Case 1. Non-object NPs. For “. . . take two steps to-      the landmarks are clustered close to the outbound direction,
+    wards the door”, for instance, steps will be extracted     whereas on the vertical dimension (pitch), landmarks are
+     as a candidate. Similarly, left in “. . . take a left”.          clustered on the horizon and slightly below.
+   • Case 2. Ill-formed/incomplete sentences. For exam-
+     ple, in Fig. 9, the single-word sentence “Fancy.”  re-     9. Landmark Detection
+     sults in fancy being parsed as a landmark text span.                                                           Training.  As noted in Sec.  4, the CenterNet landmark
+  To address Case 1, we manually compiled a stoplist      detector was trained using a single class to represent a land-
+(Fig. 7) of common non-object NPs that may appear in in-    mark (i.e., 2 classes in total).  In initial experiments, we
+door environment (e.g. [side, step, one, endpoint, . . . ]) for      also investigated training the detector using a richer set of
+each language (English, Hindi, Telugu). Case 2 is unavoid-     landmark classes, by clustering landmark phrases (using k-
+able with the tools currently available to us.  Fortunately,     means) into classes based on their MURAL-large [31] text
+they occur quite rarely.                                    embeddings. However, this slightly reduced automatic eval-
+   Fig. 8 demonstrates landmark phrase extraction on an ex-     uation scores for the full model (Tab. 4), perhaps because
+ample instruction.                                              detection conﬁdence scores are uncalibrated across classes.
+
+
+Evaluation.  In Sec.  3 of the paper, we include re-     Inference.  During inference with the landmark detector,
+sults from a  small-scale  evaluation  of 100 randomly-    we must determine how many landmarks to return. As de-
+sampled English  instructions from the  silver landmark     scribed in Sec. 4, we used a 1:1 ratio of landmarks to path
+dataset.  To provide ground truth landmark groundings,      length, deﬁned as the number of panos in the path. To de-
+each automatically-extracted landmark phrase was manu-     termine this ratio, we experimented with the following val-
+ally aligned by the paper authors to a subsequence of frames     ues {1.0, 1.2, 1.5, 1.75, 2.0} and computed automatic eval-
+from the corresponding pose trace video. The interface used     uations on the full model as reported in Tab. 5.
+=== PDF PAGE 13 ===
+Figure 7. Stoplists for excluding hard-to-localize noun phrases (NPs) when extracting landmark phrases. Left: English; Center: Hindi;
+Right: Telugu. Each stoplist was compiled by a native speaker examining samples of parsed landmark phrases.
+
+
+
+
+
+Figure 8. Landmark phrase extraction for the instruction segment “You are facing towards the commode. Turn right to and exit the
+washroom. Turn right and walk straight till you reach the white cabinet.”. First the object-denoting heads are identiﬁed, then we ﬁlter
+through each one’s dependency links to ﬁnd full NP phrases for each head with constraints (e.g. only including adjectival, numeral, or
+adverbial dependencies, etc.).
+=== PDF PAGE 14 ===
+Figure 9. Annotation interface used to collect ground-truth landmark groundings for a small-scale evaluation of the silver landmark dataset.
+For each automatically extracted landmark phrase (e.g., back yard, right), the annotator inputs a range identifying the frames in the pose
+trace video (left) where that landmark can be seen.
+
+
+
+
+
+Figure 10. Further examples of bootstrapped silver landmark annotations, illustrating both correct groundings (e.g., packaged items, top
+right [8] and beaded curtain, bottom right [4]) as well as failure cases (e.g., lamp, top left [5]).
+=== PDF PAGE 15 ===
+Figure 11. Left: Frequency distribution of the top 20 landmark phrases. Right top: Long-tail distribution over all landmark phrases sorted
+in descending order (both x- and y-axes are labeled in log10-scale: landmark indices for x-axis, instance counts for y-axis). Right bottom:
+20 samples of landmark phrases occurring only once. Common indoor/household items described generically (e.g. table or door) come
+on top of the rank over more speciﬁed ones (e.g. large brown dining table or closed double door). On the bottom end of frequency are
+speciﬁcally described uncommon objects, e.g. handmade wooden lamp, parapet wall, ﬁrst two arched doorways, etc.
+
+
+
+                                                                           #landmarks / path length ratio  BLEU  CIDEr
+
+                                                                                   1.0                              5.8      7.5
+                                                                                   1.2                              5.8      7.2
+                                                                                   1.5                              5.3      6.1
+                                                                                1.75                             4.9      5.0
+                                                                                   2.0                              4.4      3.7
+
+                                                                  Table 5.  Impact of varying the #landmarks / path length ratio.
+                                                              Automatic evaluation scores are reported for Marky-mT5 with
+                                                                Rewrite auxiliary training and CC3M/12M pretraining.
+
+
+
+                                                                 trained model (CC3M, CC12M, CC3M+CC12M) was ﬁne-Figure 12. Distribution of landmark centers in equirectangular im-
+age coordinates aligned to the outbound direction (i.e., the direc-     tuned and the ﬁnal pretrained version of the downstream
+tion to the next pano on the route). As expected, landmarks are     model was selected based on SPICE.
+clustered around the outbound heading direction. With regards to
+pitch, most landmarks are found on the horizon or slightly below.     11. Experiments
+The reason is fairly simple in the context of indoor environments:
+most landmarks are found on the ﬂoor or at table height, relatively    Human Wayﬁnding  In the PanGEA interface, each an-
+few are found on walls and ceilings.                                notator is shown a virtual environment in a window on the
+                                                                                  left, paired with the textual navigation instruction being
+                                                              evaluated on the right (refer top pane in Fig. 13). Hovering
+10. Instruction Generation                                  their mouse on the window, the annotator will see a green-
+                                                            square indicator showing them the next locations available
+Pretraining and Finetuning.  During pretraining, mod-      for them to move to. After double clicking on the green-
+els are trained with Cross Entropy Loss and optimized with      square, they are taken to the next location — illustrated in
+Adafactor [54] with a learning rate of 1. Batch size is 128.      Fig. 13 bottom pane, which presents a chain of ﬁrst person
+Pretrained models were trained for 1.45M steps. Each pre-     snapshots taken while moving. Upon arriving at the loca-
+=== PDF PAGE 16 ===
+                                                                                               Visual Search %
+
+       Model             Landmarks WC NE ↓ SR ↑ SDTW ↑ NDTW ↑  Quality ↑  Start ↓  Other ↓  Time (s) ↓
+
+    1  Marky-mT5            Outbound   75.0   5.2   52.8     40.0       57.0        4.2       36.7     25.4      101.8
+ (en)  2  Marky-mT5              Predicted   81.6   4.2   61.3     46.5       61.2        4.3       36.1     24.6      107.6
+ RxR  3  Marky-mT5                 Silver     91.2   4.0   65.0     49.0       60.8        4.3       36.3     25.2      118.4    4  Human                             -       98.6   2.7   77.5     62.2       71.0        4.6       35.3     24.3      113.5
+
+    1  Marky-mT5            Outbound   82.1   5.6   50.8     32.6       46.4        4.2       42.5     27.4      194.8
+ (hi)  2  Marky-mT5              Predicted   78.5   4.7   59.4     40.9       52.5        4.2       38.4     27.6      192.4
+ RxR  3  Marky-mT5                 Silver     72.4   4.6   60.7     42.3       54.4        4.3       39.1     27.1      176.0    4  Human                             -       75.0   2.9   77.1     59.4       67.8        4.6       37.0     26.3      171.5
+
+    1  Marky-mT5            Outbound   43.2   5.2   56.3     39.6       52.9        4.1       37.5     27.9      143.8
+ (te)  2  Marky-mT5              Predicted   52.1   4.3   63.9     44.6       55.1        4.1       38.3     27.2      162.5
+ RxR  3  Marky-mT5                 Silver     51.9   4.4   64.2     45.0       55.9        4.1       38.1     27.5      154.5
+    4  Human                             -       53.7   2.6   80.9     62.6       68.9        4.4       37.1     26.5      157.4
+
+Table 6. RxR Val-Unseen human wayﬁnding performance (N = 1,517 for each model), reported separately by language (English, Hindi
+and Telugu).
+
+
+                                                          Results  In Tab.  2 of the main paper we report human
+                                                    wayﬁnding results on paths from the RxR Val-Unseen split,
+                                                           aggregated overall all languages. In Tab. 6 we report these
+                                                                      results separately for each language (English, Hindi and
+                                                              Telugu). Results – and most importantly, the patterns hold-
+                                                             ing between the different settings – are consistent across all
+                                                             languages.
+                                                                   Finally note that, for both R2R and RxR evaluation (Val-
+                                                          Unseen), each path is only evaluated once per language.
+                                                              Therefore, for R2R we have 783 items/paths, for RxR, we
+                                                        have 1,517 paths, and with 3 languages, 4,551 items.
+
+
+                                                    Error analysis on Marky-mT5 instructions.  Our hu-
+Figure 13. Top: the PanGEA interface used in human wayﬁnding    man wayﬁnding results are representative of a step-change
+evaluations; Bottom: illustration of a series of ﬁrst person snap-      in instruction quality compared to previous models. To bet-
+shots taken along a navigation path.                                     ter understand the types of errors that still remain, we per-
+                                                     form a manual error analysis on 110 randomly-sampled En-
+                                                                   glish instructions generated for RxR Val-Unseen paths by
+tion the annotator believes is the destination, they may hit      the full Marky-mT5 system using predicted landmarks.
+the STOP button to ﬁnish the task.                                                     To perform the analysis we added an option in the
+   Afterwards, the annotator responds to a multi-choice    PanGEA wayﬁnding interface to toggle the visibility of the
+question to provide a subjective rating of instruction quality,     ground-truth path, so that we could better assess how well
+classifying the instruction as containing:                          that path was described by the generated instruction. We
+   • No mistakes, very very easy to follow;                       classify instruction errors and weaknesses into the follow-
+   • Few mistakes, easy to follow;                             ing six categories:
+   • Some mistakes, but still not hard to follow;                       • Landmark Errors
+   • Many mistakes, hard to follow;                              – Full Hallucination. The instruction describes a
+   • Way too many mistakes to follow.                               landmark that does not exist in the environment;
+From the top to the bottom, the answer determines the Qual-           – Weak Description. A landmark description that
+ity metric (a Likert score from 5 to 1). All annotators were                   is ﬂawed, but not completely wrong (e.g.  blue
+ﬂuent in the languages in the instructions given to them for               towel described as blue napkin);
+wayﬁnding. The annotators were paid hourly wages that are           – Wrong Orientation. An instruction refers to a
+competitive for their locale, and they have standard rights as              landmark but orients it incorrectly with respect
+contractors.                                                                 to the route, e.g. saying it is on the left side when
+=== PDF PAGE 17 ===
+                   % of all errors                        Model      Landmarks Aux PT SR ↑SPL ↑NDTW ↑SDTW ↑
+           Landmark Errors:                                        1 SpkFol-RxR    Full Panos            29.6   25.9     41.6      23.4
+                Full Hallucination              11.4                        2 MARKY-MT5  Full Panos            50.7   46.9     60.1      43.1
+                                                                           3 MARKY-MT5  Outbound            53.6   50.1     62.9      46.7
+            Weak Description              62.9                                                                           4 MARKY-MT5     Silver              55.9   52.1     64.1      48.6
+            Wrong Orientation               7.9                        5 MARKY-MT5     Silver   ✓       56.3   52.3     64.2      48.9
+             Path Errors:                                              6 MARKY-MT5     Silver   ✓ ✓  56.4   52.5     64.2      48.9
+            Wrong Action                   7.1                        7 MARKY-MT5     Pred.   ✓ ✓  55.7   51.8     63.3      47.7
+              Missing Action                  3.6                        8 Human                              56.5   52.7     62.9      48.4
+            Weak Granularity                7.1
+                                                                  Table 8. Automatic evaluations of generated instructions on RxR
+Table 7. Of generated instructions with errors, 25.7% of errors     Val-Unseen based on HAMT [?] wayﬁnding performance.  Set-
+are issues with actions or landmark orientation (wrong, missing,      tings and row numbers correspond to Tab. 3 in the main paper.
+or convoluted [i.e., weak granularity]). Another 11.4% of errors
+are full hallucinations but the overwhelming majority, 62.9% are
+an issue with some aspect of the description of a landmark.           Results on automatic evaluation.  Beyond the strong
+                                                                 quality of MARKY-MT5-generated instructions in human
+                                                               evaluation (Tabs. 1 and 2), they also perform at the sim-
+                                                                              ilar level in automatic/model evaluation.  Employing the
+               it is actually on the right side.
+                                                                      state-of-the-art HAMT [?] VLN agent (Tab. 8), in partic-
+   • Path Errors
+                                                                          ular, we received 55.7% vs. 56.5% success rate and 63.3%
+      – Wrong action. A mistake in an action/step (e.g.
+                                                                    vs. 62.9% nDTW between model-generated (with predicted
+          turn right when one needs to turn left);
+                                                          landmarks) vs. human-written instructions, demonstrating
+      – Missing action. Skipping a an action/step (e.g.
+                                                                     that MARKY-MT5 produces instructions followable by both
+          the instruction neglects to mention a crucial right
+                                                human and model agents.
+         hand turn);
+      – Weak granularity. Some segment of the instruc-
+           tion is too coarse to describe the multiple steps
+           that are needed in the path trajectory (e.g. merely
+          using go forward to describe a route that passes
+         through two doorways and a dining hall).
+
+  We provide examples of each error type in Fig. 14 and
+Fig. 15, where the blue/purple (arrowed) balls indicate the
+ground truth path. The error analysis was performed by the
+paper authors with a critical eye; any weakness in the in-
+structions was annotated as an error.
+
+  The results are summarized in Tab. 7. Of the instructions
+annotated, 16% were judged to be error-free, with some er-
+rors or weaknesses identiﬁed in the remaining 84%. Out
+of the 6 error types, Weak Description was by far the most
+common (62.9% of all errors). In contrast, the proportion
+of Full Hallucination, Wrong Orientation and Wrong Ac-
+tion errors–which were common in previous models–was
+relatively low, at 11.4%, 7.9% and 7.1% respectively.
+
+   Anecdotally, we noticed that the cost of different errors
+varies. Human wayﬁnders can often overcome minor ﬂaws
+in the description of a landmark (e.g. if a pink bedspread is
+misidentiﬁed as a white bedspread). However if ambiguity
+is involved, e.g. move towards the open door when there
+more than one door is in view, confusion results. Full hallu-
+cination and wrong orientation can certainly be misleading
+but if the navigator survey the environment carefully in the
+context of the neighboring segments in the instruction, they
+are also often resolvable. The three types of path errors are
+less recoverable, as they often result in missteps that take
+the wayﬁnder to an entirely wrong path.
+=== PDF PAGE 18 ===
+Figure 14. Examples of Landmark Errors. Full Hallucination: a plant and portrait are mentioned in the top and bottom panes respectively
+but these landmarks cannot be found in the visual scene. Weak Description: the top pane exempliﬁes an ambiguous landmark – there are
+two open doors, and it’s not clear which one to move towards; the bottom pane illustrates a ﬂawed description (speciﬁcally, wrong color).
+Wrong orientation: On the top pane, the shower is to the right hand side of the wayﬁnder rather than left; in the bottom pane, the sofa
+chair should be on the left side instead.
+
+
+
+
+
+Figure 15. Examples of Path Errors. Wrong action: the examples show a right turn mistaken to be a left turn, and going up stairs mistaken
+as going down. Missing action: for the top pane, the washroom is not visible before making an additional left turn; for the bottom pane,
+stairs require a right turn to see. Weak granularity: in the examples, overly coarse instruction segments are given for long path segments.

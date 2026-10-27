@@ -1,0 +1,621 @@
+=== PDF PAGE 1 ===
+CVPR
+#4432
+CVPR
+#4432
+CVPR 2024 Submission #4432. CONFIDENTIAL REVIEW COPY. DO NOT DISTRIBUTE.
+Instance-aware Exploration-Verification-Exploitation
+for Instance ImageGoal Navigation: Supplementary Materials
+Anonymous CVPR submission
+Paper ID 4432
+1. Switch Policy
+001
+1.1. Theoretical Analysis
+002
+We consider the following situation: when the agent’s cur-
+003
+rent observation contains an object of the same category as
+004
+in the goal image, a simple Exploration-Exploitation (EE)
+005
+Policy will directly judge this observation, which can be
+006
+divided into the following four cases: TP, TN, FP, FN, de-
+007
+scribed in Tab. 1. In this case, the judgment of the current
+008
+observation can be formulated as:
+009
+pee(TP) = p(TP|d, t),
+(1)
+010
+011
+pee(FP) = p(FP|d, t),
+(2)
+012
+where p(∗|d, t) represents the TP or FP probability at Eu-
+013
+clidean distance of d and selected threshold of t. ee refers
+014
+to the Exploration-Exploitation policy.
+015
+On the contrary, our proposed Exploration-Verification-
+016
+Exploitation (EVE) unfolds this decision-making problem
+017
+over time, turning it into a sequential decision problem. In
+018
+Tab. 1, we add a new item in row 5 to illustrate this pro-
+019
+cess. For example, if the Policy cannot determine whether
+020
+the current observation is the goal or not, it will give the
+021
+Uncertain prediction. We set the agent forward step size to
+022
+da, then the maximum Verification steps is lmax = ⌊d/da⌋.
+023
+Hence, the final success rate of the EVE strategy is:
+024
+peve(TP) =
+lmax
+X
+i=1
+i−1
+Y
+j=1
+p(U|dc(j), t(dc(j)))
+× p(TP|dc(i), t(dc(i))),
+(3)
+025
+026
+peve(FP) =
+lmax
+X
+i=1
+i−1
+Y
+j=1
+p(U|dc(j), t(dc(j)))
+× p(FP|dc(i), t(dc(i))),
+(4)
+027
+where dc(i) = d −da × i represents the distance at current
+028
+verification step. In our proposed EVE policy, the threshold
+029
+t is affected by the Euclidean distance of dc(i), which will
+030
+change according to the current verification steps.
+031
+We use the formulas in Eq. (3) and Eq. (4) to represent
+032
+the probabilities of TP and FP obtained by the agent using
+033
+the EVE Policy after going through a maximum of lmax
+034
+verification steps when the Euclidean distance from the ob-
+035
+ject is d.
+i−1
+Q
+j=1
+p(U|dc(j), t(dc(j))) represents the possibility
+036
+of verifying i −1 steps, which can be treated as the weight
+037
+of p(∗|dc(i), t(dc(i))), where ∗denotes TP or FP. To am-
+038
+plify the probability of TP and suppress FP in our EVE pol-
+039
+icy, the agent should make judgments when the distance is
+040
+closer, and refrain from making judgments when the dis-
+041
+tance is farther empirically.
+042
+For simplicity, we consider an extreme situation where
+043
+p(U|dc(i), t(dc(i))) is equal to 1 when the Euclidean dis-
+044
+tance between the agent and the potential target is not min-
+045
+imal. p(∗|d, t) satisfies the following:
+046
+X
+p(∗|d, t) = 1,
+∗= U, TP, FP, TN, FN.
+(5)
+047
+Therefore, p(TP|dc(i), t(dc(i))) or p(FP|dc(i), t(dc(i))) is
+048
+equal to 0. In other words, the agent only makes judgments
+049
+when it is closest to the potential target. In such a situation,
+050
+Eq. (3) and Eq. (4) can be simplified as follows:
+051
+p∗
+eve(TP) = p(TP|dc(lmax), t(dc(lmax))),
+(6)
+052
+053
+p∗
+eve(FP) = p(FP|dc(lmax), t(dc(lmax))).
+(7)
+054
+Compared with the formulas in Eq. (1) and Eq. (2), we
+055
+can conclude that in such a extreme situation, EVE Policy
+056
+changes the decision-making location of the agent from d
+057
+to dc, that is, it allows the agent to make judgments from
+058
+the closest position instead of the original one. Intuitively,
+059
+we can consider this as being helpful for the agent to make
+060
+correct decisions.
+From a quantitative analysis perspec-
+061
+tive, at the Hard difficulty level with Thresh = 100, which
+062
+represents the number of matched keypoints, pee(TP) =
+063
+p(TP|d = [4, inf), t = 100) = 0.090 in Tab. 2. How-
+064
+ever, for the EVE Policy, it is as if the difficulty level has
+065
+been switched from Hard to Easy before making a decision,
+066
+at which point p∗
+eve(TP) = p(TP|d = [0, 2), t = 100) =
+067
+1
+
+
+=== PDF PAGE 2 ===
+CVPR
+#4432
+CVPR
+#4432
+CVPR 2024 Submission #4432. CONFIDENTIAL REVIEW COPY. DO NOT DISTRIBUTE.
+Event
+Description in Context
+TP (True Positive)
+The policy correctly predicts that the visible object is the goal.
+TN (True Negative)
+The policy correctly predicts that the visible object is not the goal.
+FP (False Positive)
+The policy incorrectly predicts that the visible object is the goal.
+FN (False Negative)
+The policy incorrectly predicts that the visible object is not the goal.
+Uncertain (U)
+The policy cannot precisely determine whether the visible object is or not the goal.
+Table 1. Events and corresponding descriptions.
+Easy
+Medium
+Hard
+Thresh
+TP
+TN
+FN
+FP
+TP
+TN
+FN
+FP
+TP
+TN
+FN
+FP
+40
+0.741
+0.853
+0.259
+0.147
+0.569
+0.848
+0.431
+0.152
+0.526
+0.835
+0.474
+0.165
+60
+0.651
+0.963
+0.349
+0.037
+0.569
+0.964
+0.431
+0.036
+0.380
+0.961
+0.620
+0.039
+80
+0.610
+0.977
+0.390
+0.023
+0.500
+0.982
+0.500
+0.018
+0.314
+0.974
+0.686
+0.026
+100
+0.582
+0.981
+0.418
+0.019
+0.451
+0.986
+0.549
+0.014
+0.090
+0.992
+0.910
+0.008
+Table 2. The probabilities of TP, TN, FP, and FN under various difficulty levels (according to the Euclidean distance between the agent and
+potential target) and selected thresholds (the number of matched keypoints).
+0.582. Such a significant improvement will be extremely
+068
+beneficial for the agent to make accurate and robust deci-
+069
+sions.
+070
+1.2. Implementation Details
+071
+Based on this idea, we design the Goal Map Selection func-
+072
+tion fswitch, depicted in Fig. 1. We analyze the data re-
+073
+garding Instance Re-identification in Tab. 2 and find that
+074
+when the thresh is set to 100, the TN remains consistently
+075
+high, ranging from 0.981 to 0.992. This indicates that in
+076
+the majority of cases, the agent does not mistakenly iden-
+077
+tify non-existent targets in its field of view. Furthermore,
+078
+when the threshold is set to 60, regardless of the difficulty
+079
+level, the TN values still remain relatively high, ranging
+080
+from 0.961 to 0.964. This indicates that, in cases where the
+081
+thresh is greater than 60, the probability of the agent mak-
+082
+ing FP errors is extremely low. When thresh is set to 60,
+083
+the probability of TP increases from 0.380 (hard) to 0.651
+084
+(easy). This suggests that there is a significant possibility,
+085
+under the threshold of 60, for the agent to successfully iden-
+086
+tify the correct target as it gradually approaches it, without
+087
+misidentifying the target. Based on the analysis of the data,
+088
+we design fswitch that maps the matched keypoints and the
+089
+Euclidean distance between the agent and potential targets
+090
+to the selection signal of the Switch Policy. The function
+091
+fswitch is represented as Fig. 1.
+092
+When the distance is large, only the Verification and Ex-
+093
+ploration strategies exist. This is due to the fact that when
+094
+the thresh is set to 100, the TP rate is merely 0.090. This
+095
+suggests that it is challenging for the agent to make accurate
+096
+judgments about potential targets at a considerable distance.
+097
+Consequently, we instruct the agent to refrain from making
+098
+1.0
+1.5
+2.0
+2.5
+3.0
+3.5
+4.0
+4.5
+5.0
+Euclidean distance / m
+40
+50
+60
+70
+80
+90
+100
+110
+120
+The Number of Matched Keypoints
+Goal Map Selection
+High Thresh
+Low Thresh
+Exploitation Goal
+Verification Goal
+Exploration Goal
+Figure 1. Goal Map Selection fswitch.
+judgments under such circumstances, and we consistently
+099
+apply the Verification strategy.
+100
+In medium difficulty scenarios, when the thresh is 80,
+101
+the TN rate remains high at 0.982 while the TP rate
+102
+reaches 0.500.
+Therefore, we set the boundary between
+103
+the Exploitation and Verification strategies from (2, 60) to
+104
+(4, 100). Given the rapid decline of the TN rate below 60
+105
+(dropping from 0.963 to 0.853 in easy condition), we des-
+106
+ignate values below 60 as the boundary for the Exploration
+107
+strategy. Since an agent encounters numerous potential tar-
+108
+gets in a single episode, the occurrence of FP errors is un-
+109
+acceptable. Hence, in our prior strategy determination, we
+110
+deemed the decline of TN from 0.963 to 0.853 as intolera-
+111
+2
+
+
+=== PDF PAGE 3 ===
+CVPR
+#4432
+CVPR
+#4432
+CVPR 2024 Submission #4432. CONFIDENTIAL REVIEW COPY. DO NOT DISTRIBUTE.
+Goal Image
+Positive Samples
+Negative Samples
+Figure 2. Overview of our Instance Re-identification dataset. The first row indicates the goal image, while the second and third row denotes
+the positive samples or negative samples respectively.
+ble.
+112
+2. Exploration-Exploitation Policy Implemen-
+113
+tation Details
+114
+In this section, we introduce the implementation details of
+115
+our baseline method, i.e., Exploration-Exploitation Policy
+116
+for Instance Image Goal Navigation. While keeping the In-
+117
+stance Classification and Semantic Mapping modules un-
+118
+changed, we assess the semantic segmentation of the cur-
+119
+rent observation. If objects of the same category as those
+120
+in the target image exist, we carry out local feature match-
+121
+ing. The quantity of matched key points is then compared
+122
+with a fixed threshold. If the comparison is successful, the
+123
+Exploitation policy is executed directly. Otherwise, the Ex-
+124
+ploration policy continues.
+125
+Under the premise of constructing an Instance Re-
+126
+identification dataset, we set a threshold of 100 through
+127
+the analysis of the confusion matrix for instance re-
+128
+identification. We do not choose the threshold based on the
+129
+highest F1 score because the cost of False Positive (FP) er-
+130
+rors is substantial, leading to a steep decline in the success
+131
+rate. At the same time, successful prediction of positive
+132
+samples can implicitly depend on the exploration strategy.
+133
+3. Local Policy Implementation Details
+134
+For a given goal map Mg(t), the inputs to the Local Pol-
+135
+icy are its first two channels, representing the distribution
+136
+of obstacles on the local map mo(t) and the target distri-
+137
+bution on the map mg(t). Subsequently, the Fast Marching
+138
+Method (FMM) 1 is utilized to construct the shortest dis-
+139
+tance field obtained from the flood of the goal map, and the
+140
+local minimum is selected around the agent. Action is then
+141
+generated based on the angle between this local minimum
+142
+and the agent.
+143
+In order to enhance the robustness of the agent during
+144
+path planning, we design the collision map mc(t) and the
+145
+visited map mv(t). Prior to constructing the shortest dis-
+146
+tance field, we merge the collision map mc(t) and the vis-
+147
+ited map mv(t) with the local obstacle map mo(t). The
+148
+construction of the collision map mc(t) is based on colli-
+149
+1https://github.com/scikit-fmm/scikit-fmm
+3
+
+
+=== PDF PAGE 4 ===
+CVPR
+#4432
+CVPR
+#4432
+CVPR 2024 Submission #4432. CONFIDENTIAL REVIEW COPY. DO NOT DISTRIBUTE.
+sion detection. Collision detection involves inspecting the
+150
+distance an agent has traveled when a forward action is exe-
+151
+cuted, comparing it with the expected distance. If the actual
+152
+distance is less than the expected one, a collision is assumed
+153
+to have occurred. If a collision occurs, the corresponding
+154
+area in front of the agent on the collision map mc(t) is set
+155
+to 1, indicating that the area is untraversable. The construc-
+156
+tion of the visited map mv(t) involves setting the path that
+157
+the agent has traversed prior to timestep t to 1. The colli-
+158
+sion map sets untraversable area in the front region of the
+159
+agent when a collision is detected, while the visited map
+160
+designates the traversed path as traversable area, which are
+161
+merged to the current obstacle map mo(t). The processed
+162
+obstacle map mo(t) can handle out-of-view collision and
+163
+memorize previous traversed area. Therefore, under highly
+164
+complicated indoor environment, it can plan path robustly
+165
+and efficiently.
+166
+4. Instance Re-identification Dataset
+167
+We create Instance Re-identification Dataset based on the
+168
+HM3D-SEM [2] train/val split. Anchor images are defined
+169
+as goal images that depict specific object instances, which
+170
+do not share the same parameters as agent’s camera. Specif-
+171
+ically, anchor images are 512 × 512 RGB images and are
+172
+captured from different viewpoints. Viewpoints represent
+173
+different viewing angles of an object instance at the differ-
+174
+ent height. In contrast, the goal images can be captured
+175
+from different height, look-at-angle and field-of-view.
+176
+For each anchor goal image, we sample 10 positive and
+177
+negative images using the agent’s camera. Positive images
+178
+are defined as observations where the target instance is vis-
+179
+ible to the oracle, and the area rate of the visible object in-
+180
+stance should not fall below 0.01. Negative images are ran-
+181
+domly sampled from the same scene and do not contain the
+182
+specified goal instance. We have divided the dataset into
+183
+three distinct difficulty levels: easy, medium, hard. Easy
+184
+level is defined as a range of Euclidean distances from the
+185
+object instance to the current viewpoint of [0, 2)m, whereas
+186
+medium level ranges from [2, 4)m and hard level encom-
+187
+passes [4, +∞)m. We give a brief overview of our dataset
+188
+in Fig. 2.
+189
+5. Episode Analysis.
+190
+We provide three testing episodes of performing Instance
+191
+ImageGoal Navigation task in the Habitat [1] simulator.
+192
+Each video frame is divided into three columns. The first
+193
+column shows the goal image, where the blue text indicates
+194
+the current policy being executed (Exploration, Verification,
+195
+Exploitation). The second column represents the current
+196
+observation, while the third column displays the Goal Map
+197
+Mg(t). The three videos demonstrate the process in which
+198
+our agent explores the environment, locates potential tar-
+199
+gets, verifies if these potential targets are the objects in the
+200
+goal image, and makes decisions accordingly. The agent ac-
+201
+tively switches between Exploration, Verification, and Ex-
+202
+ploitation policies. After verifying several distracting ob-
+203
+jects, the agent successfully locates and navigates the target
+204
+correctly.
+205
+References
+206
+[1] Manolis Savva, Abhishek Kadian, Oleksandr Maksymets, Yili
+207
+Zhao, Erik Wijmans, Bhavana Jain, Julian Straub, Jia Liu,
+208
+Vladlen Koltun, Jitendra Malik, et al. Habitat: A platform for
+209
+embodied ai research. In Proceedings of the IEEE/CVF Con-
+210
+ference on Computer Vision and Pattern Recognition (CVPR),
+211
+pages 9339–9347, 2019. 4
+212
+[2] Karmesh Yadav, Ram Ramrakhya, Santhosh Kumar Ramakr-
+213
+ishnan, Theo Gervet, John Turner, Aaron Gokaslan, Noah
+214
+Maestre, Angel Xuan Chang, Dhruv Batra, Manolis Savva,
+215
+et al. Habitat-matterport 3d semantics dataset. In Proceedings
+216
+of the IEEE/CVF Conference on Computer Vision and Pattern
+217
+Recognition (CVPR), pages 4927–4936, 2023. 4
+218
+4

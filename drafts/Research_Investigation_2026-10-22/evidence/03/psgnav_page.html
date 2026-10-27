@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PSG-Nav: Probabilistic Scene Graph Navigation via Multiverse Decision Making</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #ffffff;
+      --surface: #f8f9fb;
+      --border: #e5e7eb;
+      --accent: #4f6df5;
+      --accent2: #7c5cff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --green: #10b981;
+      --card-r: 12px;
+    }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter','Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); line-height:1.7; }
+    nav { position:sticky; top:0; z-index:100; background:rgba(255,255,255,0.95); backdrop-filter:blur(12px); border-bottom:1px solid var(--border); padding:0 2rem; }
+    nav .inner { max-width:1100px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; height:56px; }
+    nav .logo { font-weight:700; font-size:1rem; color:var(--accent); letter-spacing:.02em; }
+    nav .links { display:flex; gap:1.8rem; }
+    nav .links a { color:var(--muted); text-decoration:none; font-size:.9rem; transition:color .2s; }
+    nav .links a:hover { color:var(--text); }
+    .hero { max-width:900px; margin:0 auto; padding:5rem 2rem 3rem; text-align:center; }
+    .badge { display:inline-block; background:rgba(16,185,129,.12); border:1px solid rgba(16,185,129,.4); color:#059669; border-radius:999px; padding:.3rem 1rem; font-size:.8rem; font-weight:700; letter-spacing:.05em; margin-bottom:1.5rem; }
+    .hero h1 { font-size:clamp(1.8rem,4vw,2.8rem); font-weight:800; line-height:1.25; color:#000; margin-bottom:1.5rem; }
+    .authors { font-size:.95rem; color:var(--muted); margin-bottom:.4rem; line-height:2; }
+    .authors .author { color:var(--text); font-weight:600; }
+    .authors sup { color:var(--accent); font-size:.7rem; font-weight:700; }
+    .affiliations { font-size:.85rem; color:var(--muted); margin-bottom:2rem; line-height:1.9; }
+    .affiliations sup { color:var(--accent); font-weight:600; }
+    .btn-group { display:flex; flex-wrap:wrap; gap:.75rem; justify-content:center; margin-bottom:3rem; }
+    .btn { display:inline-flex; align-items:center; gap:.4rem; padding:.55rem 1.2rem; border-radius:8px; font-size:.875rem; font-weight:600; text-decoration:none; transition:all .2s; cursor:pointer; border:none; }
+    .btn-primary { background:var(--accent); color:#fff; }
+    .btn-primary:hover { background:#3b5de7; transform:translateY(-1px); box-shadow:0 4px 12px rgba(79,109,245,.3); }
+    .btn-secondary { background:transparent; border:1px solid var(--border); color:var(--muted); }
+    .btn-secondary:hover { border-color:var(--accent); color:var(--text); transform:translateY(-1px); }
+    .teaser { max-width:900px; margin:0 auto 4rem; padding:0 2rem; }
+    .teaser img { width:100%; border-radius:var(--card-r); border:1px solid var(--border); box-shadow:0 20px 60px rgba(0,0,0,.08); }
+    .caption { text-align:center; color:var(--muted); font-size:.85rem; margin-top:.75rem; font-style:italic; }
+    section { max-width:900px; margin:0 auto; padding:0 2rem 5rem; }
+    section h2 { font-size:1.5rem; font-weight:700; border-left:3px solid var(--accent); padding-left:.75rem; margin-bottom:1.5rem; }
+    section p { color:var(--muted); margin-bottom:1rem; font-size:.975rem; }
+    section p strong { color:var(--text); }
+    .highlights { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:1rem; margin-bottom:2rem; }
+    .highlight-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--card-r); padding:1.25rem; transition:transform .2s,box-shadow .2s; }
+    .highlight-card:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,.06); }
+    .highlight-card .icon { font-size:1.6rem; margin-bottom:.5rem; }
+    .highlight-card h3 { font-size:.95rem; font-weight:700; margin-bottom:.4rem; color:var(--text); }
+    .highlight-card p { font-size:.85rem; color:var(--muted); margin:0; }
+    .fig-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:1.5rem; }
+    .fig-grid.single { grid-template-columns:1fr; }
+    .fig-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--card-r); overflow:hidden; transition:transform .2s,box-shadow .2s; }
+    .fig-card:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,.06); }
+    .fig-card img { width:100%; display:block; }
+    .fig-card .fig-caption { padding:.75rem 1rem; color:var(--muted); font-size:.82rem; font-style:italic; text-align:center; border-top:1px solid var(--border); }
+    .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:1rem; margin:2rem 0; }
+    .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--card-r); padding:1.2rem 1rem; text-align:center; }
+    .stat-card .num { font-size:2rem; font-weight:800; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+    .stat-card .label { color:var(--muted); font-size:.8rem; margin-top:.2rem; }
+    .bibtex-wrap { background:#1e1e2e; border-radius:var(--card-r); padding:1.25rem 1.5rem; margin-top:1rem; position:relative; }
+    .bibtex-wrap pre { color:#cdd6f4; font-family:'JetBrains Mono','Fira Code','Consolas',monospace; font-size:.82rem; line-height:1.6; overflow-x:auto; margin:0; }
+    .copy-btn { position:absolute; top:.75rem; right:.75rem; background:rgba(255,255,255,.1); color:#cdd6f4; border:1px solid rgba(255,255,255,.15); border-radius:6px; padding:.3rem .75rem; font-size:.75rem; cursor:pointer; transition:background .2s; }
+    .copy-btn:hover { background:rgba(255,255,255,.2); }
+    .lightbox { position:fixed; inset:0; z-index:200; background:rgba(0,0,0,.92); display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .3s; }
+    .lightbox.active { opacity:1; pointer-events:all; }
+    .lightbox img { max-width:92vw; max-height:90vh; border-radius:8px; }
+    .lightbox .close { position:absolute; top:1.2rem; right:1.5rem; color:#fff; font-size:2rem; cursor:pointer; line-height:1; }
+    .divider { border:none; border-top:1px solid var(--border); margin:0 2rem 5rem; }
+    footer { text-align:center; padding:2rem; color:var(--muted); font-size:.82rem; border-top:1px solid var(--border); }
+    footer a { color:var(--accent); text-decoration:none; }
+    footer a:hover { text-decoration:underline; }
+    @media (max-width:640px) { .fig-grid { grid-template-columns:1fr; } nav .links { gap:1rem; font-size:.8rem; } .hero h1 { font-size:1.5rem; } }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="inner">
+    <div class="logo">PSG-Nav</div>
+    <div class="links">
+      <a href="#abstract">Abstract</a>
+      <a href="#method">Method</a>
+      <a href="#results">Results</a>
+      <a href="#videos">Videos</a>
+
+    </div>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="badge">&#127942; ICML 2026</div>
+  <h1>PSG-Nav: Probabilistic Scene Graph Navigation<br/>via Multiverse Decision Making</h1>
+  <div class="authors">
+    <span class="author">Rufeng Chen</span><sup>1</sup>&ensp;
+    <span class="author">Yue Chang</span><sup>1</sup>&ensp;
+    <span class="author">Xiaqiang Tang</span><sup>1</sup>&ensp;
+    <span class="author">Hechang Chen</span><sup>2</sup>&ensp;
+    <span class="author">Sihong Xie</span><sup>1</sup>
+  </div>
+  <p class="affiliations">
+    <sup>1</sup>The Hong Kong University of Science and Technology (Guangzhou)&ensp;&ensp;
+    <sup>2</sup>Jilin University
+  </p>
+  <div class="btn-group">
+    <a href="https://arxiv.org/abs/2606.01313" target="_blank" class="btn btn-primary">&#128196; Paper (arXiv)</a>
+    <a href="https://github.com/Chenrf1121/psg-nav" target="_blank" class="btn btn-secondary">&#128187; Code</a>
+  </div>
+</div>
+
+
+<section id="abstract">
+  <h2>Abstract</h2>
+  <p>Open-vocabulary navigation requires embodied agents to manage significant <strong>perception uncertainty</strong> stemming from semantic ambiguity and model errors. However, most existing works settle for locally-optimal <strong>deterministic approaches</strong>, depriving complex navigation decision-making over multiple composite possibilities that are critical for globally better solutions.</p>
+  <p>We propose <strong>Probabilistic Scene Graph Navigation (PSG-Nav)</strong>, which constructs a <strong>3D Probabilistic Scene Graph</strong> that uses full semantic categorical distributions to account for perception uncertainty. To efficiently reason about optimal navigation landmarks, we propose <strong>Multiverse Decision</strong> to sample multiple most-likely world settings from the joint distribution, and evaluate landmarks based on compatibility between landmarks and multiverses.</p>
+  <p>To mitigate false positives due to epistemic uncertainty, we introduce the <strong>Evidential Experience Calibrator (EEC)</strong>, which enables online lifelong adaptation by cross-validating detections against memories of past successes and failures. Extensive experiments on <strong>MP3D, HM3D, and HSSD</strong> demonstrate PSG-Nav achieves new state-of-the-art Success Rates of <strong>66.1%, 44.8%, and 67.9%</strong>, respectively.</p>
+  <div class="highlights" style="margin-top:2rem">
+    <div class="highlight-card">
+      <div class="icon">&#127757;</div>
+      <h3>3D Probabilistic Scene Graph</h3>
+      <p>Full semantic categorical distributions over object classes, capturing perception uncertainty at every node.</p>
+    </div>
+    <div class="highlight-card">
+      <div class="icon">&#9883;&#65039;</div>
+      <h3>Multiverse Decision</h3>
+      <p>Samples multiple most-likely world states; selects landmarks robust across all sampled worlds.</p>
+    </div>
+    <div class="highlight-card">
+      <div class="icon">&#129504;</div>
+      <h3>Evidential Experience Calibrator</h3>
+      <p>Online lifelong memory of past successes and failures to suppress false positive goal verification.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<section id="method">
+  <h2>Method</h2>
+  <p>PSG-Nav consists of three key components: the <strong>3D Probabilistic Scene Graph</strong> that models perception uncertainty via categorical node distributions; the <strong>Multiverse Decision</strong> module that samples plausible world states and selects the globally optimal landmark; and the <strong>Evidential Experience Calibrator (EEC)</strong> that maintains online evidential memory for false-positive suppression.</p>
+</section>
+
+<hr class="divider" />
+
+<section id="results">
+  <h2>Main Results</h2>
+  <p>PSG-Nav is evaluated on three widely-used benchmarks: <strong>HM3D</strong>, <strong>MP3D</strong>, and <strong>HSSD</strong>, achieving new state-of-the-art on all three under Success Rate (SR) and SPL metrics.</p>
+  <div class="fig-card" style="margin-top:1.5rem">
+    <img src="images/page_results_table.jpg" alt="Main Results Table" onclick="openLightbox(this)" style="cursor:zoom-in; width:100%; display:block;" />
+    <div class="fig-caption"><strong>Table 1.</strong> Comparison with state-of-the-art methods on HM3D, MP3D, and HSSD.</div>
+  </div>
+  <div class="stats">
+    <div class="stat-card"><div class="num">44.8%</div><div class="label">SR on HM3D</div></div>
+    <div class="stat-card"><div class="num">66.1%</div><div class="label">SR on MP3D</div></div>
+    <div class="stat-card"><div class="num">67.9%</div><div class="label">SR on HSSD</div></div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<section id="videos">
+  <h2>EEC Error Correction Demos</h2>
+  <p>The <strong>Evidential Experience Calibrator (EEC)</strong> cross-validates new detections against a memory of past successes and failures, effectively suppressing false positives during long-horizon exploration.</p>
+  <div style="display:grid; grid-template-columns:1fr; gap:1.5rem; margin-top:1.5rem">
+    <div class="fig-card">
+      <video controls style="width:100%; display:block; aspect-ratio:16/9; background:#000;"><source src="videos/hm3d-chair.mp4" type="video/mp4" /></video>
+      <div class="fig-caption"><strong>HM3D &mdash; Chair.</strong> EEC rejects false positive detections based on prior failure memory.</div>
+    </div>
+    <div class="fig-card">
+      <video controls style="width:100%; display:block; aspect-ratio:16/9; background:#000;"><source src="videos/hm3d-plant.mp4" type="video/mp4" /></video>
+      <div class="fig-caption"><strong>HM3D &mdash; Plant.</strong> After rejecting a false positive, the agent continues to find the true target.</div>
+    </div>
+    <div class="fig-card">
+      <video controls style="width:100%; display:block; aspect-ratio:16/9; background:#000;"><source src="videos/hm3d-tv.mp4" type="video/mp4" /></video>
+      <div class="fig-caption"><strong>HM3D &mdash; TV.</strong> The model repeatedly misidentifies a refrigerator as a TV; EEC learns from this failure and rejects it.</div>
+    </div>
+    <div class="fig-card">
+      <video controls style="width:100%; display:block; aspect-ratio:16/9; background:#000;"><source src="videos/mp3d-chest-of-drawers.mp4" type="video/mp4" /></video>
+      <div class="fig-caption"><strong>MP3D &mdash; Chest of Drawers.</strong> After two rejections, the agent successfully finds the true target.</div>
+    </div>
+  </div>
+
+  <h2 style="margin-top:3rem">HM3D-OVON (Open-Vocabulary)</h2>
+  <p>PSG-Nav on the <strong>HM3D-OVON</strong> benchmark, where targets are specified as open-vocabulary descriptions beyond standard category labels.</p>
+  <div style="display:grid; grid-template-columns:1fr; gap:1.5rem; margin-top:1.5rem">
+    <div class="fig-card">
+      <video controls style="width:100%; display:block; aspect-ratio:16/9; background:#000;"><source src="videos/ovon_cloths.mp4" type="video/mp4" /></video>
+      <div class="fig-caption"><strong>Objective: &ldquo;Find cloths.&rdquo;</strong></div>
+    </div>
+    <div class="fig-card">
+      <video controls style="width:100%; display:block; aspect-ratio:16/9; background:#000;"><source src="videos/ovon_pillow.mp4" type="video/mp4" /></video>
+      <div class="fig-caption"><strong>Objective: &ldquo;Find a pillow.&rdquo;</strong></div>
+    </div>
+    <div class="fig-card">
+      <video controls style="width:100%; display:block; aspect-ratio:16/9; background:#000;"><source src="videos/ovon_rug.mp4" type="video/mp4" /></video>
+      <div class="fig-caption"><strong>Objective: &ldquo;Find a rug.&rdquo;</strong></div>
+    </div>
+  </div>
+
+  <h2 style="margin-top:3rem">Real-World Experiments</h2>
+  <p>Our robotic platform is built upon an <strong>Agilex SCOUT MINI</strong> chassis with a <strong>RealSense D435 RGB-D camera</strong>, <strong>CH110 IMU</strong>, and dual <strong>Livox MID 360 LiDARs</strong>. All computation runs onboard via an <strong>NVIDIA Jetson AGX Xavier</strong>.</p>
+  <div class="fig-card" style="margin:1.5rem 0">
+    <img src="images/robot_platform.png" alt="Robot Platform" onclick="openLightbox(this)" style="cursor:zoom-in; width:100%; display:block;" />
+    <div class="fig-caption"><strong>Figure 5.</strong> Our custom robotic platform based on Agilex SCOUT MINI.</div>
+  </div>
+  <div style="display:grid; grid-template-columns:1fr; gap:1.5rem; margin-top:1.5rem">
+    <div class="fig-card">
+      <video controls style="width:100%; display:block; aspect-ratio:16/9; background:#000;"><source src="videos/real-chair.mp4" type="video/mp4" /></video>
+      <div class="fig-caption"><strong>Real-world &mdash; Chair.</strong> The agent rejects a sofa misidentified as a chair based on past experience, then finds the true target.</div>
+    </div>
+    <div class="fig-card">
+      <video controls style="width:100%; display:block; aspect-ratio:16/9; background:#000;"><source src="videos/real-keyboard.mp4" type="video/mp4" /></video>
+      <div class="fig-caption"><strong>Real-world &mdash; Keyboard.</strong> The robot successfully navigates to the target in a challenging scenario.</div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+
+<footer>
+  <p>&copy; 2026 PSG-Nav &nbsp;&middot;&nbsp;
+    <a href="https://arxiv.org/abs/2606.01313" target="_blank">arXiv</a> &nbsp;&middot;&nbsp;
+    <a href="https://github.com/Chenrf1121/psg-nav" target="_blank">GitHub</a>
+  </p>
+</footer>
+
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <span class="close" onclick="closeLightbox()">&times;</span>
+  <img id="lightbox-img" src="" alt="" />
+</div>
+
+<script>
+  function openLightbox(img) {
+    document.getElementById('lightbox-img').src = img.src;
+    document.getElementById('lightbox').classList.add('active');
+  }
+  function closeLightbox() {
+    document.getElementById('lightbox').classList.remove('active');
+  }
+  document.addEventListener('keydown', function(e) { if(e.key==='Escape') closeLightbox(); });
+
+</script>
+</body>
+</html>

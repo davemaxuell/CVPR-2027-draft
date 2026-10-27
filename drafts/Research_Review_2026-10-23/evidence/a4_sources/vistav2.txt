@@ -1,0 +1,882 @@
+VISTAv2: World Imagination for Indoor Vision‑and-Language Navigation
+Report GitHub Issue
+×
+Title:
+Content selection saved. Describe the issue below:
+Description:
+Submit without GitHub
+Submit in GitHub
+arXiv is now an independent nonprofit!
+Learn more
+×
+Back to arXiv
+Why HTML?
+Report Issue
+Back to Abstract
+Download PDF
+Abstract
+1 Introduction
+2 Related Work
+Vision-and-Language Navigation (VLN).
+Video Generation as World Models.
+Language Guided Mapping and Frontier Exploration.
+3 Method
+3.1 Pipeline Overview
+3.2 World Model Formulation
+Action Space.
+Action Representation.
+Action-Driven Video Generation.
+Language Reasoner and Prior Map.
+Score-level fusion.
+3.3 Imagination to Value (I2V)
+Input.
+Frame scoring.
+Egocentric projection.
+Use.
+Multi-rollout aggregation.
+Uncertainty gating.
+3.4 World Model Details
+Architecture.
+Training data.
+Optimization and schedule.
+4 Experiments
+4.1 Experiment Setup
+4.2 Experiments Results
+4.3 Ablations: From semantics to imagination to imagined value
+Impact of imagination (VLFM →\to VISTA).
+Impact of imagination-to-value fusion (VISTA →\to VISTAv2).
+Failure case study.
+5 Conclusion
+6 Limitations and Future Work
+References
+License: arXiv.org perpetual non-exclusive license
+arXiv:2512.00041v1 [cs.RO] 14 Nov 2025
+VISTAv2: World Imagination for Indoor Vision‑and-Language Navigation
+Yanjia Huang
+Xianshun Jiang
+Xiangbo Gao
+Mingyang Wu
+Zhengzhong Tu
+††thanks: Corresponding author: tzz@tamu.edu
+Affiliation: Texas A&M University, TACO Group
+Affiliation: https://taco-group.github.io/
+Abstract
+Vision-and-Language Navigation (VLN) requires agents to follow language instructions while acting in continuous real world spaces. Prior image imagination based VLN work shows benefits for discrete panoramas but lacks online, action-conditioned predictions and does not produce explicit planning values; moreover, many methods replace the planner with long-horizon objectives that are brittle and slow. To bridge this gap, we propose VISTAv2, a generative world model that rolls out egocentric future views conditioned on past observations, candidate action sequences, and instructions, and projects them into an online value map for planning. Unlike prior approaches, VISTAv2 does not replace the planner. The online value map is fused at score level with the base objective, providing reachability and risk-aware guidance. Concretely, we employ a Conditional Diffusion Transformer video predictor aware of action to synthesize short-horizon futures, align them with the natural language instruction via a vision-language scorer, and fuse multiple rollouts in a differentiable Imagination-to-Value head to output an imagined egocentric value map. For efficiency, rollouts occur in VAE latent space with a distilled sampler and sparse decoding, enabling inference on a single consumer GPU. Evaluated on MP3D and RoboTHOR, VISTAv2 improves over strong baselines, and ablations show that action-conditioned imagination, instruction-guided value fusion, and the online value-map planner are all critical—suggesting that VISTAv2 offers a practical and interpretable route to robust VLN.
+1 Introduction
+“The map is not the territory.”
+- Alfred Korzybski
+Enabling embodied agents to understand natural instructions and locate them both quickly and robustly in real-world environments without prior maps still remains a core challenge in Vision-and-Language Navigation tasks [1, 2, 3, 4, 5]. There are two different methods for approaching this, each with strengths and limitations. One relies on Large Vision-Language Models (VLMs) to match ”currently observed objects” with ”verbalized goals” through scoring the similarity, then employs frontier exploration or occupancy maps for ”semantically driven mapping and search” (e.g., VLFM [6]). The other leverages world models to perform long-range rollouts in action space, evaluating path quality by ”imagining future scenes” (e.g., Navigation World Model and VISTA [7, 8]). The former exhibits strong semantic generalization and simple deployment but lacks explicit evaluation of reachability and geometric information, often leading to looks right but turns out wrong detours. The latter can explicitly assess evidence of reachability but suffers from long-rollout fragility which makes it challenging to achieve stable gains.
+In this paper, we argue that VLN benefits from short-horizon, action-conditioned imagination that lives in map space. We observe the followings. Pure language–vision matching tells what looks relevant but not whether it is reachable from the current pose. It cannot foresee occlusions or near-term collisions, and often over-scores visually salient but blocked targets (e.g., behind walls, glass, or outside the current room), leading to detours and backtracking [9, 10, 11, 12, 13, 14]. Optimizing a full world model objective over long-horizons amplifies small pose errors and sampling noise; appearance drift across dozens of denoising steps causes the planner to chase artifacts rather than geometry. The compute budget required for long rollouts also reduces the number of candidates we can evaluate per step [15, 16, 17, 18, 19].
+To address these challenges, we present VISTAv2, a language-conditioned, action-aware generative world model. VISTAv2 (i) rolls out short-horizon egocentric futures, (ii) turns them into an imagined value map by combining instruction–vision alignment with traversability and obstacle cues, and (iii) re-ranks planner candidates via score-level fusion with the base objective. Overall, VISTAv2 is a test-time plug-in to standard frontier-based exploration planners, runs online through latent-space diffusion with distillation, and shows improvements on VLN datasets.
+Our contributions are summarized as follows:
+•
+A world model for VLN that performs short-horizon, action-conditioned rollouts and expresses their guidance as an egocentric value map in map space.
+•
+An Imagination-to-Value head that converts predicted futures into a value map and guides planning via score fusion, without replacing the planner.
+•
+Compared to VISTA, VISTAv2 improves Val-Unseen SR and SPL by +3.6 and +5.4 with shorter TL (13.26→\rightarrow10.73, −19%-19\%), and improves Test-Unseen SPL by +2.3 with shorter TL (14.20→\rightarrow12.44, −12%-12\%).
+Figure 1: VISTAv2 pipeline overview (§3.1).
+From a language instruction and observations (RGB, depth, odometry), the agent:
+(1) builds a local map and proposes frontier-based candidate trajectories;
+(2) forms a language prior over the map (Value);
+(3) uses the world model to imagine short-horizon futures and converts them into an egocentric imagined value map;
+(4) fuses imagined value and the prior with the planner’s native score to rank candidates (Eq. (2)) and executes the first control in a receding-horizon loop.
+2 Related Work
+Vision-and-Language Navigation (VLN).
+VLN links natural language instructions with embodied perception and control [20, 21, 22, 23, 24, 25, 26, 27, 28, 29]. Early work posed the problem on panoramic navigation graphs with R2R and RxR [3, 30], later enabled at scale by the Habitat simulator [31] for photo-realistic, high speed training and evaluation. And beyond navigation graphs, VLN-CE lifts agents into continuous 3D control with egocentric sensing and realistic collisions, removing graph constraints and exposing geometric challenges central to real robots [32]. Recent trends leverage foundation or VLM models to strengthen language grounding and zero-shot generalization [8, 33, 17, 34, 18, 35, 36], complementary work studies injecting visual imagination as an added modality to provide landmark cues, yielding measurable SR gains on VLN agents. However, current VLN systems still struggle to reason about reachability and collision risk, VLM only scoring often favors visually salient yet unreachable directions, and long-horizon rollouts can be brittle and slow, compounding errors in continuous settings.
+Video Generation as World Models.
+Video generative models can act as controllable world models that roll out egocentric futures conditioned on past observations and actions. Recent systems show that such models can steer planning or augment downstream reasoning, either by playing out imagined trajectories or by ranking candidate plans using synthesized evidence [37, 38, 39, 40, 41]. Notable examples include large, action-conditioned controllable world models like Genie [42], which could generate interactive environments from both image or text prompts and allow agent control via input actions. Navigation World Models instantiate this idea for visual navigation with a controllable video generator that predicts future observations from past frames and navigation actions [7]. The model is trained on diverse egocentric videos and is used after training to simulate trajectories and verify whether a candidate plan reaches the goal. NWM is built on a Conditional Diffusion Transformer (CDiT), whose complexity is linear in the number of context frames, enabling scaling to large models while maintaining strong prediction quality. At deployment, NWM uses the generator in MPC and re-ranking for both insides and outsides of rollouts. This design reduces exposure to long-horizon drift without rewriting the planner.
+Language Guided Mapping and Frontier Exploration.
+This line of work steers exploration by aligning egocentric observations with instruction text and projecting the scores onto maps or frontiers. A representative example is VLFM, which builds a frontier map and ranks candidate frontiers by vision–language similarity to the goal text, enabling zero-shot semantic navigation without task-specific training [6]. Follow up works extend the idea with panoramic cues and imagination from discrete viewpoints [17], further improving frontier selection under language guidance [34]. These methods provide strong semantic priors and simple deployment, yet they reason about reachability and collision risk only indirectly, high-scoring regions can be occluded or geometrically infeasible, and the scores are typically static [43, 44, 45, 46, 10]. Our work complements this trend by injecting an action conditioned, short-horizon prior: we convert imagined futures into an egocentric value map and fuse it with the planner’s native objective at score level, preserving the underlying map-based search while adding instruction consistent, geometry-aware guidance.
+Figure 2: World Model (§3.2).
+Given the recent egocentric frames It−m+1:tI_{t-m+1:t}, the instruction gg, and a candidate trajectory AA, we integrate poses to obtain C⁡(A)∈S​E​(2)HC(A)\!\in\!SE(2)^{H} and feed (xt,g,C⁡(A))(x_{t},g,C(A)) to the action-conditioned video diffusion model 𝒲θ\mathcal{W}_{\theta} (CDiT in VAE latent space).
+𝒲θ\mathcal{W}_{\theta} produces a short-horizon egocentric rollout {I^t+τ}τ=1H\{\hat{I}_{t+\tau}\}_{\tau=1}^{H}; only a stride-Δ​t\Delta t subset is decoded for downstream I2V scoring (§3.3).
+3 Method
+We target test-time enhancement for Vision-and-Language Navigation in standard VLN environments: at inference, an agent augments its default policy with a language-conditioned, action aware generative world model that imagines future egocentric observations and converts them into an online value map for planning (Fig. 1). Our approach, VISTAv2, couples two components tightly: ❶ a video diffusion world model that rolls out short-horizon egocentric futures conditioned on the instruction and candidate actions; ❷ an Imagination-to-Value (I2V) head converts the imagined futures into an egocentric value map. At test-time, we do not replace the planner: the value map is fused at score level with the planner’s native objective to rank candidate actions, keeping the search procedure intact.
+Sec.3.1 overviews the VISTAv2 pipeline. Sec.3.2 formalizes the language-conditioned, action-aware world model. Sec.3.3 introduces the I2V head, which converts multi rollouts, instruction aligned signals into an egocentric value map and fuses it with the base planner’s score for action selection. Finally, Sec.3.4 details the architecture and training setup used in our experiments.
+3.1 Pipeline Overview
+Fig. 1 illustrates our pipeline: given a language instruction gg and egocentric observations at time tt (RGB ItI_{t}, depth DtD_{t}, odometry PtP_{t}), VISTAv2 augments a standard frontier-based navigation stack with action-conditioned imagination and score-level fusion. Four components participate: a World Model 𝒲\mathcal{W}, a Language Reasoner ℛ\mathcal{R} (text–vision scorer), an Imagination-to-Value head ℋ\mathcal{H}, and a base Planner 𝒫\mathcal{P}.
+Given egocentric ItI_{t}, PtP_{t}, and an instruction goal gg, we launch an nn-step candidate–expansion loop instead of committing to an action directly. For each trajectory in the current candidate set such as frontiers with short-horizon paths, the world model rolls out HH-step egocentric futures (we take HH=4 here), yielding imagined observations. Conditioned on the instruction, a language–vision scorer (BLIP [47]) evaluates these imagined observations and (i) writes instructive evidence into a small buffer, and (ii) via an Imagination-to-Value (I2V) head converts them into an egocentric imagined value map. We fuse the imagined value with the planner’s native score to rank candidates and keep the top-KK to form the next layer. After the search, the planner executes the first control of the best candidate; mapping updates and the loop repeats at the next step. This imagine →\rightarrow score →\rightarrow fuse →\rightarrow act procedure augments a frozen navigation stack with world model priors and motion forecasts, improving VLN at test-time.
+3.2 World Model Formulation
+We treat the world model as an egocentric video generation simulator that rolls out a sequence of actions from previous observations. Given the last mm RGB frames It−m+1:tI_{t-m+1:t}, poses P1:tP_{1:t}, an instruction gg, and a candidate control sequence At:t+H−1A_{t:t+H-1}, the model predicts short-horizon egocentric futures that will later be converted into an imagined value map (Sec. 3.3).
+Action Space.
+We use a continuous, egocentric control space
+𝒜⊂ℝ4,aτ=(Δ​xτ,Δ​yτ,Δ​θτ,κτ),\mathcal{A}\subset\mathbb{R}^{4},\quad a_{\tau}=(\Delta x_{\tau},\,\Delta y_{\tau},\,\Delta\theta_{\tau},\,\kappa_{\tau}),
+where (Δ​x,Δ​y)(\Delta x,\Delta y) are planar displacements in the local frame, Δ​θ\Delta\theta is the yaw change, and κ\kappa scales step duration. Feasibility is enforced by platform limits
+‖(Δ​x,Δ​y)‖≤vmax​κ​Δ​t\|(\Delta x,\Delta y)\|\leq v_{\max}\kappa\Delta t and |Δ​θ|≤ωmax​κ​Δ​t|\Delta\theta|\leq\omega_{\max}\kappa\Delta t,
+and a STOP primitive is available when appropriate.
+Action Representation.
+A candidate At:t+H−1A_{t:t+H-1} from the base planner is resampled to a fixed horizon HH.
+Each step is embedded as
+a~τ=[Δ​xτσx,Δ​yτσy,sin⁡Δ​θτ,cos⁡Δ​θτ,κτσκ],\tilde{a}_{\tau}=\Big[\tfrac{\Delta x_{\tau}}{\sigma_{x}},\,\tfrac{\Delta y_{\tau}}{\sigma_{y}},\,\sin\Delta\theta_{\tau},\,\cos\Delta\theta_{\tau},\,\tfrac{\kappa_{\tau}}{\sigma_{\kappa}}\Big],
+concatenated with a sinusoidal time code and a learned mode bit (turn vs. go-straight). The sequence
+A~t:t+H−1\tilde{A}_{t:t+H-1} is provided as per-timestep conditioning tokens.
+Action-Driven Video Generation.
+Let xt∈ℝH×W×3x_{t}\in\mathbb{R}^{H\times W\times 3} be the current egocentric frame and
+C⁡(A)=(c1,…,cH)∈S​E​(3)HC(A)=\big(c_{1},\dots,c_{H}\big)\in SE(3)^{H} the pose sequence induced by a candidate trajectory AA starting from pose PtP_{t} (for ground robots C⁡(A)⊂S​E​(2)C(A)\subset SE(2)).
+Our instruction- and pose-conditioned video diffusion model
+𝒲θ:(xt,g,C⁡(A))↦𝐗⁡(A)\displaystyle\mathcal{W}_{\theta}:\;(x_{t},g,C(A))\mapsto\;\mathbf{X}(A)
+={x^t+τ}τ=1H,\displaystyle=\{\hat{x}_{t+\tau}\}_{\tau=1}^{H},
+(1)
+x^t+τ\displaystyle\hat{x}_{t+\tau}
+∈ℝH×W×3.\displaystyle\in\mathbb{R}^{H\times W\times 3}.
+maps the triplet (xt,g,C⁡(A))(x_{t},g,C(A)) to an egocentric rollout that follows the intended motion while emphasizing instruction-relevant visual evidence.
+In practice we operate in latent space, i.e., with zt=E⁡(xt)z_{t}=E(x_{t}) and z^t+τ\hat{z}_{t+\tau} rolled out by a CDiT; only a sparse subset is decoded x^t+τ=D⁡(z^t+τ)\hat{x}_{t+\tau}=D(\hat{z}_{t+\tau}) for downstream scoring.
+Language Reasoner and Prior Map.
+We use a frozen vision–language encoder ℛ\mathcal{R} (BLIP) to obtain a text embedding ϕg\phi_{g} and per-pixel/patch image features ϕ⁡(⋅)\phi(\cdot).
+Given the current observation set and the local map ℳt\mathcal{M}_{t}, we compute a language prior VtpriorV_{t}^{\text{prior}} by projecting alignment scores to the egocentric grid:
+s⁡(u,v)\displaystyle s(u,v)
+=softmaxτ​(cos⁡⟨ϕg,ϕ⁡(It)​[u,v]⟩),\displaystyle=\!\mathrm{softmax}_{\tau}\!\big(\cos\!\langle\phi_{g},\,\phi(I_{t})[u,v]\rangle\big),
+Vtprior\displaystyle V_{t}^{\text{prior}}
+=Π⁡(s⁡(⋅)→ℳt).\displaystyle=\!\Pi\!\big(s(\cdot)\rightarrow\mathcal{M}_{t}\big).
+where Π⁡(⋅)\Pi(\cdot) denotes depth-aware splatting onto the map and τ\tau is a temperature.
+VtpriorV_{t}^{\text{prior}} captures instruction relevance but is action-agnostic; it is fused at score level in Eq. (2).
+Score-level fusion.
+For a candidate At:t+H−1A_{t:t+H-1}, we fuse imagined value and the planner’s native score:
+Sfused(At:t+H−1)\displaystyle S_{\text{fused}}\big(A_{t:t+H-1}\big)
+=Sbase(At:t+H−1)\displaystyle=S_{\text{base}}\big(A_{t:t+H-1}\big)
+(2)
++λ1∑τ=1HγτVtimg(xτ(A),yτ(A))\displaystyle+\lambda_{1}\sum_{\tau=1}^{H}\gamma^{\tau}\,V_{t}^{\text{img}}\!\big(x_{\tau}(A),y_{\tau}(A)\big)
++λ2∑τ=1HγτVtprior(xτ(A),yτ(A)).\displaystyle+\lambda_{2}\sum_{\tau=1}^{H}\gamma^{\tau}\,V_{t}^{\text{prior}}\!\big(x_{\tau}(A),y_{\tau}(A)\big).
+where (xτ​(A),yτ​(A))(x_{\tau}(A),y_{\tau}(A)) are egocentric samples along AA, γ∈(0,1]\gamma\!\in\!(0,1] is a temporal discount, and λ1,λ2≥0\lambda_{1},\lambda_{2}\!\geq\!0 are fusion weights. The highest-scoring candidate is chosen and only its first control is executed (receding horizon).
+Algorithm 1 𝒲θ\mathcal{W}_{\theta}.Rollout — Action-Driven Video Generation
+Input: It−m+1:tI_{t-m+1:t}, PtP_{t}, instruction gg, candidate At:t+H−1A_{t:t+H-1}, horizon HH, decode stride Δ​t\Delta t, denoise steps KdK_{d}
+Output: C⁡(A)=(c1,…,cH)C(A)=(c_{1},\dots,c_{H}), latent rollout z^t+1:t+H\hat{z}_{t+1:t+H}, decoded frames 𝐗⁡(A)={x^t+τ}τ∈𝒮\mathbf{X}(A)=\{\hat{x}_{t+\tau}\}_{\tau\in\mathcal{S}}
+1
+C(A)←IntegratePoses(Pt,At:t+H−1)C(A)\leftarrow\textsc{IntegratePoses}(P_{t},A_{t:t+H-1});  𝒮←{τ:τ=1,1+Δt,…,H}\mathcal{S}\leftarrow\{\,\tau:\tau=1,1{+}\Delta t,\dots,H\,\};
+2
+zt−m+1:t←E(It−m+1:t)z_{t-m+1:t}\leftarrow E(I_{t-m+1:t});  z^t+1:t+H←∅\hat{z}_{t+1:t+H}\leftarrow\emptyset;  𝐗⁡(A)←∅\mathbf{X}(A)\leftarrow\emptyset;
+3
+for τ=1\tau=1 to HH do
+4
+cond←(zt−m+1:t,z^t+1:t+τ−1,Φ(g),A~t:t+τ−1,τ)\text{cond}\leftarrow\big(z_{t-m+1:t},\,\hat{z}_{t+1:t+\tau-1},\,\Phi(g),\,\tilde{A}_{t:t+\tau-1},\,\tau\big);
+5
+z^t+τ←CDiT_Denoise​(cond,Kd)\hat{z}_{t+\tau}\leftarrow\textsc{CDiT\_Denoise}(\text{cond};K_{d});
+6
+if τ∈𝒮\tau\in\mathcal{S} then
+7
+x^t+τ←D⁡(z^t+τ)\hat{x}_{t+\tau}\leftarrow D(\hat{z}_{t+\tau});  𝐗⁡(A)←𝐗⁡(A)∪{x^t+τ}\mathbf{X}(A)\leftarrow\mathbf{X}(A)\cup\{\hat{x}_{t+\tau}\};
+8
+return C⁡(A)C(A), z^t+1:t+H\hat{z}_{t+1:t+H}, 𝐗⁡(A)\mathbf{X}(A);
+3.3 Imagination to Value (I2V)
+Input.
+For a candidate At:t+H−1A_{t:t+H-1}, the world model (Sec. 3.1) provides a sparse set of imagined egocentric frames {I^t+τ}\{\hat{I}_{t+\tau}\}, their poses {cτ}\{c_{\tau}\} and depth (predicted or monocular).
+Frame scoring.
+Each I^t+τ\hat{I}_{t+\tau} is converted to a single confidence map by linearly combining three dense cues: (i) instruction alignment (text–vision similarity), (ii) traversability/free-space, and (iii) obstacle/uncertainty penalty. The weights are learned, nonnegative, and the output is temperature-scaled and normalized to [0,1][0,1].
+Egocentric projection.
+Using camera intrinsics and pose cτc_{\tau}, the confidence map is softly projected onto a fixed egocentric grid around the agent (depth-aware splatting with bilinear accumulation). We apply a light morphological smoothing to account for the robot footprint and mask out regions outside the field of view.
+Use.
+VtimgV_{t}^{\text{img}} is sampled along each candidate path and fused at score level with the planner’s native score (Eq. (2)). For efficiency, we decode every Δ​t\Delta t frames and use a compact grid (e.g., 80×8080{\times}80 within a 1212 m window).
+Multi-rollout aggregation.
+Given imagined frames at times τ∈𝒮\tau\!\in\!\mathcal{S}, we accumulate into the value map with discount γ\gamma:
+Vtimg​(u,v)=LSEβ​{γτ​Π​(v~t+τ)​(u,v)}τ∈𝒮,V_{t}^{\text{img}}(u,v)=\mathrm{LSE}_{\beta}\big\{\gamma^{\tau}\,\Pi(\tilde{v}_{t+\tau})(u,v)\big\}_{\tau\in\mathcal{S}},
+where LSEβ​(⋅)\mathrm{LSE}_{\beta}(\cdot) is a temperature-controlled log-sum-exp that smoothly approximates max-pooling and Π\Pi is the egocentric projection.
+Using LSE avoids brittleness of hard maxima while preserving peakiness at promising regions.
+Uncertainty gating.
+We estimate the rollout uncertainty σA\sigma_{A} (from ensemble variance or diffusion variance) and disable imagination when it is high.
+We use a hard gate with a fixed threshold θ=0.6\theta\!=\!0.6 across all experiments, see Figure 5.
+Algorithm 2 OneStepPlan: Imagine–Score–Fuse–Act (single step)
+Require: current It−m+1:t,D1:t,PtI_{t-m+1:t},D_{1:t},P_{t}, map ℳt\mathcal{M}_{t}, instruction gg; world model 𝒲\mathcal{W}; reasoner ℛ\mathcal{R}; I2V head ℋ\mathcal{H}; base planner 𝒫\mathcal{P}; horizon HH, #candidates KK, discount γ\gamma, weights λ1,λ2\lambda_{1},\lambda_{2}, decode stride Δ​t\Delta t
+Ensure: next action ata_{t}
+1
+ℬ←𝒫.Candidates​(ℳt,K)\mathcal{B}\leftarrow\mathcal{P}.\textsc{Candidates}(\mathcal{M}_{t},K) ;  // frontiers →\rightarrow paths AA
+2
+Vtprior←ℛ.Prior​(g,ℳt,Pt)V_{t}^{\text{prior}}\leftarrow\mathcal{R}.\textsc{Prior}(g,\mathcal{M}_{t},P_{t})
+for each A∈ℬA\in\mathcal{B} do
+3
+C⁡(A)←IntegratePoses​(Pt,A)C(A)\leftarrow\textsc{IntegratePoses}(P_{t},A) ;  // poses along AA
+4
+𝐗^(A)←𝒲.Rollout(It−m+1:t,g,C(A);Δt)\hat{\mathbf{X}}(A)\leftarrow\mathcal{W}.\textsc{Rollout}(I_{t-m+1:t},g,C(A);\Delta t)
+Vtimg←ℋ.I2V​(𝐗^​(A),C⁡(A))V_{t}^{\text{img}}\leftarrow\mathcal{H}.\textsc{I2V}(\hat{\mathbf{X}}(A),C(A))
+sbase←𝒫.Score​(A)s_{\text{base}}\leftarrow\mathcal{P}.\textsc{Score}(A)
+simg←SamplePath​(Vtimg,A,γ)s_{\text{img}}\leftarrow\textsc{SamplePath}(V_{t}^{\text{img}},A,\gamma)
+sprior←SamplePath​(Vtprior,A,γ)s_{\text{prior}}\leftarrow\textsc{SamplePath}(V_{t}^{\text{prior}},A,\gamma)
+Sfused​(A)←sbase+λ1​simg+λ2​spriorS_{\text{fused}}(A)\leftarrow s_{\text{base}}+\lambda_{1}s_{\text{img}}+\lambda_{2}s_{\text{prior}} ;  // Eq. (2)
+5
+A⋆←arg⁡maxA∈ℬ​Sfused​(A)A^{\star}\leftarrow\arg\max_{A\in\mathcal{B}}S_{\text{fused}}(A);
+6
+return first control of A⋆A^{\star};
+Table 1: Performance on R2R. All methods use the 3 m success radius and identical stop rules.
+Models
+Validation Unseen
+Test Unseen
+SR ↑\uparrow
+SPL ↑\uparrow
+TL ↓\downarrow
+NE ↓\downarrow
+SR ↑\uparrow
+SPL ↑\uparrow
+TL ↓\downarrow
+NE ↓\downarrow
+EnvDrop [48]
+52.0
+48.0
+10.70
+5.22
+51.0
+47.0
+11.66
+5.23
+VLFM [6]
+52.5
+30.4
+/
+/
+/
+/
+/
+/
+PREVALENT [49]
+58.0
+53.0
+10.19
+4.71
+54.0
+51.0
+10.51
+5.30
+RecBERT [50]
+63.0
+57.0
+12.01
+3.93
+63.0
+57.0
+12.35
+4.09
+HAMT [51]
+66.2
+61.5
+11.46
+3.62
+65.0
+60.0
+12.27
+3.93
+HAMT-​Imagine [52]
+67.26
+62.02
+11.80
+3.58
+65.0
+60.0
+12.66
+3.89
+DUET [53]
+71.52
+60.41
+13.94
+3.31
+69.0
+59.0
+14.73
+3.65
+DUET-​Imagine [52]
+72.12
+60.48
+14.35
+3.19
+71.0
+60.0
+15.35
+3.52
+PanoGen [54]
+74.2
+64.3
+13.40
+3.03
+71.7
+61.9
+14.38
+3.31
+NavCoT [55]
+40.23
+36.64
+9.95
+6.26
+/
+/
+/
+/
+OmniNav [56]
+69.5
+66.1
+/
+3.74
+/
+/
+/
+/
+VISTA [8]
+77.8
+68.3
+13.26
+2.92
+74.9
+66.7
+14.20
+3.77
+VISTAv2 (ours)
+81.4
+73.7
+10.73
+3.76
+73.1
+69.0
+12.44
+4.05
+3.4 World Model Details
+Architecture.
+Our world model uses a CDiT-L backbone , with the same encoder and decoder used throughout the Navigation World Model (NWM) [7]. Conditioning is injected by per-timestep action tokens and an instruction embedding, as described in Sec. 3.1. All inputs are resized to 224×224224\times 224 and processed in bf16 precision.
+Training data.
+We curate 489k egocentric RGB frames from HM3D and MP3D, organized as short trajectories with their pose sequences and actions. The train/val split follows our navigation splits; we use only indoor scenes and discard trajectories shorter than a fixed minimum length. Details and scene lists are provided in the Appendix.
+Optimization and schedule.
+Unless otherwise noted, we train on 8×\times RTX 6000 Ada 48 GB for ∼\sim8 days, totaling ≈\approx\,200k optimizer steps.
+We use AdamW (lr ×10−58\!\times\!10^{-5}, weight decay 0.050.05, β=(0.9,0.999)\beta{=}(0.9,0.999)), cosine decay with 2k warmup, gradient clipping at 10.0, and an EMA with decay 0.9999.
+Batch size is 8 with accumulation 2 (effective 16).
+Mixed precision is bf16. We evaluate every 2k steps and save short rollouts for visual inspection.
+Actions are zz-score normalized over the training split.
+4 Experiments
+4.1 Experiment Setup
+Benchmarks.
+We evaluate in Habitat on continuous VLN-CE episodes derived from the Room-to-Room corpus in Matterport3D (R2R). For R2R we follow the standard splits: train 10,819 episodes over 61 scenes, val-seen 778 over 53, val-unseen 1,839 over 11, and test 3,408 over 18 scenes [3]. For HM3D, we adopt the public validation configuration with 2,000 episodes across 20 scenes and 6 goal categories to assess generalization in large-scale real-scan environments [57].
+Metrics.
+We report standard VLN metrics [58]:
+❶ Success Rate (SR) — fraction of episodes where the agent issues Stop within 3 meters of the goal;
+❷ Success weighted by Path Length (SPL) — SR weighted by path efficiency relative to the shortest path;
+❸ Navigation Error (NE) — shortest path distance (meters) from the final position to the goal;
+❹ Trajectory Length (TL) — total distance traveled (meters).
+Higher SR/SPL and lower NE/TL indicate better navigation. All inference is on a single GeForce RTX 4090; for VISTAv2 this includes world model rollouts, I2V scoring, and planner evaluation.
+Figure 3: Effect of visual imagination on goal discovery. Each panel shows one episode (same start/goal). Left (No Imagination): the base planner explores many frontiers (red circles) guided only by occupancy/prior; the value over the explored region is diffuse (green mask), the agent wanders (132 steps) and fails to localize the TV. Right (With Imagination): our world model rolls out egocentric futures and the I2V head produces a fan-shaped image value map (orange/yellow), which fused with the prior sharpens the score and steers the agent through the doorway to the TV room, succeeding in 30 steps. Top: current depth/RGB and occupancy with path; Right column: value maps; Bottom: frontier set and fused score along the chosen path.
+4.2 Experiments Results
+We evaluate VISTAv2 on both the R2R benchmark and RoboTHOR, and observe clear, consistent improvements over strong baselines across all splits in higher SR/SPL and with competitive NE/TL.
+Baselines.
+We compare VISTAv2 with representative VLN/VLN-CE systems:
+EnvDrop, PREVALENT, RecBERT, HAMT, HAMT-Imagine, DUET, DUET-Imagine, VLFM, PanoGen(++), NavCoT, OmniNav, and the prior VISTA. When a method is defined on the panorama graph, we follow the standard R2R protocol and evaluate on the same splits; all methods share the same sensor suite and stopping rule for fair comparison.
+Main Results.
+Table 1 reports results on R2R (Val-Unseen/Test-Unseen). VISTAv2 yields higher SPL and shorter trajectories on both splits, with modest SR/NE trade-offs. Val-Unseen: 81.4 SR / 73.7 SPL (+3.6/+5.4 vs. VISTA), TL 13.26→\rightarrow10.73 (–19%), NE 3.76 vs. 2.92. Test-Unseen: 73.1 SR / 69.0 SPL (–1.8/+2.3), TL 14.20→\rightarrow12.44, NE 4.05 vs. 3.77. Our fused policy tends to issue Stop once the imagined value concentrates near the goal and local confidence is high, which favors shorter, decisive paths yet can end just outside the 3 m success radius.
+Imagination with value helps.
+Against semantic-only or frontier-style approaches (e.g., VLFM and PanoGen++ rows), VISTAv2 lifts SPL by ≈5−10\approx\!5-10 points and SR by a similar margin, indicating that converting imagined futures into an egocentric value map improves action selection beyond language–vision matching.
+Sequential imagination better than goal imagination.
+Compared to goal-only imagination baselines (e.g., HAMT-Imagine, DUET-Imagine), VISTAv2 yields large gains (Val: ↑\uparrowSR by ≈9\approx\!9–14\!14 points; Test: ↑\uparrowSR by ≈8\approx\!8 points). We attribute this to our action-conditioned, short-horizon rollouts and score-level fusion, which respect near-term reachability and geometric risk during planning. Overall, these trends support our claim: VLN agents perform better when imagination is expressed as a value in map space and used to re-rank candidates, rather than relying on semantics alone or optimizing a long-horizon world-model objective.
+Table 2: Comparison on RoboTHOR.
+Model
+SWPL↑\uparrow
+SR↑\uparrow
+CLIP-Ref. [59]
+2.4
+2.7
+CLIP-Patch [59]
+10.6
+20.3
+CLIP-Grad. [59]
+9.7
+15.2
+MDETR [59]
+8.4
+9.3
+OWL [59]
+17.2
+27.5
+ESC [60]
+22.2
+38.1
+VLTNet [29]
+17.1
+33.2
+VISTA [8]
+28.8
+43.1
+VISTAv2 (ours)
+34.7
+61.3
+RoboTHOR Results.
+Table 2 shows that VISTAv2 also brings sizable gains in the interactive RoboTHOR setting: it achieves 61.3 SR and 34.7 SWPL (Success-Weighted Path Length), outperforming VISTA by +18.2 SR and +5.9 SWPL, and surpassing CLIP-based, OWL, ESC, and VLTNet baselines by a large margin. The concurrent SR and SWPL gains suggest that map-space value priors from short-horizon rollouts both reduce outright failures and improve path efficiency, consistent with our R2R results.
+We further tried to use the NWM to directly generate and score long-horizon future frames, but this naive pixel-space planner performed significantly worse due to severe rollout drift and artifacts.
+4.3 Ablations: From semantics to imagination to imagined value
+Setup. We contrast three stages:
+(1) VLFM — frontier/map exploration scored only by vision–language similarity (no imagination);
+(2) VISTA — imagination for reasoning but no map-space value fusion;
+(3) VISTAv2 (ours) — short-horizon, action-conditioned imagination projected to an egocentric value map and fused at score level.
+Table 3: Ablation on R2R. VLFM (semantics only) →\rightarrow VISTA (imagination w/o value) →\rightarrow VISTAv2 (imagination→\tovalue + fusion).
+Val-Unseen
+Method
+TL↓\downarrow
+NE↓\downarrow
+SR↑\uparrow
+SPL↑\uparrow
+VLFM [6]
+–
+–
+52.5
+30.4
+VISTA [8]
+13.26
+2.92
+77.8
+68.3
+VISTAv2 (ours)
+10.73
+3.76
+81.4
+73.7
+Test-Unseen
+Method
+TL↓\downarrow
+NE↓\downarrow
+SR↑\uparrow
+SPL↑\uparrow
+VLFM [6]
+–
+–
+48.2
+26.4
+VISTA [8]
+14.20
+3.77
+74.9
+66.7
+VISTAv2 (ours)
+12.44
+4.05
+73.1
+69.0
+Impact of imagination (VLFM →\to VISTA).
+Adding imagination beyond language–vision scoring yields large gains on Val-Unseen: +25.3 SR and +37.9 SPL (77.8/68.3 vs. 52.5/30.4), fixing many visually plausible yet unreachable detours. The higher SPL indicates fewer backtracks and more direct paths, consistent with the model pruning dead-ends and avoiding “bait” views (mirrors, glass, long hallways). Qualitatively, short-horizon egocentric rollouts provide explicit reachability evidence. For example, whether a corridor bends behind the camera, a doorway is traversable, or a landmark is occluded by walls, frontiers that merely look semantically promising no longer dominate the ranking. Notably, this improvement comes without additional path supervision: simulated futures act as a geometry-aware prior that complements language matching and stabilizes decisions across scenes.
+Figure 4: Qualitative visualization of the world-model rollout. For two trajectories in MP3D and HM3D. The rollouts capture room layout and semantics (doorways, arches, windows, tables and bookshelves), which are sufficient for planning even when textures appear stylized.
+Impact of imagination-to-value fusion (VISTA →\to VISTAv2).
+Projecting short-horizon rollouts to a map-space value and fusing at score level improves both success and efficiency: on Val-Unseen, +1.6 SR, +5.4 SPL, and TL ↓\downarrow19.1%; on Test-Unseen, SPL +2.3 and TL ↓\downarrow12.4%, with a small SR trade-off ( -1.8) and slightly higher NE (+0.28). Qualitatively, the value prior acts as a reachability-aware tie-breaker among candidates with similar base scores, suppressing imagined frontiers and zig-zag oscillations and yielding more direct paths (higher SPL, shorter TL). Because fusion preserves the planner, geometric constraints remain intact, while language alignment and traversability cues steer the search toward feasible, instruction-relevant corridors.
+This ablation isolates the effects: frontier-only →\rightarrow imagination →\rightarrow imagination-to-value, where the last step yields the largest SPL gains and clear TL reductions.
+And we sweep the uncertainty–gating threshold θ\theta (percentile of rollout variance σA\sigma_{A}) on R2R Val-Unseen. It exhibits a single-peak trend: too small θ\theta degenerates to no fusion (VISTA), while too large θ\theta admits noisy rollouts. We therefore set θ=0.6\theta{=}0.6 consistent with our main results (Fig. 5).
+Failure case study.
+In scenes with large mirrors or glass partitions, the imagined rollout can overestimate traversability and inflate language alignment behind reflective surfaces. In one episode, the instruction asks the agent to reach a visible landmark in the adjacent room. From the start pose, a full-wall mirror creates a strong false “continuation” of the corridor; monocular depth underestimates the barrier and the world model predicts a plausible forward corridor in a few steps. After projection, the I2V map places a high-value ridge straight ahead, and the fused score ranks this candidate above an alternative that first detours around the corner. As the agent advances, the base mapper eventually detects the blockage, triggering a local oscillation and an early stop just short of the correct doorway—yielding lower SR and slightly higher NE despite a short TL.
+Figure 5: Uncertainty gating sweep on R2R (Val-Unseen). SR/SPL versus the gating threshold θ\theta (right axis: fallback rate). Performance peaks at a moderate θ\theta as 0.6.
+5 Conclusion
+We presented VISTAv2, a language-conditioned, action-aware world model for Vision-and-Language Navigation that rolls out short-horizon egocentric futures and expresses their guidance as an egocentric value map in map space. Instead of replacing the planner with a long-horizon objective, VISTAv2 fuses the imagined value at score level with a standard frontier based stack, injecting instruction-consistent and reachability-aware cues at test time. On R2R and RoboTHOR, VISTAv2 delivers consistent gains in SR and SPL with shorter paths, and ablations show that imagination helps beyond language priors and projecting imagination into map space value is key to efficiency and robustness. The value maps are interpretable and lightweight to deploy, suggesting a practical route for bringing generative world models into embodied navigation.
+6 Limitations and Future Work
+Our rollouts are short-horizon and rely on monocular depth and pose estimates; failures occur in low-texture, reflective, or cluttered scenes where uncertainty increases. Future work includes uncertainty-aware planning over longer horizons, richer action spaces, memory for multi-episode goals, and sim-to-real transfer on mobile robots.
+References
+[1]
+W. Xin, H. Qiuyuan, C. Asli, G. Jianfeng, S. Dinghan, W. Yuan-Fang, W. William, and Z. Lei (2018)
+Reinforced cross-modal matching and self-supervised imitation learning for vision-language navigation.
+arXiv preprint arXiv:1811.10092.
+External Links: Link
+Cited by: §1.
+[2]
+C. Jinyu, G. Chen, M. Erli, Z. Qiong, and L. Si (2022)
+Reinforced structured state-evolution for vision-language navigation.
+arXiv preprint arXiv:2204.09280.
+External Links: Link
+Cited by: §1.
+[3]
+P. Anderson, Q. Wu, D. Teney, J. Bruce, M. Johnson, N. Sünderhauf, I. Reid, S. Gould, and A. Van Den Hengel (2018)
+Vision-and-language navigation: interpreting visually-grounded navigation instructions in real environments.
+In Proceedings of the IEEE conference on computer vision and pattern recognition,
+pp. 3674–3683.
+Cited by: §1,
+§2,
+§4.1.
+[4]
+P. Wu, Y. Mu, B. Wu, Y. Hou, J. Ma, S. Zhang, and C. Liu (2024)
+VoroNav: voronoi-based zero-shot object navigation with large language model.
+External Links: 2401.02695,
+Link
+Cited by: §1.
+[5]
+X. Wang, Q. Huang, A. Celikyilmaz, J. Gao, D. Shen, Y. Wang, W. Y. Wang, and L. Zhang (2019)
+Reinforced cross-modal matching and self-supervised imitation learning for vision-language navigation.
+External Links: 1811.10092,
+Link
+Cited by: §1.
+[6]
+N. Yokoyama, S. Ha, D. Batra, J. Wang, and B. Bucher (2023)
+VLFM: vision-language frontier maps for zero-shot semantic navigation.
+External Links: 2312.03275,
+Link
+Cited by: §1,
+§2,
+Table 1,
+Table 3,
+Table 3.
+[7]
+A. Bar, G. Zhou, D. Tran, T. Darrell, and Y. LeCun (2025)
+Navigation world models.
+External Links: 2412.03572,
+Link
+Cited by: §1,
+§2,
+§3.4.
+[8]
+Y. Huang, M. Wu, R. Li, and Z. Tu (2025)
+VISTA: generative visual imagination for vision-and-language navigation.
+External Links: 2505.07868,
+Link
+Cited by: §1,
+§2,
+Table 1,
+Table 2,
+Table 3,
+Table 3.
+[9]
+S. Dhruv, O. Blazej, I. Brian, and L. Sergey (2022)
+LM-nav: robotic navigation with large pre-trained models of language, vision, and action.
+arXiv preprint arXiv:2207.04429.
+External Links: Link
+Cited by: §1.
+[10]
+H. Chenguang, M. Oier, Z. Andy, and B. Wolfram (2022)
+Visual language maps for robot navigation.
+arXiv preprint arXiv:2210.05714.
+External Links: Link
+Cited by: §1,
+§2.
+[11]
+V. Arun, D. Dengxin, and G. Luc (2019)
+Talk2Nav: long-range vision-and-language navigation with dual attention and spatial memory.
+arXiv preprint arXiv:1910.02029.
+External Links: Link
+Cited by: §1.
+[12]
+Z. Jiazhao, W. Kunyu, X. Rongtao, Z. Gengze, H. Yicong, F. Xiaomeng, W. Qi, Z. Zhizheng, and W. He (2024)
+NaVid: video-based vlm plans the next step for vision-and-language navigation.
+arXiv preprint arXiv:2402.15852.
+External Links: Link
+Cited by: §1.
+[13]
+W. Xin, X. Wenhan, W. Hongmin, and W. William (2018)
+Look before you leap: bridging model-free and model-based reinforcement learning for planned-ahead vision-and-language navigation.
+arXiv preprint arXiv:1803.07729.
+External Links: Link
+Cited by: §1.
+[14]
+C. Shizhe, G. Pierre-Louis, T. Makarand, S. Cordelia, and L. Ivan (2022)
+Think global, act local: dual-scale graph transformer for vision-and-language navigation.
+arXiv preprint arXiv:2202.11742v1.
+External Links: Link
+Cited by: §1.
+[15]
+C. Matthew, G. Theophile, K. Mukul, Y. Sriram, S. Dhruv, M. So, S. Kavit, P. Chris, G. Saurabh, B. Dhruv, M. Roozbeh, M. Jitendra, and C. Devendra (2023)
+GOAT: go to any thing.
+arXiv preprint arXiv:2311.06430.
+External Links: Link
+Cited by: §1.
+[16]
+N. Khanh, D. Debadeepta, B. Chris, and D.  (2018)
+Vision-based navigation with language-based assistance via imitation learning with indirect intervention.
+arXiv preprint arXiv:1812.04155.
+External Links: Link
+Cited by: §1.
+[17]
+L. Jialu and B. Mohit (2023)
+PanoGen: text-conditioned panoramic environment generation for vision-and-language navigation.
+arXiv preprint arXiv:2305.19195.
+External Links: Link
+Cited by: §1,
+§2,
+§2.
+[18]
+W. Meng, W. Chenyang, Y. Xiqian, W. Tai, Y. Yuqiang, M. Xiaohan, Z. Chenming, C. Wenzhe, W. Hanqing, C. Yilun, L. Xihui, and P. Jiangmiao (2025)
+StreamVLN: streaming vision-and-language navigation via slowfast context modeling.
+arXiv preprint arXiv:2507.05240.
+External Links: Link
+Cited by: §1,
+§2.
+[19]
+Z. Li, Y. Lu, Y. Mu, and H. Qiao (2024)
+Cog-ga: a large language models-based generative agent for vision-language navigation in continuous environments.
+arXiv preprint arXiv:2409.02522.
+External Links: Link
+Cited by: §1.
+[20]
+Z. Ganlong, L. Guanbin, C. Weikai, and Y. Yizhou (2024)
+OVER-nav: elevating iterative vision-and-language navigation with open-vocabulary detection and structured representation.
+arXiv preprint arXiv:2403.17334.
+External Links: Link
+Cited by: §2.
+[21]
+J. Krantz, A. Gokaslan, D. Batra, S. Lee, and O. Maksymets (2021)
+Waypoint models for instruction-guided navigation in continuous environments.
+External Links: 2110.02207,
+Link
+Cited by: §2.
+[22]
+C. Yibo, X. Liang, Z. Yakun, Z. Meishan, Y. Ye, and Y. Erwei (2023)
+Grounded entity-landmark adaptive pre-training for vision-and-language navigation.
+arXiv preprint arXiv:2308.12587.
+External Links: Link
+Cited by: §2.
+[23]
+K. Chia-Wen, M. Chih-Yao, H. Judy, and K. Zsolt (2022)
+Structure-encoding auxiliary tasks for improved visual representation in vision-and-language navigation.
+arXiv preprint arXiv:2211.11116.
+External Links: Link
+Cited by: §2.
+[24]
+R. Sonia, W. Saim, P. Shivansh, J. Unnat, and C. Angel (2021)
+Language-aligned waypoint (law) supervision for vision-and-language navigation in continuous environments.
+arXiv preprint arXiv:2109.15207.
+External Links: Link
+Cited by: §2.
+[25]
+C. Ta-Chung, E. Mihail, K. Seokhwan, S. Minmin, and H. Dilek (2019)
+Just ask:an interactive learning framework for vision and language navigation.
+arXiv preprint arXiv:1912.00915.
+External Links: Link
+Cited by: §2.
+[26]
+R. Hu, D. Fried, A. Rohrbach, D. Klein, T. Darrell, and K. Saenko (2019)
+Are you looking? grounding to multiple modalities in vision-and-language navigation.
+arXiv preprint arXiv:1906.00347.
+External Links: Link
+Cited by: §2.
+[27]
+L. Dillon, B. Tomasz, X. Xinxing, and G. Frank (2024)
+AdaVLN: towards visual language navigation in continuous indoor environments with moving humans.
+arXiv preprint arXiv:2411.18539.
+External Links: Link
+Cited by: §2.
+[28]
+H. Yicong, R. Cristian, W. Qi, and G. Stephen (2020)
+Sub-instruction aware vision-and-language navigation.
+arXiv preprint arXiv:2004.02707.
+External Links: Link
+Cited by: §2.
+[29]
+C. Wen, Y. Huang, H. Huang, Y. Huang, S. Yuan, Y. Hao, H. Lin, Y. Liu, and Y. Fang (2024)
+Zero-shot object navigation with vision-language models reasoning.
+In Pattern Recognition: 27th International Conference, ICPR 2024, Kolkata, India, December 1–5, 2024, Proceedings, Part XVIII,
+Berlin, Heidelberg, pp. 389–404.
+External Links: ISBN 978-3-031-78455-2,
+Link,
+Document
+Cited by: §2,
+Table 2.
+[30]
+A. Ku, P. Anderson, R. Patel, E. Ie, and J. Baldridge (2020)
+Room-across-room: multilingual vision-and-language navigation with dense spatiotemporal grounding.
+arXiv preprint arXiv:2010.07954.
+Cited by: §2.
+[31]
+M. Savva, A. Kadian, O. Maksymets, Y. Zhao, E. Wijmans, B. Jain, J. Straub, J. Liu, V. Koltun, J. Malik, D. Parikh, and D. Batra (2019)
+Habitat: A Platform for Embodied AI Research.
+In Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV),
+Cited by: §2.
+[32]
+J. Krantz, E. Wijmans, A. Majumdar, D. Batra, and S. Lee (2020)
+Beyond the nav-graph: vision-and-language navigation in continuous environments.
+External Links: 2004.02857,
+Link
+Cited by: §2.
+[33]
+B. Lin, Y. Nie, Z. Wei, J. Chen, S. Ma, J. Han, H. Xu, X. Chang, and X. Liang (2025)
+Navcot: boosting llm-based vision-and-language navigation via learning disentangled reasoning.
+IEEE Transactions on Pattern Analysis and Machine Intelligence.
+Cited by: §2.
+[34]
+S. Wang, D. Zhou, L. Xie, C. Xu, Y. Yan, and E. Yin (2025)
+PanoGen++: domain-adapted text-guided panoramic environment generation for vision-and-language navigation.
+Neural Networks 187, pp. 107320.
+External Links: ISSN 0893-6080,
+Link,
+Document
+Cited by: §2,
+§2.
+[35]
+Z. Zhan, L. Yu, S. Yu, and G. Tan (2024)
+MC-gpt: empowering vision-and-language navigation with memory map and reasoning chains.
+External Links: 2405.10620,
+Link
+Cited by: §2.
+[36]
+S. Kurita and K. Cho (2020)
+Generative language-grounded policy in vision-and-language navigation with bayes’ rule.
+External Links: 2009.07783,
+Link
+Cited by: §2.
+[37]
+O. Bar-Tal, H. Chefer, O. Tov, C. Herrmann, R. Paiss, S. Zada, A. Ephrat, J. Hur, G. Liu, A. Raj, et al. (2024)
+Lumiere: a space-time diffusion model for video generation.
+In SIGGRAPH Asia 2024 Conference Papers,
+pp. 1–11.
+Cited by: §2.
+[38]
+R. Girdhar, M. Singh, A. Brown, Q. Duval, S. Azadi, S. S. Rambhatla, A. Shah, X. Yin, D. Parikh, and I. Misra (2023)
+Emu video: factorizing text-to-video generation by explicit image conditioning.
+arXiv preprint arXiv:2311.10709.
+Cited by: §2.
+[39]
+J. Ho, W. Chan, C. Saharia, J. Whang, R. Gao, A. Gritsenko, D. P. Kingma, B. Poole, M. Norouzi, D. J. Fleet, et al. (2022)
+Imagen video: high definition video generation with diffusion models.
+arXiv preprint arXiv:2210.02303.
+Cited by: §2.
+[40]
+S. Tulyakov, M. Liu, X. Yang, and J. Kautz (2018)
+Mocogan: decomposing motion and content for video generation.
+In Proceedings of the IEEE conference on computer vision and pattern recognition,
+pp. 1526–1535.
+Cited by: §2.
+[41]
+L. Yu, Y. Cheng, K. Sohn, J. Lezama, H. Zhang, H. Chang, A. G. Hauptmann, M. Yang, Y. Hao, I. Essa, et al. (2023)
+Magvit: masked generative video transformer.
+In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition,
+pp. 10459–10469.
+Cited by: §2.
+[42]
+J. Bruce, M. Dennis, A. Edwards, J. Parker-Holder, Y. Shi, E. Hughes, M. Lai, A. Mavalankar, R. Steigerwald, C. Apps, Y. Aytar, S. Bechtle, F. Behbahani, S. Chan, N. Heess, L. Gonzalez, S. Osindero, S. Ozair, S. Reed, J. Zhang, K. Zolna, J. Clune, N. de Freitas, S. Singh, and T. Rocktäschel (2024)
+Genie: generative interactive environments.
+External Links: 2402.15391,
+Link
+Cited by: §2.
+[43]
+S. B. Laina, S. Boche, S. Papatheodorou, S. Schaefer, J. Jung, and S. Leutenegger (2025)
+FindAnything: open-vocabulary and object-centric mapping for robot exploration in any environment.
+External Links: 2504.08603,
+Link
+Cited by: §2.
+[44]
+M. Uno, K. Tanaka, D. Iwata, Y. Noda, S. Miyazaki, and K. Terashima (2025)
+LGR: llm-guided ranking of frontiers for object goal navigation.
+External Links: 2503.20241,
+Link
+Cited by: §2.
+[45]
+J. Jiang, Y. Zhu, Z. Wu, and J. Song (2025)
+DualMap: online open-vocabulary semantic mapping for natural language navigation in dynamic changing scenes.
+External Links: 2506.01950,
+Link
+Cited by: §2.
+[46]
+B. Yu, H. Kasaei, and M. Cao (2023)
+L3MVN: leveraging large language models for visual target navigation.
+In 2023 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS),
+pp. 3554–3560.
+External Links: Link,
+Document
+Cited by: §2.
+[47]
+J. Li, D. Li, C. Xiong, and S. Hoi (2022)
+Blip: bootstrapping language-image pre-training for unified vision-language understanding and generation.
+In International conference on machine learning,
+pp. 12888–12900.
+Cited by: §3.1.
+[48]
+H. Tan, L. Yu, and M. Bansal (2019)
+Learning to navigate unseen environments: back translation with environmental dropout.
+arXiv preprint arXiv:1904.04195.
+Cited by: Table 1.
+[49]
+W. Hao, C. Li, X. Li, L. Carin, and J. Gao (2020)
+Towards learning a generic agent for vision-and-language navigation via pre-training.
+In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition,
+pp. 13137–13146.
+Cited by: Table 1.
+[50]
+Y. Hong, Q. Wu, Y. Qi, C. Rodriguez-Opazo, and S. Gould (2020)
+A recurrent vision-and-language bert for navigation.
+arXiv preprint arXiv:2011.13922.
+Cited by: Table 1.
+[51]
+S. Chen, P. Guhur, C. Schmid, and I. Laptev (2021)
+History aware multimodal transformer for vision-and-language navigation.
+Advances in neural information processing systems 34, pp. 5834–5847.
+Cited by: Table 1.
+[52]
+A. Perincherry, J. Krantz, and S. Lee (2025)
+Do visual imaginations improve vision-and-language navigation agents?.
+External Links: 2503.16394,
+Link
+Cited by: Table 1,
+Table 1.
+[53]
+S. Chen, P. Guhur, M. Tapaswi, C. Schmid, and I. Laptev (2022)
+Think global, act local: dual-scale graph transformer for vision-and-language navigation.
+In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition,
+pp. 16537–16547.
+Cited by: Table 1.
+[54]
+J. Li and M. Bansal (2023)
+PanoGen: text-conditioned panoramic environment generation for vision-and-language navigation.
+External Links: 2305.19195,
+Link
+Cited by: Table 1.
+[55]
+B. Lin, Y. Nie, Z. Wei, J. Chen, S. Ma, J. Han, H. Xu, X. Chang, and X. Liang (2025)
+NavCoT: boosting llm-based vision-and-language navigation via learning disentangled reasoning.
+External Links: 2403.07376,
+Link
+Cited by: Table 1.
+[56]
+X. Xue, J. Hu, M. Luo, X. Shichao, J. Chen, Z. Xie, Q. Kuichen, G. Wei, M. Xu, and Z. Chu (2025)
+OmniNav: a unified framework for prospective exploration and visual-language navigation.
+External Links: 2509.25687,
+Link
+Cited by: Table 1.
+[57]
+S. K. Ramakrishnan, A. Gokaslan, E. Wijmans, O. Maksymets, A. Clegg, J. Turner, E. Undersander, W. Galuba, A. Westbury, A. X. Chang, M. Savva, Y. Zhao, and D. Batra (2021)
+Habitat-matterport 3d dataset (hm3d): 1000 large-scale 3d environments for embodied ai.
+External Links: 2109.08238,
+Link
+Cited by: §4.1.
+[58]
+G. Ilharco, V. Jain, A. Ku, E. Ie, and J. Baldridge (2019)
+General evaluation for instruction conditioned navigation using dynamic time warping.
+External Links: 1907.05446,
+Link
+Cited by: §4.1.
+[59]
+G. Samir, W. Mitchell, I. Gabriel, S. Ludwig, and S. Shuran (2022)
+CoWs on pasture: baselines and benchmarks for language-driven zero-shot object navigation.
+arXiv preprint arXiv:2203.10421.
+External Links: Link
+Cited by: Table 2,
+Table 2,
+Table 2,
+Table 2,
+Table 2.
+[60]
+K. Zhou, K. Zheng, C. Pryor, Y. Shen, H. Jin, L. Getoor, and X. E. Wang (2023)
+ESC: exploration with soft commonsense constraints for zero-shot object navigation.
+External Links: 2301.13166,
+Link
+Cited by: Table 2.
+Experimental support, please
+view the build logs
+for errors. Generated by
+L
+A
+T
+E
+xml
+.
+Instructions for reporting errors
+We are continuing to improve HTML versions of papers, and your feedback helps enhance accessibility and mobile
+support. To report errors in the HTML that will help us improve conversion and rendering, choose any of the
+methods listed below:
+Click the "Report Issue" (
+) button, located in the page header.
+Tip: You can select the relevant text first, to include it in your report.
+Our team has already identified the following issues. We appreciate your time reviewing and reporting rendering errors we
+may not have found yet. Your efforts will help us improve the HTML versions for all readers, because disability
+should not be a barrier to accessing research. Thank you for your continued support in championing open access for
+all.
+Have a free development cycle? Help support accessibility at arXiv! Our collaborators at LaTeXML maintain a list of packages that need conversion, and welcome developer contributions.
+We gratefully acknowledge support from
+our major funders,
+member institutions, ,
+and all contributors.
+About
+·
+Help
+·
+Contact
+·
+Subscribe
+·
+Copyright
+·
+Privacy
+·
+Accessibility
+·
+Operational Status (opens in new tab)
+Major funding support from

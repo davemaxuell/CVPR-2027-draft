@@ -1,0 +1,315 @@
+[
+  {
+    "id": "adanav",
+    "title": "AdaNav: Adaptive Reasoning with Uncertainty for Vision-Language Navigation",
+    "authors": [
+      "Xin Ding",
+      "Jianyu Wei",
+      "Yifan Yang",
+      "Shiqi Jiang",
+      "Qianxi Zhang",
+      "Hao Wu",
+      "Fucheng Jia",
+      "Liang Mi",
+      "Yuxuan Yan",
+      "Weijun Wang",
+      "Yunxin Liu",
+      "Zhibo Chen",
+      "Ting Cao"
+    ],
+    "year": 2026,
+    "venue": "ICML 2026; preprint first posted 2025",
+    "source": "https://arxiv.org/abs/2509.24387",
+    "bibliography": "ICML's 2026 downloads listing and Microsoft Research's publication record identify ICML 2026. An older anonymous ICLR submission is not the final venue.",
+    "pages": [
+      "1-8",
+      "12-17"
+    ],
+    "problem": "A trained monocular VLN-CE policy must choose when additional language reasoning is worth its latency. Inputs are instruction, RGB history, and internal action-token uncertainty; outputs are low-level navigation commands and optional descriptions, summaries, or corrections. Navigation training is required; transfer to RxR without RxR training is a different setting from the main mixed R2R/RxR training.",
+    "method": "AUTHOR CLAIM / PAPER METHOD (§3, pp.3–5): factor the policy into action generation, reasoning-mode selection, and conditional reasoning text. The selector has four outcomes: no reasoning, description, summary, correction. Token entropy H=−(1/N)Σ_tokenΣ_vocab p log p is computed from action-generation probabilities, then its history, current observation representation, and instruction are linearly combined to produce mode scores. A cold-start prior places soft mass near mode-specific entropy thresholds τ_m=τ_0+mδ. The heuristic weight is annealed toward zero so learned selection takes over. Reward combines geodesic progress with clipped relative reasoning-length cost; the latter uses the shortest successful response in a group (Eq.11). Inference runs the selector, conditionally generates reasoning, and conditions the action policy on accumulated reasoning.\n\nTraining (§4.1): 3,000 episodes each from R2R and RxR, five rollouts per episode, learning rate 10^-6 on four A100 GPUs. Cross-dataset experiments instead use 3,000 R2R episodes. The 6K count excludes backbone pretraining. DEDUCTION: the derivation leaves the dimensions/encoding of variable-length entropy history unspecified. Eq.6 calls its output logits, Eq.8 defines a normalized probability, Eq.9 mixes them, and Eq.10 applies another softmax, whereas Algorithm 1 samples the mixture directly. These alternatives are not equivalent. No optimality guarantee follows from using RL.",
+    "novelty": "Relative to fixed-interval NavGPT-style reasoning and direct-action NaVid/NaVILA, the contribution is a learned uncertainty-conditioned mode gate with a heuristic curriculum, not the invention of reasoning or uncertainty monitoring. Tables 6 and 8 separately test gate/prior/RL and input signals. It strongly overlaps any proposal to 'reason only when action entropy is high.'",
+    "results": "PAPER EXPERIMENT: Table 1 p.6 reports NaVid 37.0 SR/35.0 SPL versus NaVid-AdaNav 47.7/42.34 on R2R-CE val-unseen; NaVILA improves 54.0 to 60.19 SR. These are different pretrained backbones and additional training, not equal-total-data comparisons. Table 6 p.8 compares fixed-five-step 40.12 SR, heuristic-only 42.53, no-prior RL 43.82, and full 47.7. Table 7 reports mean gate 0.0029 s, action 0.76 s, and reasoning 2.94 s; 2.5 reasoning calls per average 55-step trajectory lowers cost relative to dense reasoning. Appendix B calibrates thresholds on 1,000 validation episodes; the exact split must be disclosed to assess tuning leakage. Appendix F acknowledges missed transient ambiguity and adds 500 targeted examples; this is mitigation through extra training, not proof of calibrated uncertainty.",
+    "code": "ACCESS LIMITATION: the paper advertises https://github.com/xinding-sys/AdaNav, but git ls-remote returned repository-not-found on 2026-10-22. No selector, optimizer, or reward implementation was inspected. The mathematical ambiguity therefore remains unresolved.",
+    "repository_status": "Advertised official repository inaccessible",
+    "bottlenecks": [
+      {
+        "id": "03-adanav-uncertainty",
+        "description": "Confidently wrong or brief ambiguity can escape the reasoning gate",
+        "conditions": "Novel semantics, short lighting/view changes, or transient uncertainty",
+        "cause": "Action token entropy is not calibrated probability of navigation failure; temporal averaging suppresses spikes",
+        "evidence": "Author-acknowledged Appendix F, Table 17; deduction from Eq.5 and entropy averaging",
+        "kind": "methodological",
+        "followups": "AwareVLN uses supervised key-event triggers; Progress-Think models semantic progress. Neither establishes calibration of this gate.",
+        "status": "Partially addressed",
+        "confidence": "high"
+      }
+    ],
+    "key_findings": [
+      {
+        "claim": "Adaptive entropy-gated reasoning is established prior art, with training and latency ablations.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "AdaNav.pdf",
+        "locator": "§3; Tables 6–8 pp.8"
+      }
+    ],
+    "limitations": "No official source code or benchmarks executed. Entropy/logit mixing, handling groups without successful samples, and the RL estimator are not verified in code. Repository and official-venue search recorded in evidence/03/search_01.json.",
+    "followup_sources": [
+      "https://gwxuan.github.io/AwareVLN/",
+      "https://horizonrobotics.github.io/robot_lab/progress-think"
+    ],
+    "status": "Complete with explicit code-access limitation"
+  },
+  {
+    "id": "analogical",
+    "short_name": "Analogical Descriptions",
+    "title": "Vision-and-Language Navigation with Analogical Textual Descriptions in LLMs",
+    "authors": [
+      "Yue Zhang",
+      "Tianyi Ma",
+      "Zun Wang",
+      "Yanyuan Qiao",
+      "Parisa Kordjamshidi"
+    ],
+    "year": 2025,
+    "venue": "EMNLP 2025",
+    "pages": [
+      "1-6"
+    ],
+    "source": "https://aclanthology.org/2025.emnlp-main.759/",
+    "problem": "Training-free graph VLN must discriminate nearby candidate views that receive nearly identical captions and interpret subtle relative directions. The environment supplies candidate images, connectivity, headings, elevations, and distances. Actions select graph candidates; this is not physical continuous-control validation.",
+    "method": "PAPER METHOD (§3, pp.2–4): retain MapGPT's instruction, topological map, action-history, and candidate-action prompt. A VLM sees candidate images jointly and creates descriptions emphasizing their differences instead of independently captioning each view. A second textual representation converts candidate relative heading/elevation/distance into comparative spatial prose (ordering, nearer/farther, orientation). The navigation LLM receives images and/or the comparative captions plus spatial prose and selects a candidate. Eq.2 is conditional generation of joint scene captions; Eq.3 adds these representations to MapGPT's decision context. No task-specific gradient objective is introduced. GPT-4o-2024-08-06, temperature zero, at most 15 actions and 2,000 generated tokens are used (§4). Training-free describes this pipeline, not the pretraining of GPT-4o.",
+    "novelty": "The mechanism is contextual comparative prompting over visual candidates and metric relations, extending MapGPT. It is not a new backbone or learned analogical module. Table 2's caption-only, spatial-only, combined, raw-image, and Qwen variants provide the main isolation evidence.",
+    "results": "PAPER EXPERIMENT: Table 1 p.4 reports R2R val-unseen MapGPT/GPT-4o 43.8 SR and 36.5 SPL versus 49.5/42.5; REVERIE navigation SR 30.00 to 33.16. Table 2 uses only 216 examples from 72 scenes; joint image+text gets 50.0 SR/40.2 SPL versus GPT-4o image baseline 47.7/38.7. Captioner and GPT release changes materially affect results, so compare within the same model version. The paper does not establish object-grounding RGS improvement from navigation SR alone. Author limitations explicitly acknowledge added caption-generation cost and hallucination.",
+    "bottlenecks": [
+      {
+        "id": "03-analogical-grounding",
+        "description": "Comparative text can amplify a hallucinated distinction or incorrectly verbalized relation",
+        "conditions": "Visually similar candidates, ambiguous rotations, missing landmarks",
+        "cause": "All comparative descriptions are generated; no evidence validator separates observation from inferred contrast",
+        "evidence": "§7 pp.5–6; deduction from §3 pipeline",
+        "kind": "methodological",
+        "followups": "ProFocus adds targeted perception; GC-VLN checks explicit graph constraints; these use different observations/tasks.",
+        "status": "Partially addressed",
+        "confidence": "high"
+      }
+    ],
+    "key_findings": [
+      {
+        "claim": "Text comparison is useful on matched GPT-4o conditions but the improvement is tied to graph-supplied geometry.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "Analogical Descriptions.pdf",
+        "locator": "§3 and Tables 1–2 p.4"
+      }
+    ],
+    "limitations": "Full paper pp.1–6 reviewed; detailed appendix prompts not yet separately inspected. No benchmark executed. API release drift, candidate geometry, and additional calls must be controlled.",
+    "followup_sources": [
+      "https://arxiv.org/abs/2603.05530",
+      "https://proceedings.mlr.press/v305/yin25a.html"
+    ]
+  },
+  {
+    "id": "aoplanner",
+    "title": "Affordances-Oriented Planning Using Foundation Models for Continuous Vision-Language Navigation",
+    "authors": [
+      "Jiaqi Chen",
+      "Bingqian Lin",
+      "Xinmin Liu",
+      "Lin Ma",
+      "Xiaodan Liang",
+      "Kwan-Yee K. Wong"
+    ],
+    "year": 2025,
+    "venue": "AAAI 2025",
+    "pages": [
+      "1",
+      "3-7"
+    ],
+    "problem": "Replace graph-provided candidate waypoints with foundation-model low-level planning in continuous environments. Assumes four directional RGB views, depth, calibrated camera intrinsics, and a rotate-then-forward controller. Evaluates R2R-CE and sampled English RxR-CE, not a monocular RGB-only setting.",
+    "method": "PAPER METHOD (pp.3–5): GroundingDINO plus SAM segments navigable ground in each 90° view. Uniformly sampled pixels on the floor mask are labeled with IDs. Gemini-1.5-Pro receives the instruction, annotated view, and waypoint/path definitions; it returns candidate waypoint IDs and connecting image-plane paths. A separate GPT-4o PathAgent sees all four images with candidate paths and uses history/instruction to select one. Depth and camera intrinsics back-project selected pixels to 3D; ETPNav-style rotation/forward control executes the piecewise path. Eq.1 specifies low-level generation; Eq.2 specifies high-level selection. No navigation loss is optimized in the zero-shot variant.\n\nA distinct trained variant collects approximately 10K locations/40K images and 40K Gemini calls as pseudo waypoint labels, trains the ETPNav waypoint predictor, and combines it with an ETPNav high-level policy. This is waypoint distillation, not a training-free system. The paper refers optimizer details to its arXiv appendix; conference text alone does not specify them.",
+    "novelty": "Visual affordance prompting and explicit RGB-space paths extend MapGPT's high-level reasoning into waypoint proposal and continuous movement. Table 2 removes floor masks, instructions, and waypoint definitions; Table 3 crosses trained/zero-shot waypoint generators with baseline/PathAgent. These are stronger mechanism controls than comparing only final benchmark scores.",
+    "results": "PAPER EXPERIMENT: Table 1 p.6 separates zero-shot R2R SR25.5/SPL16.6 and RxR22.4/15.1 from distilled R2R47/33 and RxR43.3/30.5. Treating 47 SR as the training-free score would be incorrect. RxR uses 500 sampled episodes and ablations use 100 sampled R2R episodes (§experiments p.5). Table 2: removing affordances lowers subset SR27 to15; Table 4: Gemini proposer+GPT-4o decider reaches27 versus same-Gemini14 and same-GPT-4o16. Strong modular evidence, but API capability and sensing differ across baselines; ground segmentation alone does not guarantee path feasibility.",
+    "bottlenecks": [
+      {
+        "id": "03-aoplanner-motion",
+        "description": "A plausible floor-projected path may still be unexecutable or inefficient",
+        "conditions": "Occluded obstacles, poor depth, narrow traversable regions, simulator reconstruction artifacts",
+        "cause": "2D mask and language path selection do not prove collision-free 3D dynamics",
+        "evidence": "Method pp.4–5; author discussion p.5 of image quality and remaining supervised gap; deduction on feasibility",
+        "kind": "methodological",
+        "followups": "CA-Nav adds persistent semantic/value maps; GC-VLN adds graph constraints and backtracking; NaVILA learns a physical locomotion controller.",
+        "status": "Shifted into sensing/control assumptions",
+        "confidence": "high"
+      }
+    ],
+    "key_findings": [
+      {
+        "claim": "The 47% R2R success result belongs to the trained distillation variant; zero-shot SR is 25.5%.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "AO-Planner.pdf",
+        "locator": "Table 1 p.6"
+      }
+    ],
+    "limitations": "Conference PDF reviewed; arXiv implementation appendix remains an explicit access-scope limitation. No API calls or navigation benchmark executed.",
+    "followup_sources": [
+      "https://arxiv.org/abs/2412.10137",
+      "https://proceedings.mlr.press/v305/yin25a.html"
+    ]
+  },
+  {
+    "id": "auxthink",
+    "title": "Aux-Think: Exploring Reasoning Strategies for Data-Efficient Vision-Language Navigation",
+    "authors": [
+      "Shuo Wang",
+      "Yongcai Wang",
+      "Wanting Li",
+      "Xudong Cai",
+      "Yucheng Wang",
+      "Maiyue Chen",
+      "Kaihui Wang",
+      "Zhizhong Su",
+      "Deying Li",
+      "Zhaoxin Fan"
+    ],
+    "year": 2025,
+    "venue": "NeurIPS 2025",
+    "pages": [
+      "1-10",
+      "13-16"
+    ],
+    "problem": "Test whether explicit generated chain-of-thought helps a monocular continuous navigator under limited navigation supervision. The paper distinguishes learning from reasoning traces from generating them during deployment. Inputs are the instruction, current RGB frame, and eight uniformly sampled history frames.",
+    "method": "PAPER METHOD (§3): Qwen2.5-VL-72B annotates 320K oracle-trajectory states using observations, instruction, and known correct action; these are rationalizations conditioned on the answer. NVILA-lite 8B (SigLIP, projector, Qwen2) is supervised on three prompt-switched tasks: action sequence prediction, CoT generation, and reconstruction of the trajectory's instruction. Eqs.2–5 sum negative log likelihood for these tasks. CoT never becomes a required prefix for the action task. During inference only action prediction is activated; predict a short action horizon and execute its first action before observing again. Horizon three is best in Table 5. Forward increments are25/50/75cm and turns15/30/45°. Training uses eight H20 GPUs, one epoch about60h, learning rate10^-5; the larger variant adds RxR, DAgger, and web data.\n\nDEDUCTION: the action objective's summation k=0..n in Eq.4 is off by one against text saying n actions. More substantively, post-action tokens cannot causally alter an earlier action token within the same causal inference pass; their training gradients and later-history conditioning can, so the proposed 'hidden state interference' explanation is a hypothesis rather than established mechanism.",
+    "novelty": "A controlled comparison of No/Pre/Post/Aux-Think plus navigation CoT data is the contribution. Auxiliary reasoning itself has predecessors (AuxRN and language multitask learning). The distinctive deployment choice decouples reasoning generation from action context, contrasting AdaNav/AwareVLN sparse explicit reasoning. It blocks a broad claim that 'CoT as train-only auxiliary loss' is new.",
+    "results": "PAPER EXPERIMENT: Table 3 p.9 reports No-Think35.1 SR/30.2 SPL/1.25s; Pre-Think11.4/8.6/30.62s; Post-Think29.0/23.8/28.97s; Aux CoT41.3/35.8/1.25s. Table4's full three-task model reaches46.0/40.5; enlarged-data Table1 reaches54.8 SR/46.9 SPL on R2R. RxR Table2 gives52.2 SR but40.2 SPL, below NaVILA44.0 SPL, so success gains trade against path efficiency. Introductory Figure1 and Table3 use different variant values; cite the specific table. Results establish the tested data/architecture setting, not universal harm from inference reasoning.",
+    "bottlenecks": [
+      {
+        "id": "03-auxthink-causal",
+        "description": "CoT quality and correctness are not separately identified from extra supervision and action-conditioned annotation",
+        "conditions": "Out-of-distribution states and long trajectories",
+        "cause": "Oracle-only traces encode known answers; auxiliary tasks may regularize without learning the claimed reasoning process",
+        "evidence": "§3.2 annotation; §3.3 failure analysis; Tables3–5",
+        "kind": "insufficiently tested",
+        "followups": "CorrectNav adds error-state supervision; AwareVLN adds key-event/correction traces; Progress-Think aligns semantic progress.",
+        "status": "Partially addressed",
+        "confidence": "high"
+      }
+    ],
+    "key_findings": [
+      {
+        "claim": "The tested explicit reasoning variants degrade whereas prompt-separated auxiliary reasoning improves matched-data performance.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "Aux-Think.pdf",
+        "locator": "Table3 p.9 and Table4 p.10"
+      }
+    ],
+    "limitations": "No benchmark execution. Checklist/reference pages are not additional empirical evidence; remaining appendix generation prompts were not fully audited.",
+    "followup_sources": [
+      "https://arxiv.org/abs/2508.10416",
+      "https://gwxuan.github.io/AwareVLN/",
+      "https://horizonrobotics.github.io/robot_lab/progress-think"
+    ]
+  },
+  {
+    "id": "awarevln",
+    "title": "AwareVLN: Reasoning with Self-awareness for Vision-Language Navigation",
+    "authors": [
+      "Wenxuan Guo",
+      "Xiuwei Xu",
+      "Yichen Liu",
+      "Xiangyu Li",
+      "Hang Yin",
+      "Huangxing Chen",
+      "Wenzhao Zheng",
+      "Jianjiang Feng",
+      "Jie Zhou",
+      "Jiwen Lu"
+    ],
+    "year": 2026,
+    "venue": "CVPR 2026",
+    "pages": [
+      "1-7"
+    ],
+    "problem": "A monocular RGB navigation policy should recognize subtask completion, deviations, and terminal mistakes while retaining low-latency actions. At inference no depth or pose is used; training data generation uses simulator privileged semantics and reference waypoints.",
+    "method": "PAPER METHOD (§3, pp.3–6): one VLM predicts either [REASON] or [ACT]. Inputs include the instruction, eight sampled RGB frames, last reasoning text, and elapsed steps since that reasoning. Reasoning has three ordered fields: scene description, progress assessment, next plan; generated text is reused as future context. Action mode emits parsed movement chunks. Eq.3 chooses the larger of two mode logits. An automatic engine collects expert trajectories and DAgger-like rollouts corrected to reference waypoints. Room-category transitions and completed recovery define subtask events; reference-path distance defines deviations and stopping errors. Qwen-VL-Max labels reasoning with full-episode context, privileged room/progress information and, for mistakes, future correction observations. SFT follows NaVILA/VILA pretraining plus generated reasoning and human videos. Four nodes of H20 GPUs are reported; inference is about1 FPS on4090. The main paper does not specify a separate RL objective.",
+    "novelty": "Unified special-token mode selection plus event-specific structured data extends direct-action NaVILA and fixed-interval Nav-R1. The key contribution is supervision construction and sparse scheduling, not proof of introspective self-awareness. Tables3–4 isolate event categories and scheduling/token choices.",
+    "results": "PAPER EXPERIMENT: Table1 p.6 reports R2R65.4 SR/55.1 SPL and RxR67.6/56.1. Table3 p.7: removing subtask events yields52.3 R2R SR; removing deviations55.1; removing stopping-error examples60.0. However the latter gives57.5 SPL, ABOVE the full model55.1, contradicting the prose's 'best across all metrics' claim. Table4 dense reasoning63.8 SR versus sparse65.4 supports sparse control, but latency distributions and equal-generation-budget controls are absent. Real-world18 instructions across three scenes are useful demonstrations with small cell counts, not broad reliability evidence.",
+    "bottlenecks": [
+      {
+        "id": "03-awarevln-progress",
+        "description": "Learned progress and trigger labels depend on privileged, hindsight-derived supervision",
+        "conditions": "Subtasks without room transitions, novel rooms, off-route states absent from correction collection",
+        "cause": "Room change is an imperfect proxy for semantic completion; future correction observations help the annotator beyond inference information",
+        "evidence": "§3.3 pp.4–5; deduction on train/test information asymmetry",
+        "kind": "methodological",
+        "followups": "Progress-Think uses learned monotone semantic alignment instead; AdaNav uses uncertainty gating. Neither alone proves event calibration.",
+        "status": "Partially addressed",
+        "confidence": "high"
+      }
+    ],
+    "key_findings": [
+      {
+        "claim": "The released approach combines trained sparse reasoning and simulator-derived correction supervision, rather than zero-shot prompting.",
+        "evidence_type": "PAPER EXPERIMENT",
+        "source": "AwareVLN.pdf",
+        "locator": "§3.3–3.4 and Tables3–4"
+      }
+    ],
+    "limitations": "Main paper pp.1–7 read; supplementary parameter details and all annotation examples are not yet completely audited. No benchmark executed.",
+    "followup_sources": [
+      "https://horizonrobotics.github.io/robot_lab/progress-think",
+      "https://arxiv.org/abs/2509.24387"
+    ]
+  },
+  {
+    "id": "ca_nav",
+    "short_name": "CA-Nav",
+    "title": "Constraint-Aware Zero-Shot Vision-Language Navigation in Continuous Environments",
+    "authors": [
+      "Kehan Chen",
+      "Dong An",
+      "Yan Huang",
+      "Rongtao Xu",
+      "Yifei Su",
+      "Yonggen Ling",
+      "Ian Reid",
+      "Liang Wang"
+    ],
+    "year": 2026,
+    "venue": "arXiv v4; final journal status not independently verified",
+    "source": "https://arxiv.org/abs/2412.10137v4",
+    "pages": [
+      "1",
+      "3-8"
+    ],
+    "bibliography": "The PDF's 'Journal of LaTeX Class Files, August2021' masthead is a template artifact, not a publication record. First preprint date is2024; the reviewed version is v4. Do not infer venue/year from the masthead.",
+    "problem": "Training-free sequential instruction navigation in continuous space with narrow79° RGB-D view and odometry. Outputs use0.25m forward and30° turns. The task is not merely category object search, since temporal and directional constraints must hold in order.",
+    "method": "PAPER METHOD (§III): an initial LLM call decomposes instructions into object/location/direction constraints queued by subinstruction. GroundingDINO checks objects within5m, BLIP2 VQA checks locations, and odometry over five steps checks direction. All current constraints must be satisfied before advancing, except minimum10/maximum25-step switching heuristics. BLIP2 image-text similarity supplies a scalar value projected across the visible frustum of a semantic occupancy map. Cosine-squared angular confidence weights temporal fusion (Eqs.2–4). On subinstruction switches, previous map scores decay byγ=0.5 rather than resetting; a trajectory maskλ^visit_count withλ=.95 discourages revisits. SLIC clusters the value map; select the highest-mean superpixel centroid, then execute an FMM path. For the final target, RepViT-SAM projects an object mask centroid. No navigation optimizer/loss is introduced; foundation models are pretrained.",
+    "novelty": "Extends VLFM-style value mapping to an explicitly ordered constraint queue and superpixel rather than frontier selection. Relative to InstructNav, reduces repeated LLM calls and uses egocentric sensing. Object/location/direction ablations and map-update ablations support component utility; this is already explicit instruction constraint tracking.",
+    "results": "PAPER EXPERIMENT: reviewed v4 TableI p.7 reports R2R val-unseen25.3 SR/10.8 SPL; TableII p.8 gives English RxR19.0/6.0. Abstract improvements of12%/13% are relative to A2Nav22.6/16.8 SR, not +12/+13 percentage points. TableI separates panoramic InstructNav from its egocentric adaptation. Stronger success does not imply efficient path fidelity: RxR nDTW13.5 and SPL6.0 are important limitations. The queue's timeout bypass means 'constraint-aware' is not a hard correctness guarantee.",
+    "bottlenecks": [
+      {
+        "id": "03-ca_nav-commit",
+        "description": "Constraint checks can prematurely commit to the wrong instruction stage or timeout past an unmet requirement",
+        "conditions": "Repeated landmarks, detector/VQA errors, long within-room subtasks",
+        "cause": "Binary local checks and finite timeouts replace uncertainty-aware satisfaction evidence; map values are not explicit object relations",
+        "evidence": "§III-B p.4 switching rules; TablesI–II low SPL; deduction about false-positive checks",
+        "kind": "methodological",
+        "followups": "GC-VLN introduces explicit graph constraints and backtracking; Context-Nav verifies viewpoint-dependent object relations for instance goals.",
+        "status": "Partially addressed",
+        "confidence": "high"
+      }
+    ],
+    "key_findings": [
+      {
+        "claim": "Explicit constraint queues predate new proposals for instruction-condition tracking, but their timeout rules weaken hard satisfaction semantics.",
+        "evidence_type": "DEDUCTION",
+        "source": "CA-Nav.pdf",
+        "locator": "§III-B p.4"
+      }
+    ],
+    "limitations": "Full v4 method and principal tables read; remaining ablation/real-world appendix pages not yet fully audited. Journal acceptance not verified. No benchmark executed.",
+    "followup_sources": [
+      "https://proceedings.mlr.press/v305/yin25a.html",
+      "https://openaccess.thecvf.com/content/CVPR2026/html/Jang_Context-Nav_Context-Driven_Exploration_and_Viewpoint-Aware_3D_Spatial_Reasoning_for_Instance_CVPR_2026_paper.html"
+    ]
+  }
+]

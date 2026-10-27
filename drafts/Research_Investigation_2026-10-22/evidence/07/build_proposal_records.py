@@ -1,0 +1,166 @@
+from pathlib import Path
+import json
+import datetime
+
+root = Path(__file__).resolve().parents[2]
+proposals = [
+    {
+        'id': 'P1', 'name': 'Recovery labels', 'status': 'Prepared for independent review; no novelty or empirical certification',
+        'provisional_rank': 1, 'novelty_confidence': 'Uncertain; generic automata and milestone mechanisms are established',
+        'hypothesis': 'History-conditioned sets of efficient acceptable recovery actions reduce teacher error and improve held-out recovery compared with matched geometric, nDTW, reversible-chunk and reward-machine controls.',
+        'gap': 'Geometric rejoining can alias histories with different unfinished instruction obligations; empirical incidence is unknown.',
+        'source_claim_ids': ['correctnav-C01','fgr2r-C01','progressthink-C01','navnuances-C01','navnuances-C02','ROOT-C03'],
+        'source_bottleneck_ids': ['03-correctnav-recovery','fgr2r-transition','mtrack-procedure','mtrack-hard'],
+        'source_matrix_ids': ['05-R01','05-R03','05-R04','05-R06','05-R08','05-R10'],
+        'additional_source_ids': ['07-ground_compose_reinforce'],
+        'additional_supplied_locators': ['HAMT extended PDF p 9 Table 7; p 16 Sections B.1-B.2, existing R2R-Back task/protocol'],
+        'mechanism': 'Annotate event witnesses and remaining state, construct training-only graph-times-instruction-state oracle, supervise a set of tied efficient actions, and optionally condition the navigator on a learned soft instruction-state token.',
+        'formal_variables': {'G':'positive-cost navigation graph','Q':'finite instruction-state set','q_t':'verified state for annotated history','Y_t':'cost-efficient acceptable action set','b_phi':'categorical state estimator from observed history'},
+        'objective': '-log(sum_a_in_Y pi(a|history,instruction,b)) + lambda*(-log b(q_true)) plus matched ordinary-task loss; unresolved labels masked or separately partial-labelled.',
+        'novelty_argument': 'Potentially a validated off-path teacher/annotation protocol and controlled intervention in photorealistic VLN, not a new automaton, progress monitor, backtracking mechanism or imitation-learning principle.',
+        'expected_benefits': ['Fewer incorrect recovery labels','Better ordered-obligation completion if the affected slice is common and observable'],
+        'tradeoffs': ['Annotation and event-grounding cost','Product-state growth','Possible ordinary-task regressions'],
+        'starting_repository': {'url':'https://github.com/cshizhe/VLN-DUET','commit':'93e8b233164bc079a6db48b8a0a78d123ec8de41','files':['map_nav_src/r2r/agent.py:239-285','map_nav_src/r2r/agent.py:404-423','map_nav_src/models/vilmodel.py','map_nav_src/models/graph_utils.py']},
+        'minimal_changes': ['Separate auditable recovery-oracle module','Annotation loader and set-target loss','Optional state-token head after label-only experiment'],
+        'datasets': ['R2R natural deviations','RxR/R4R non-shortest instructions','R2R-Back with its existing stage-aware success/full-route SPL','validated NavNuances-style paired slices'],
+        'baselines': ['native DUET','common-action-interface DUET SPL and nDTW teachers','geometric rejoin','reversible chunk pointer','M-TRACK-style milestone and reward-machine teacher','oracle parsing/state upper bounds'],
+        'controls': ['Same sampled states and action candidates','Same human labels and optimizer updates','Charge intermediate macro paths','Compare label-only before added-state architecture','Scene/episode clustered uncertainty','FGR2R/M-TRACK reconstructed mechanisms labelled paper-derived; released navigation paths are incomplete'],
+        'cheapest_test': 'Independently annotate remaining obligations and acceptable actions at natural deviations and same-pose/different-history pairs; compare existing teacher error before training.',
+        'falsification': ['Negligible disagreement after annotation','Low annotation reliability','Simple milestone/reversible teacher removes gap','Gains disappear with common candidates/data','Only oracle state helps'],
+        'assumptions': ['A bounded instruction grammar has reliable event semantics','Required history is observable','Training-only graph and event supervision are available'],
+        'anticipated_confounders': ['Expanded visited destination set','Extra labels','Different recovery-state distribution','Privileged parse or future suffix','Synthetic-pair prevalence mistaken for natural frequency'],
+        'empirical_status': 'No benchmark. One original finite product-graph example executed.',
+        'executed_evidence': ['evidence/07/mechanism_checks.py','evidence/07/mechanism_check_results.json'],
+        'prerequisites': ['Visual assets and model checkpoint','Human event annotations','Explicit permitted-route semantics','Validate paper-derived milestone/chunk baselines; do not assume incomplete releases are runnable'],
+        'review_questions': ['Is the teacher intervention meaningfully different from existing reward-machine or partial-label imitation methods?','Does the action-set loss admit harmful degenerate solutions?','Can all controls share the same feasible action set?']
+    },
+    {
+        'id':'P2','name':'Validity and difficulty','status':'Prepared for independent review; no novelty or empirical certification',
+        'provisional_rank':2,'novelty_confidence':'Uncertain; likely an empirical/data contribution unless witness supervision adds distinct value',
+        'hypothesis':'At fixed generated pool, accepted count and training compute, independent semantic-validity selection that preserves valid difficult pairs improves held-out semantic following beyond success/compatibility/noisy-label selection.',
+        'gap':'Navigator success and pair validity are different variables; current selection can in principle reject valid hard pairs or retain invalid easy pairs, with prevalence unmeasured.',
+        'source_claim_ids':['rcm-C01','srdf-C01','ROOT-C03'],
+        'source_bottleneck_ids':[],
+        'source_matrix_ids':['05-D01','05-D02','05-D06','05-D07','05-D08'],
+        'additional_source_ids':['07-dataset_cartography','07-learning_to_reweight'],
+        'additional_supplied_locators':['GSA-VLN Appendix A.2, PDF pp 16-17: speaker splits, environment-specific DUET selection and visual instruction correction','Meta-Explore supplementary p 4, Table 2 and Section C.3: category processing changes results'],
+        'mechanism':'Use blinded human audit and clause-to-view/transition witnesses to train a validity scorer separate from a frozen policy difficulty measure; select equal-count difficulty strata and train the unchanged navigator.',
+        'formal_variables':{'v_i':'valid/invalid/unresolved semantic label','d_i':'difficulty for named frozen policy','w_i':'auditable evidence witness','s_i':'binary sample selection','D_k':'disjoint exhaustive eligible-pool partition with declared semantic/difficulty assignment','B_k':'feasible per-partition quota; sum B_k=B'},
+        'objective':'Validity scorer: three-way pair CE, clause-status CE, and masked -log(sum of attention on adjudicated witness units). Selection maximizes sum_i s_i*p(valid_i) under fixed B and strata; ordinary action CE trains the unchanged navigator. These ordinary losses/optimization are not claimed novel or guaranteed.',
+        'novelty_argument':'Potentially a measured validity-versus-competence separation and witness-supervised selector under fixed budgets; generic filtering, curriculum and reweighting are prior art.',
+        'expected_benefits':['Lower semantic supervision noise','Retain useful difficult compositional examples'],
+        'tradeoffs':['Independent annotation','Evidence extraction and scorer compute','Selection overfitting risk'],
+        'starting_repository':{'url':'https://github.com/cshizhe/VLN-DUET','commit':'93e8b233164bc079a6db48b8a0a78d123ec8de41','files':['map_nav_src/r2r/agent.py:404-423','map_nav_src/r2r/data_utils.py']},
+        'comparison_repository':{'url':'https://github.com/OpenGVLab/RSI-Nav','commit':'5e8fa2c74cf8e7dc305b33088a963b200e20805d','files':['evo/evo_rollout.py:1490-1540,1570-1600','evo/evo_utils.py:1013-1105']},
+        'minimal_changes':['Versioned selected-pair manifest','Independent validity/witness scorer','Frozen difficulty logging; unchanged navigator loss'],
+        'datasets':['One frozen generated R2R/RxR training pool','Independent human-authored evaluation instructions','Validated contrast and paraphrase sets'],
+        'baselines':['Random equal-count selection','Navigator success/SPL/nDTW','Independent compatibility','APS-style hard selection','Training-dynamics and clean-validation weighting','Validity-only and difficulty-only','Witness-free scorer','GELA-style alignment control','GSA model selection plus visual correction, with correction/pool changes separated'],
+        'controls':['Same accepted count and token/update budget','Common visual features/backbone','Same path/scene mix or explicit factorial controls','Scorer cross-fitting by scene/route family','Same human audit labels for learned controls','Count additional clause/witness annotation effort; equal pair count does not ensure equal human effort'],
+        'cheapest_test':'Blinded validity-by-difficulty audit; compare false acceptance/rejection at equal acceptance rate before large-scale training.',
+        'falsification':['Validity adds no discrimination beyond existing selectors','Hard subset is mainly noisy labels','Witness supervision adds no value','Downstream gains vanish under equal budgets','Only action sensitivity increases'],
+        'assumptions':['Semantic validity can be adjudicated for enough examples','Fixed candidate pool is available','Audit labels are independent of navigator scores'],
+        'anticipated_confounders':['Extra human supervision','Style artifacts in constructed negatives','Different training tokens/updates','Generator-matched evaluation','Selection thresholds tuned on final test','Benchmark construction conditioned on a navigator or same-scene selector; distinct from downstream navigator leakage'],
+        'empirical_status':'Untested; no audit labels, model training or navigation execution.',
+        'executed_evidence':[],
+        'prerequisites':['Generated pool and route views','Independent annotators','Frozen navigator checkpoint or difficulty logs'],
+        'review_questions':['Is there contribution beyond established data-quality/curriculum methods?','Does witness supervision improve validity at the same human-label budget?','Can original success filters be faithfully implemented without missing source?']
+    },
+    {
+        'id':'P3','name':'Joint future events','status':'Speculative candidate prepared for independent review; may be rejected',
+        'provisional_rank':4,'novelty_confidence':'Low pending independent search; future QA and decision-aware compression already exist',
+        'hypothesis':'For observable decisions requiring two ordered events on one continuation, joint-event prediction improves candidate ranking over equally sized additive future semantics with matched data and labels.',
+        'gap':'Additive expected future features can preserve timewise marginals while losing ordered co-occurrence; actual NavQ target collisions and policy impact are unknown.',
+        'source_claim_ids':['navq-C01','navq-C02','navq-C03','navq-C04'],
+        'source_bottleneck_ids':['02-navq-aggregation'],
+        'source_matrix_ids':['06-W01','06-W03'],
+        'additional_source_ids':['07-semantic_world_models','07-planning_sufficiency','07-compactnav'],
+        'mechanism':'Predict K event occurrence probabilities and KxK ordered pair probabilities under one specified continuation policy/horizon; use a matched navigator readout and test held-out compositions.',
+        'formal_variables':{'h':'observed history','a':'first candidate action','mu':'fixed continuation policy','H':'finite horizon','Z_i^k':'grounded event k at future step i','p_k':'probability of any occurrence','J_kl':'probability of event k then event l on one continuation'},
+        'objective':'Masked BCE for single and joint event targets from identical continuation samples; compare additive features, sequences, future QA and direct value at equal budget. Raw heads are not a coherent trajectory distribution; audit J<=min(p) violations and compare bounded/projection variants.',
+        'novelty_argument':'Possible branch-consistent temporal-event target and controlled VLN study; not generic semantic prediction, world-model sufficiency, distributional prediction or low-rank compression.',
+        'expected_benefits':['Retain a specific non-additive future distinction','Reuse compact event evidence across paired order queries'],
+        'tradeoffs':['K-squared outputs','Sparse/noisy event labels','Limited higher-order expressivity','Continuation-policy mismatch at deployment'],
+        'starting_repository':{'url':'https://github.com/woyut/NavQ_ICCV25','commit':'9465fe43c9c1583bd7ba390b6be30996ea4f5a5c','files':['code/Q_pretrain/dataset.py:189-222','code/Q_pretrain/GPT_VL.py:236-239']},
+        'minimal_changes':['Training event target builder','Matched event prediction head/loss','Fixed-candidate scoring harness before closed-loop integration'],
+        'datasets':['Labelled branch continuations from training scenes','Ordered route extension on R2R/RxR; original NavQ tasks are object-goal'],
+        'baselines':['NavQ additive future target','Single-event target','Full short event sequence','Action-conditioned future QA','Direct action-value head','Capacity-matched history-only head','Larger additive feature control'],
+        'controls':['Same continuation samples and event labels','Same capacity/candidates/sensing','Fixed continuation policy for first ranking test','Oracle-representation versus learned-prediction separation','Shuffled order/pair targets'],
+        'cheapest_test':'Oracle-representation readout on independently labelled correlated branches; stop if joint statistics provide no headroom, then test whether observable history predicts the distinction.',
+        'falsification':['No real target/readout headroom','Difference unobservable from history','Future-QA or sequence baseline matches at cost','Benefit is only capacity or labels','Closed-loop policy shift erases gain'],
+        'assumptions':['Events and order can be reliably grounded','The needed distinction is observable or statistically predictable','Continuation policy is declared and sufficiently supported'],
+        'anticipated_confounders':['Extra semantic labels','Task shift from object-goal to route following','Oracle future leakage','Candidate generator changes','Confusing expected event probability with reachability/guarantee'],
+        'empirical_status':'One original finite arithmetic counterexample executed; no NavQ/model/benchmark execution.',
+        'executed_evidence':['evidence/07/mechanism_checks.py','evidence/07/mechanism_check_results.json'],
+        'prerequisites':['Caption/event features','Training graph and continuation records','Released predictor/checkpoint verification','Route-event labels'],
+        'review_questions':['Is this equivalent to predictive-state/successor or semantic-QA prior art?','Do the probabilities refer to a consistent continuation policy?','Can the target be learned without extra hidden information?']
+    },
+    {
+        'id':'P4','name':'Failure-aware memory','status':'Prepared for independent review; no novelty or empirical certification',
+        'provisional_rank':3,'novelty_confidence':'Uncertain; typed/provenance/negative memory and Bayesian negative evidence are established',
+        'hypothesis':'Separating identity error from control/arrival failure before persistent negative writes reduces harmful suppression and improves repeated navigation beyond no-write/quarantine/tri-state controls at fixed memory and feedback.',
+        'gap':'Terminal failure does not uniquely locate the failed semantic claim; an inspected outcome-to-false-positive write path may misattribute failures, but prevalence is unmeasured. Native PSG ObjectNav category claims and any added specific-instance task must remain distinct.',
+        'source_claim_ids':['psgnav-C02','polarmem-C01','polarmem-C02'],
+        'source_bottleneck_ids':['PSG-1','POLAR-1'],
+        'source_matrix_ids':['06-M03','06-A01','06-A02','05-S05','05-P03','05-R11'],
+        'additional_source_ids':['07-negative_information'],
+        'mechanism':'Train separate masked identity/approach/completion attribution heads with controlled paired evidence; write negative semantics only with identity-specific contradiction evidence, otherwise quarantine or update a route/control claim.',
+        'formal_variables':{'c':'scoped identity/approach/completion claim','E':'observable evidence','qD':'estimated identity-claim error probability','qR':'approach failure estimate','qC':'completion-check error estimate','W':'recorded claim-specific contradiction witness'},
+        'objective':'Sum of masked BCE attribution losses, optionally identity invariance on verified controller-only paired interventions; semantic negative gate qD>=tauD and W=1. No independence or exclusivity assumption across causes.',
+        'novelty_argument':'Potentially failure-attribution training/evaluation for persistent memory; fixing one wrong write rule or adding source/uncertain tags alone is not a scientific mechanism.',
+        'expected_benefits':['Fewer false negative semantic writes','Reduce later rejection of correct targets','Preserve uncertain useful facts'],
+        'tradeoffs':['Attribution labels and model','Storage for scoped evidence','Quarantine can leave stale information','Track/pose errors can defeat attribution'],
+        'starting_repository':{'url':'https://github.com/Chenrf1121/psg-nav','commit':'181d878ff207845a31e542a19a6592925c1e9bab','files':['PSG_Nav.py:1484-1554','RAG manager write/read interface: inspect exact implementation before edits']},
+        'minimal_changes':['Shadow logging of writes before changing actions','Typed outcome ledger','Attribution wrapper and explicit quarantine path','Preserve immutable upstream baseline'],
+        'datasets':['Paired ObjectNav/instance-goal traces','Repeated tasks with randomized scene episode orders','Separate natural failure audit'],
+        'baselines':['Outcome-only writes','Memory frozen','All failed writes quarantined','Recency decay','Tri-state/source-tag memory','Oracle, predicted and witness-presence-only variants'],
+        'controls':['Same detector/planner','Same capacity/eviction/retrieval/feedback','Reset versus persistent memory','No/self/oracle terminal feedback separate','Cost on all episodes','Scene-disjoint calibration and held-out order tests'],
+        'cheapest_test':'Replay valid-category/control-failure versus incorrect-category/control-success traces; measure false semantic writes and later suppression. Same-class different-instance errors belong only to a separately specified instance-goal extension.',
+        'falsification':['Harmful writes rare','No-write/quarantine matches trained method','Cause labels need unavailable privileged evidence','Reduced deletions cause stale-memory harms','Classifier merely moves error upstream'],
+        'assumptions':['Failure causes have observable evidence in sufficient cases','Training labels are reliable','Claim/track identity can be maintained','Deployable witness is linked observed evidence plus predicted contradiction, not ground-truth truth certification'],
+        'anticipated_confounders':['Extra ground-truth terminal feedback','Different episode order/exposure','More memory/model calls','Counterfactuals altering identity evidence inadvertently','Release bug fix mistaken for research novelty','Conflating native category ObjectNav with specific-instance goals'],
+        'empirical_status':'Original truth-table counterexample executed; no trace audit, attribution training or repeated navigation benchmark.',
+        'executed_evidence':['evidence/07/mechanism_checks.py','evidence/07/mechanism_check_results.json'],
+        'prerequisites':['Perception/execution traces','Training-only identity/control labels','Simulator or replay corpus','RAG manager audit'],
+        'review_questions':['Does simple quarantine already remove the harm?','Can identity-error evidence be inferred without privileged inputs?','Is attribution different from existing fault diagnosis/belief update methods?']
+    }
+]
+for p in proposals:
+    p['cutoff']='2026-10-22'
+    p['detail_path']='proposals/draft_proposals.md'
+    p['logical_status']='Formulation proposed; independently audited status pending assignment 08'
+    p['implementation_status']='No proposed system implemented; pinned starting source inspected within recorded scope'
+(root/'proposals/proposals.json').write_text(json.dumps(proposals,ensure_ascii=False,indent=2),encoding='utf-8')
+
+rows=[]
+for n in range(1,5):
+    rows.extend(json.loads((root/f'assignments/{n:02d}_results.json').read_text(encoding='utf-8')))
+role_groups = [
+ ('P1','Recovery/progress/constraint mechanism or route-supervision control', 'duet selfmonitoring regretful tacticalrewind topologicalplanning marval correctnav awarevln progressthink idealvln ca_nav gc_vln hsgm fgr2r babywalk mtrack landmark_rxr metaexplore navgrpo'),
+ ('P2','Data, grounding, compatibility or selection control', 'speakerfollower rcm scalevln srdf navrag airbert prevalent marval roomtour3d gela vln_trans skillnav kerm goat analogical navillm'),
+ ('P3','Predictive representation, world-model or auxiliary-future comparison', 'chasing_ghosts cotvla cvaml dinowm dreamer dreamwalker fantasyvln genex hnr imaginenav lcvn learning_to_map lookbeforeleap monodream navforesee navmorph navq nwm pathdreamer planet sali sc2wm sgm unemo vid2world visualimaginations visualplanning vlnsig wmnav womap worldmodels worldvln bevbert'),
+ ('P4','Persistent evidence, uncertainty, feedback or representation-loss control', 'ivln overnav gridmm mapnav navgpt navgpt2 mapgpt ham_vln polarmem psgnav context_nav evonav feedtta atena fstta gsavln continualvln m3e same slow4fast uagm gaussianmap ver gavln'),
+ ('ALL','Evaluation, sensing, cost or information-access constraint', 'r2r rxr reverie navnuances vlnmme vsi_bench embodiedgap embodiedqa iqa knowno explore_confident aiuta ieve activevig uln uot mind_error'),
+ ('ALL','Backbone, reasoning, compression or physical execution comparison', 'hamt vlnbert navid navila uninavid navfom streamvln aoplanner adanav auxthink discussnav ecot console profocus r3 rl4vla susa walkreadless omniagent cot'),
+ ('P4','Adjacent semantic novelty reference; not a navigation action-risk method', 'eoe'),
+ ('NONE','Internal landscape report used only as a lead, never primary experimental evidence', 'environment_review')
+]
+role_map={}
+for proposal,role,ids in role_groups:
+    for id in ids.split(): role_map.setdefault(id,[]).append((proposal,role))
+coverage=[]
+for r in sorted(rows,key=lambda r:r['paper_id']):
+    roles=role_map.get(r['paper_id'], [('ALL','General architecture/protocol comparison; no proposal premise inferred solely from its score')])
+    coverage.append({'paper_id':r['paper_id'],'short_name':r['short_name'],'dossier':f'dossiers/{r["paper_id"]}.md',
+                     'proposal_roles':[{'proposal':a,'role':b} for a,b in roles],
+                     'constraint_preserved':'; '.join(b['description'] for b in r.get('bottlenecks',[])),
+                     'source_record_status_at_synthesis':r['completion_status']})
+(root/'evidence/07/coverage_review.json').write_text(json.dumps(coverage,ensure_ascii=False,indent=2),encoding='utf-8')
+lines=['# Supplied-paper synthesis coverage','',
+       'All 132 supplied entries are included through the final team dossiers and structured evidence from assignments 01–06. This role map records how they constrain proposal construction; it does not claim that assignment 07 independently reread every complete PDF or every repository. Direct primary text/code checks by assignment 07 are recorded separately. Final source deltas were incorporated after the coordinator completion gate; independent evaluations 08–10 remain pending.','',
+       '| Paper | Role in synthesis | Limitation retained |','|---|---|---|']
+for r in coverage:
+    name=r['short_name'].replace('|','/'); roles='; '.join(x['proposal']+': '+x['role'] for x in r['proposal_roles'])
+    limit=r['constraint_preserved'].replace('|','/').replace('\n',' ')
+    lines.append(f'| [{name}](../../{r["dossier"]}) | {roles} | {limit} |')
+(root/'evidence/07/coverage_review.md').write_text('\n'.join(lines)+'\n',encoding='utf-8')
+print(json.dumps({'proposals':len(proposals),'coverage_entries':len(coverage),'unique_papers':len({r['paper_id'] for r in coverage})}))

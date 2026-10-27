@@ -1,0 +1,1210 @@
+===== PDF PAGE 1 =====
+         Where Did It Go Wrong? Capability-Oriented Failure Attribution for
+                       Vision-and-Language Navigation Agents
+
+          Jianming Chen1,2,3,4, Yawen Wang1,2,3,4*, Junjie Wang1,2,3,4*, Xiaofei Xie5, Shoubin Li1,2,3,4,
+                               Qing Wang1,2,3,4, Fanjiang Xu1,2,3,4*
+                            1Institute of Software, Chinese Academy of Sciences, Beijing, China
+                2Science & Technology on Integrated Information System Laboratory, Beijing, China
+            3State Key Laboratory of Complex System Modeling and Simulation Technology, Beijing, China
+                            4University of Chinese Academy of Sciences, Beijing, China
+                                 5Singapore Management University, Singapore
+                              {jianming2023, yawen2018, junjie, shoubin, wq, fanjiang}@iscas.ac.cn, xfxie@smu.edu.sg
+                          Abstract                    Embodied agents integrate and rely on a com-
+                                                                 bination of capabilities to perform complex tasks
+               Embodied agents in safety-critical applications                                                   (Gu et al., 2022), including perception, memory,
+                 such as Vision-Language Navigation (VLN)
+                                                                planning, and decision, with each capability serv-
+                   rely on multiple interdependent capabilities2026                                                                 ing as a component within the agent. However, due                       (e.g., perception, memory, planning, decision),
+               making failures difficult to localize and at-       to the close interdependence of these capabilities,
+                     tribute. Existing testing methods are largely        deficiencies in one often cascade to others, leadingApr
+                  system-level and provide limited insight into        to compounded errors. This interplay of errors can
+               which capability deficiencies cause task fail-      be particularly pronounced in tasks that involve28
+                    ures. We propose a capability-oriented testing                                                               lengthy sequences, as mistakes can propagate and
+                 approach that enables failure detection and at-
+                                                  compound over time. A prominent illustration of
+                    tribution by combining (1) adaptive test case
+                                                                            this phenomenon can be found in Vision-Language                  generation via seed selection and mutation, (2)
+                   capability oracles for identifying capability-       Navigation (VLN) agents, which are a represen-
+                    specific errors, and (3) a feedback mechanism        tative type of embodied agent designed to follow[cs.MA]              that attributes failures to capabilities and guides        natural language instructions and navigate through
+                    further test generation. Experiments show that       environments (Wu et al., 2024). In VLN tasks, fail-
+                 our method discovers more failure cases and       ing to associate a visual landmark with the corre-
+               more accurately pinpoints capability-level defi-                                                            sponding instruction (a perception error) could lead
+                   ciencies than state-of-the-art baselines, provid-
+                                                                       to incorrect memory updates, flawed planning, and
+                  ing more interpretable and actionable guidance
+                                                                    ultimately poor decision-making during navigation                    for improving embodied agents.
+                                                   (Wang et al., 2023b, 2021; Zhu et al., 2020).
+          1  Introduction                               Although existing test case generation tech-
+                                                               niques are effective in identifying system-level fail-
+             Recently, embodied agents have garnered increas-                                                                     ures, they fall short for embodied agents due to
+             ing attention for their potential to interact with var-                                                                   the interplay and error propagation among capabil-
+             ious environments in applications such as naviga-                                                                                ities (Wei et al., 2022; Wang et al., 2025a; Cheng
+              tion assistance for the visually impaired (Liu et al.,                                                                         et al., 2023). Traditional methods treat agent as
+            2024; Yang et al., 2022; Yuan et al., 2025) andarXiv:2604.25161v1                                                      a monolithic entity, detecting task failures with-
+          home service robots (Shah et al., 2023; Narasimhan                                                              out revealing which capability caused the error
+               et al., 2025; Elnoor et al., 2025; Yan et al., 2024).                                                                or how it emerged (Chen et al., 2026). The ab-
+            These agents are designed to perform tasks that de-                                                            sence of capability-oriented failure attribution re-
+          mand safety and efficiency, making their reliability                                                                              stricts developers from precisely locating and re-
+               essential in daily life. Any errors in their operations                                                               solving weaknesses, hindering targeted improve-
+            can lead to severe consequences, such as visually                                                            ments.  Therefore, there is an urgent need for a
+            impaired users being misdirected from safe routes                                                                     capability-oriented testing approach tailored to em-
+           (Duh et al., 2021), or home service robots neglect-                                                          bodied agents—one that generates test cases en-
+             ing to turn off appliances, which could result in                                                                  abling precise failure localization at capability level.
+              safety hazards (Narasimhan et al., 2025). There-                                             By isolating issues within specific capabilities, it
+               fore, comprehensive testing to ensure these agents                                                     would offer greater interpretability and more ac-
+           work reliably under diverse conditions is crucial.                                                                   tionable insights for developers.
+                  *Corresponding authors.                          To enable capability-oriented testing of embod-
+
+===== PDF PAGE 2 =====
+ied agents, two key challenges must be addressed.   the largest number of failure cases targeting each
+First,  it  is necessary  to construct  capability-    capability. Next, we repair the failure case using
+oriented test oracles that assess whether capability   our capability oracles, achieving repair rates rang-
+outputs are correct. Automatically building such    ing from 81.30% to 96.69%, thereby demonstrating
+oracles is difficult, as it requires anticipating di-   the high fidelity of the oracles. Finally, through ab-
+verse scenarios and designing distinct evaluation    lation experiments, we validate the significance of
+metrics for different capabilities. Second, effec-   the feedback scores we design, showing that both
+tive failure attribution over long task trajectories is    failure-oriented and capability-oriented feedback
+challenging. Each time step in a sequence involves    contribute to discovering more failure cases. The
+a chain with multiple capabilities interacting, and   main contributions of this work are as follows:
+these steps collectively form an even longer chain
+of task execution.  Errors introduced by one ca-       • To the best of our knowledge, this is the first
+pability often propagate and compound over time,       work to propose automated test case gener-
+making it difficult to trace back to the initial source         ation specifically targeted at the individual
+of failure. Developing a mechanism to identify the         capabilities of embodied agents.
+initial error along this chain is essential.                   • We automatically construct a novel set of
+  In this paper, we propose a novel Capability-        capability-oriented test oracles designed to
+oriented Testing approach, CanTest, for revealing        independently evaluate each capability of em-
+and attributing failures to specific capabilities. Our        bodied agents, e.g., the perception, memory,
+approach includes: (1) a process for automatic gen-        planning, and decision-making capabilities
+eration of test cases, with the adaptive selection        within VLN agents.
+and mutation of case seeds, to generate test cases        • We designed a feedback mechanism that at-
+that are likely to expose capability-oriented failures.         tributes task failures to the specific capability
+More notably, to address the first challenge, we in-         error and thus provides the feedback scores
+troduce (2) the construction of capability oracles,         that comprehensively account for both failure
+which extract expected outputs and define indepen-       and capability error.
+dent evaluation metrics for each capability to deter-       • Experimental evaluations on the effectiveness
+mine whether errors occur. To address the second        of CanTest outperform all baselines, with
+challenge, we design (3) a feedback mechanism        promising performance in terms of the num-
+that leverages the oracles to identify the capability        ber of failure cases, which can all be attributed
+responsible for a failure and computes a feedback         to specific capability errors1.
+score that considers both the failure and its source
+                                       2  Related Workcapability error. By integrating failure-oriented and
+capability-oriented measurements, CanTest com-   2.1  Testing VLN Agent
+putes feedback scores that guide the generation of
+                                                        Traditionally, the quality assessment of embodied
+test cases designed to expose both capability defi-
+                                                  agents has relied heavily on task-specific metrics
+ciencies and task-level failures.
+                                                 designed to quantify performance in controlled en-
+  To evaluate the effectiveness of CanTest, we take
+                                               vironments (Valle et al., 2025). For instance, in
+the VLN task as the subject of our study, and con-
+                                                    the realm of navigation and path planning, evalu-
+duct experiments targeting three advanced VLN
+                                                     ations are often conducted using various metrics,
+models, with results indicating that CanTest is ca-
+                                                   including path length, execution time, and energy
+pable of discovering the largest number of failure
+                                              consumption (Gu et al., 2022; Wu et al., 2024).
+cases and outperforms three baselines, which are
+                                                     In addition, many of these tests (Driess et al.,
+either commonly used or state-of-the-art (SOTA).
+                                              2023; Zitkovich et al., 2023; Wang et al., 2025b,
+The improvement in the number of discovered fail-
+                                               2024b) are primarily designed for simulation-based
+ure cases relative to the best-performing baseline
+                                                      robots, providing various scenarios for a diverse
+ranges from 23.34% to 33.70%. Moreover, we
+                                                  range of tasks, such as manipulation and navigation.
+conduct an experiment that plugs the capability or-
+                                          They often focus on scene setup and task comple-
+acles and attribution mechanisms constructed by
+                                                         tion without capturing the full range of capabilities
+CanTest into the baseline, expanding their ability
+                                                   required by the agents, such as reasoning quality
+to provide failure attribution. However, the results
+indicate that CanTest is still capable of discovering       1https://github.com/JMChen121/CanTest/
+
+===== PDF PAGE 3 =====
+and task performance quality. For instance, in the    s1, . . . , sT where st denotes state. VLN remains
+benchmarks used to evaluate PaLM-E (Driess et al.,   challenging due to ambiguous instructions and en-
+2023) and RT-2 (Zitkovich et al., 2023), the authors   vironmental uncertainty, e.g., dynamics and noisy
+emphasize the final task performance of specific    visual inputs (Wang et al., 2024a).
+agents in complex environments. VLATest (Wang
+                                                    3.2  Failures of VLN Task
+et al., 2025b) is a fuzzy framework designed to
+generate robotic operational scenarios for testing    In the VLN task, failures of the agent are typically
+agents, which also uses a simple oracle to evaluate    defined as the inability of the agent to successfully
+the correctness of task completion.                complete the given navigation task. Specifically,
+                                                          failures can be determined from the aspects of tar-
+2.2  Technology of Test Case Generation         get position and step limit(Chen et al., 2022), as
+                                          shown in Appendix A.1.Existing approaches primarily employ the follow-
+                                                   Regardless of whether the endpoint is too faring technologies to implement automatic test case
+                                             from the target position or whether it has consumedgeneration: Evolutionary Algorithms (Tang et al.,
+                                                     additional time steps outside the limit, such situa-2021; Zhou et al., 2023), which are inspired by bi-
+                                                        tions will be deemed as task failures. In this paper,ological evolution principles to optimize test case
+                                      we use "error" to refer to the deviation between thegeneration.  For example, AVUnit (Zhou et al.,
+                                                      capability output and the expected output, while2023) supports various fuzz testing algorithms that
+                                                       "failure" signifies that the task has not been com-use robustness and coverage as fitness metrics to
+                                                        pleted. Furthermore, it is worth noting that not allautomatically search for test cases that violate these
+                                                       capability errors will lead to task failures.assertions. Model-Based Search (Feng et al., 2023;
+Haq et al., 2022, 2023), where algorithms utilize                                                    3.3  Problem Statement
+models of the system under test to guide the search
+                                We aim to develop a capability-oriented testingfor valid test cases. For instance, SAMOTA (Haq
+                                              approach for embodied agents. An automatedet al., 2022) extends existing multi-objective search
+                                                              test case generation mechanism is required to pro-algorithms for test case generation, enabling effi-
+                                             duce the test case set TC = {tc1, tc2, . . . , tcn}cient use of alternative models with lower running
+                                                         that explores the case space comprehensively. Letcosts. Fuzzing Methods (Wei et al., 2022; Wang
+                                                a target agent A = {Cp, Cm, Cpl, Cd} integrat-et al., 2025a; Cheng et al., 2023), which involve
+                                                  ing multiple capabilities, where Cp, Cm, Cpl, andsending random or semi-random inputs to uncover
+                                       Cd denote the capability of perception, memory,vulnerabilities. For example, MoDitector (Wang
+                                                   planning, and decision, respectively.  The ap-et al., 2025a) can effectively generate conflict or
+                                               proach should enable the construction of test ora-failure scenarios and can also establish relation-
+                                                        cles {TOp, TOm, TOpl, TOd} for each capabilityships between module errors and system failures.
+                                      Cx ∈A to evaluate their quality and leverage these
+3  Problem Statement                            oracles to diagnose capability-oriented errors in the
+                                                        trajectory τ.
+3.1  Vision-Language Navigation                      Finally, for the test case tci, if it is a failure case,
+The VLN agents aim to enable intelligent agents to   we can attribute the failure to a specific capability:
+perform navigation tasks in unknown environments       (∀τi = A(tci), tci is failure)
+based on natural language instructions (Zhu et al.,      ∧(Cerrors = {Cx|TOx(Cx) = False})   (1)
+2020). The agent receives a natural language in-
+                                   ⇒∃!C∗x ∈Cerrors, C∗x = Attr(τi),struction I as input (e.g., "Walk from the kitchen to
+the living room, then enter the green door leading   where τi is produced when target agent A executes
+to the bedroom"). The instruction is represented     tci. Cerrors denotes the set of capabilities that are
+as a word sequence: I = {w1, w2, w3, . . . , wL},   erroneous (i.e., cannot be verified by the oracle).
+where wi denotes the i-th word in the instruction,   Attr() represents the function, which attributes the
+and L is the total number of words.                  decisive error in the τi to the sole capability C∗x.
+  The agent perceives the environment from
+                                       4  Approach
+an egocentric view and acts through viewpoint
+changes or low-level actions  (e.g., move  for-   Our proposed CanTest contains three modules,
+ward, turn left/right), producing a trajectory τ =   whose overview is shown in Figure 1.  First, we
+
+===== PDF PAGE 4 =====
+  Sec 4.1: Adaptive Test Case Generation
+                                                    Adaptive Generation
+                                                                                                                    Task Instruction:
+                                                      Seed               Adaptive Mutation                        “Take   the   towel  from   the
+                                                    ⚫                                                                                    Mild                                                                                             Mutation
+                                                                                                                    bathroom and place on the table                                                             Selection                                                    ⚫                                                                                            Aggressive                                                                                                   Mutation
+                                                                                                                                                in the bedroom.”                                     Seed Corpus                                     LLM
+      Environment Assets
+
+
+  Sec 4.2: Capability Oracles Construction
+
+                                                                                                                   Simulation
+                                                      Historic Route:               Optimal Route:                Planned Action:                     Expert            Simulator
+                                              “bathroom  (towel) →                                                              Model
+                                                lobby (sofa, rug) →
+       Ground          Cabinet, Bed…            bedroom.”
+         Truth
+
+        Agent’s                                                                            Planned Route:               Decided Action:
+        Output                                                    I brought the
+                                                        towel from the
+                                                   bathroom ……
+                               Closet, Bed…                                                                                                                         Target
+                          Perception              Memory                  Planning                   Decision                 Environment      VLN Agent
+
+                          Update Seed
+
+
+                         Feedback of             Capability-Oriented
+                             Test Case              Failure Attribution                 Perception:Decision: forwardtowel               Perception:Decision: turntableright
+                                                          …   Memory: …                                         Failure-Oriented                  Perception       Decision              Memory: …
+                                                                                                                            Planning: …                   Planning: …
+    Discovered Capability-          Capability-Oriented             Memory        Planning                         t1                            tn                   Trajectory
+    Oriented Failure Cases
+                                                                                                   Details of Capability at Time Step
+  Sec 4.3: Capability-Oriented and Failure-Oriented Feedback
+
+                                      Figure 1: Overview of CanTest.
+
+
+design a module of Adaptive Test Case Genera-    first selects seeds and then applies mutation to the
+tion, which utilizes an adaptive generation mecha-   selected seeds to generate new test cases.
+nism to create challenging task instructions, as test     Our scene assets are sourced from the HM3D
+cases for Vision-and-Language Navigation (VLN)    dataset (Yadav et al., 2023), which provides a rich
+tasks. The second module is Capability Oracles    collection of 3D panoramic scenes, including se-
+Construction. It automatically constructs oracles to   mantic annotations of rooms and objects (denoted
+determine if there are errors in the capabilities, by    as Ar and Ao, respectively), forming the founda-
+obtaining the expected output through prior knowl-    tion for test case creation. Using these assets as the
+edge and the execution state of the target agent and     initial resource pool, custom-designed prompts are
+defining metrics to measure the deviation between    fed into a large language model (LLM), which com-
+the actual and expected output.  Finally, in the    bines room and object annotation to generate the
+Capability-Oriented and Failure-Oriented Feed-   task instruction: I = L(ar, ao), where ar ∈Ar
+back module, we introduce a feedback mechanism.   and ao ∈Ao. We treat task instructions as test
+It aims to attribute failures to specific capabilities    cases for target agents. The prompt is shown in
+based on oracles, thereby calculating capability-   Appendix A.5.
+oriented feedback, which is then combined with     CanTest first initializes a batch of test cases as
+failure-oriented feedback to guide the iterative gen-   the initial seed corpus SC. During each iteration of
+eration of test cases.                               seed updates, we first calculate the selection proba-
+                                                               bility for all seeds and then select a candidate based
+4.1  Adaptive Test Case Generation            on these probabilities. The selection probability for
+                                               each case seed pcsi is:
+Following  the  classical  search-based  fuzzing
+                                                               max(Fcsi, 0)
+methodology (Wei et al., 2022; Wang et al., 2025a),                    pcsi =                     ,            (2)
+                                     PNi=1 FcsiCanTest maintains a seed corpus where each seed
+corresponds to a test case, with a feedback score.   where the denominator is the sum of all feedback
+A higher feedback score indicates a higher like-   scores. The higher the feedback score, the higher
+lihood of uncovering capability-oriented failures.   the probability of the seed being selected.
+The feedback score will be further elaborated in      After selecting a seed s, CanTest aims to bal-
+Section 4.3. In each iteration, adaptive generation   ance failure preservation and search-space explo-
+
+===== PDF PAGE 5 =====
+ration during mutation. To this end, we design    perception from expert model, respectively.
+two instruction mutation operators with different   Memory Oracle. We define a memory oracle that
+intensities: mild mutation, which makes small se-   measures the accuracy of the ability to recall past
+mantic changes to preserve failure-relevant part,   information. CanTest first records the visual an-
+and aggressive mutation, which introduces larger    notations information in the historical route and
+changes to diversify trajectories and expose ad-   organizes them in terms of the time step, which is
+ditional weaknesses. Moreover, CanTest adopts    treated as the expected output of the memory con-
+an adaptive strategy to select a mutation operator    tent. Then CanTest calculates time step-oriented
+based on feedback score. Detailed mutation opera-   semantic similarity between current memory con-
+tor, selection strategy, and algorithm are provided    tent of agent and visual annotations in the expected
+in Appendix A.2 and A.5.                          output to quantify errors of the memory.
+
+4.2  Capability Oracles Construction                ϵmt = 1 −||Mt −V Agt1,...,t−1||L,      (4)
+Achieving capability-oriented testing requires con-
+structing capability oracles. To address it, we pro-   where Mt represents the memory description from
+pose an automated oracle-construction mechanism    the target agent at time step t. V Agt1,...,t−1 denotes
+that derives the expected output of each capability,   the sequence of visual annotations in the histori-
+and then compares it with the agent’s actual outputs    cal route before time step t, and their similarity is
+to calculate metrics for identifying deficiencies.      evaluated by the LLM (restricted between 0 and 1).
+  We leverage expert models provided in the sim-   The designed prompt is shown in Appendix A.5.
+ulation environment to obtain the true task execu-   Planning Oracle. The error of planning capabil-
+tion traces and related information. Specifically,    ity can be measured by evaluating the similarity
+the navigation expert has access to the global map   between the trajectory generated by target agent’s
+and uses greedy pathfinding to produce a (near-   planned route and ground truth trajectory provided
+)optimal route (Gupta et al., 2017; Kumar et al.,   by the expert model. Since the planning process in-
+2018). For perception, we use the RAM image    volves spatial and temporal reasoning, we adopt the
+annotation model (Zhang et al., 2024) to provide    normalized Dynamic Time Warping (nDTW) (Mag-
+expected detections and semantic annotations (e.g.,    alhaes et al., 2019) to assess the alignment between
+object labels and bounding boxes) for the current    the two trajectories. nDTW is widely used for path
+view. When such privileged information is unavail-    similarity evaluation, as it accounts for both spatial
+able, similar supervision can be obtained via short-   proximity and temporal alignment. The error of the
+est path algorithms and manually annotated data.     planning capability is measured by:
+Perception Oracle. We use the weighted Intersec-
+                                                                                                            pl   gt
+tion over Union (IoU) (Rezatofighi et al., 2019) to                ϵplt = 1 −nDTW(τt  , τt,...,n),        (5)
+measure the error in perception, as it is a widely
+recognized metric. The error is measured by:       where τ tpl represents route planned by target agent
+                                                                                   gt
+                                                           at time step t. τ t,...,n denotes the ground truth tra-       N                                        gt
+     1                                                      jectory sequence from time step t onwards.                                                          ),ϵpt =         ( X ||V At,n −V Agtt,n||L −|Pt,n ∩Pt,n|gt   N        n=1                        |Pt,n ∪Pt,n|     Decision Oracle. The decision commands are di-
+                                                 (3)    rectly applied to the target agent and should follow
+where t represents the t-th time step in the trajec-   the planned action provided by the upstream plan-
+tory, N represents the number of objects detected    ning. Since the set of available actions is finite and
+in the current view. V At,n and V Agtt,n denote the    fixed, we directly compare the differences between
+visual annotations of the target agent and the ex-   the actual decision actions and the planned actions
+pected output, respectively. The first term in the    in the trajectory:
+parentheses represents the similarity of visual an-
+notations, and the second term corresponds to the                 ϵdt = 1 −||Dt −Dplt  ||,           (6)
+IoU metric. The term ||V At,n −V Agtt,n||L is pro-
+vided by the LLM, where the prompt we use is   where Dt represents the action chosen by the target
+                                           gt                                   correspond    agent at time step t. Dplt  is the planned action fromshown in Appendix A.5. Pt,n and P t,n
+                                                                                                                pl
+to the detected bounding boxes obtained by the tar-   the previous planned trajectory τ t−1, which serves
+get agent’s perception and the expected output of    as the expected output for the decision.
+
+===== PDF PAGE 6 =====
+   300                                                                300                                                                 250
+
+   250 cases          Random      BehAVExplor                                   Random      BehAVExplor                                Random      BehAVExplor             VLATest      CanTest (Ours)                                                     cases 250        VLATest      CanTest (Ours)                                                   cases 200       VLATest      CanTest (Ours)
+   200                                                                200
+                                                                                                                                          150 failure                                                                                                                                                                                                    failure                                                                                                                                                                                                                                                                                                                                                                                                         failure
+of 150                                                        of 150                                                                                                                of 100
+ Number 10050                                                                                                                                                         Number 10050                                                                                                                                                          Number  50
+
+     0                                                                  0                                                                  0
+       0      0.5     1      1.5     2      2.5     3      3.5     4             0      0.5     1      1.5     2      2.5     3      3.5     4             0      0.5     1      1.5     2      2.5     3      3.5     4
+                        Time (hour)                                               Time (hour)                                               Time (hour)
+                        (a) ApexNav                                             (b) MGDM                                                 (c) Mem2Ego
+
+Figure 2: The comparison between CanTest and the baselines on the number of failure cases for all target models.
+
+Table 1: Comparison of the number of failure cases toward each capability. +OA represents the integration of the
+capability Oracle and Attribution mechanism from our proposed CanTest, as a baseline plug-in.
+
+
+                                 Perception                  Memory                       Planning                         Decision
+     Approach
+                   ApexNav MGDM  Mem2Ego  ApexNav MGDM  Mem2Ego  ApexNav MGDM  Mem2Ego  ApexNav MGDM  Mem2Ego
+
+   Random + OA        20.4       22.8       21.1        16.4       15.7       11.1        19.2       18.1       16.9        24.8       20.1       21.7
+  BehAVExplor + OA     40.9       43.1       37.1        46.4       44.2       20.5        35.6       37.4       33.1        43.2       42.1       38.4
+    VLATest + OA        51.8       56.4       50.1        54.1       50.4       26.9        45.1       41.1       39.7        52.1       50.4       58.1
+   CanTest (Ours)       72.2       74.7       61.4        66.3       56.1       42.8        52.5       49.3       66.1        59.5       64.7       63.4
+
+
+4.3  Capability-Oriented and Failure-Oriented    earliest one as the failure-source error, and refer to
+    Feedback                                               its corresponding capability as the failure-source
+                                                       capability.  Details of the intervention operator,
+After obtaining the task instruction (i.e., test case)
+                                                      indicator function, and the earliest-error rule are
+and capability oracles, CanTest lets the target
+                                                 provided in Appendix A.4.
+agent perform the task. The resulting trajectory
+τ = {s1, s2, . . . , sT } is a time series, where the    4.3.2  Feedback of Test Case
+state st at each time step contains both the agent’s   For the test case seed, the feedback score consists
+own information (e.g., current position) and infor-                                                     of two components: (1) Failure-Oriented Feedback
+mation about the surrounding environment (e.g.,                                            and (2) Capability-Oriented Feedback.  Failure-
+nearby objects). CanTest utilizes capability oracles                                                    oriented feedback aims to guide the generation of
+to determine whether the current test case fails due                                                    the case seed that is more likely to result in fail-
+to errors of the specific capability. Then, the failure-                                                       ures. Capability-oriented feedback aims to guide
+oriented and capability-oriented feedback scores                                                    the generation of the case seed that is more likely
+are computed to simultaneously guide adaptive gen-                                                        to result in capability-oriented failures.
+eration of high-value test cases. The algorithm of                                                         (1) Failure-Oriented Feedback.  Based on
+feedback calculation is shown in the Appendix A.3.                                                whether the task is successful, failure-oriented feed-
+                                              back F f is defined as 0 (failure) or 1 (success).
+4.3.1  Capability-Oriented Failure Attribution                                                         (2) Capability-Oriented Feedback. We iden-
+To attribute a task failure to specific capabilities,    tify the failure-source capability and the failure-
+CanTest identifies which capability errors are truly    source time step, i.e., (C∗x, t∗), as described above.
+responsible for the failure along a long trajectory.   For capability C∗x, the corresponding error value
+First, CanTest detects capability errors using the    ϵxt∗is calculated by the capability oracles. The er-
+capability oracles (Sec. 4.2) for {Cp, Cm, Cpl, Cd}.    ror values for each capability are normalized to the
+Because not every detected error necessarily causes    range [0, 1] and are used as the capability-oriented
+the final failure (Zhang et al., 2025c), we further de-   feedback, denoted as F c = Norm(ϵxt∗).
+termine failure-inducing errors via counterfactual     The final feedback score Fcs of the case seed
+reasoning (Chen et al., 2025a): for each detected    integrates both failure-oriented and capability-
+error at time t in capability Cx, we intervene by    oriented aspects: Fcs = F f + λCxF c. λCx is
+replacing the agent output with the oracle output   an adaptive parameter used to control the weight
+and roll out the remainder of the trajectory under    of capability-oriented feedback. For failure-source
+this correction. If this intervention turns the orig-    capability C∗x, if the number of failure cases caused
+inal failed trajectory into a success, the error is   by Cx in the already identified capability-oriented
+deemed failure-inducing. When multiple failure-    failure case set is relatively high, a lower λCx is
+inducing errors exist, we attribute the failure to the   used to reduce the search focus on this capability.
+
+===== PDF PAGE 7 =====
+                   Target object        VLN Agent             Planned Route                 Historical Route             Good Route                    Actual Decision
+
+ Task Instruction:                             Task Instruction:                             Task Instruction:                            Task Instruction:
+ “Walk to the mirror in the bathroom.”          “Walk to the bed in another bedroom.”         “Walk to the toilet in the bathroom.”           “Walk to the sofa in the lounge.”
+
+
+
+
+
+                                                        Memory: I come
+                                                             from the hallway by
+                                                                         the staircase……
+
+
+      (a) Perception-Responsible Failure              (b) Memory-Responsible Failure                 (c) Planning-Responsible Failure               (d) Decision-Responsible Failure
+
+                         Figure 3: Examples of Failure Due to Different Capabilities.
+
+
+It helps ensure comprehensive testing across all    This superior performance can be attributed primar-
+capabilities. λCx is defined as:                          ily to the unique function of CanTest to construct
+                                                    oracle for various underlying capabilities. These
+  λCx = NCy/NCx, Cy ∈{Cp, Cm, Cpl, Cd},      oracles play a pivotal role in identifying the source
+                                                 (7)    errors in failure test cases, thereby providing more
+where NCy denotes the average of capability-    specific guidance that discovers failure cases more
+oriented failure cases in the failure case set. This    targeted and effective.
+score is used to guide adaptive test case generation.                                           The feedback scores produced by this process
+                                                      are instrumental in guiding the iterative generation
+5  Evaluation
+                                                   of test cases, ensuring that the focus remains on
+Experimental Environment. We conduct experi-    capabilities where the model struggles the most. In
+ments in Habitat3 (Gupta et al., 2017), which pro-    contrast, BehAVExplor and VLATest rely solely
+vides a 3D scene environment for VLN. We select   on feedback from system-level outcomes to direct
+three advanced VLN models as the target models to    their case generation, neglecting the capability eval-
+be tested: ApexNav (Zhang et al., 2025b), MGDM    uation. This limitation results in a less nuanced un-
+(Song et al., 2025), and Mem2Ego (Zhang et al.,   derstanding of the specific weaknesses of the agent,
+2025a). Their details are shown in Appendix A.6.    hence leading to their relatively lower performance
+Baselines. We compare CanTest with two com-    in uncovering diverse failure cases.
+monly used techniques and one SOTA technique.
+                                                      5.1.2  Number of Capability-Oriented Failures(1) Random is an approach for randomly generat-
+ing test cases, which we implement following previ-   Our proposed CanTest can generate failure cases
+ous work (Chen et al., 2025b; Pang et al., 2022). (2)    that can be attributed to specific capabilities. More-
+BehAVExplor (Cheng et al., 2023) is a behavior-   over, its components of capability oracle and at-
+guided fuzzing technique, which is commonly used    tribution mechanism can be used as a plug-in (de-
+to generate diverse test cases. (3) VLATest (Wang    noted as + OA) to extend baseline methods, thereby
+et al., 2025b) is the SOTA fuzzing framework de-   enabling them to perform capability-oriented fail-
+signed to generate robotic manipulation scenes for    ure attribution as well. Based on this, we further
+testing Vision-Language-Action (VLA) models.     compare the number of capability-oriented failures
+                                                        identified by our proposed CanTest against those
+5.1  Advantage of CanTest
+                                                        identified by the augmented baselines.  Table 1
+5.1.1  Number of Failures                         presents the results across different capabilities.
+We present the trend of the number of discovered     The results indicate that CanTest can discover
+failure cases across the entire experimental duration    the most failure cases for all capabilities.  This
+of CanTest and the baselines in Figure 2. The re-   reason is that CanTest promotes comprehensive ex-
+sults clearly demonstrate that, throughout each time    ploration of different capabilities through adaptive
+interval, CanTest consistently outperforms the base-   weighting when calculating the feedback scores to
+lines. The improvement in the final number of dis-   guide test case generation. Specifically, across the
+covered failure cases relative to the best-performing    four capabilities, CanTest significantly outperforms
+baseline (VLATest) ranges from 23.34% to 33.70%.   the baselines. This comprehensive coverage of ca-
+
+===== PDF PAGE 8 =====
+Table 2: The results of repairing failure cases using oracles. #Fail represents the number of discovered failure test
+cases. #Repa and %Repa respectively represent the number and proportion of test cases successfully repaired.
+
+
+                    Perception            Memory                Planning                 Decision
+   Model
+               #Fail  #Repa  %Repa   #Fail  #Repa  %Repa   #Fail  #Repa  %Repa   #Fail  #Repa  %Repa
+
+  ApexNav    72.2    60.9   84.35%   66.3    53.9   81.30%   52.5    45.7   87.05%   59.5    56.6   95.13%
+  MGDM    74.7    62.4   83.53%   56.1    46.2   82.35%   49.3    42.6   86.41%   64.7    61.4   94.90%
+ Mem2Ego   61.4    52.7   85.83%   42.8    35.8   83.64%   66.1    59.3   89.71%   63.4    61.3   96.69%
+
+
+
+    80.0                                                                           80.0                                                                           80.0
+                                                                                                  CanTest   w/o FOF   w/o COF   w/o Feedback                                                                                                                                                                           CanTest   w/o FOF   w/o COF   w/o Feedback
+                                                                                   70.0                        CanTest   w/o FOF   w/o COF   w/o Feedback           casescases 70.060.0                                                                                                                                                                                                                                                                                                cases 70.060.0                                                                                   60.0
+                                                                                                                                                                                                         failurefailure 50.0                                                                           50.0                                                                           50.0                                                                                                                                                                                                                                                                                                                                                                                                                   failure    40.0                                                                                                                                                                  40.0                                                          of 40.0of                                                                                                                   of    30.0                                                                                                                                                                  30.0                                                                                   30.0
+Number 20.010.0                                                                                                                                                           Number 20.010.0                                                                                                                                                           Number 20.010.0
+     0.0                                                                                0.0                                                                                0.0
+             Perception     Memory       Planning        Decision                   Perception     Memory       Planning        Decision                   Perception     Memory       Planning        Decision
+                         (a) ApexNav                                               (b) MGDM                                                   (c) Mem2Ego
+
+                           Figure 4: The results of the ablation study for feedback.
+
+
+pabilities ensures that a diverse range of failures    ing 80% when using the oracles, thereby validating
+can be identified during testing, providing more    the effectiveness of the automatically constructed
+helpful failure analysis for agent enhancement.       capability oracles in CanTest.
+Examples of Capability-Oriented Failures. To
+further demonstrate the practicality of CanTest, we    5.3  Ablation: Feedback Effectiveness
+manually analyze the failure test cases attributed                                         To validate the effectiveness of feedback, we
+to the four capabilities it discovers, with represen-                                           compared  CanTest  with  three  variants:   (1)
+tative examples illustrated in Figure 3. Based on                                                without  failure-oriented feedback,  using only
+these interpretable examples, we provide action-                                                      capability-oriented feedback (w/o FOF), (2) with-
+able enhancement suggestions for improving the                                                    out capability-oriented feedback, using only failure-
+agent. The details are presented in Appendix A.8.                                                     oriented feedback (w/o COF), and (3) without any
+                                               feedback (w/o Feedback). Figure 4 displays the5.2  Fidelity of Capability Oracles
+                                               comparison of results between CanTest and the dif-
+To evaluate the fidelity of automatically constructed                                                        ferent variants. In all cases, CanTest outperformed
+capability oracles by CanTest, we utilized the ora-                                                     the other variants, indicating that any type of feed-
+cles introduced in Section 4.2 to provide expected                                              back contributes to discovering more failure cases.
+output for each capability. For the failure cases                                                 Furthermore, the performance difference between
+identified by CanTest, we repaired these cases by                                            w/o FOF and w/o COF is minimal, which suggests
+replacing the outputs of the erroneous capabilities                                                        that failure-oriented and capability-oriented feed-
+with the expected output. If the oracles are accurate,                                              back are nearly equally important.
+the test cases should be easily repaired.
+  The results of repairing failure cases are shown                                       6  Conclusion
+in Table 2. For each failure-responsible capability,
+a relatively high repair rate is achieved, i.e., repair   This paper presents CanTest, an automated frame-
+rates ranging from 81.30% to 96.69%. This indi-   work for capability-oriented testing of embodied
+cates that the expected output used by the oracles    agents. CanTest generates capability-oriented test
+constructed by CanTest is reliable and accurate.   cases and constructs independent oracles for key
+Specifically, the repair rates for perception, mem-    capabilities, enabling systematic detection of ca-
+ory, and planning, which are upstream capabilities,    pability errors by comparing agent outputs against
+are lower compared to decision, which is a down-   expected outputs. To handle long-horizon interac-
+stream capability. This indicates that upstream er-    tions, CanTest further introduces a failure attribu-
+rors are often more complex, as they can propagate    tion mechanism to identify failure-source errors
+and impair subsequent decision execution. Across    along the trajectory. Experiments demonstrate that
+different capabilities, however, all models achieved   CanTest discovers more failure cases than strong
+high repair effectiveness, with repair rates exceed-   baselines, achieves the best capability-level attri-
+
+===== PDF PAGE 9 =====
+bution performance, and attains a high repair rate,   Innovation Team 2024 ISCAS (No. 2024-66), the
+validating the fidelity of the proposed oracles. Abla-   National Research Foundation, Singapore, and the
+tion studies further confirm the effectiveness of our   Cyber Security Agency under its National Cyberse-
+failure- and capability-oriented feedback signals.     curity R&D Programme (NCRP25-P04-TAICeN).
+                                     Any opinions, findings and conclusions or recom-
+Limitations                                   mendations expressed in this material are those of
+                                                    the author(s) and do not reflect the views of Na-
+Despite its effectiveness, CanTest has several limi-
+                                                         tional Research Foundation, Singapore and Cyber
+tations that remain to be addressed in future work.
+                                                    Security Agency of Singapore.
+Expert Model. A key assumption in CanTest
+is the availability of an “expert” model to con-
+struct capability-specific oracles, e.g., (i) an opti-   References
+mal or near-optimal route for navigation/planning,
+                                                     Jianming Chen, Yawen Wang, Junjie Wang, Xiaofei Xie,
+and (ii) semantic grounding for perception (e.g.,                                                       Jun Hu, Qing Wang, and Fanjiang Xu. 2025a. Under-
+room/object labels). In settings where such an ex-      standing individual agent importance in multi-agent
+pert is not directly provided, obtaining reliable su-      system via counterfactual reasoning. Proceedings
+                                                              of the AAAI Conference on Artificial Intelligence,pervision may require additional prior knowledge
+                                                      39(15):15785–15794.
+or effort. For instance, in structured maps or par-
+tially known layouts, shortest-path planning (e.g.,   Jianming Chen, Yawen Wang, Junjie Wang, Xiaofei Xie,
+over a reconstructed graph) can serve as a proxy      Yuanzhe Hu, Qing Wang, and Fanjiang Xu. 2026. Ad-
+                                                                  versarial attack on black-box multi-agent by adaptive
+expert for near-optimal routes. Similarly, percep-                                                             perturbation. Proceedings of the AAAI Conference
+tion supervision can be approximated through extra      on Artificial Intelligence, 40(35):29359–29367.
+annotation effort, such as human-labeled semantic
+                                                     Jianming Chen, Yawen Wang, Junjie Wang, Xiaofei Xie,
+descriptions of scenes or objects.                                                Dandan Wang, Qing Wang, and Fanjiang Xu. 2025b.
+Simulation Environment. Our current evaluation      Demo2test: Transfer testing of agent in competi-
+is conducted in simulation, and directly transfer-       tive environment with failure demonstrations. ACM
+ring our oracle design to the physical world is non-      Trans. Softw. Eng. Methodol., 34(2).
+trivial. We view CanTest as a diagnostic frame-   Jinyu Chen, Chen Gao, Erli Meng, Qiong Zhang, and
+work whose core idea—capability-oriented failure       Si Liu. 2022. Reinforced structured state-evolution
+attribution via oracle interventions—remains appli-       for vision-language navigation. In Proceedings of
+                                                            the IEEE/CVF Conference on Computer Vision and
+cable, but whose oracle implementations must be
+                                                           Pattern Recognition (CVPR), pages 15450–15459.
+adapted for sim2real. In future work, we will ex-
+plore (i) leveraging human-in-the-loop supervision    Mingfei Cheng, Yuan Zhou, and Xiaofei Xie. 2023.
+                                                       Behavexplor: Behavior diversity guided testing forfor sparse but high-value annotations (e.g., validat-
+                                                  autonomous driving systems. In Proceedings of the
+ing key perception entities or waypoint-level plans)                                                32nd ACM SIGSOFT International Symposium on
+to calibrate oracle thresholds; and (ii) training      Software Testing and Analysis, ISSTA 2023, page
+learned surrogate oracles from real logs, where “ex-      488–500.
+pert” signals can be distilled from demonstrations,                                            Danny Driess, Fei Xia, Mehdi S. M. Sajjadi, Corey
+corrective feedback, or safety monitors. We ex-      Lynch, Aakanksha Chowdhery, Brian Ichter, Ayzaan
+pect that combining weak experts with uncertainty-     Wahid, Jonathan Tompson, Quan Vuong, Tianhe
+aware oracle thresholds and selective human ver-      Yu, Wenlong Huang, Yevgen Chebotar, Pierre Ser-
+                                                      manet, Daniel Duckworth, Sergey Levine, Vincent
+ification can enable CanTest to provide useful,                                                    Vanhoucke, Karol Hausman, Marc Toussaint, Klaus
+capability-level failure attribution under a realis-      Greff, and 3 others. 2023.  Palm-e: an embodied
+tic environment.                                     multimodal language model. In Proceedings of the
+                                                         40th International Conference on Machine Learning,
+Acknowledgments                               ICML’23.
+
+                                                   Ping-Jung Duh, Yu-Cheng Sung, Liang-Yu Fan Chi-
+This work was supported by the National Natural                                                         ang, Yung-Ju Chang, and Kuan-Wen Chen. 2021.
+Science Foundation of China Grant No. 62232016,      V-eye: A vision-based navigation system for the vi-
+Basic Research Program of ISCAS Grant No.      sually impaired. IEEE Transactions on Multimedia,
+ISCAS-JCZD-202405 and No.  ISCAS-JCZD-      23:1567–1580.
+202304, Major Program of ISCAS Grant No.   Mohamed Elnoor, Kasun Weerakoon, Gershom Senevi-
+ISCAS-ZD-202401 and No. ISCAS-ZD-202302,       ratne, Jing Liang, Vignesh Rajagopal, and Dinesh
+
+===== PDF PAGE 10 =====
+  Manocha. 2025. Vi-lad: Vision-language attention   Qi Pang, Yuanyuan Yuan, and Shuai Wang. 2022. Mdp-
+   distillation for socially-aware robot navigation in dy-      fuzz: testing models solving markov decision pro-
+  namic environments. Preprint, arXiv:2503.09820.         cesses. In Proceedings of the 31st ACM SIGSOFT
+                                                            International Symposium on Software Testing and
+Shuo Feng, Haowei Sun, Xintao Yan, Haojie Zhu,                                                             Analysis, page 378–390. Association for Computing
+  Zhengxia Zou, Shengyin Shen, and Henry X Liu.                                                       Machinery.
+  2023. Dense reinforcement learning for safety valida-
+   tion of autonomous vehicles. Nature, 615(7953):620–                                           Hamid Rezatofighi, Nathan Tsoi, JunYoung Gwak,
+   627.                                                Amir Sadeghian, Ian Reid, and Silvio Savarese. 2019.
+                                                       Generalized intersection over union: A metric andChen Gao, Xingyu Peng, Mi Yan, He Wang, Lirong
+                                                       a loss for bounding box regression. In Proceedings  Yang, Haibing Ren, Hongsheng Li, and Si Liu.
+                                                                of the IEEE/CVF conference on computer vision and  2023. Adaptive zone-aware hierarchical planner for
+                                                            pattern recognition, pages 658–666.  vision-language navigation. In Proceedings of the
+  IEEE/CVF Conference on Computer Vision and Pat-
+                                             Dhruv Shah, Bła˙zej Osi´nski, brian ichter, and Sergey   tern Recognition (CVPR), pages 14911–14920.
+                                                        Levine. 2023.  Lm-nav: Robotic navigation with
+Jing Gu, Eliana Stefani, Qi Wu, Jesse Thomason, and       large pre-trained models of language, vision, and ac-
+  Xin Wang. 2022. Vision-and-language navigation:        tion. In Proceedings of The 6th Conference on Robot
+ A survey of tasks, methods, and future directions.      Learning, volume 205 of Proceedings of Machine
+   In Proceedings of the 60th Annual Meeting of the      Learning Research, pages 492–504.
+  Association for Computational Linguistics (Volume
+  1: Long Papers), pages 7606–7623. Association for    Xinshuai Song, Weixing Chen, Yang Liu, Weikai Chen,
+  Computational Linguistics.                         Guanbin Li, and Liang Lin. 2025. Towards long-
+                                                          horizon vision-language navigation: Platform, bench-
+Saurabh Gupta, James Davidson, Sergey Levine, Rahul     mark and method. In Proceedings of the Computer
+  Sukthankar, and Jitendra Malik. 2017.  Cognitive      Vision and Pattern Recognition Conference, pages
+  mapping and planning for visual navigation. In Pro-     12078–12088.
+   ceedings of the IEEE conference on computer vision
+  and pattern recognition, pages 2616–2625.          Yun Tang, Yuan Zhou, Tianwei Zhang, Fenghua Wu,
+                                               Yang Liu, and Gang Wang. 2021.   Systematic
+Fitash Ul Haq, Donghwan Shin, and Lionel Briand.
+                                                                testing of autonomous driving systems using map
+  2022. Efficient online testing for dnn-enabled sys-
+                                                       topology-based scenario classification.   In 2021
+  tems using surrogate-assisted and many-objective op-
+                                                      36th IEEE/ACM International Conference on Au-
+   timization. In Proceedings of the 44th international
+                                                     tomated Software Engineering (ASE), pages 1342–
+   conference on software engineering, pages 811–822.
+                                                       1346. IEEE.
+Fitash Ul Haq, Donghwan Shin, and Lionel C Briand.
+  2023.  Many-objective reinforcement learning for    Pablo Valle, Chengjie Lu, Shaukat Ali, and Aitor Arri-
+   online testing of dnn-enabled systems.  In 2023        eta. 2025. Evaluating uncertainty and quality of vi-
+  IEEE/ACM 45th International Conference on Soft-      sual language action-enabled robots. arXiv preprint
+  ware Engineering (ICSE), pages 1814–1826. IEEE.       arXiv:2507.17049.
+
+Ashish Kumar, Saurabh Gupta, David Fouhey, Sergey   Hanqing Wang, Wei Liang, Luc Van Gool, and Wen-
+   Levine, and Jitendra Malik. 2018. Visual memory      guan Wang. 2023a. Dreamwalker: Mental planning
+   for robust path following.  In Advances in Neural       for continuous vision-language navigation. In Pro-
+  Information Processing Systems, volume 31.             ceedings of the IEEE/CVF International Conference
+                                                 on Computer Vision (ICCV), pages 10873–10883.
+Shuijing Liu, Aamir Hasan, Kaiwen Hong, Runx-
+  uan Wang, Peixin Chang, Zachary Mizrachi, Justin                                               Hanqing Wang, Wenguan Wang, Wei Liang, Caiming
+   Lin, D. Livingston McPherson, Wendy A. Rogers,                                                     Xiong, and Jianbing Shen. 2021. Structured scene
+  and Katherine Driggs-Campbell. 2024. Dragon: A                                             memory for vision-language navigation. In Proceed-
+  dialogue-based robot for assistive navigation with                                                          ings of the IEEE/CVF Conference on Computer Vi-
+   visual language grounding. IEEE Robotics and Au-                                                          sion and Pattern Recognition (CVPR), pages 8455–
+  tomation Letters, 9(4):3712–3719.                                                       8464.
+Gabriel Ilharco Magalhaes, Vihan Jain, Alexander Ku,
+                                                   Renzhi Wang, Mingfei Cheng, Xiaofei Xie, Yuan Zhou,  Eugene Ie, and Jason Baldridge. 2019. General evalu-
+                                                  and Lei Ma. 2025a. Moditector: Module-directed   ation for instruction conditioned navigation using dy-
+                                                                 testing for autonomous driving systems. Proc. ACM  namic time warping. In NeurIPS Visually Grounded
+                                                              Softw. Eng., 2(ISSTA).   Interaction and Language (ViGIL) Workshop, vol-
+  ume 1.
+                                                  Ting Wang, Zongkai Wu, and Donglin Wang. 2023b.
+Siddarth Narasimhan, Aaron Hao Tan, Daniel Choi, and      Visual perception  generalization  for vision-and-
+  Goldie Nejat. 2025. Olivia-nav: An online lifelong      language navigation via meta-learning. IEEE Trans-
+   vision language approach for mobile robot social       actions on Neural Networks and Learning Systems,
+   navigation. Preprint, arXiv:2409.13675.                 34(8):5193–5199.
+
+===== PDF PAGE 11 =====
+Zehao Wang, Minye Wu, Yixin Cao, Yubo Ma, Meiqi    Mingjie Zhang, Yuheng Du, Chengkai Wu, Jinni Zhou,
+  Chen, and Tinne Tuytelaars. 2024a.  Navigating      Zhenchao Qi, Jun Ma, and Boyu Zhou. 2025b. Apex-
+   the nuances: A fine-grained evaluation of vision-      nav: An adaptive exploration strategy for zero-shot
+  language navigation. Preprint, arXiv:2409.17313.         object navigation with target-centric semantic fusion.
+                                                        arXiv preprint arXiv:2504.14478.
+Zhijie Wang, Zhehua Zhou, Jiayang Song, Yuheng
+  Huang, Zhan Shu, and Lei Ma. 2024b. Ladev: A   Shaokun Zhang, Ming Yin, Jieyu Zhang, Jiale Liu,
+   language-driven testing and evaluation platform for      Zhiguang Han, Jingyang Zhang, Beibin Li, Chi
+   vision-language-action models in robotic manipula-     Wang, Huazheng Wang, Yiran Chen, and Qingyun
+   tion. arXiv preprint arXiv:2410.05191.              Wu. 2025c. Which agent causes task failures and
+                                                when? on automated failure attribution of LLM multi-
+Zhijie Wang, Zhehua Zhou, Jiayang Song, Yuheng       agent systems. In Forty-second International Confer-
+  Huang, Zhan Shu, and Lei Ma. 2025b. Vlatest: Test-      ence on Machine Learning.
+   ing and evaluating vision-language-action models
+   for robotic manipulation. Proc. ACM Softw. Eng.,   Youcai Zhang, Xinyu Huang, Jinyu Ma, Zhaoyang Li,
+  2(FSE).                                         Zhaochuan Luo, Yanchun Xie, Yuzhuo Qin, Tong
+                                                    Luo, Yaqian Li, Shilong Liu, and 1 others. 2024.
+Anjiang Wei, Yinlin Deng, Chenyuan Yang, and Ling-                                                     Recognize anything: A strong image tagging model.
+  ming Zhang. 2022. Free lunch for testing: fuzzing                                                             In Proceedings of the IEEE/CVF Conference on Com-
+   deep-learning libraries from open source. In Proceed-      puter Vision and Pattern Recognition, pages 1724–
+   ings of the 44th International Conference on Software                                                       1732.
+  Engineering, page 995–1007.
+                                             Yuan Zhou, Yang Sun, Yun Tang, Yuqi Chen, Jun Sun,
+Wansen Wu, Tao Chang, Xinmeng Li, Quanjun Yin, and                                                         Christopher M Poskitt, Yang Liu, and Zijiang Yang.
+  Yue Hu. 2024. Vision-language navigation: a survey                                                      2023. Specification-based autonomous driving sys-
+  and taxonomy. Neural Computing and Applications,                                                tem testing. IEEE Transactions on Software Engi-
+  36(7):3291–3316.                                                            neering, 49(6):3391–3410.
+
+Karmesh Yadav, Ram Ramrakhya, Santhosh Kumar                                               Fengda Zhu, Yi Zhu, Xiaojun Chang, and Xiaodan
+  Ramakrishnan, Theo Gervet, John Turner, Aaron                                                        Liang. 2020. Vision-language navigation with self-
+  Gokaslan, Noah Maestre, Angel Xuan Chang, Dhruv                                                           supervised auxiliary reasoning tasks. In Proceedings
+   Batra, Manolis Savva, and 1 others. 2023. Habitat-                                                              of the IEEE/CVF Conference on Computer Vision
+   matterport 3d semantics dataset. In Proceedings of                                                 and Pattern Recognition (CVPR).
+   the IEEE/CVF Conference on Computer Vision and
+   Pattern Recognition, pages 4927–4936.               Brianna Zitkovich, Tianhe Yu, Sichun Xu, Peng Xu,
+                                                  Ted Xiao, Fei Xia, Jialin Wu, Paul Wohlhart, Stefan
+Yupei Yan, Weimin Ma, Sengfat Wong, Xuemei Yin,                                                       Welker, Ayzaan Wahid, and 1 others. 2023.  Rt-2:
+  Qiang Pan, Zhiwen Liao, and Xiaoxin Lin. 2024.                                                         Vision-language-action models transfer web knowl-
+  The navigation of home service robot based on deep                                                   edge to robotic control.  In Conference on Robot
+   learning and machine learning. Journal of Robotics,                                                         Learning, pages 2165–2183. PMLR.
+  2024(1):5928227.
+
+Zongming Yang, Liang Yang, Liren Kong, Ailin Wei,
+   Jesse Leaman, Johnell Brooks, and Bing Li. 2022.
+  Seeway: Vision-language assistive navigation for the
+   visually impaired. In 2022 IEEE International Con-
+   ference on Systems, Man, and Cybernetics (SMC),
+  pages 52–58.
+
+Zhiqiang Yuan, Ting Zhang, Ying Deng, Jiapei Zhang,
+  Yeshuang Zhu, Zexi Jia, Jie Zhou, and Jinchao
+  Zhang. 2025. Walkvlm:aid visually impaired peo-
+   ple walking by vision language model.  Preprint,
+  arXiv:2412.20903.
+
+Lingfeng Zhang, Yuecheng Liu, Zhanguang Zhang,
+  Matin Aghaei, Yaochen Hu, Hongjian Gu, Moham-
+  mad Ali Alomrani, David Gamaliel Arcos Bravo,
+  Raika Karimi, Atia Hamidizadeh, Haoping Xu,
+  Guowei Huang, zhanpeng zhang, Tongtong Cao, We-
+  ichao Qiu, Xingyue Quan, Jianye HAO, Yuzheng
+  Zhuang, and Yingxue Zhang. 2025a. Mem2ego: Em-
+  powering vision-language models with global-to-ego
+  memory for long-horizon embodied navigation. In
+  Workshop on Foundation Models Meet Embodied
+  Agents at CVPR 2025.
+
+===== PDF PAGE 12 =====
+A  Appendix                                   considered a failure. The formula is as follows:
+
+A.1  Background                           (True,    if t > Tmax,
+                                                           Failstep =                              (9)
+A.1.1  Vision-Language Navigation                               False,  otherwise,
+In this section, we take the VLN agent as the re-
+                                           where t is the number of steps taken by the agent,search target, which is an intelligent agent that
+                                              and Tmax is the maximum allowed number of stepsoperates in an unknown or partially known envi-
+                                                        for the task.ronment to perform navigation tasks based on spe-
+cific instructions. Specifically, the VLN agents aim    A.1.3  Capabilities of VLN Agent
+to enable intelligent agents to perform navigation                                         To accomplish VLN tasks, agents usually require
+tasks in unknown environments based on natural                                                      the following core capabilities (Gu et al., 2022; Wu
+language instructions (Zhu et al., 2020). The agent                                                            et al., 2024):
+receives a natural language instruction I as input
+(e.g., "Walk from the kitchen to the living room,        • Perception: The agent perceives the environ-
+then enter the green door leading to the bedroom").       ment from an egocentric view, extracting vi-
+The instruction is represented as a sequence of         sual features (e.g., objects, obstacles, spatial
+words, denoted as: I = {w1, w2, w3, . . . , wL},        layout) (Wang et al., 2023b). Perception di-
+where wi denotes the i-th word in the instruction,         rectly affects the agent’s ability to link obser-
+and L is the total number of words.                       vations with language instructions (e.g., iden-
+  The agent perceives the environment from an         tifying a "green door").
+egocentric (first-person) view and interacts with
+                                                                 • Memory: VLN tasks often require short-termit through a series of discrete viewpoint changes
+                                                and long-term memory to record previouslyor low-level actions (e.g., moving forward, turn-
+                                                             visited locations and observed scenes, help-ing left or right). The agent’s execution gener-
+                                                      ing the agent avoid revisiting the same areasates a trajectory τ = {s1, s2, . . . , sT } formed as
+                                             (Wang et al., 2021).a time sequence, where st represents the agent’s
+state at the t-th time step. The task may contain
+                                                                 • Planning: Planning involves designing an ef-
+incomplete or ambiguous instructions, as well as
+                                                                   ficient navigation trajectory to the target, con-
+dynamic elements and noisy visual inputs in the
+                                                         sidering both language instructions and the
+environment, presenting substantial challenges for
+                                                   observed environment (Wang et al., 2023a).
+navigation (Wang et al., 2024a).
+                                                   For example, the agent may need to infer a
+A.1.2  Failures of VLN Task                          path to a "bedroom" through an intermediate
+                                             room ("living room").
+In the VLN task, failures of the agent are typically
+defined as the inability of the agent to successfully                                                                 • Decision: Decision-making determines the
+complete the given navigation task. Specifically,                                                      next action (e.g., turn left, move forward)
+failures can be determined from the following as-                                                   based on real-time perception, memory, and
+pects (Chen et al., 2022):                                                    planned trajectories (Gao et al., 2023).
+  Target Position: For each navigation task, after
+the agent executes the stop action, the task is consid-     These capabilities are interdependent during task
+ered successful if the distance between the agent’s    execution. Perception provides the foundation for
+final position and the target position is within a   memory and planning, memory supports planning
+certain threshold. The formula is as follows:        and decision by reducing redundant actions, and
+                                                  planning defines the trajectory that decision follows
+      (            True,    if d(pfinal, ptarget) > δ,        in real-time. While these capabilities collectively
+ Failpos =                                     (8)
+            False,  otherwise,                  enable VLN agents to navigate effectively, any defi-
+                                                   ciency in these capabilities can lead to task failures.
+where pfinal denotes the agent’s final position, ptarget
+                                            A.2  Adaptive Test Case Generationis the target position, d(·, ·) represents the distance
+function, and δ is the distance threshold.        We design an algorithm for adaptive case genera-
+  Step Limit: If the number of steps taken by the    tion, described in Algorithm 1. CanTest first initial-
+agent exceeds the maximum step limit, the task is    izes a batch of test cases as the initial seed corpus
+
+===== PDF PAGE 13 =====
+SC (line 1). During each iteration of seed updates,    Algorithm 1: The Algorithm for Adaptive
+we first calculate the selection probability for all     Test Case Generation.
+seeds and then select a candidate based on these      Input: The semantic annotations Ar and
+probabilities (line 2). where the denominator is the          Ao of environment assets.
+sum of all feedback scores. The higher the feed-     Output: The generated test case seed s′.
+back score, the higher the probability of the seed     1 Initialization: Generate the initial seed
+being selected.                                       corpus SC.
+  After selecting seed s as the candidate, we de-     2 Select candidate s from SC. with
+signed an adaptive mutation strategy that applies        probability ps according to the Equation 2;
+different mutation methods to candidates with vary-     3 Calculate the adaptive mutation probability
+ing levels of feedback scores. Essentially, mutation     pm according to the Equation 10;
+involves modifying the objects or rooms in the task     4  if random() < pm then
+instruction so that the agent takes a different route,     5    Get the room annotation ar and object
+to make the route more likely to reveal failures. We           annotation ao from candidate s;
+design prompts to apply the LLM to mutate the cur-     6    Sample another object: a′o = Sample(Ao,
+rent instructions, and detailed prompts are available            ar, ao);
+on our website. Specifically, for task instructions,     7      s′ = MildMutation(s, ar, a′o);
+we design two levels of mutation as follows.             8 end
+  Mild Mutation: for test cases with higher feed-     9 else
+back scores (indicating a higher probability of fail-    10    Get the room annotation ar from
+ure), we apply mild mutation to the task instruction.          candidate s;
+For example, as shown in Figures 5 (a) and (b),    11    Sample another room and object: a′r, a′o
+we make slight changes without altering the des-        = Sample(Ar, Ao, ar);
+tination room (i.e., modifying the destination as     12      s′ = AggressiveMutation(s, a′r, a′o);
+another object within the room).                           13 end
+  Aggressive Mutation:  conversely, for those    14 return s′;
+with lower feedback scores, as shown in Figures 5
+(a) and (c), using the same room as the destination
+may not easily lead to failures. Therefore, we apply
+                                         more likely to fail due to certain capability defi-
+aggressive mutation to alter the target room itself,
+                                                         ciencies. Therefore, CanTest tends to perform mild
+guiding the agent along a significantly different
+                                                mutation to avoid excessive mutations that could
+path to expose potential weaknesses.
+                                                   lead to difficulty in revealing failure (lines 4-8).
+  To adaptively select the appropriate mutation
+                                                   Conversely, a lower pm leads to a tendency for ag-
+strategy, we calculate the following mutation prob-
+                                                      gressive mutation, expanding the search space and
+abilities based on the feedback score:
+                                                        striving for greater difference before and after the
+                  Fcs −min(F)                 mutation (lines 9-13).
+        pm =                            (10)            max(F) −min(F),
+                                            A.3  The Algorithm for Capability Failure
+where F = {Fcs1, . . . , Fcsn} and pm represents the                                               Feedback
+degree to which the feedback score of the current
+seed ranks among all seeds. A higher pm indi-   The workflow for capability and failure feedback is
+cates that current seed is more outstanding within   shown in the Algorithm 2. After obtaining the task
+the seed corpus, i.e., it is more likely to fail due    instruction (i.e., test case) and capability oracles,
+to certain capability deficiencies. Therefore, Can-   CanTest lets the target agent explore the environ-
+Test tends to perform mild mutation to avoid ex-   ment based on the instruction to perform the task.
+cessive mutations that could lead to difficulty in   The resulting trajectory τ = {s1, s2, . . . , sT } is a
+revealing failure. Conversely, a lower pm leads    time series, where the state st at each time step con-
+to a tendency for aggressive mutation, expanding    tains both the agent’s own information (e.g., current
+the search space and striving for greater difference    position) and information about the surrounding en-
+before and after the mutation.                      vironment (e.g., nearby objects). The various capa-
+ A higher pm indicates that the current seed is     bilities generate their respective outputs based on st
+more outstanding within the seed library, i.e., it is    (line 1). CanTest utilizes capability oracles to eval-
+
+===== PDF PAGE 14 =====
+  Task Instruction:                                 Task Instruction:                                 Task Instruction:
+ “Move to the door of the bedroom.”                “Walk to the bedside table in the bedroom.”         “Walk to the dining table in the lobby.”
+
+
+
+
+
+        VLN Agent                               VLN Agent                               VLN Agent
+           Route                                                 Route                                                 Route
+            Destination                                                   Destination                                                   Destination
+
+                   (a) Original Case                           (b) New Case After Mild Mutation                  (c) New Case After Aggressive Mutation
+
+                   Figure 5: Illustration of the mild mutation and the Aggressive mutation.
+
+
+uate τ, determining whether the current test case   time t is corrected, i.e., by replacing the original
+fails due to errors of the specific capability (line 2).   output with the capability oracle. The steps before
+Then, the failure-oriented and capability-oriented   time t remain unchanged, while the actions after
+feedback scores are computed to simultaneously   time t are automatically updated accordingly. This
+guide adaptive generation of high-value test cases.   process generates a modified trajectory:
+
+A.4  The Details of Capability-Oriented                           (Cx,t)                                                            τ   = M(Cx,t)(TOx, τ),       (11)
+      Failure Attribution
+To attribute failures to specific capabilities, it is nec-   where M(Cx,t) represents the modification to the
+essary to identify the source of failures. Because    output of capability Cx at time step t. TOx is the
+capabilities interact across long task trajectories,    test oracle for this capability, which serves as the
+not all capability errors necessarily lead to task fail-   expected output for the capability output and is
+ure. To address this, CanTest incorporates a failure    substituted into τ. If the modified trajectory τ (Cx,t)
+attribution mechanism that first identifies capabil-    results in R(τ (Cx,t)) = Success, then the error
+ity errors via oracles, then determines which of   (Cx, t) is considered as a failure-inducing error.
+these actually caused the failures (named as failure-  We define a failure-inducing error indicator as a
+inducing errors). Among these, the earliest occur-   capability-time tuple (Cx, t):
+ring error is designated as the failure-source error.
+The capability corresponding to the error is referred         1,   if R(τ (Cx,t)) is Success
+                               
+to as failure-inducing or failure-source capability.      δτ(Cx, t) =     and R(τ) is Failure,
+   Specifically,  for the  capabilities of percep-                                                              0,  otherwise.
+tion, memory, planning, and decision (denoted as                                                                                                (12)
+{Cp, Cm, Cpl, Cd}), each capability error is evalu-                               A failure-inducing error is then a tuple (C′x, t′)
+ated by the oracle introduced in Section 4.2. We use
+                                                with δτ(C′x, t′) = 1, where C′x denotes the failure-
+the tuple (Cx, t) to represent an error, which means                                                inducing capability and  t′ represents the corre-
+that the capability Cx (Cx ∈{Cp, Cm, Cpl, Cd})                                              sponding failure-inducing time step.  Multiple
+of the target agent at time step t produces outputs
+                                                     failure-inducing errors may occur within a single
+that violate the oracles. A trajectory may contain
+                                                          trajectory. To handle this, we attribute the failure
+multiple errors, but not all errors necessarily lead
+                                                        to the earliest failure-inducing error, defined as:
+to an overall failure (Zhang et al., 2025c). We
+aim to identify the truly failure-inducing errors that          C(τ) = {(Cx, t)|δτ(Cx, t) = 1},
+ultimately lead to failure within a long chain of
+                                                (C∗x, t∗) = arg   min     t,         (13)interdependent capabilities.                                                           (C′x,t′)∈C(τ)
+  CanTest attribute failures to specific capability
+errors, leveraging the concept of counterfactual   where C∗x denotes the failure-source capability and
+causal reasoning (Chen et al., 2025a). Specifically,   t∗the corresponding failure-source time step. Ac-
+suppose the trajectory τ is a failure, i.e., R(τ) =    cordingly, the failure of trajectory τ is attributed to
+Failure, as defined in Section 3.2. Consider the    the capability C∗x at time step t∗, and τ is stored in
+following scenario: if the error in capability Cx at    the failure case set.
+
+===== PDF PAGE 15 =====
+ Algorithm 2: The Algorithm for Capability         complete. The scene assets used in our experi-
+  Failure Feedback.                             ments are primarily sourced from HM3D (Yadav
+   Input: The generated test case seed s′ and          et al., 2023), which includes 216 large-scale indoor
+          corresponding task instruction I, the     3D reconstructed scenes along with their seman-
+          oracles {TOx}.                                 tic annotations. We selected three advanced VLN
+  Output: The feedback score Fcs of the case      models as the target models to be tested: ApexNav
+            seed.                              (Zhang et al., 2025b), MGDM (Song et al., 2025),
+ 1 Let target agent execute task according to        and Mem2Ego (Zhang et al., 2025a).
+    instruction I and get trajectory τ;
+ 2 Identify the capability error (Cx, t) using         A.6.2  Baseline
+    the {TOx} introduced in Section 4.2;
+                                          The baseline VLATest defines four operators (Tar- 3  if result of τ R(τ) = Failure then
+                                                    get object, Confounding objects, Lighting, and 4    Replace the (Cx, t) with the {TOx} to
+                                           Camera) and generates test cases in a fuzzing-        calculate indicator;
+                                               based framework by sampling/perturbing these 5     Identify the failure-inducing error
+       (C′x, t′) from (Cx, t) using indicator;          factors.  To adapt VLATest to VLN, we keep
+                                                      the same operator-driven generation paradigm and 6     Identify the failure-source error (C∗x, t∗)
+       from (C′x, t′);                        make task-specific adjustments: (1) Target object
+                                           becomes the VLN’s destination landmark (goal- 7     Store τ to the failure case set;
+                                                         related object/room cue in the instruction); (2) Con- 8     Calculate the failure-oriented and
+                                                 founding objects become distractor landmarks that        capability-oriented feedback;
+                                                     the agent should avoid/keep away from; (3) Light- 9     Calculate the adaptive weight λCx for
+                                                  ing perturbs the perceived view via illumination-        capability-oriented feedback;
+                                                        intensity changes; and (4) Camera perturbs obser-10    return feedback score
+                  f                                    vations via camera-rotation (viewpoint) shifts. The       Fcs = F + λCxF c;
+                                                 remaining components (e.g., object sampling strat-11 end
+                                                       egy, perturbation magnitudes, and the fuzzing loop)12 else
+                                                  follow the original VLATest framework.13    return feedback score Fcs = 0;
+14 end
+                                            A.7  Failure Diversity
+
+                                           To further examine whether the discovered failuresA.5  Details of Prompts
+                                                     are diverse rather than repeated instances of a few
+Figures 6–10 summarize the prompts used in our                                              dominant patterns, we conduct an additional man-
+framework. Specifically, we provide the templates    ual diversity analysis.  Specifically, we design a
+for mild and aggressive mutation to generate can-                                                      finer-grained failure taxonomy that goes beyond
+didate instructions, as well as the prompts for the                                                    the four high-level capability sources used in the
+perception and memory oracles that produce se-                                           main paper. The taxonomy contains eight failure
+mantic observations and route/history information                                                    types spanning perception, memory, planning, and
+used by the planner.                                                  decision-making, as summarized in Table 3.
+                                             Under this taxonomy, we randomly sampleA.6  Experimental Settings
+                                          100 failure cases on ApexNav discovered by our
+A.6.1  Environment                                           method and another 100 cases discovered by the
+We take the VLN agent as the subject of our study,   best baseline, and manually assign each case to
+and conduct experiments in Habitat3 (Gupta et al.,   one taxonomy category. The results show that our
+2017), a platform that provides a 3D scene environ-   method covers all eight categories, whereas the best
+ment for VLN. At each time step, the agent receives    baseline covers only six categories and does not
+RGB observations from three directions: forward,   discover failures of types ME-2 (Temporal/Order
+left, and right. The agent is provided with atomic    Error) and PL-2 (Looping). This suggests that our
+actions, including "Move Forward," "Turn Left,"   method uncovers a broader range of failure modes,
+"Turn Right," and "Stop." When the agent executes    instead of repeatedly generating failures from the
+the "Stop" action, the current task is considered   same pattern.
+
+===== PDF PAGE 16 =====
+System Prompt
+
+You are a strict VLN instruction generator. Your output will be used as an automated test case. The instruction must be executable, minimally ambiguous, and grounded in the given
+room/object annotations. Output EXACTLY one JSON object and nothing else.
+User Prompt
+
+Create one navigation instruction I that uses the given semantic annotations.
+Given:
+- Destination room (a_r): "{a_r}"
+- Target object (a_o): "{a_o}"
+Optional additional candidates:
+- Other plausible objects in the same room: {other_objects_in_room}
+- Other rooms in the scene: {other_rooms}
+Hard constraints (must satisfy all):
+(1) The FINAL destination room must be exactly a_r.
+(2) The FINAL target must be exactly a_o and must be in the destination room.
+(3) 1 or 2 sentences only.
+(4) No privileged info (no coordinates, no map, no "north/east", no dataset names, no "annotation").
+(5) Use plain indoor navigation actions (walk/go/turn/enter/pass/stop/take/place/put).
+(6) Avoid vague goals like "explore" or "look around". The instruction must end with reaching/finding/placing at a_o in a_r.
+(7) If you use a two-step "take ... and place ..." structure, the second step MUST end at a_r and a_o.
+Soft constraints (try to satisfy):
+- Include one landmark object (not equal to a_o) if other_objects_in_room is available.
+- Use deterministic phrasing (avoid "maybe", "try", "somewhere").
+STYLE EXAMPLE (for style/structure only):
+"Take the towel from the bathroom and place on the table in the bedroom."
+Generate ONE instruction following a similar style: clear action verbs, concrete rooms/objects, and a concise two-step structure if appropriate, while strictly satisfying the hard
+constraints above.
+Output JSON schema:
+{
+ "instruction": "...",
+ "goal_room": "…",
+ "goal_object": "…",
+ "landmark_object": "... or null",
+ "num_sentences": 1 or 2
+}
+If you cannot find a landmark, set landmark_object to null.
+Do not output anything outside the JSON.
+
+
+                           Figure 6: The prompt for task instruction generation.
+
+
+
+
+
+System Prompt
+
+You are an instruction mutation engine for Vision-and-Language Navigation (VLN). Your goal is to minimally modify a task instruction while keeping  it executable and
+semantically coherent. You MUST follow the constraints and output EXACTLY the JSON schema requested.
+User Prompt
+
+Perform MILD mutation of a VLN instruction.
+Original instruction: "{instruction}"
+Context:
+- Destination room in the original instruction (if known): "{dest_room}"
+- Candidate objects in the destination room (if available): {objects_in_dest_room}
+- Object(s) mentioned in the original destination: {original_dest_objects}
+MILD mutation definition:
+- Keep the destination ROOM unchanged.
+- Only modify the destination OBJECT(S) within the same room, choosing a different plausible object.
+- Do NOT change the action sequence structure (e.g., "go to", "turn", "walk", "enter", "exit") except for necessary grammatical agreement.
+- Preserve other constraints in the instruction (e.g., "avoid", "after", "before", "then", "until") and preserve the number of steps/clauses as much as possible.
+- The mutated instruction must remain natural, concise, and unambiguous.
+If objects_in_dest_room is provided, choose ONLY from that list and ensure the new object is different from original_dest_objects.
+If it is not provided, choose a common household object that plausibly exists in {dest_room}.
+Output format:
+Return exactly one JSON object with:
+{
+ "mutation_type": "mild",
+ "original_instruction": "...",
+ "mutated_instruction": "...",
+ "changed_spans": [
+  {"from": "...", "to": "...", "reason": "..."}
+ ]
+}
+Do not output any explanations outside the JSON.
+
+
+                                 Figure 7: The prompt for mild mutation.
+
+===== PDF PAGE 17 =====
+System Prompt
+
+You are an instruction mutation engine for Vision-and-Language Navigation (VLN). Your goal is to substantially modify a task instruction to force a different navigation route
+while keeping it executable and semantically coherent. You MUST follow the constraints and output EXACTLY the JSON schema requested.
+User Prompt
+
+Perform AGGRESSIVE mutation of a VLN instruction.
+Original instruction: "{instruction}"
+Context:
+- Original destination room (if known): "{dest_room}"
+- Candidate alternative destination rooms (if available): {candidate_rooms}
+- Allowed room types (if available): {room_types}
+- Known start area / current area (optional): "{start_area}"
+AGGRESSIVE mutation definition:
+- Change the destination ROOM to a different plausible room (not equal to the original destination room).
+- Update the destination OBJECT(S) accordingly so they are plausible in the new room.
+- Keep the instruction's overall intent and structure (number of clauses, ordering words like "then/after/before") as much as possible, but rewrite the minimal necessary parts to
+ensure coherence.
+- Do NOT introduce impossible requirements (e.g., two destinations that conflict).
+- Preserve constraints unrelated to the destination when possible (e.g., "avoid the stairs", "do not enter the bedroom", etc.). If a preserved constraint would contradict the new
+destination, adjust it minimally and explicitly record it in changed_spans.
+If candidate_rooms is provided, choose ONLY from that list and ensure it differs from dest_room.
+If not provided, choose a common household room that is different from dest_room (e.g., kitchen, bathroom, bedroom, living room, hallway, dining room, office).
+Output format:
+Return exactly one JSON object with:
+{
+ "mutation_type": "aggressive",
+ "original_instruction": "...",
+ "mutated_instruction": "...",
+ "changed_spans": [
+  {"from": "...", "to": "...", "reason": "..."}
+  ],
+ "new_destination_room": "...",
+ "new_destination_object": "..."
+}
+Do not output any explanations outside the JSON.
+
+
+                              Figure 8: The prompt for aggressive mutation.
+
+
+
+
+
+System Prompt
+
+You are a strict semantic similarity evaluator for vision-language annotations. Your job is to output a single numeric distance d in [0, 1] measuring how different two annotations
+ are. d = 0 means semantically equivalent; d = 1 means completely unrelated or contradictory. Be consistent and deterministic. Do not output anything except the JSON specified.
+User Prompt
+
+Compute the semantic distance between the agent annotation and the expected annotation.
+Agent annotation (VA): “{VA}”
+Expected annotation (VA_gt): "{VA_gt}"
+Scoring rules (distance d in [0,1]):
+ - d = 0.00: identical meaning or exact synonyms (e.g., "sofa" vs "couch").
+ - d = 0.10: same object/category with minor wording differences (e.g., "dining table" vs "table"; "wooden chair" vs "chair").
+ - d = 0.30: same broad category but notable mismatch in specificity/attributes that could matter (e.g., "desk" vs "table"; "armchair" vs "chair").
+ - d = 0.60: related but different categories or plausible confusion (e.g., "cabinet" vs "refrigerator"; "lamp" vs "ceiling light").
+ - d = 0.90: unrelated categories (e.g., "bed" vs "microwave").
+ - d = 1.00: explicit contradiction (e.g., "door" vs "window" when clearly distinct) or mutually exclusive labels.
+Additional guidance:
+ - Ignore capitalization, punctuation, and plurality.
+ - Treat common hypernym/hyponym relations as close (table vs dining table) but not identical.
+ - If either annotation is empty/unknown ("unknown", "none", ""), set d = 0.80 unless both are unknown/empty, in which case d = 0.00.
+Output format:
+Return exactly one JSON object: {"d": <number>} with <number> rounded to 2 decimal places.
+Do not include explanations.
+Examples:
+1) VA="sofa", VA_gt="couch" -> {"d": 0.00}
+2) VA="table", VA_gt="dining table" -> {"d": 0.10}
+3) VA="bed", VA_gt="microwave" -> {"d": 0.90}
+
+
+                               Figure 9: The prompt for perception oracle.
+
+===== PDF PAGE 18 =====
+ System Prompt
+
+ You are a strict semantic similarity evaluator for embodied-agent memory. Your job is to output a single numeric similarity s in [0, 1] measuring how well the agent's memory
+  description matches the ground-truth historical visual annotations up to time t-1. s = 1 means the memory is fully consistent and accurately reflects the history; s = 0 means it is
+  unrelated or contradictory. Be consistent and deterministic. Do not output anything except the JSON specified.
+ User Prompt
+
+ Compute the semantic similarity between the agent's memory description at time t and the historical visual annotations along the ground-truth route before time t.
+ Agent memory (M_t): "{M_t}"
+  Ground-truth history (VA_gt_{1..t-1}): {VA_gt_list}
+  Notes:
+  - VA_gt_{1..t-1} is a time-ordered sequence. Each element corresponds to a past time step and contains the visual annotations (e.g., detected objects/rooms/attributes).
+  - The memory M_t may be a compressed summary; it does NOT need to mention every item to get a high score.
+  Scoring rules (similarity s in [0,1]):
+  - s = 1.00: Memory is fully consistent with the history; it correctly mentions the key visited rooms/objects/events (allowing synonyms) and contains no hallucinated entities/events
+  that are absent from the history. If the memory includes temporal/order statements, they align with the sequence.
+  - s = 0.80: Mostly consistent; minor omissions of less important details are allowed; at most negligible extra details that do not change the meaning.
+  - s = 0.50: Partially consistent; mentions some correct history but misses many key elements OR includes some hallucinated/incorrect claims that affect correctness.
+  - s = 0.20: Largely inconsistent; only weak overlap with history OR many hallucinations/contradictions.
+  - s = 0.00: Completely unrelated to the history or directly contradicts it.
+  Evaluation guidance:
+  - Treat synonyms/hypernyms as matches when reasonable (e.g., "sofa"~"couch", "dining table"~"table").
+  - Ignore capitalization, punctuation, and plurality.
+  - Focus on factual consistency with VA_gt_{1..t-1}:
+  * Penalize hallucinations (entities/rooms/actions not supported by history) and contradictions.
+  * Do NOT penalize concise summaries that omit minor details.
+  - Time-step consistency: only evaluate ordering if M_t explicitly references order (e.g., "first..., then..."). If M_t has no explicit order cues, do not penalize for missing ordering.
+  Output format:
+  Return exactly one JSON object: {"s": <number>} with <number> rounded to 2 decimal places.
+ Do not include explanations.
+  Examples:
+  1) M_t="I went from the kitchen to the living room and saw a sofa."
+   VA_gt includes kitchen then living room with sofa -> {"s": 0.90}
+  2) M_t="I was in the bedroom and saw a microwave."
+   VA_gt contains only hallway and bathroom with sink -> {"s": 0.00}
+  3) M_t="I passed through a hallway and ended near a table."
+   VA_gt contains hallway and dining table (but many other objects) -> {"s": 0.70}
+
+
+                                 Figure 10: The prompt for memory oracle.
+
+Table 3: Finer-grained failure taxonomy used in the manual diversity analysis. Each failure type is defined by its
+characteristic evidence in the trajectory and its typical consequence.
+
+
+  Capability   Failure Type                Decision Evidence                                         Consequence
+
+  Perception   PE-1 Missed Detection       At step t, the target object or landmark is visible but not perceived.    Misses a critical entrance or landmark.
+  Perception   PE-2 Object Confusion       The target is perceived as a similar but different object or landmark.   Moves toward a similar but incorrect room or landmark.
+  Memory    ME-1 Forgetting              Previously visited paths or landmarks are not retained in memory.     Leads to redundant search or backtracking.
+  Memory    ME-2 Temporal/Order Error   The visitation order of landmarks is confused or misassigned.         Violates ordering constraints such as before, after, or pass-after.
+  Planning     PL-1 Detour                    Fails to choose a shorter route and instead follows a longer one.       Takes a long detour and reaches the step limit.
+  Planning     PL-2 Looping                Repeatedly passes the same landmarks or revisits the same area.       Falls into a loop until the step limit is reached.
+  Planning     PL-3 Constraint Violation      Fails to follow the instruction constraints.                       The route violates constraints such as pass/avoid/order requirements.
+  Decision    DE-1 Inconsistent with Plan   The executed action deviates from the previously planned next step.   Makes an incorrect turn, e.g., at an intersection.
+
+
+A.8  Usefulness of Capability-Oriented                  (b), the instruction requires the agent to walk
+      Failures                                              to another bedroom. However, after the agent
+                                                           traveled from one bedroom to another, it lost  1. Perception-Oriented: as shown in Figure 3
+                                                         the long-term memory of originally coming      (a), the agent is already positioned in front
+                                                from the first bedroom. This deficiency in     of the mirror as required by the instructions.
+                                           memory subsequently cause the agent to leave    However, due to insufficient perception capa-
+                                                         the current bedroom again, leading to task      bilities, it cannot recognize the mirror, thus
+                                                                  failure.     resulting in the agent moving away from the
+     target object and being unable to complete the       Enhancement Suggestion: Consider introduc-
+     task instructions in the subsequent trajectory.        ing a better integration mechanism of short-
+    Enhancement Suggestion: Improve the un-       term and long-term memory, allowing the
+     derstanding of the environment by providing        agent to retain necessary information while
+    more context about the surrounding environ-        switching between different rooms.
+    ment.  For example, by integrating percep-
+                                                            3. Planning-Oriented: as illustrated in Figure 3     tion results from adjacent time steps, the Spa-
+                                                                      (c), the agent has different routes to reach the     tiotemporal continuity of context can be lever-
+                                                            location specified in the task instructions. Due    aged to reduce perception uncertainty.
+                                                           to poor planning, the agent did not choose a
+  2. Memory-Oriented: as presented in Figure 3         better route. The planned route is too long,
+
+===== PDF PAGE 19 =====
+   ultimately causing the time steps to exceed
+   the limit and resulting in failure.
+
+  Enhancement  Suggestion:   Improve  the
+   agent’s path planning algorithms by allow-
+   ing real-time analysis of the environment and
+  dynamic adjustments to choose better routes.
+   Additionally, set reasonable time budgets to
+   ensure the agent considers time constraints
+   during the planning process.
+
+4. Decision-Oriented: as shown in Figure 3 (d),
+   the agent does not follow the planned route for
+   decision-making. Due to its unwarranted au-
+  tonomy in decision-making, it deviates from
+   the planned route, ultimately leading to an im-
+   proper decision that results in the inability to
+   complete the task.
+
+  Enhancement Suggestion: Limit the agent’s
+  autonomy in decision-making, and promptly
+   assess whether adjustments are needed when
+   decisions are inconsistent with the planned
+   route.

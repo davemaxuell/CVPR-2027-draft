@@ -1,0 +1,77 @@
+{
+  "group": "A",
+  "split": "train",
+  "controller": "expert",
+  "beta": 0.0,
+  "episodes_per_dataset": 8,
+  "seed": 2,
+  "workers": 2,
+  "perturb_steps": 8,
+  "recovery_rule": {
+    "name": "goal_first_stop_2m_ordered_waypoints_v2",
+    "route": "actual positions from validated group-A expert replay, followed by episode.goals[0].position",
+    "progress": "advance only consecutive reached waypoints; never regress or jump to a later nearest point",
+    "waypoint_radius_m": 0.5,
+    "goal_radius_m": 2.0,
+    "max_navmesh_snap_m": 0.5,
+    "max_goal_snap_m": 1.0,
+    "follower": "Habitat ShortestPathFollower; reset each query because expert actions may not be executed",
+    "errors": "invalid label, excluded from SFT; never convert follower failure to STOP",
+    "privileged_inputs": "reference route, goal, simulator pose and navigation mesh; labels only",
+    "movement_final_follower_radius_m": 1.0,
+    "stop_priority": "STOP before consulting route progress whenever geodesic task-goal distance <2m"
+  },
+  "selection": "seeded scene-balanced selection from the validated Step 2 group-A expert pool; policy failures retained",
+  "jpeg_quality": 95,
+  "expert_pool_sha256": {
+    "r2r": "2a7146137170c420769c0f0b8963ae49a1b49a576a2b75b2818158062706056a",
+    "rxr": "dc721349fed4a4cf5646fa9a57452d2b54c9ca74cc7266dfd73a4b317f0f02bc"
+  },
+  "frames": "T actions and T+1 actual RGB frames; prefix uses executed actions",
+  "simulator": {
+    "habitat_sim": "0.2.4 headless withbullet",
+    "habitat_lab": "v0.2.4",
+    "env": "conda `rolevln` (env/setup_env.sh)",
+    "rgb": {
+      "width": 640,
+      "height": 480,
+      "hfov": 79
+    },
+    "depth": {
+      "width": 640,
+      "height": 480,
+      "hfov": 79,
+      "min": 0.0,
+      "max": 10.0
+    },
+    "rgb_sensor_position_m": [
+      0.0,
+      1.25,
+      0.0
+    ],
+    "forward_step_m": 0.25,
+    "turn_angle_deg": 15,
+    "allow_sliding": true,
+    "success_distance_m": 3.0,
+    "max_episode_steps": {
+      "r2r": 500,
+      "rxr": 700
+    },
+    "gt_replay_check": "logs/check_ce_replay_r2r.json",
+    "rxr_expert_turn_angle_deg": 30,
+    "rxr_turn_handling": "unified_15",
+    "render_gpu": 0
+  },
+  "source_sha256": {
+    "tools/collect_dagger_stop.py": "3d26b056e1c05ad6e0a40ec64fe14eb4c027a75c18c1a39fd8f31e4e661883ec",
+    "sim/recovery_stop_v2.py": "e12286de7a1ed524dd57e54f01b7e4da51a972a12762c8c64355b0fbb3939229",
+    "sim/recovery.py": "ea08d01000a1594f29c1e551dcbea4ab361bd1e9815afe73ff2a2fb5dadbc05a",
+    "sim/config.py": "c345359be6f06d8cbfcd993673c29a9f24df5669b50ade09f15de6a722ca3787",
+    "sim/episodes.py": "a80e05d3c3cf740095a5afaf115a8f8d87ec310a7ec3355118b1783e4ea27ef1",
+    "sim/rxr_dataset.py": "2b5fe06551eeed52b6dbdb3030c9e9c1cfbb884efe99d5a0c530592fd2187bcd",
+    "policy/smolvlm2.py": "2dc097c0f3bd09eacd94cb5a438e15635a62b1a9215a0c66f7c2655b437c1a96",
+    "policy/common.py": "fa30de03d782dae761b2444a2d1dcdb853dd756d25cd76cee84ce6b69c5b474e",
+    "policy/online.py": "763dd6e8873953cc82e427d196fba32aa2ba1d9bc0a5d64ade187d33d7481ac2",
+    "manifest/scene_partition.json": "8ee6a37535c92f953fe509f9cfa38e1ce2ac069656d4b443fbdfd4b13f54d2d7"
+  }
+}
