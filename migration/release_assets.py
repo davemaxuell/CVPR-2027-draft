@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tier-2 files (our checkpoints that are not in git, and the explorer run logs) as GitHub release assets.
+"""Tier-2 files (our checkpoints that are not in git, and two explorer step logs over 100 MB) as GitHub release assets.
 
     # old server: upload everything in migration/release_assets.json (token needs Contents: read and write)
     python3 -I migration/release_assets.py upload
@@ -13,7 +13,7 @@
 The token comes from GITHUB_TOKEN or GH_TOKEN, else a hidden prompt; it is never written anywhere. Downloads
 from a public repo work without one (empty prompt), using the public release download links.
 Uploads skip assets already on the release with the right size. Downloads skip files whose sha256 already
-matches, put checkpoints at their original paths and unpack the archives where they came from.
+matches and put every file at its original path (archive parts, if any, are unpacked where they came from).
 Standard library only.
 """
 import argparse
@@ -168,7 +168,7 @@ def load_manifest(args):
 
 
 def local_target(a):
-    return ROOT / a['path'] if a['kind'] == 'checkpoint' else DOWNLOADS / a['name']
+    return ROOT / a['path'] if a.get('path') else DOWNLOADS / a['name']     # checkpoints and files: own path
 
 
 def upload_source(a, assets_dir):
@@ -330,7 +330,7 @@ def cmd_verify(args):
     _, assets = load_manifest(args)
     missing = bad = 0
     for a in assets:
-        if a['kind'] != 'checkpoint':
+        if not a.get('path'):
             continue
         t = local_target(a)
         if not t.is_file():
@@ -339,15 +339,15 @@ def cmd_verify(args):
         elif sha256(t) != a['sha256']:
             bad += 1
             print('MISMATCH', a['path'])
-    n = sum(a['kind'] == 'checkpoint' for a in assets)
-    print(f'{n - missing - bad}/{n} checkpoints OK, {missing} missing, {bad} mismatched')
+    n = sum(bool(a.get('path')) for a in assets)
+    print(f'{n - missing - bad}/{n} files OK, {missing} missing, {bad} mismatched')
     return 1 if missing or bad else 0
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('command', choices=['upload', 'download', 'verify'])
-    ap.add_argument('--kind', choices=['checkpoint', 'archive-part'])
+    ap.add_argument('--kind', choices=['checkpoint', 'file', 'archive-part'])
     ap.add_argument('--match', help='only assets whose name matches this glob')
     ap.add_argument('--assets-dir', type=Path, default=ASSETS_DIR, help='upload: staged files (export_repo.py)')
     ap.add_argument('--from-dir', help='download: copy from a local folder of assets instead of GitHub')

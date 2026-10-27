@@ -4,7 +4,8 @@ Snapshot of 2026-10-27, written for picking the work up on the new machine. The 
 `[OURS]/baseline-v0/README.md`, the `docs/Step*_Run.md` files and each run's `RESULTS.md` /
 `final_verification.json`. This page says what was done, what is still running, and where every artifact
 is after the move: **git** (in this repo), **release** (GitHub release `assets-v1`, fetched with
-`migration/release_assets.py`), or **regenerate** / **carry** (copy by disk).
+`migration/release_assets.py`), **carry** (a server item in RETRIEVE_FROM_SERVER.md: `pull_from_server.py`),
+or **regenerate**. Every release file is also available as the server item `our_checkpoints`.
 
 ## The pipeline in one paragraph
 
@@ -35,8 +36,8 @@ Scenes are split A (fit the policy) / B (fit the scorer) / C (development) / E (
 | Four-model repeat | NWM pair + one shared scorer over 4 world models, then the 7-system E repeat | Queued (`tools/auto_four_*.py`, `auto_nwm_repeat.py`), each waiting on the previous stage | `runs/automatic_*/status.json` |
 
 The `carry` folders are not checkpoints. Regenerating them means rerunning policy rollouts on the
-simulator, so copy them by disk if you want to continue from exactly this state (~62 G in total, see
-MIGRATION.md §2.3).
+simulator, so pull them if you want to continue from exactly this state: ~64 G, the `recommended` server
+items `processed_*` (RETRIEVE_FROM_SERVER.md).
 
 ## What was running when this snapshot was taken
 

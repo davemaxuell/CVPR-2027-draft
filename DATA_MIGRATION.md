@@ -5,7 +5,12 @@ Checked on 2026-10-27 against the code that reads data: the navigation explorer
 other models (ScaleVLN/DUET, ETPNav, and the VLN-CE candidates in `[prior works]/CANDIDATE_MODELS.md`).
 All paths are relative to the `RoleVLN/` folder. Sizes are from `du` (binary units: G = GiB).
 
-None of the datasets go into git. Every file in sections 1–5 is either a dataset under its own license
+**Fastest route while the old server is up:** copy all of this from it with `migration/pull_from_server.py`
+([RETRIEVE_FROM_SERVER.md](RETRIEVE_FROM_SERVER.md)); its item list mirrors this document. The public sources
+below are for when the server is gone.
+
+None of the datasets go into git, apart from a few small public annotation files the explorer reads
+(R2R/FGR2R/REVERIE enc annotations, RxR val guide files, connectivity graphs). Every file in sections 1–5 is either a dataset under its own license
 (Matterport3D Terms of Use, RxR license, ...) or larger than GitHub's 100 MB file limit. Our own checkpoints and
 run logs are a separate matter: they are in git or in the GitHub release (section 6, [MIGRATION.md](MIGRATION.md)).
 
@@ -111,11 +116,11 @@ These are our own results. [MIGRATION.md](MIGRATION.md) §1 shows how each one m
 | Path | Size | How it moves |
 |---|---:|---|
 | `[OURS]/baseline-v0/runs/` | 13 G | Records, results and the 15 selected/frozen checkpoints are in **git**. The other 89 checkpoints and optimizer states are **release assets** (`migration/release_assets.py download`). 2 G of `*.jpg` frame dumps are left out. |
-| `[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/exprs_map/` (eval preds, step logs, what-if results) | 891 M | **release** archive `scalevln_exprs_map.tar.gz`, unpacked in place by `release_assets.py download` |
-| `[prior works]/ETPNav/data/logs/explorer/` (episode logs + cube-face renders) | 3.8 G | **release** archive `etpnav_explorer_logs.tar` (3 parts) |
-| `[prior works]/ScaleVLN/analysis/vln_viz/cache/` | 3.7 G | `rxr_subtasks/`, `view_index.json`, `navmaps/` in **git**; meshes rebuild with `build_meshes.py --detail` (needs the house `.ply`), row caches rebuild on start |
+| `[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/exprs_map/` (eval preds, step logs, what-if results) | 891 M | **git**, except the two `steps_train.jsonl` over 100 MB (**release** + server item `explorer_train_steplogs`) |
+| `[prior works]/ETPNav/data/logs/explorer/` (episode logs + cube-face renders) | 3.8 G | episode logs in **git**; the 138k cube-face renders are Matterport-derived: server item `etpnav_explorer_views` |
+| `[prior works]/ScaleVLN/analysis/vln_viz/cache/` | 3.7 G | `rxr_subtasks/`, `view_index.json`, `navmaps/` in **git**; meshes are Matterport-derived: server item `explorer_meshes`, or rebuild with `build_meshes.py --detail`; row caches rebuild on start |
 | `data/processed/baseline_v0/expert_groupA/`, `wm_dino_features_refined512_v1/` | 319 G | **regenerate** (`tools/render_expert.py`, about 20 min on the H100; then the DINO feature pass) |
-| `data/processed/baseline_v0/{dagger_*,scorer_labels_*,scorer_features_*,wm_visits_*,wm_groupA_*,expert_groupC_600}` | 62 G | **carry by disk** if you want to continue without re-running rollouts (MIGRATION.md §2.3) |
+| `data/processed/baseline_v0/{dagger_*,scorer_labels_*,scorer_features_*,wm_visits_*,wm_groupA_*,expert_groupC_600}` | 64 G | **server items** `processed_*` if you want to continue without re-running rollouts |
 
 ## 7. Things that differ on the new machine
 

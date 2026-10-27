@@ -9,6 +9,7 @@ Working repository (public). Datasets are not included.
 | Document | What it covers |
 |---|---|
 | [MIGRATION.md](MIGRATION.md) | What is in git / in the release / not included; final sync on the old server; full setup on a new machine |
+| [RETRIEVE_FROM_SERVER.md](RETRIEVE_FROM_SERVER.md) | For the agent on the new machine: pull everything not on GitHub from the old server (`migration/pull_from_server.py`) |
 | [TRAINING_STATE.md](TRAINING_STATE.md) | What has been trained, results, what was running at the snapshot, diagnoses and next steps, 16 GB VRAM notes |
 | [DATA_MIGRATION.md](DATA_MIGRATION.md) | Every dataset and public weight file: needed or not, size, where to download it |
 | [`[OURS]/baseline-v0/README.md`](%5BOURS%5D/baseline-v0/README.md) | The vanilla baseline in detail (layout, environment, every step's run record) |
@@ -25,9 +26,10 @@ Working repository (public). Datasets are not included.
   CANDIDATE_MODELS.md         VLN-CE models to add next
 data/                         dataset docs, download/verification tools, split lists (the data itself is not in git)
 drafts/                       research investigation and review drafts (2026-10-22, 2026-10-23)
-migration/                    export_repo.py, release_assets.py, relocate_paths.py, manifests
+migration/                    export_repo.py, release_assets.py, pull_from_server.py, relocate_paths.py, manifests
 ```
 
 Our checkpoints: the selected and frozen ones are committed under `[OURS]/baseline-v0/runs/`. All the
-others, and the explorer's run logs, are in the GitHub release `assets-v1`:
-`python3 -I migration/release_assets.py download`.
+others are in the GitHub release `assets-v1` (`python3 -I migration/release_assets.py download`) and on the old
+server (`migration/pull_from_server.py`). The explorer's run logs are in git; its Matterport-derived images
+and meshes are server items.

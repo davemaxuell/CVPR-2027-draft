@@ -1,31 +1,38 @@
 # Migration guide: RoleVLN → new machine
 
 This repo (`github.com/davemaxuell/CVPR-2027-draft`, public) is a snapshot of the `RoleVLN/` folder on the
-old H100 server, taken 2026-10-27. Three documents cover the move:
+old H100 server, taken 2026-10-27. Four documents cover the move:
 
 - **this file**: what is where, the final sync on the old server, and the setup on the new machine, step by step
+- [RETRIEVE_FROM_SERVER.md](RETRIEVE_FROM_SERVER.md): for the agent on the new machine. It copies everything that
+  is not on GitHub straight from the old server (`migration/pull_from_server.py`)
 - [TRAINING_STATE.md](TRAINING_STATE.md): what we trained, results, what was running, what to do next
-- [DATA_MIGRATION.md](DATA_MIGRATION.md): every dataset and public weight file: needed or not, size, source
+- [DATA_MIGRATION.md](DATA_MIGRATION.md): every dataset and public weight file: needed or not, size, public source
 
 ## 1. What is where
 
 | Tier | Contents | Size | How you get it |
 |---|---|---:|---|
-| **git** | All code (ours + the patched ScaleVLN/DUET, ETPNav, MatterSim and habitat-lab v0.1.7 sources), docs, drafts, run records and results, logs, the explorer (`[prior works]/ScaleVLN/analysis/vln_viz`) with its small caches, and the **selected/frozen checkpoints** (15 files, every one < 100 MB) | ~2.5 G | `git clone` |
-| **release** `assets-v1` | Every other checkpoint of ours (89 files: intermediate checkpoints, optimizer/trainer states, NWM EMA weights) and the explorer run logs (ScaleVLN eval/step logs, ETPNav R2R-CE/RxR-CE logs + renders) as split archives | ~12 G | `python3 -I migration/release_assets.py download` |
-| **datasets / public weights** | Matterport3D scenes, VLN-CE episodes, DUET features, released DUET/ETPNav/HF checkpoints | ~100 G | download from the sources in DATA_MIGRATION.md |
-| **regenerate** | Expert renders, DINO features, explorer 3D mesh cache | ~320 G | scripts, §3.6 |
-| **carry (optional)** | Processed data that needs simulator rollouts to rebuild (DAgger data, WM visits, scorer labels/features) | ~62 G | disk / rsync, §2.3 |
+| **git** | All code (ours + the patched ScaleVLN/DUET, ETPNav, MatterSim and habitat-lab v0.1.7 sources), docs, drafts, run records and results, logs; the **navigation explorer** (`[prior works]/ScaleVLN/analysis/vln_viz`) with its small caches, all its run logs (DUET/ScaleVLN eval predictions, step logs, what-if results; ETPNav R2R-CE/RxR-CE episode logs) and the small public annotations it reads (R2R/FGR2R/REVERIE/RxR val, connectivity); the **selected/frozen checkpoints** (15 files, every one < 100 MB) | ~3.5 G | `git clone` |
+| **release** `assets-v1` | Every other checkpoint of ours (89 files: intermediate checkpoints, optimizer/trainer states, NWM EMA weights) and the two DUET train-split step logs over 100 MB | ~8 G | `python3 -I migration/release_assets.py download` (after the upload in §2.2) |
+| **old server** | Everything else: datasets, Matterport-derived files (scenes, skyboxes, house meshes, ETPNav cube-face renders, explorer mesh caches), public weights and model caches, processed training data. 74 GiB required + 64 GiB recommended | — | `python3 -I migration/pull_from_server.py pull --host …` ([RETRIEVE_FROM_SERVER.md](RETRIEVE_FROM_SERVER.md)) |
+| **regenerate** | Expert renders, DINO features (or pull them: 318 G) | ~320 G | scripts, §3.6 |
 
-`migration/release_assets.json` lists every release asset with its original path and sha256.
+`migration/release_assets.json` lists every release asset with its original path and sha256;
+`migration/server_manifest.json` lists every server item with its path, rsync filters and size;
 `migration/export_report.json` records what the export left out and why. The two folders that matter in git:
 `[OURS]/baseline-v0` (our pipeline) and `[prior works]` (baselines + explorer). Directory names contain
 spaces and brackets, so quote them in the shell.
 
-Not in git on purpose: datasets (licenses: Matterport3D Terms of Use, RxR), files over GitHub's 100 MB limit,
-22k simulator frame dumps (`runs/**/*.jpg`, 2 G of debug images), the upstream DINO-WM checkpoints
-(re-download), `.git` folders of the upstream clones, a virtualenv, and an upstream file with an API key in it
-(`drafts/.../CAST/.../gamma_api.txt`).
+Not in git on purpose:
+- Datasets and anything derived from Matterport3D imagery or geometry (its Terms of Use forbid redistribution,
+  and the repo is public). That includes ETPNav's cube-face renders and the explorer's mesh caches.
+- Files over GitHub's 100 MB limit.
+- 22k simulator frame dumps (`runs/**/*.jpg`).
+- The upstream DINO-WM checkpoints, the `.git` folders of the upstream clones and a virtualenv.
+- An upstream file with an API key in it (`drafts/.../CAST/.../gamma_api.txt`).
+
+All of these are server items (or regenerable).
 
 ## 2. On the old server: the final sync
 
@@ -36,7 +43,8 @@ TRAINING_STATE.md). When it has finished, or right before you stop using the ser
 
 ```bash
 cd /data/team_a/dave-workspace/RoleVLN
-python3 -I migration/export_repo.py --build-archives --stage   # mirror into ../CVPR-2027-draft, repack logs, git add
+python3 -I migration/export_repo.py --stage                    # mirror into ../CVPR-2027-draft and git add
+python3 -I migration/pull_from_server.py manifest              # refresh the server item sizes
 cd ../CVPR-2027-draft
 git commit -m "Sync from server $(date +%F)" && git push
 ```
@@ -44,7 +52,8 @@ git commit -m "Sync from server $(date +%F)" && git push
 `export_repo.py` never touches `RoleVLN/`. It copies changed files into the separate working copy
 `../CVPR-2027-draft` and deletes files that are gone from the source. Edit `TIER1` at the top of the script to
 change which checkpoints are committed. Anything else under `runs/` that ends in `.pt/.pth/.safetensors`
-becomes a release asset automatically.
+becomes a release asset automatically. New explorer runs under `exprs_map/` and ETPNav episode logs are picked up
+too (step logs over 95 MiB go to the release).
 
 ### 2.2 Upload the release assets
 
@@ -56,22 +65,23 @@ own terminal on the server, so the token stays out of shell history and logs:
 ```bash
 cd /data/team_a/dave-workspace/CVPR-2027-draft
 read -rs GITHUB_TOKEN && export GITHUB_TOKEN        # paste the token, press Enter
-python3 -I migration/release_assets.py upload       # ~12 GiB; resumable, re-run after any failure
+python3 -I migration/release_assets.py upload       # ~8 GiB; resumable, re-run after any failure
 unset GITHUB_TOKEN
 ```
 
-Uploads read the staged files in `../CVPR-2027-draft-assets/`. Checkpoints there are hardlinks, so they take no
-extra space; the explorer archives are real files (4 GiB). Assets already on the release with the right size
-are skipped, so re-running after a re-export uploads only what changed. At this server's ~6 MB/s, a first
-upload takes about 35 minutes. Delete the token afterwards.
+Uploads read the staged files in `../CVPR-2027-draft-assets/`. They are hardlinks, so they take no extra space.
+Assets already on the release with the right size are skipped, so re-running after a re-export uploads only
+what changed. At this server's ~6 MB/s, a first upload takes about 25 minutes. Delete the token afterwards.
+The release is a second copy that survives the server: everything in it can also be pulled from the server
+(item `our_checkpoints`).
 
 Fallback if you prefer the GitHub CLI: `gh release create assets-v1 ../CVPR-2027-draft-assets/*`
 (asset names = file names; `release_assets.py download` works with either).
 
-### 2.3 Data to carry by disk (optional)
+### 2.3 Processed data (pulled from the server)
 
-To continue from exactly the current state instead of re-running rollouts, copy these from
-`data/processed/baseline_v0/` with rsync or a disk (they are not datasets and not in the release):
+To continue from exactly the current state instead of re-running rollouts, pull the `recommended` server items
+(RETRIEVE_FROM_SERVER.md), or copy these from `data/processed/baseline_v0/` by disk:
 
 | Folder | Size | Rebuild cost if you don't carry it |
 |---|---:|---|
@@ -83,9 +93,11 @@ To continue from exactly the current state instead of re-running rollouts, copy 
 | `expert_groupA`, `wm_dino_features_refined512_v1` | 319 G | don't carry: re-render (20 min on the H100) and recompute |
 
 ```bash
-rsync -a --info=progress2 /data/team_a/dave-workspace/RoleVLN/data/processed/baseline_v0/scorer_labels_smolvlm2_refined512_v1 \
-      newhost:/path/to/RoleVLN/data/processed/baseline_v0/
+python3 -I migration/pull_from_server.py pull --host USER@OLD_SERVER --item processed_scorer_labels processed_dagger
 ```
+
+**The server must stay reachable until the pull is complete:** `pull_from_server.py check` reports `complete`
+for every item you need.
 
 ## 3. On the new machine
 
@@ -115,9 +127,23 @@ python3 -I migration/relocate_paths.py --conda-base ~/miniforge3 --hf-home ~/hf_
 It replaces `/data/team_a/dave-workspace/RoleVLN` → the clone, `/data/shared/hf_cache` → `--hf-home`, and
 `/home/bufsgpu/yes` (the old conda base) → `--conda-base`. Run records under `runs/` keep the old paths as history.
 
-### 3.2 Our checkpoints and the explorer logs
+### 3.2 Everything not on GitHub: pull it from the old server
 
-No token is needed while the repo is public (press Enter at the token prompt):
+While the old server is reachable, this is the simplest route for everything: datasets, Matterport files,
+model caches, our checkpoints and processed data. Follow [RETRIEVE_FROM_SERVER.md](RETRIEVE_FROM_SERVER.md):
+
+```bash
+python3 -I migration/pull_from_server.py pull --host USER@OLD_SERVER                          # required, ~74 GiB
+python3 -I migration/pull_from_server.py pull --host USER@OLD_SERVER --priority recommended   # + ~64 GiB
+python3 -I migration/pull_from_server.py check --host USER@OLD_SERVER --priority recommended
+```
+
+With that done, skip §3.3 (except gated-model access, if you will re-download anything) and go to §3.4.
+
+### 3.2b Our checkpoints from the GitHub release (alternative)
+
+After the upload in §2.2, the release keeps a copy that survives the server. No token is needed while the
+repo is public (press Enter at the token prompt):
 
 ```bash
 python3 -I migration/release_assets.py download          # everything; or --kind checkpoint, or --match 'step5_*'
@@ -127,11 +153,11 @@ python3 -I migration/release_assets.py verify            # sha256 of every check
 If you make the repo private later, downloads need a fine-grained token with *Contents: Read-only*
 (`read -rs GITHUB_TOKEN && export GITHUB_TOKEN` first).
 
-Checkpoints land at their original paths under `[OURS]/baseline-v0/runs/`. The archives unpack into
-`[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/exprs_map/` and `[prior works]/ETPNav/data/logs/explorer/`.
+Checkpoints land at their original paths under `[OURS]/baseline-v0/runs/`, and the two big step logs under
+`[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/exprs_map/steplogs/`.
 If you moved `CVPR-2027-draft-assets/` by disk instead: `release_assets.py download --from-dir /path/to/it`.
 
-### 3.3 Datasets and public weights
+### 3.3 Datasets and public weights from their public sources (if the server is gone)
 
 Follow [DATA_MIGRATION.md](DATA_MIGRATION.md) §1–4 and its checklist. In short:
 
@@ -185,7 +211,7 @@ TRAINING_STATE.md.
 ```bash
 # expert renders for policy training (group A; ~200 G, 20 min on an H100 with 24 workers)
 cd "[OURS]/baseline-v0" && python tools/render_expert.py --out ../../data/processed/baseline_v0/expert_groupA --workers 8 --chunk 150
-# explorer 3D meshes (needs data/mattersim/.../house_segmentations; ~3.6 G; the server also builds a missing one on demand)
+# explorer 3D meshes, unless you pulled the server item explorer_meshes (needs the house .ply: item mattersim_house_ply)
 cd "[prior works]/ScaleVLN" && python3 analysis/vln_viz/build_meshes.py --detail      # whole buildings + per-floor detail
 ```
 
@@ -214,6 +240,7 @@ The Scorer checks overwrite their `*_results.json`; `git diff` shows whether any
   changed on the server after the export gets new sha256 values on the next export + upload.
 - **Dangling symlinks right after cloning** (`data/tours.json`, `data/datasets/*/scene_datasets`,
   `[prior works]/ETPNav/data/scene_datasets`, …) are expected. They point into datasets you haven't downloaded yet.
-- **The explorer lists no CE runs**: the ETPNav archive hasn't been unpacked (§3.2), or `--no-ce` was passed.
+- **The explorer lists CE runs but shows no panoramas**: pull the server item `etpnav_explorer_views`.
+  `--no-ce` hides CE runs entirely.
 - **Old automatic jobs don't resume**: their `job.json` files hold absolute paths and in-progress state.
   Restart the stage from its `tools/run_step*.py` / `tools/auto_*.py` entry point (TRAINING_STATE.md).

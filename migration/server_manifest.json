@@ -1,0 +1,664 @@
+{
+ "updated_utc": "2026-10-27T05:23:14.110842+00:00",
+ "server_root": "/data/team_a/dave-workspace/RoleVLN",
+ "note": "Everything not on GitHub, as rsync items. migration/pull_from_server.py pull --host USER@OLD_SERVER",
+ "items": [
+  {
+   "id": "scenes_mp3d",
+   "priority": "required",
+   "src": "data/scene_datasets/mp3d",
+   "dest": "data/scene_datasets/mp3d",
+   "filters": [
+    "- *_semantic.ply"
+   ],
+   "use": "Habitat scenes for everything CE: baseline-v0, ETPNav, all CE datasets, build_navmaps.py",
+   "note": "_semantic.ply (15 G) left out: nothing reads it",
+   "alt": "Matterport3D download_mp.py --task habitat",
+   "bytes": 7099083493,
+   "files": 270
+  },
+  {
+   "id": "mattersim_skyboxes",
+   "priority": "required",
+   "src": "data/mattersim/v1/scans",
+   "dest": "data/mattersim/v1/scans",
+   "filters": [
+    "+ /*/",
+    "+ /*/matterport_skybox_images/***",
+    "- *"
+   ],
+   "use": "explorer panoramas / front view / \"Photo at agent\"",
+   "note": "",
+   "alt": "download_mp.py --type matterport_skybox_images",
+   "bytes": 18550898883,
+   "files": 65473
+  },
+  {
+   "id": "mattersim_house_meta",
+   "priority": "required",
+   "src": "data/mattersim/v1/scans",
+   "dest": "data/mattersim/v1/scans",
+   "filters": [
+    "+ /*/",
+    "+ /*/house_segmentations/",
+    "- /*/house_segmentations/*.ply",
+    "+ /*/house_segmentations/*",
+    "- *"
+   ],
+   "use": "explorer floors and room names (.house, panorama_to_region)",
+   "note": "the .ply meshes are the separate optional item mattersim_house_ply",
+   "alt": "download_mp.py --type house_segmentations",
+   "bytes": 6070070566,
+   "files": 360
+  },
+  {
+   "id": "r2r_ce",
+   "priority": "required",
+   "src": "data/datasets/R2R_VLNCE_v1-3_preprocessed",
+   "dest": "data/datasets/R2R_VLNCE_v1-3_preprocessed",
+   "filters": [],
+   "use": "baseline-v0 R2R-CE episodes + experts",
+   "note": "",
+   "alt": "VLN-CE README (Google Drive)",
+   "bytes": 262152738,
+   "files": 12
+  },
+  {
+   "id": "r2r_ce_minimal",
+   "priority": "required",
+   "src": "data/datasets/R2R_VLNCE_v1-3",
+   "dest": "data/datasets/R2R_VLNCE_v1-3",
+   "filters": [],
+   "use": "R2R-CE minimal release (IR2R-CE links)",
+   "note": "",
+   "alt": "VLN-CE README",
+   "bytes": 2607089,
+   "files": 4
+  },
+  {
+   "id": "rxr_ce",
+   "priority": "required",
+   "src": "data/datasets/RxR_VLNCE_v0",
+   "dest": "data/datasets/RxR_VLNCE_v0",
+   "filters": [],
+   "use": "baseline-v0 RxR-CE episodes; ETPNav nDTW ground truth",
+   "note": "its text_features link points at the skipped 159 G RxR text features (item rxr_text_features)",
+   "alt": "VLN-CE README",
+   "bytes": 363605000,
+   "files": 13
+  },
+  {
+   "id": "ir2r_ce",
+   "priority": "required",
+   "src": "data/datasets/IR2R-CE",
+   "dest": "data/datasets/IR2R-CE",
+   "filters": [
+    "- /known_maps.zip"
+   ],
+   "use": "CE dataset (planned iterative-CE experiments)",
+   "note": "",
+   "alt": "github.com/jacobkrantz/IVLN-CE",
+   "bytes": 219898466,
+   "files": 149
+  },
+  {
+   "id": "reverie_ce",
+   "priority": "required",
+   "src": "data/datasets/REVERIE-CE",
+   "dest": "data/datasets/REVERIE-CE",
+   "filters": [],
+   "use": "CE dataset (planned)",
+   "note": "",
+   "alt": "HF MrZihanWang/Dynam3D",
+   "bytes": 22626417,
+   "files": 138
+  },
+  {
+   "id": "navrag_ce",
+   "priority": "required",
+   "src": "data/datasets/NavRAG-CE",
+   "dest": "data/datasets/NavRAG-CE",
+   "filters": [],
+   "use": "CE dataset (planned; training also needs HM3D, never had)",
+   "note": "",
+   "alt": "HF MrZihanWang/Dynam3D",
+   "bytes": 673760470,
+   "files": 1242
+  },
+  {
+   "id": "ha_vln",
+   "priority": "required",
+   "src": "data/datasets/HA-VLN",
+   "dest": "data/datasets/HA-VLN",
+   "filters": [
+    "- /original/huggingface/HAPS2_0/HAPS2_0.zip"
+   ],
+   "use": "CE dataset HA-VLN 2.0 (episodes, HAPS 2.0 humans, CMA ckpt)",
+   "note": "the 7.8 G zip is left out; HAPS2_0/ is extracted",
+   "alt": "HF fly1113/HA-VLN",
+   "bytes": 14703490818,
+   "files": 116694
+  },
+  {
+   "id": "etpnav_data",
+   "priority": "required",
+   "src": "[prior works]/ETPNav/data",
+   "dest": "[prior works]/ETPNav/data",
+   "filters": [
+    "- /scene_datasets",
+    "- /datasets/RxR_VLNCE_v0",
+    "- /logs/explorer/",
+    "- /logs/checkpoints/explorer_*/",
+    "- /logs/tensorboard_dirs/"
+   ],
+   "use": "ETPNav eval: CE episodes, released checkpoints, waypoint predictors",
+   "note": "the two dataset symlinks are already in git (relative)",
+   "alt": "modelscope download --model admagic/ETPNav",
+   "bytes": 6671492348,
+   "files": 35
+  },
+  {
+   "id": "etpnav_explorer_views",
+   "priority": "required",
+   "src": "[prior works]/ETPNav/data/logs/explorer",
+   "dest": "[prior works]/ETPNav/data/logs/explorer",
+   "filters": [],
+   "use": "explorer CE runs: habitat cube faces at every map node (episode logs are already in git)",
+   "note": "Matterport-derived renders, so not in the public repo",
+   "alt": "rerun tools/log_etpnav_steps.py (~45 min/split)",
+   "bytes": 4029927298,
+   "files": 138192
+  },
+  {
+   "id": "duet_eval",
+   "priority": "required",
+   "src": "[prior works]/ScaleVLN/VLN-DUET/datasets/R2R",
+   "dest": "[prior works]/ScaleVLN/VLN-DUET/datasets/R2R",
+   "filters": [
+    "+ /features/",
+    "+ /features/clip_vit-b16_mp3d_original.hdf5",
+    "+ /features/clip_vit-h14_mp3d_original.hdf5",
+    "+ /trained_models/",
+    "+ /trained_models/finetune/***",
+    "- *"
+   ],
+   "use": "DUET/ScaleVLN eval, explorer what-if and log_duet_steps.py",
+   "note": "",
+   "alt": "HF OpenGVLab/ScaleVLN",
+   "bytes": 6025224872,
+   "files": 4
+  },
+  {
+   "id": "explorer_train_steplogs",
+   "priority": "required",
+   "src": "[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/exprs_map",
+   "dest": "[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/exprs_map",
+   "filters": [
+    "+ /steplogs/",
+    "+ /steplogs/*/",
+    "+ /steplogs/*/steps_train.jsonl",
+    "- *"
+   ],
+   "use": "explorer: DUET train-split step logs (the two files over GitHub's 100 MB limit)",
+   "note": "also a release asset",
+   "alt": "",
+   "bytes": 242784950,
+   "files": 2
+  },
+  {
+   "id": "our_checkpoints",
+   "priority": "required",
+   "src": "[OURS]/baseline-v0/runs",
+   "dest": "[OURS]/baseline-v0/runs",
+   "filters": [
+    "+ */",
+    "+ *.pt",
+    "+ *.pth",
+    "+ *.safetensors",
+    "+ *.ckpt",
+    "+ *.pth.tar",
+    "- *"
+   ],
+   "use": "all our checkpoints + optimizer states (15 are also in git; 89 also on the release)",
+   "note": "includes the 3 upstream DINO-WM checkpoints under step5/assets",
+   "alt": "",
+   "bytes": 10190434757,
+   "files": 107
+  },
+  {
+   "id": "hf_smolvlm2",
+   "priority": "required",
+   "src": "/data/shared/hf_cache/hub/models--HuggingFaceTB--SmolVLM2-500M-Video-Instruct",
+   "dest": "{HF_HOME}/hub/models--HuggingFaceTB--SmolVLM2-500M-Video-Instruct",
+   "filters": [],
+   "use": "policy backbone (revision 7b375e1b)",
+   "note": "",
+   "alt": "env/download_models.py",
+   "bytes": 2034855117,
+   "files": 14
+  },
+  {
+   "id": "hf_dinov2_small",
+   "priority": "required",
+   "src": "/data/shared/hf_cache/hub/models--facebook--dinov2-small",
+   "dest": "{HF_HOME}/hub/models--facebook--dinov2-small",
+   "filters": [],
+   "use": "world-model encoder",
+   "note": "",
+   "alt": "env/download_models.py",
+   "bytes": 88252208,
+   "files": 5
+  },
+  {
+   "id": "hf_nwm",
+   "priority": "required",
+   "src": "/data/shared/hf_cache/hub/models--facebook--nwm",
+   "dest": "{HF_HOME}/hub/models--facebook--nwm",
+   "filters": [],
+   "use": "NWM/CDiT (gated on HF)",
+   "note": "",
+   "alt": "HF facebook/nwm (request access)",
+   "bytes": 788003024,
+   "files": 1
+  },
+  {
+   "id": "hf_dino_wm",
+   "priority": "required",
+   "src": "/data/shared/hf_cache/hub/datasets--gaoyuezhou--dino_wm",
+   "dest": "{HF_HOME}/hub/datasets--gaoyuezhou--dino_wm",
+   "filters": [],
+   "use": "DINO-WM transfer source",
+   "note": "",
+   "alt": "HF gaoyuezhou/dino_wm",
+   "bytes": 953204707,
+   "files": 1
+  },
+  {
+   "id": "hf_bert_base_uncased",
+   "priority": "required",
+   "src": "/home/bufsgpu/.cache/huggingface/hub/models--bert-base-uncased",
+   "dest": "{HOME}/.cache/huggingface/hub/models--bert-base-uncased",
+   "filters": [],
+   "use": "ScaleVLN tokenizer (it runs with HF_HUB_OFFLINE=1 and the default cache)",
+   "note": "",
+   "alt": "HF bert-base-uncased",
+   "bytes": 441148280,
+   "files": 10
+  },
+  {
+   "id": "clip_cache",
+   "priority": "required",
+   "src": "/home/bufsgpu/.cache/clip",
+   "dest": "{HOME}/.cache/clip",
+   "filters": [],
+   "use": "ETPNav CLIP ViT-B/32",
+   "note": "",
+   "alt": "downloaded by clip.load",
+   "bytes": 353976522,
+   "files": 1
+  },
+  {
+   "id": "explorer_meshes",
+   "priority": "recommended",
+   "src": "[prior works]/ScaleVLN/analysis/vln_viz/cache",
+   "dest": "[prior works]/ScaleVLN/analysis/vln_viz/cache",
+   "filters": [
+    "+ /meshes/***",
+    "+ /meshes_hd/***",
+    "- *"
+   ],
+   "use": "explorer 3D building + per-floor detail meshes",
+   "note": "Matterport-derived; otherwise rebuild with build_meshes.py --detail from mattersim_house_ply",
+   "alt": "",
+   "bytes": 3794552316,
+   "files": 277
+  },
+  {
+   "id": "processed_scorer_labels",
+   "priority": "recommended",
+   "src": "data/processed/baseline_v0/scorer_labels_smolvlm2_refined512_v1",
+   "dest": "data/processed/baseline_v0/scorer_labels_smolvlm2_refined512_v1",
+   "filters": [],
+   "use": "Step 6 labels + branch traces; needed for the relabel-and-retrain scorer test",
+   "note": "",
+   "alt": "",
+   "bytes": 10910712832,
+   "files": 41136
+  },
+  {
+   "id": "processed_scorer_features",
+   "priority": "recommended",
+   "src": "data/processed/baseline_v0/scorer_features_smolvlm2_refined512_dino_pair_v1",
+   "dest": "data/processed/baseline_v0/scorer_features_smolvlm2_refined512_dino_pair_v1",
+   "filters": [],
+   "use": "Step 7 scorer features (else tools/cache_step7.py)",
+   "note": "",
+   "alt": "",
+   "bytes": 6502229503,
+   "files": 340
+  },
+  {
+   "id": "processed_dagger",
+   "priority": "recommended",
+   "src": "data/processed/baseline_v0",
+   "dest": "data/processed/baseline_v0",
+   "filters": [
+    "+ /dagger_groupA_round1_smolvlm2/***",
+    "+ /dagger_groupA_round2_smolvlm2_stop2m/***",
+    "- *"
+   ],
+   "use": "DAgger round 1 + STOP round 2 data",
+   "note": "",
+   "alt": "",
+   "bytes": 14841197762,
+   "files": 197760
+  },
+  {
+   "id": "processed_wm_corpus",
+   "priority": "recommended",
+   "src": "data/processed/baseline_v0",
+   "dest": "data/processed/baseline_v0",
+   "filters": [
+    "+ /wm_visits_groupA_smolvlm2_refined512_v1/***",
+    "+ /wm_groupA_smolvlm2_refined512_v1/***",
+    "- *"
+   ],
+   "use": "Step 4 world-model corpus (visits + index)",
+   "note": "",
+   "alt": "",
+   "bytes": 28197785108,
+   "files": 97378
+  },
+  {
+   "id": "processed_expert_c600",
+   "priority": "recommended",
+   "src": "data/processed/baseline_v0/expert_groupC_600",
+   "dest": "data/processed/baseline_v0/expert_groupC_600",
+   "filters": [],
+   "use": "group-C validation renders (SFT val)",
+   "note": "",
+   "alt": "",
+   "bytes": 4224432966,
+   "files": 47425
+  },
+  {
+   "id": "mattersim_house_ply",
+   "priority": "optional",
+   "src": "data/mattersim/v1/scans",
+   "dest": "data/mattersim/v1/scans",
+   "filters": [
+    "+ /*/",
+    "+ /*/house_segmentations/",
+    "+ /*/house_segmentations/*.ply",
+    "- *"
+   ],
+   "use": "house meshes: only to rebuild the explorer mesh caches",
+   "note": "",
+   "alt": "",
+   "bytes": 26498181761,
+   "files": 90
+  },
+  {
+   "id": "mattersim_camera_params",
+   "priority": "optional",
+   "src": "data/mattersim/v1/scans",
+   "dest": "data/mattersim/v1/scans",
+   "filters": [
+    "+ /*/",
+    "+ /*/undistorted_camera_parameters/***",
+    "- *"
+   ],
+   "use": "MatterSim camera parameters (nothing here reads them)",
+   "note": "",
+   "alt": "",
+   "bytes": 42776398,
+   "files": 90
+  },
+  {
+   "id": "scenes_mp3d_semantic",
+   "priority": "optional",
+   "src": "data/scene_datasets/mp3d",
+   "dest": "data/scene_datasets/mp3d",
+   "filters": [
+    "+ /*/",
+    "+ /*/*_semantic.ply",
+    "- *"
+   ],
+   "use": "Habitat semantic meshes (unused)",
+   "note": "",
+   "alt": "",
+   "bytes": 15242865351,
+   "files": 90
+  },
+  {
+   "id": "rxr_pose_traces_val",
+   "priority": "optional",
+   "src": "data/datasets/RxR/pose_traces",
+   "dest": "data/datasets/RxR/pose_traces",
+   "filters": [
+    "+ /rxr_val_seen/***",
+    "+ /rxr_val_unseen/***",
+    "- *"
+   ],
+   "use": "only to rebuild the explorer RxR sub-tasks",
+   "note": "",
+   "alt": "",
+   "bytes": 4305780162,
+   "files": 44930
+  },
+  {
+   "id": "rxr_annotations",
+   "priority": "optional",
+   "src": "data/datasets/RxR",
+   "dest": "data/datasets/RxR",
+   "filters": [
+    "+ /*.jsonl.gz",
+    "+ /*.json",
+    "+ /LICENSE",
+    "+ /README.upstream.md",
+    "- *"
+   ],
+   "use": "original RxR annotations (val guide files are in git)",
+   "note": "",
+   "alt": "",
+   "bytes": 946414258,
+   "files": 20
+  },
+  {
+   "id": "duet_training",
+   "priority": "optional",
+   "src": "[prior works]/ScaleVLN/VLN-DUET/datasets",
+   "dest": "[prior works]/ScaleVLN/VLN-DUET/datasets",
+   "filters": [
+    "- /R2R/exprs_map/"
+   ],
+   "use": "everything else for retraining ScaleVLN/DUET (features, aug, LXMERT)",
+   "note": "",
+   "alt": "HF OpenGVLab/ScaleVLN",
+   "bytes": 51190686382,
+   "files": 1507
+  },
+  {
+   "id": "reverie_training",
+   "priority": "optional",
+   "src": "[prior works]/ScaleVLN/VLN-DUET-RVR/datasets/REVERIE",
+   "dest": "[prior works]/ScaleVLN/VLN-DUET-RVR/datasets/REVERIE",
+   "filters": [],
+   "use": "ScaleVLN REVERIE features/checkpoints/annotations",
+   "note": "",
+   "alt": "HF OpenGVLab/ScaleVLN",
+   "bytes": 10157791482,
+   "files": 21
+  },
+  {
+   "id": "processed_expert_a",
+   "priority": "optional",
+   "src": "data/processed/baseline_v0/expert_groupA",
+   "dest": "data/processed/baseline_v0/expert_groupA",
+   "filters": [],
+   "use": "group-A expert renders",
+   "note": "re-render instead: tools/render_expert.py (20 min on the H100)",
+   "alt": "",
+   "bytes": 209867400777,
+   "files": 2287022
+  },
+  {
+   "id": "processed_wm_dino_features",
+   "priority": "optional",
+   "src": "data/processed/baseline_v0/wm_dino_features_refined512_v1",
+   "dest": "data/processed/baseline_v0/wm_dino_features_refined512_v1",
+   "filters": [],
+   "use": "cached DINO features",
+   "note": "recompute from the expert renders instead",
+   "alt": "",
+   "bytes": 131738234361,
+   "files": 6
+  },
+  {
+   "id": "runs_frames_and_indices",
+   "priority": "optional",
+   "src": "[OURS]/baseline-v0/runs",
+   "dest": "[OURS]/baseline-v0/runs",
+   "filters": [
+    "+ */",
+    "+ *.jpg",
+    "+ /step5_smolvlm2_refined512/data_index/*",
+    "- *"
+   ],
+   "use": "simulator frame dumps + Step 5 data index",
+   "note": "",
+   "alt": "",
+   "bytes": 2406867976,
+   "files": 22004
+  },
+  {
+   "id": "discrete_benchmarks",
+   "priority": "optional",
+   "src": "data/datasets",
+   "dest": "data/datasets",
+   "filters": [
+    "+ /R2R/***",
+    "+ /R4R/***",
+    "+ /REVERIE/***",
+    "+ /SOON/***",
+    "+ /CVDN/***",
+    "+ /NDH/***",
+    "+ /HANNA/***",
+    "- *"
+   ],
+   "use": "R2R, R4R, REVERIE, SOON, CVDN, NDH, HANNA annotations",
+   "note": "",
+   "alt": "",
+   "bytes": 856495339,
+   "files": 21193
+  },
+  {
+   "id": "discrete_shared",
+   "priority": "optional",
+   "src": "data",
+   "dest": "data",
+   "filters": [
+    "+ /img_features/***",
+    "+ /connectivity/***",
+    "- *"
+   ],
+   "use": "ResNet-152 features + MatterSim graphs for those benchmarks",
+   "note": "",
+   "alt": "",
+   "bytes": 4179574542,
+   "files": 92
+  },
+  {
+   "id": "gsa_r2r",
+   "priority": "optional",
+   "src": "data/datasets/GSA-R2R",
+   "dest": "data/datasets/GSA-R2R",
+   "filters": [],
+   "use": "GSA-R2R annotations, graphs, CLIP features",
+   "note": "",
+   "alt": "",
+   "bytes": 16794231100,
+   "files": 1522
+  },
+  {
+   "id": "rxr_text_features",
+   "priority": "skip",
+   "src": "data/datasets/RxR/text_features",
+   "dest": "data/datasets/RxR/text_features",
+   "filters": [],
+   "use": "only VLN-CE CMA/Seq2Seq RxR baselines",
+   "note": "",
+   "alt": "",
+   "bytes": 169706988319,
+   "files": 378207
+  },
+  {
+   "id": "rxr_pose_traces_train",
+   "priority": "skip",
+   "src": "data/datasets/RxR/pose_traces/rxr_train",
+   "dest": "data/datasets/RxR/pose_traces/rxr_train",
+   "filters": [],
+   "use": "nothing reads it",
+   "note": "",
+   "alt": "",
+   "bytes": 15708213637,
+   "files": 158934
+  },
+  {
+   "id": "matterport_zips",
+   "priority": "skip",
+   "src": "data/.downloads",
+   "dest": "data/.downloads",
+   "filters": [],
+   "use": "original Matterport/Habitat zips (extracted copies above)",
+   "note": "",
+   "alt": "",
+   "bytes": 1182539757274,
+   "files": 1532
+  },
+  {
+   "id": "dataset_download_cache",
+   "priority": "skip",
+   "src": "data/datasets/.downloads",
+   "dest": "data/datasets/.downloads",
+   "filters": [],
+   "use": "archives already extracted",
+   "note": "",
+   "alt": "",
+   "bytes": 15328406085,
+   "files": 659
+  },
+  {
+   "id": "scalevln_smoke_runs",
+   "priority": "skip",
+   "src": "[prior works]/ScaleVLN/runs",
+   "dest": "[prior works]/ScaleVLN/runs",
+   "filters": [],
+   "use": "setup smoke tests and demo exports",
+   "note": "",
+   "alt": "",
+   "bytes": 48815341112,
+   "files": 1099
+  },
+  {
+   "id": "legacy",
+   "priority": "skip",
+   "src": "data",
+   "dest": "data",
+   "filters": [
+    "+ /datasets/",
+    "+ /datasets/PRM800K/***",
+    "+ /processed/",
+    "+ /processed/navvem_episodes/***",
+    "+ /hime_task_data/***",
+    "+ /logs/***",
+    "- *"
+   ],
+   "use": "PRM800K, NavVEM episodes, hime task data, download logs",
+   "note": "",
+   "alt": "",
+   "bytes": 1294157389,
+   "files": 1123
+  }
+ ]
+}

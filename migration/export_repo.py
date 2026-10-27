@@ -3,13 +3,14 @@
 
     python3 -I migration/export_repo.py                       # sync into ../CVPR-2027-draft
     python3 -I migration/export_repo.py --dry-run             # report only
-    python3 -I migration/export_repo.py --build-archives      # also pack the explorer logs (tier 2)
     python3 -I migration/export_repo.py --stage               # ... and `git add` the result (commit/push yourself)
 
 What goes where (see MIGRATION.md):
-  git      code, docs, results, logs, and the selected/frozen checkpoints (TIER1, every file < 95 MiB)
-  release  every other checkpoint of ours + the explorer run logs, listed in migration/release_assets.json
-  nothing  datasets, public weights, regenerable caches and frames (DATA_MIGRATION.md says how to get them)
+  git      code, docs, results, logs, the explorer with its run logs and the small public annotations it reads,
+           and the selected/frozen checkpoints (TIER1, every file < 95 MiB)
+  release  every other checkpoint of ours + the two step logs over 100 MB (migration/release_assets.json)
+  server   everything else, incl. all Matterport-derived files (scenes, renders, meshes: not redistributable
+           in a public repo): migration/pull_from_server.py, RETRIEVE_FROM_SERVER.md
 
 The source tree is never modified. Nested upstream clones are copied as plain files (their .git is skipped);
 clean clones under drafts/.../repositories are recorded (URL + commit) instead of copied.
@@ -56,13 +57,15 @@ TIER1 = [
 # Upstream checkpoints that only sit in our runs folder: re-download instead (MIGRATION.md).
 UPSTREAM_CKPTS = ['step5_smolvlm2_refined512/assets/outputs/*/checkpoints/*']
 
-# Explorer outputs packed into release archives: (asset prefix, folder relative to SRC, compress).
-ARCHIVES = [
-    ('scalevln_exprs_map', '[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/exprs_map', True),
-    ('etpnav_explorer_logs', '[prior works]/ETPNav/data/logs/explorer', False),
-]
+# Folders packed into release archives: (asset prefix, folder relative to SRC, compress). Empty now: the explorer
+# logs are in git, and ETPNav's cube-face renders are Matterport-derived, so they come from the server instead.
+ARCHIVES = []
+# Non-checkpoint files over the git limit that go up as release files (restored to their path).
+RELEASE_FILES = ['[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/exprs_map/steplogs/*/steps_train.jsonl']
+# Larger-than-GIT_LIMIT files allowed in git (still < 95 MiB): the explorer's step logs.
+BIG_OK = ['[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/exprs_map/**']
 
-TOP_FILES = {'README.md', 'MIGRATION.md', 'DATA_MIGRATION.md', 'TRAINING_STATE.md'}
+TOP_FILES = {'README.md', 'MIGRATION.md', 'DATA_MIGRATION.md', 'TRAINING_STATE.md', 'RETRIEVE_FROM_SERVER.md'}
 TOP_DIRS = {'migration', 'data', 'drafts', '[OURS]', '[prior works]'}
 
 SKIP_NAMES = {'.git', '__pycache__', '.ipynb_checkpoints', '.mypy_cache', '.pytest_cache', '.venvs', '.venv', 'venv'}
@@ -94,7 +97,23 @@ KEEP_IN_PRUNED = [
     '[prior works]/ETPNav/data/logs/eval_results/**',
     '[prior works]/ETPNav/data/logs/*.log',
     '[prior works]/ETPNav/data/logs/running_log/**',
+    # navigation explorer: run logs (scores, poses, no imagery) and the small public annotations it reads
+    '[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/exprs_map/**',
+    '[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/connectivity_mp3d/**',
+    '[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/annotations/FGR2R/**',
+    '[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/annotations/R2R_train_enc.json',
+    '[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/annotations/R2R_val_seen_enc.json',
+    '[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/annotations/R2R_val_unseen_enc.json',
+    '[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/annotations/R2R_val_train_seen_enc.json',
+    '[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/annotations/R2R_test_enc.json',
+    '[prior works]/ScaleVLN/VLN-DUET-RVR/datasets/REVERIE/annotations/REVERIE_val_seen_enc.json',
+    '[prior works]/ScaleVLN/VLN-DUET-RVR/datasets/REVERIE/annotations/REVERIE_val_unseen_enc.json',
+    '[prior works]/ScaleVLN/VLN-DUET-RVR/datasets/REVERIE/annotations/BBoxes.json',
+    '[prior works]/ETPNav/data/logs/explorer/*/episodes_*.jsonl',
+    '[prior works]/ETPNav/data/logs/explorer/*/meta_*.json',
 ]
+# Public annotation files kept from data/datasets (CC BY 4.0 RxR guide files the explorer reads).
+PUBLIC_DATASET_FILES = {'data/datasets/RxR/rxr_val_seen_guide.jsonl.gz', 'data/datasets/RxR/rxr_val_unseen_guide.jsonl.gz'}
 # data/datasets keeps only small provenance files at data/datasets/<name>/<file> plus its layout symlinks.
 DATASET_DOC_GLOBS = ['README*.md', 'LICENSE*', 'source_manifest.json', 'generation_manifest.json',
                      'required_scenes.json', 'envdrop_missing_episode_ids.json', 'haps_extraction_report.json']
@@ -108,6 +127,11 @@ DRAFT_REPO_BINARY = ('.png', '.jpg', '.jpeg', '.gif', '.msh', '.obj', '.stl', '.
 DRAFT_REPOS = 'drafts/Research_Investigation_2026-10-22/repositories'
 GENERATED = {'migration/release_assets.json', 'migration/export_report.json', 'migration/hardcoded_paths.txt',
              f'{DRAFT_REPOS}/REPOSITORIES.json', '.gitignore'}
+
+
+def pat(g):
+    """Glob with the folder names' brackets taken literally ('[OURS]' is otherwise a character class)."""
+    return g.replace('[OURS]', '[[]OURS]').replace('[prior works]', '[[]prior works]')
 
 
 def rel(p):
@@ -165,7 +189,24 @@ class Plan:
 
 
 def keep_in_pruned(r):
-    return any(fnmatch.fnmatch(str(r), g) or str(r) == g for g in KEEP_IN_PRUNED)
+    return any(str(r) == g or fnmatch.fnmatchcase(str(r), pat(g)) for g in KEEP_IN_PRUNED)
+
+
+def may_contain_keep(r):
+    """Whether a pruned folder can hold a KEEP_IN_PRUNED entry, so the walk has to look inside it."""
+    rp = r.parts
+    for g in KEEP_IN_PRUNED:
+        gp = PurePosixPath(g).parts
+        for i, part in enumerate(rp):
+            if i >= len(gp) - 1 and (i >= len(gp) or gp[i] != '**'):
+                break
+            if gp[i] == '**':
+                return True
+            if part != gp[i] and not fnmatch.fnmatchcase(part, pat(gp[i])):
+                break
+        else:
+            return True
+    return False
 
 
 def link_target(p, r):
@@ -186,6 +227,9 @@ def classify_file(plan, p, r, st):
         return plan.skip('download provenance (93 MB)', size)
     if str(r) in SECRET_FILES:
         return plan.skip('contains a credential (upstream file)', size)
+    if str(r) in PUBLIC_DATASET_FILES:
+        plan.git[r] = p
+        return
     if under(r, 'data/datasets'):
         if len(r.parts) == 4 and any(fnmatch.fnmatch(name, g) for g in DATASET_DOC_GLOBS) and size < 2 * MIB:
             plan.git[r] = p
@@ -208,7 +252,12 @@ def classify_file(plan, p, r, st):
         return plan.skip('assets/binaries inside reference clones under drafts/', size)
     if under(r, OURS_RUNS) and name.lower().endswith(FRAME_SUFFIXES):
         return plan.skip('simulator frame dumps in runs/ (jpg)', size)
-    if size > GIT_LIMIT:
+    if any(fnmatch.fnmatchcase(str(r), pat(g)) for g in RELEASE_FILES):
+        plan.assets.append({'name': 'file--' + str(r).replace('/', '--').replace(' ', '_').replace('[', '').replace(']', ''),
+                            'path': str(r), 'size': size, 'mtime': st.st_mtime, 'kind': 'file'})
+        return
+    big_ok = any(fnmatch.fnmatchcase(str(r), pat(g)) for g in BIG_OK) and size <= TIER1_LIMIT
+    if size > GIT_LIMIT and not big_ok:
         plan.too_big.append((str(r), size))
         return plan.skip('over 50 MiB, not a checkpoint', size)
     plan.git[r] = p
@@ -256,10 +305,9 @@ def walk(plan):
                     if under(r, 'data/datasets') and len(r.parts) >= 4:
                         plan.skip('dataset payload')
                         continue
-                    if inside_prune and not any(k.startswith(str(r) + '/') for k in KEEP_IN_PRUNED):
-                        if not keep_in_pruned(r):
-                            plan.skip('excluded folders (datasets, public weights, caches, smoke runs)')
-                            continue
+                    if inside_prune and not may_contain_keep(r):
+                        plan.skip('excluded folders (datasets, public weights, caches, smoke runs)')
+                        continue
                     stack.append(p)
                 elif e.is_file():
                     st = e.stat()
@@ -407,7 +455,8 @@ def main():
     old = json.loads(manifest_path.read_text()) if manifest_path.is_file() else {}
     cache = {e['source']: {'size': e['size'], 'mtime': e.get('mtime'), 'sha256': e['sha256']}
              for e in old.get('assets', []) if e.get('source') and e.get('sha256')}
-    archive_entries = [e for e in old.get('assets', []) if e['kind'] == 'archive-part']
+    archive_entries = [e for e in old.get('assets', []) if e['kind'] == 'archive-part'
+                       and any(e['archive'].startswith(prefix + '.tar') for prefix, _, _ in ARCHIVES)]
     if a.build_archives and not a.dry_run:
         archive_entries = build_archives(a.assets_dir)
         for e in archive_entries:
@@ -425,7 +474,7 @@ def main():
                 e['sha256'] = sha256(src, cache)
                 e['mtime'] = src.stat().st_mtime
             assets.append(e)
-        link_assets([e for e in assets if e['kind'] == 'checkpoint'], a.assets_dir)
+        link_assets([e for e in assets if e['kind'] in ('checkpoint', 'file')], a.assets_dir)
         names = [e['name'] for e in assets]
         assert len(names) == len(set(names)), 'duplicate release asset names'
 
@@ -450,7 +499,7 @@ def main():
         'updated_utc': datetime.now(timezone.utc).isoformat(), 'source': str(SRC), 'dest': str(a.dest),
         'git_files': len(plan.git), 'git_symlinks': len(plan.links), 'git_bytes': git_bytes,
         'tier1_checkpoints': sorted(str(r) for r in plan.git if tier1(r) and is_ckpt(r.name)),
-        'release_checkpoints': len(plan.assets), 'release_checkpoint_bytes': sum(e['size'] for e in plan.assets),
+        'release_files': len(plan.assets), 'release_bytes': sum(e['size'] for e in plan.assets),
         'largest_git_files': big,
         'skipped': {k: {'files': v[0], 'bytes': v[1]} for k, v in sorted(plan.skipped.items())},
         'over_50MiB_not_exported': plan.too_big,
