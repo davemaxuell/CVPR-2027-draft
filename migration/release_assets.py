@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Tier-2 files (our checkpoints that are not in git, the third-party checkpoints, and two explorer step logs over
-100 MB) as GitHub release assets.
+"""Tier-2 files (our checkpoints that are not in git, the third-party checkpoints, the Step 7 scorer features, and
+two explorer step logs over 100 MB) as GitHub release assets.
 
     # old server: upload everything in migration/release_assets.json (token needs Contents: read and write)
     python3 -I migration/release_assets.py upload
     # new machine, from the repo root (public repo: press Enter at the token prompt; private: Contents: read)
-    python3 -I migration/release_assets.py download                        # everything (~23 GiB)
+    python3 -I migration/release_assets.py download                        # everything (~29 GiB)
     python3 -I migration/release_assets.py download --kind checkpoint      # only checkpoints
     python3 -I migration/release_assets.py download --match 'step5_*'      # by asset name
     python3 -I migration/release_assets.py download --from-dir /mnt/disk/CVPR-2027-draft-assets   # no GitHub

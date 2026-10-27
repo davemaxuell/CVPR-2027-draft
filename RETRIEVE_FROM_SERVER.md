@@ -40,9 +40,10 @@ relative to the repo as on the server. `hf_*` items go into `$HF_HOME/hub/`; `hf
 After pulling:
 
 1. If the repo is not at `/data/team_a/dave-workspace/RoleVLN`, run `migration/relocate_paths.py` (MIGRATION.md §3.1).
-2. Checkpoint integrity: `python3 -I migration/release_assets.py verify` (sha256 of all 107 release files, which
-   `our_checkpoints`, `explorer_train_steplogs`, `etpnav_data`, `duet_eval`, `ha_vln` and the optional
-   `duet_training` + `reverie_training` also provide).
+2. Checkpoint integrity: `python3 -I migration/release_assets.py verify` (sha256 of all 443 release files:
+   105 checkpoints, 2 step logs, 336 scorer-feature files, which `our_checkpoints`, `explorer_train_steplogs`,
+   `etpnav_data`, `duet_eval`, `ha_vln`, `processed_scorer_features` and the optional `duet_training` +
+   `reverie_training` also provide).
 3. Set up the environments and run the checks: MIGRATION.md §3.4–3.7.
 
 Alternatives if the server is gone: all checkpoints, ours and third-party, come from the GitHub release (`release_assets.py download`,
@@ -83,7 +84,7 @@ downloading `mattersim_house_ply`. Processed data can be regenerated with the st
 |---|---:|---|---|
 | `explorer_meshes` | 3.5 G | explorer 3D building + per-floor detail meshes (Matterport-derived; otherwise rebuild with build_meshes.py --detail from mattersim_house_ply) | `[prior works]/ScaleVLN/analysis/vln_viz/cache` |
 | `processed_scorer_labels` | 10.2 G | Step 6 labels + branch traces; needed for the relabel-and-retrain scorer test | `data/processed/baseline_v0/scorer_labels_smolvlm2_refined512_v1` |
-| `processed_scorer_features` | 6.1 G | Step 7 scorer features (else tools/cache_step7.py) | `data/processed/baseline_v0/scorer_features_smolvlm2_refined512_dino_pair_v1` |
+| `processed_scorer_features` | 6.1 G | Step 7 scorer features (also on the release; else tools/cache_step7.py) | `data/processed/baseline_v0/scorer_features_smolvlm2_refined512_dino_pair_v1` |
 | `processed_dagger` | 13.8 G | DAgger round 1 + STOP round 2 data | `data/processed/baseline_v0` |
 | `processed_wm_corpus` | 26.3 G | Step 4 world-model corpus (visits + index) | `data/processed/baseline_v0` |
 | `processed_expert_c600` | 3.9 G | group-C validation renders (SFT val) | `data/processed/baseline_v0/expert_groupC_600` |

@@ -120,7 +120,7 @@ These are our own results. [MIGRATION.md](MIGRATION.md) §1 shows how each one m
 | `[prior works]/ETPNav/data/logs/explorer/` (episode logs + cube-face renders) | 3.8 G | episode logs in **git**; the 138k cube-face renders are Matterport-derived: server item `etpnav_explorer_views` |
 | `[prior works]/ScaleVLN/analysis/vln_viz/cache/` | 3.7 G | `rxr_subtasks/`, `view_index.json`, `navmaps/` in **git**; meshes are Matterport-derived: server item `explorer_meshes`, or rebuild with `build_meshes.py --detail`; row caches rebuild on start |
 | `data/processed/baseline_v0/expert_groupA/`, `wm_dino_features_refined512_v1/` | 319 G | **regenerate** (`tools/render_expert.py`, about 20 min on the H100; then the DINO feature pass) |
-| `data/processed/baseline_v0/{dagger_*,scorer_labels_*,scorer_features_*,wm_visits_*,wm_groupA_*,expert_groupC_600}` | 64 G | **server items** `processed_*` if you want to continue without re-running rollouts |
+| `data/processed/baseline_v0/{dagger_*,scorer_labels_*,scorer_features_*,wm_visits_*,wm_groupA_*,expert_groupC_600}` | 64 G | **server items** `processed_*` if you want to continue without re-running rollouts; `scorer_features_*` (6.1 G) is also on the **release** |
 
 ## 7. Things that differ on the new machine
 

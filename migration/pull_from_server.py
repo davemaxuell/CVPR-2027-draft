@@ -119,7 +119,7 @@ ITEMS = [
     item('processed_scorer_labels', 'recommended', f'{PROC}/scorer_labels_smolvlm2_refined512_v1',
          'Step 6 labels + branch traces; needed for the relabel-and-retrain scorer test'),
     item('processed_scorer_features', 'recommended', f'{PROC}/scorer_features_smolvlm2_refined512_dino_pair_v1',
-         'Step 7 scorer features (else tools/cache_step7.py)'),
+         'Step 7 scorer features (also on the release; else tools/cache_step7.py)'),
     item('processed_dagger', 'recommended', PROC, 'DAgger round 1 + STOP round 2 data',
          filters=['+ /dagger_groupA_round1_smolvlm2/***', '+ /dagger_groupA_round2_smolvlm2_stop2m/***', '- *']),
     item('processed_wm_corpus', 'recommended', PROC, 'Step 4 world-model corpus (visits + index)',

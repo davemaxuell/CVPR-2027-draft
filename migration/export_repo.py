@@ -8,8 +8,9 @@
 What goes where (see MIGRATION.md):
   git      code, docs, results, logs, the explorer with its run logs and the small public annotations it reads,
            and the selected/frozen checkpoints (TIER1, every file < 95 MiB)
-  release  every other checkpoint of ours, the third-party checkpoints we evaluate or start from, and the two step
-           logs over 100 MB (migration/release_assets.json); files over PART go up as .partNN pieces
+  release  every other checkpoint of ours, the third-party checkpoints we evaluate or start from, the Step 7 scorer
+           features (RELEASE_DIRS) and the two step logs over 100 MB (migration/release_assets.json); files over
+           PART go up as .partNN pieces
   server   everything else, incl. all Matterport-derived files (scenes, renders, meshes: not redistributable
            in a public repo): migration/pull_from_server.py, RETRIEVE_FROM_SERVER.md
 
@@ -72,6 +73,9 @@ THIRD_PARTY_CKPTS = [
 ARCHIVES = []
 # Non-checkpoint files over the git limit that go up as release files (restored to their path).
 RELEASE_FILES = ['[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/exprs_map/steplogs/*/steps_train.jsonl']
+# Folders inside PRUNE released file by file (restored to their path; *.lock files are left out). The Step 7 scorer
+# features are frozen inputs of Steps 8-10: policy context + DINO feature arrays, no images.
+RELEASE_DIRS = ['data/processed/baseline_v0/scorer_features_smolvlm2_refined512_dino_pair_v1']
 # Larger-than-GIT_LIMIT files allowed in git (still < 95 MiB): the explorer's step logs.
 BIG_OK = ['[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/exprs_map/**']
 
@@ -356,6 +360,20 @@ def third_party_checkpoints(plan):
                                     'mtime': st.st_mtime, 'kind': 'checkpoint'})
 
 
+def release_dirs(plan):
+    """Release entries for every file under RELEASE_DIRS."""
+    for top in RELEASE_DIRS:
+        for d, dirs, files in os.walk(SRC / top):
+            dirs[:] = sorted(x for x in dirs if x not in SKIP_NAMES)
+            for name in sorted(files):
+                p = Path(d) / name
+                if name.endswith('.lock') or p.is_symlink():
+                    continue
+                r, st = rel(p), p.stat()
+                plan.assets.append({'name': 'file--' + flat_name(r), 'path': str(r), 'size': st.st_size,
+                                    'mtime': st.st_mtime, 'kind': 'file'})
+
+
 def sha256(path, cache):
     st = path.stat()
     key = str(path)
@@ -512,6 +530,7 @@ def main():
     walk(plan)
     markdown_notes(plan)
     third_party_checkpoints(plan)
+    release_dirs(plan)
     git_bytes = sum(p.stat().st_size for p in plan.git.values())
     copied, removed = mirror(plan, a.dest, a.dry_run)
 
@@ -545,8 +564,8 @@ def main():
         assert len(names) == len(set(names)), 'duplicate release asset names'
 
         manifest = {'repo': REPO, 'tag': TAG, 'updated_utc': datetime.now(timezone.utc).isoformat(),
-                    'note': 'Tier-2 files: our checkpoints not in git, the third-party checkpoints, and the explorer '
-                            'logs. Entries with split=true go up as their file-part pieces. '
+                    'note': 'Tier-2 files: our checkpoints not in git, the third-party checkpoints, the Step 7 scorer '
+                            'features and the explorer logs. Entries with split=true go up as their file-part pieces. '
                             'migration/release_assets.py upload | download | verify.',
                     'assets': assets}
         manifest_path.parent.mkdir(parents=True, exist_ok=True)

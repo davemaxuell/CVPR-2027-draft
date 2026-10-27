@@ -6,7 +6,7 @@ Snapshot of 2026-10-27, written for picking the work up on the new machine. The 
 is after the move: **git** (in this repo), **release** (GitHub release `assets-v1`, fetched with
 `migration/release_assets.py`), **carry** (a server item in RETRIEVE_FROM_SERVER.md: `pull_from_server.py`),
 or **regenerate**. Our release files are also in the server item `our_checkpoints`; the release also holds the
-third-party checkpoints (MIGRATION.md §1).
+third-party checkpoints and the Step 7 scorer features (MIGRATION.md §1).
 
 ## The pipeline in one paragraph
 
@@ -30,7 +30,7 @@ Scenes are split A (fit the policy) / B (fit the scorer) / C (development) / E (
 | 5A DINO dynamics | DINO-WM PointMaze transfer vs fresh dynamics, 37,852 updates each | Both select update 36,864; C feature MSE 1.347 / 1.321 (copy-current 4.611) | `runs/step5_smolvlm2_refined512/frozen/` (both models + encoder): **git**; all intermediate checkpoints: **release**; DINO features `wm_dino_features_refined512_v1` (123 G): **regenerate** from the expert renders |
 | 5B NWM/CDiT | Same comparison with NWM transfer vs fresh CDiT | CPU assets and checks done; GPU work queued behind the DINO E pilot | `assets/nwm_cdit_s_ema.pt`: **release** |
 | 6 Scorer labels | All 4 actual action outcomes at 1,024 B + 256 C roots | 5,120 measured branches, full audit passed | `scorer_labels_smolvlm2_refined512_v1` (11 G, includes the branch traces): **carry**. Needed for the cheap relabelling test below. |
-| 7 Scorer features | Frozen policy context + DINO predictions for all 1,280 roots | Audit passed | `scorer_features_smolvlm2_refined512_dino_pair_v1` (6.1 G): **carry** (or recompute with `tools/cache_step7.py`) |
+| 7 Scorer features | Frozen policy context + DINO predictions for all 1,280 roots | Audit passed | `scorer_features_smolvlm2_refined512_dino_pair_v1` (6.1 G): **release** + carry (or recompute with `tools/cache_step7.py`) |
 | 8 Scorer training | Pooled scorer + learned-null-future control, 2,048 updates each | Training verified; the 6 checkpoints shortlisted for Step 9 | shortlisted 6: **git**; the other 26: **release** |
 | 9 C calibration | Navigation screen + margin calibration on C224 | **Running at export time.** Diagnosis so far: with the scorer 8/224 (transfer) and 6/224 (fresh) vs 29/224 for the policy alone; the scorer forces STOP early (197/224 episodes) | per-episode results in `runs/step9_*`: **git** (snapshot, re-sync when done) |
 | 10 E pilot | 224 E episodes, 5 systems, frozen settings | Starts automatically after Step 9 | `runs/step10_*` |

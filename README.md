@@ -32,5 +32,5 @@ migration/                    export_repo.py, release_assets.py, pull_from_serve
 Our checkpoints: the selected and frozen ones are committed under `[OURS]/baseline-v0/runs/`. All the
 others are in the GitHub release `assets-v1` (`python3 -I migration/release_assets.py download`) and on the old
 server (`migration/pull_from_server.py`). The release also holds the third-party checkpoints (ETPNav, ScaleVLN/DUET,
-LXMERT, REVERIE, HA-VLN, DINO-WM). The explorer's run logs are in git; its Matterport-derived images
+LXMERT, REVERIE, HA-VLN, DINO-WM) and the Step 7 scorer features. The explorer's run logs are in git; its Matterport-derived images
 and meshes are server items.

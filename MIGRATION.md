@@ -14,7 +14,7 @@ old H100 server, taken 2026-10-27. Four documents cover the move:
 | Tier | Contents | Size | How you get it |
 |---|---|---:|---|
 | **git** | All code (ours + the patched ScaleVLN/DUET, ETPNav, MatterSim and habitat-lab v0.1.7 sources), docs, drafts, run records and results, logs; the **navigation explorer** (`[prior works]/ScaleVLN/analysis/vln_viz`) with its small caches, all its run logs (DUET/ScaleVLN eval predictions, step logs, what-if results; ETPNav R2R-CE/RxR-CE episode logs) and the small public annotations it reads (R2R/FGR2R/REVERIE/RxR val, connectivity); the **selected/frozen checkpoints** (15 files, every one < 100 MB) | ~3.5 G | `git clone` |
-| **release** `assets-v1` | Every other checkpoint of ours (93 files: intermediate checkpoints, optimizer/trainer states, NWM EMA weights, the upstream DINO-WM checkpoints), the third-party checkpoints we evaluate or start from (12 files: ETPNav R2R-CE/RxR-CE + waypoint predictors + depth encoder, ScaleVLN/DUET fine-tuned + pretrained, LXMERT, REVERIE, HA-VLN-CMA) and the two DUET train-split step logs over 100 MB. Files over 1.9 GiB go up as parts and are joined on download | ~23 G | `python3 -I migration/release_assets.py download` (after the upload in §2.2) |
+| **release** `assets-v1` | Every other checkpoint of ours (93 files: intermediate checkpoints, optimizer/trainer states, NWM EMA weights, the upstream DINO-WM checkpoints), the third-party checkpoints we evaluate or start from (12 files: ETPNav R2R-CE/RxR-CE + waypoint predictors + depth encoder, ScaleVLN/DUET fine-tuned + pretrained, LXMERT, REVERIE, HA-VLN-CMA) the two DUET train-split step logs over 100 MB, and the Step 7 scorer features (336 files, 6.1 G: `data/processed/baseline_v0/scorer_features_smolvlm2_refined512_dino_pair_v1`, feature arrays only). Files over 1.9 GiB go up as parts and are joined on download | ~29 G | `python3 -I migration/release_assets.py download` (after the upload in §2.2) |
 | **old server** | Everything else: datasets, Matterport-derived files (scenes, skyboxes, house meshes, ETPNav cube-face renders, explorer mesh caches), public weights and model caches, processed training data. 74 GiB required + 64 GiB recommended | — | `python3 -I migration/pull_from_server.py pull --host …` ([RETRIEVE_FROM_SERVER.md](RETRIEVE_FROM_SERVER.md)) |
 | **regenerate** | Expert renders, DINO features (or pull them: 318 G) | ~320 G | scripts, §3.6 |
 
@@ -65,16 +65,16 @@ own terminal on the server, so the token stays out of shell history and logs:
 ```bash
 cd /data/team_a/dave-workspace/CVPR-2027-draft
 read -rs GITHUB_TOKEN && export GITHUB_TOKEN        # paste the token, press Enter
-python3 -I migration/release_assets.py upload       # ~23 GiB; resumable, re-run after any failure
+python3 -I migration/release_assets.py upload       # ~29 GiB; resumable, re-run after any failure
 unset GITHUB_TOKEN
 ```
 
 Uploads read the staged files in `../CVPR-2027-draft-assets/`. They are hardlinks, so they take no extra space.
 Assets already on the release with the right size are skipped, so re-running after a re-export uploads only
-what changed. At this server's ~6 MB/s, a first upload takes about 70 minutes. Delete the token afterwards.
+what changed. At this server's ~6 MB/s, a first upload takes about 90 minutes. Delete the token afterwards.
 The release is a second copy that survives the server: everything in it can also be pulled from the server
 (items `our_checkpoints`, `explorer_train_steplogs`, `etpnav_data`, `duet_eval`, `duet_training`, `reverie_training`,
-`ha_vln`).
+`ha_vln`, `processed_scorer_features`).
 
 Fallback if you prefer the GitHub CLI: `gh release create assets-v1 ../CVPR-2027-draft-assets/*`
 (asset names = file names; `release_assets.py download` works with either).
@@ -87,7 +87,7 @@ To continue from exactly the current state instead of re-running rollouts, pull 
 | Folder | Size | Rebuild cost if you don't carry it |
 |---|---:|---|
 | `scorer_labels_smolvlm2_refined512_v1` | 11 G | Step 6 rollouts (hours). **Needed** for the planned relabel-and-retrain scorer test |
-| `scorer_features_smolvlm2_refined512_dino_pair_v1` | 6.1 G | `tools/cache_step7.py` (GPU, ~1 h) |
+| `scorer_features_smolvlm2_refined512_dino_pair_v1` | 6.1 G | none: it is on the **release** (`release_assets.py download`); else `tools/cache_step7.py` (GPU, ~1 h) |
 | `dagger_groupA_round1_smolvlm2`, `dagger_groupA_round2_smolvlm2_stop2m` | 14 G | DAgger collection with the policy (hours) |
 | `wm_visits_groupA_smolvlm2_refined512_v1`, `wm_groupA_smolvlm2_refined512_v1` | 26 G | Step 4 policy episodes (hours) |
 | `expert_groupC_600` | 4.0 G | `tools/render_expert.py --group C` with the selection in `tools/run_step2.py` (minutes) |
