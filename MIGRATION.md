@@ -1,6 +1,6 @@
 # Migration guide: RoleVLN → new machine
 
-This repo (`github.com/davemaxuell/CVPR-2027-draft`, private) is a snapshot of the `RoleVLN/` folder on the
+This repo (`github.com/davemaxuell/CVPR-2027-draft`, public) is a snapshot of the `RoleVLN/` folder on the
 old H100 server, taken 2026-10-27. Three documents cover the move:
 
 - **this file**: what is where, the final sync on the old server, and the setup on the new machine, step by step
@@ -91,8 +91,9 @@ rsync -a --info=progress2 /data/team_a/dave-workspace/RoleVLN/data/processed/bas
 
 ### 3.1 Clone
 
-The repo is private, so give the new machine access: add its SSH key to your GitHub account (or as
-another deploy key), or use an HTTPS token.
+The repo is public, so cloning needs no credentials. To push from the new machine, add its SSH key to your
+GitHub account (or as another deploy key). The deploy key `rolevln-cvpr2027-deploy` belongs to the old server;
+remove it under Settings → Deploy keys once you're done there.
 
 **Recommended: use the same absolute path as the old server.** Code, configs and run records refer to
 `/data/team_a/dave-workspace/RoleVLN` (38 code/config files, listed in `migration/hardcoded_paths.txt`), and
@@ -100,7 +101,7 @@ resuming old jobs needs it:
 
 ```bash
 sudo mkdir -p /data/team_a/dave-workspace && sudo chown "$USER" /data/team_a/dave-workspace
-git clone git@github.com:davemaxuell/CVPR-2027-draft.git /data/team_a/dave-workspace/RoleVLN
+git clone https://github.com/davemaxuell/CVPR-2027-draft.git /data/team_a/dave-workspace/RoleVLN
 cd /data/team_a/dave-workspace/RoleVLN
 ```
 
@@ -116,14 +117,15 @@ It replaces `/data/team_a/dave-workspace/RoleVLN` → the clone, `/data/shared/h
 
 ### 3.2 Our checkpoints and the explorer logs
 
-Create a fine-grained token with *Contents: Read-only* on this repo, then:
+No token is needed while the repo is public (press Enter at the token prompt):
 
 ```bash
-read -rs GITHUB_TOKEN && export GITHUB_TOKEN
 python3 -I migration/release_assets.py download          # everything; or --kind checkpoint, or --match 'step5_*'
 python3 -I migration/release_assets.py verify            # sha256 of every checkpoint
-unset GITHUB_TOKEN
 ```
+
+If you make the repo private later, downloads need a fine-grained token with *Contents: Read-only*
+(`read -rs GITHUB_TOKEN && export GITHUB_TOKEN` first).
 
 Checkpoints land at their original paths under `[OURS]/baseline-v0/runs/`. The archives unpack into
 `[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/exprs_map/` and `[prior works]/ETPNav/data/logs/explorer/`.
@@ -206,8 +208,8 @@ The Scorer checks overwrite their `*_results.json`; `git diff` shows whether any
 
 ## 4. Troubleshooting
 
-- **`release_assets.py` says 401/404**: the token lacks access to this repo or *Contents* permission, or
-  the release `assets-v1` has not been uploaded yet (§2.2).
+- **`release_assets.py` says the release is not reachable**: the release `assets-v1` has not been uploaded yet
+  (§2.2), or the repo was made private and the token is missing or lacks *Contents* permission.
 - **A checkpoint fails `verify`**: re-run `download` (it re-fetches mismatched files). A checkpoint that
   changed on the server after the export gets new sha256 values on the next export + upload.
 - **Dangling symlinks right after cloning** (`data/tours.json`, `data/datasets/*/scene_datasets`,

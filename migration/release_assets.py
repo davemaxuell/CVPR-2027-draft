@@ -3,14 +3,15 @@
 
     # old server: upload everything in migration/release_assets.json (token needs Contents: read and write)
     python3 -I migration/release_assets.py upload
-    # new machine, from the repo root (token needs Contents: read; the repo is private)
+    # new machine, from the repo root (public repo: press Enter at the token prompt; private: Contents: read)
     python3 -I migration/release_assets.py download                        # everything (~12 GiB)
     python3 -I migration/release_assets.py download --kind checkpoint      # only checkpoints
     python3 -I migration/release_assets.py download --match 'step5_*'      # by asset name
     python3 -I migration/release_assets.py download --from-dir /mnt/disk/CVPR-2027-draft-assets   # no GitHub
     python3 -I migration/release_assets.py verify
 
-The token comes from GITHUB_TOKEN or GH_TOKEN, else a hidden prompt; it is never written anywhere.
+The token comes from GITHUB_TOKEN or GH_TOKEN, else a hidden prompt; it is never written anywhere. Downloads
+from a public repo work without one (empty prompt), using the public release download links.
 Uploads skip assets already on the release with the right size. Downloads skip files whose sha256 already
 matches, put checkpoints at their original paths and unpack the archives where they came from.
 Standard library only.
@@ -39,9 +40,15 @@ UPLOADS = 'https://uploads.github.com'
 MIB = 1 << 20
 
 
-def token():
+def token(optional=False):
     t = os.environ.get('GITHUB_TOKEN') or os.environ.get('GH_TOKEN')
-    return t or getpass.getpass('GitHub token (input hidden): ').strip()
+    if t:
+        return t
+    hint = ' (Enter for none: public repo)' if optional else ''
+    t = getpass.getpass(f'GitHub token{hint}, input hidden: ').strip() if sys.stdin.isatty() else ''
+    if not t and not optional:
+        raise SystemExit('a token is needed: set GITHUB_TOKEN')
+    return t
 
 
 class GitHub:
@@ -52,7 +59,8 @@ class GitHub:
         req = urllib.request.Request(url, data=body, method=method)
         req.add_header('Accept', 'application/vnd.github+json')
         req.add_header('X-GitHub-Api-Version', '2022-11-28')
-        req.add_unredirected_header('Authorization', f'Bearer {self.tok}')   # not sent on to the CDN redirect
+        if self.tok:
+            req.add_unredirected_header('Authorization', f'Bearer {self.tok}')   # not sent on to the CDN redirect
         for k, v in (headers or {}).items():
             req.add_header(k, v)
         return urllib.request.urlopen(req, timeout=timeout)
@@ -96,8 +104,11 @@ class GitHub:
                                                   'Content-Length': str(size)}, timeout=600) as r:
                 return json.loads(r.read())
 
-    def download(self, asset_id, dest, name, size):
-        url = f'{self.api}/repos/{self.repo}/releases/assets/{asset_id}'
+    def download(self, asset, dest, name, size):
+        if self.tok:
+            url = f'{self.api}/repos/{self.repo}/releases/assets/{asset["id"]}'
+        else:   # public repo: the release download link is not rate-limited like the API
+            url = asset['browser_download_url']
         with self.request('GET', url, headers={'Accept': 'application/octet-stream'}, timeout=600) as r:
             copy_stream(r, dest, name, size)
 
@@ -281,8 +292,15 @@ def cmd_download(args):
           f'({sum(a["size"] for a in todo) / 2**30:.2f} GiB)')
     gh, remote = None, {}
     if todo and not args.from_dir:
-        gh = GitHub(m['repo'], token(), args.api, args.uploads)
-        remote = {x['name']: x for x in gh.assets(gh.release(m['tag'])['id'])}
+        gh = GitHub(m['repo'], token(optional=True), args.api, args.uploads)
+        try:
+            rel = gh.release(m['tag'])
+        except urllib.error.HTTPError as e:
+            if e.code in (401, 403, 404):
+                raise SystemExit(f'release {m["tag"]} of {m["repo"]} not reachable (HTTP {e.code}): not uploaded yet, '
+                                 'or the repo is private and the token is missing / lacks Contents: read')
+            raise
+        remote = {x['name']: x for x in gh.assets(rel['id'])}
     bad = []
     for i, a in enumerate(todo, 1):
         t = local_target(a)
@@ -296,7 +314,7 @@ def cmd_download(args):
                 bad.append(f'{a["name"]}: not on the release')
                 continue
             tmp = t.with_name(t.name + '.partial')
-            with_retries(lambda: gh.download(remote[a['name']]['id'], t, a['name'], a['size']), a['name'])
+            with_retries(lambda: gh.download(remote[a['name']], t, a['name'], a['size']), a['name'])
         if sha256(tmp) != a['sha256']:
             tmp.unlink()
             bad.append(f'{a["name"]}: sha256 mismatch')

@@ -2,7 +2,7 @@
 
 Vision-and-language navigation in continuous environments (R2R-CE, RxR-CE): a policy → world model → scorer
 pipeline, the prior-work baselines it is compared against, and an interactive navigation explorer.
-Private working repository. Datasets are not included.
+Working repository (public). Datasets are not included.
 
 **Moving to a new machine? Start with [MIGRATION.md](MIGRATION.md).**
 

@@ -35,7 +35,7 @@ Scenes are split A (fit the policy) / B (fit the scorer) / C (development) / E (
 | Four-model repeat | NWM pair + one shared scorer over 4 world models, then the 7-system E repeat | Queued (`tools/auto_four_*.py`, `auto_nwm_repeat.py`), each waiting on the previous stage | `runs/automatic_*/status.json` |
 
 The `carry` folders are not checkpoints. Regenerating them means rerunning policy rollouts on the
-simulator, so copy them by disk if you want to continue from exactly this state (~58 G in total, see
+simulator, so copy them by disk if you want to continue from exactly this state (~62 G in total, see
 MIGRATION.md §2.3).
 
 ## What was running when this snapshot was taken
