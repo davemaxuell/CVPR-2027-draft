@@ -6,6 +6,10 @@ weights, the rest of our checkpoints, processed training data) is still on the o
 there with `migration/pull_from_server.py`, which rsyncs over SSH, using the item list in
 `migration/server_manifest.json` (exact server paths, rsync filters, sizes measured 2026-10-27).
 
+**Can't reach the old server?** Use the GitHub releases instead: the public one for checkpoints and scorer
+features (MIGRATION.md §3.2b), the private one for the Matterport-derived processed data, explorer renders and
+NWM image index (§3.2c), and public sources for datasets and weights (§3.3).
+
 ## Rules
 
 - **Never commit pulled data.** Datasets and Matterport-derived files (scenes, skyboxes, house meshes, habitat
@@ -40,8 +44,8 @@ relative to the repo as on the server. `hf_*` items go into `$HF_HOME/hub/`; `hf
 After pulling:
 
 1. If the repo is not at `/data/team_a/dave-workspace/RoleVLN`, run `migration/relocate_paths.py` (MIGRATION.md §3.1).
-2. Checkpoint integrity: `python3 -I migration/release_assets.py verify` (sha256 of all 443 release files:
-   105 checkpoints, 2 step logs, 336 scorer-feature files, which `our_checkpoints`, `explorer_train_steplogs`,
+2. Checkpoint integrity: `python3 -I migration/release_assets.py verify` (sha256 of all 445 release files:
+   107 checkpoints, 2 step logs, 336 scorer-feature files, which `our_checkpoints`, `explorer_train_steplogs`,
    `etpnav_data`, `duet_eval`, `ha_vln`, `processed_scorer_features` and the optional `duet_training` +
    `reverie_training` also provide).
 3. Set up the environments and run the checks: MIGRATION.md §3.4–3.7.

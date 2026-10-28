@@ -1,0 +1,147 @@
+{
+  "version": "scorer_v2_2026-10-23",
+  "status": "frozen_after_C_branch_and_closed_loop_selection",
+  "prediction_horizon_actions": 1,
+  "candidate_actions": [
+    "FORWARD",
+    "LEFT",
+    "RIGHT",
+    "STOP"
+  ],
+  "canonical_action_ids": {
+    "FORWARD": 0,
+    "LEFT": 1,
+    "RIGHT": 2,
+    "STOP": 3,
+    "START": 4
+  },
+  "action_id_note": "These are internal IDs. Map explicitly to the actual Habitat task; do not assume its integer IDs match.",
+  "world_model_calls_for_stop": 0,
+  "future_samples_per_nonstop_candidate": 1,
+  "visual_features": {
+    "proposed_encoder": "dinov2_vits14",
+    "profile": "inspected_dinowm_native",
+    "source_image_size": 224,
+    "input_resolution": 196,
+    "patch_size": 14,
+    "raw_grid": 14,
+    "pool_factor": 2,
+    "feature_width": 384,
+    "raw_patches": 196,
+    "pooled_patches": 49,
+    "pixel_range": "RGB_0_1_before_preprocessing",
+    "mean": [
+      0.5,
+      0.5,
+      0.5
+    ],
+    "std": [
+      0.5,
+      0.5,
+      0.5
+    ],
+    "encoder_weights_revision": "072c391c8764fbdcdb9e00bfbf9ec016873fa9707c573e400f44ff385f01f9dd",
+    "checkpoint_contract_verified": true
+  },
+  "world_model_interfaces": {
+    "dinowm": {
+      "source_revision": "0a9492fa12044b852ae9e001cc74604b79c8bb0c",
+      "history_frames": 3,
+      "native_concat_dim": 1,
+      "action_embedding_width": 10,
+      "proprio_embedding_width": 10,
+      "ce_action_encoder": "new three-command embedding",
+      "ce_proprio": "constant zeros; no simulator pose",
+      "transfer": "strict compatible predictor state_dict only; source command/proprio encoders replaced"
+    },
+    "nwm": {
+      "source_revision": "3f6cd8e70d6f2d1e2b9684acff510710135f0f41",
+      "image_size": 224,
+      "context_frames": 4,
+      "latent_channels": 4,
+      "latent_size": 28,
+      "latent_scale": 0.18215,
+      "denoiser_output_channels_with_learned_variance": 8,
+      "command_width": 3,
+      "relative_time_denominator": 128,
+      "ce_command_table": null,
+      "sampling_steps": null,
+      "note": "Select command normalization and sampler budget before running a checkpoint; denoiser output is not a decoded future."
+    }
+  },
+  "text_and_context": {
+    "source": "frozen trained navigation VLM",
+    "hidden_widths": {
+      "smolvlm2": 960,
+      "onevision": 896,
+      "qwen3vl": 2048
+    },
+    "candidate_generation_states_allowed": false
+  },
+  "architecture": {
+    "width": 256,
+    "heads": 4,
+    "memory_slots": 8,
+    "candidate_blocks": 2,
+    "feedforward_width": 512,
+    "readout_width": 128,
+    "heads_out": [
+      "utility",
+      "success_logit",
+      "collision_logit"
+    ]
+  },
+  "labels": {
+    "continuation_policy": "same frozen navigation policy with one-action replanning",
+    "success_weight": 0.7,
+    "ndtw_weight": 0.3,
+    "remaining_action_cost": 0.01,
+    "remaining_collision_cost": 0.02,
+    "cost_denominator": "configured maximum episode action count",
+    "reference_path_used_at_inference": false
+  },
+  "loss": {
+    "utility_mse": 1.0,
+    "terminal_success_bce": 0.1,
+    "immediate_forward_collision_bce": 0.1,
+    "ranking_loss": 0.0
+  },
+  "initial_training_proposal": {
+    "optimizer": "AdamW",
+    "learning_rate": 0.0001,
+    "weight_decay": 0.01,
+    "root_batch_size": 8,
+    "gradient_clip_norm": 1.0,
+    "bptt_real_steps": 32,
+    "features": "cached frozen features; recompute trainable memory from actual prefix",
+    "tuning_status": "not_run"
+  },
+  "selection": {
+    "override_margin": 1000000.0,
+    "margin_selection": "held-out CE training scenes; disable overrides until validated",
+    "fallback": "base policy first action",
+    "tie_break": "base action if its score ties for best; otherwise canonical candidate order"
+  },
+  "comparison": {
+    "scorer_per_navigation_policy": true,
+    "same_scorer_weights_across_four_world_models": true,
+    "world_model_identity_input": false,
+    "world_models_frozen_during_scorer_training": true
+  },
+  "frozen_input_dataset": {
+    "version": "smolvlm2_refined512_dino_pair_v1",
+    "protocol_sha256": "020f03d57e81e88c4093dc8c5feba4bb347d668ffcb0b350884c238da59beb44",
+    "policy_identity_sha256": "729480bf5c8402b07cad653a7ef0f7124be212d50255077290316ba686777ca7",
+    "world_model_trials": [
+      "dinowm_transfer",
+      "dinov2_fresh_dynamics"
+    ],
+    "equal_model_sampling_probabilities": [
+      0.5,
+      0.5
+    ],
+    "world_model_identity_input": false,
+    "future_grad": false,
+    "memory_recomputed_from_real_prefix": true
+  }
+}

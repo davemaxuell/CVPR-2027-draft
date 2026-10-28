@@ -2,7 +2,9 @@
 
 Run: `runs/step5b_smolvlm2_refined512_nwm_pair_v1/`.
 This is the next world-model repeat under the user's standing authorization to proceed
-automatically. Its GPU work starts after the initial DINO [Step 10](Step10_Run.md) pilot finishes.
+automatically. The pipeline started at 05:59 KST on 28 October 2026, after the initial DINO
+[Step 10](Step10_Run.md) pilot passed its final audit. CPU and GPU preflight checks precede
+caching and training; the live stage is recorded in the run's `status.json`.
 
 The released `facebook/nwm` CDiT-S/2 checkpoint at revision
 `0821a1a7b1ae938539e32f13f5ad82465e0f3fde` passed strict CPU loading of all 219 EMA tensors
@@ -16,6 +18,13 @@ denoiser output agreement, finite native-objective gradients, and repeatable RNG
 sampling. The CPU sampler test uses two steps solely to exercise the interface. GPU throughput,
 mixed-precision agreement, exact optimizer/EMA restart, and packaged three-candidate prediction
 are mandatory checks before the training protocol is locked.
+
+The GPU checks passed on 28 October, including exact native loss/output agreement, exact
+optimizer/EMA restart, and repeatable complete VAE-to-DINO candidate prediction. The protocol
+is now locked and posterior caching has started. The short GPU profile measured about
+0.0874 seconds per update (55 minutes of compute per 37,852-update pass), excluding data
+loading, validation, checkpointing, and the preceding cache. The 875,174-image cache and
+both training passes remain unfinished.
 
 Both variants will use the original **2,422,469 matched group-A transitions**, the same seeded
 sample order, and the same 3,072 group-C expert-path validation samples as the DINO pair. The

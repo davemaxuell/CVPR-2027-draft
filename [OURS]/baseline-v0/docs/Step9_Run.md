@@ -1,7 +1,13 @@
 # Step 9 — C navigation calibration and frozen settings
 
 Run: `runs/step9_smolvlm2_refined512_dino_pair_v1/`.
-Execution proceeds automatically after the matched [Step 8](Step8_Run.md) runs finish.
+Completed on 27 October 2026 at 14:50 KST, after the matched [Step 8](Step8_Run.md) runs.
+The pooled update-1536/margin-0.1 candidate averaged 7/224 successes across the DINO pair;
+the null update-1408/margin-0.2 candidate achieved 19/224, versus the base policy's 29/224.
+The predeclared conservative fallback was therefore applied. Margin 1.0 still changed actions,
+so both variants froze margin 1,000,000, which reproduced all base C224 actions and 29 successes
+exactly. This is conservative base-policy behavior, not a demonstrated scorer improvement.
+Weights and settings are recorded in the run's `frozen/` bundles and `result.json`.
 
 The two checkpoints with lowest C branch regret from the predicted-only stage are shortlisted
 for each scorer variant. For each checkpoint, the two lowest-regret margins from

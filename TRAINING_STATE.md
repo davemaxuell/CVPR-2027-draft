@@ -1,5 +1,14 @@
 # Training state at migration (baseline-v0)
 
+**Current verified status — 28 October 2026:** the SmolVLM2 + DINO pipeline is complete
+through Step 10 and organized as [trial_0](%5BOURS%5D/baseline-v0/trials/trial_0/README.md).
+All five systems achieved 21/224 E successes (9.375%) with zero scorer overrides.
+The later NWM/CDiT caching and four-model queues were stopped by user request at
+06:28 KST; automatic continuation is disabled. The snapshot below predates those
+events: its running/queued statuses and recommendation to let the queue finish
+are historical, not current instructions. Use the trial archive for final results
+and selected artifacts; retain the diagnoses and migration guidance below as context.
+
 Snapshot of 2026-10-27, written for picking the work up on the new machine. The full record is
 `[OURS]/baseline-v0/README.md`, the `docs/Step*_Run.md` files and each run's `RESULTS.md` /
 `final_verification.json`. This page says what was done, what is still running, and where every artifact

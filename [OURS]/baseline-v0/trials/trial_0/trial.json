@@ -1,0 +1,736 @@
+{
+  "schema_version": 1,
+  "trial_id": "trial_0",
+  "title": "SmolVLM2-500M + DINO world-model pair",
+  "status": "complete",
+  "scope": "end-to-end pilot",
+  "parent_trial": null,
+  "organized_utc": "2026-10-28T01:58:05.353576+00:00",
+  "completed_utc": "2026-10-27T20:59:37.048038+00:00",
+  "path_convention": "Paths are relative to this trial directory unless otherwise stated. Historical snapshots retain original paths.",
+  "storage": "Snapshot small metadata and reports; relative symlinks to original runs, frozen bundles, and processed data.",
+  "policy": {
+    "model": "HuggingFaceTB/SmolVLM2-500M-Video-Instruct",
+    "training": "decoder LoRA rank 16",
+    "selected_refinement_update": 512,
+    "STOP_logit_bias": -0.25,
+    "identity_sha256": "729480bf5c8402b07cad653a7ef0f7124be212d50255077290316ba686777ca7",
+    "bundle": "checkpoints/policy",
+    "control": "checkpoints/policy_control",
+    "original_stopping_safeguard_passed": false
+  },
+  "world_models": [
+    {
+      "name": "dinowm_transfer",
+      "bundle": "checkpoints/dinowm_transfer",
+      "updates": 37852,
+      "selected_update": 36864,
+      "C_feature_MSE": 1.347413588121223
+    },
+    {
+      "name": "dinov2_fresh_dynamics",
+      "bundle": "checkpoints/dinov2_fresh_dynamics",
+      "updates": 37852,
+      "selected_update": 36864,
+      "C_feature_MSE": 1.3207671881536953
+    }
+  ],
+  "scorers": {
+    "pooled": {
+      "bundle": "checkpoints/scorer_pooled",
+      "selected_update": 1536,
+      "margin": 1000000.0,
+      "updates": 2048
+    },
+    "null": {
+      "bundle": "checkpoints/scorer_null",
+      "selected_update": 1408,
+      "margin": 1000000.0,
+      "updates": 2048
+    }
+  },
+  "datasets": [
+    "R2R-CE",
+    "RxR-CE English guide"
+  ],
+  "protocol": {
+    "forward_m": 0.25,
+    "turn_degrees": 15,
+    "actions": [
+      "FORWARD",
+      "LEFT",
+      "RIGHT",
+      "STOP"
+    ],
+    "groups": {
+      "A": "policy and world-model fitting",
+      "B": "scorer fitting",
+      "C": "development",
+      "E": "final evaluation"
+    },
+    "partition": "manifest/scene_partition.json",
+    "final": "results/protocol.json",
+    "original": "results/original_protocol.json"
+  },
+  "training_budgets": {
+    "policy_sft_updates": 4096,
+    "policy_sft_samples": 262144,
+    "policy_sft_available_samples": 2218976,
+    "policy_sft_passes": 0.11813737507751323,
+    "dagger_updates": 2048,
+    "world_model_updates_each": 37852,
+    "world_model_samples_each": 2422469,
+    "scorer_updates_each": 2048
+  },
+  "steps": [
+    {
+      "step": "00",
+      "title": "Environment and interface checks",
+      "status": "complete",
+      "path": "steps/00_setup",
+      "evidence": [
+        "steps/00_setup/check_ce_replay_r2r.json",
+        "steps/00_setup/check_ce_replay_rxr.json",
+        "steps/00_setup/check_policy_step.json",
+        "steps/00_setup/scorer_design_check.json",
+        "steps/00_setup/model_compatibility_check.json"
+      ],
+      "note": "Organizational label; original training specification begins at step 1."
+    },
+    {
+      "step": "01",
+      "title": "Experiment settings and expert data",
+      "status": "complete",
+      "path": "steps/01_experiment",
+      "evidence": [
+        "manifest/experiment_manifest.yaml",
+        "manifest/scene_partition.json",
+        "data/expert_groupA/render_manifest.json",
+        "runs/step2_smolvlm2/RESULTS.md"
+      ],
+      "note": "21333 clean expert episodes; 2218976 available SFT samples."
+    },
+    {
+      "step": "02",
+      "title": "Expert policy supervision",
+      "status": "complete",
+      "path": "steps/02_policy_sft",
+      "run": "runs/step2_smolvlm2",
+      "recorded_completion_utc": "2026-10-23T13:02:38.449424+00:00",
+      "evidence": [
+        "steps/02_policy_sft/status.json",
+        "steps/02_policy_sft/final_verification.json"
+      ],
+      "note": "4096 updates; selected update 3072; 4/64 C successes"
+    },
+    {
+      "step": "03",
+      "title": "DAgger collection and refinement",
+      "status": "complete",
+      "path": "steps/03_dagger",
+      "run": "runs/step3_smolvlm2",
+      "recorded_completion_utc": "2026-10-24T08:18:44.410259+00:00",
+      "evidence": [
+        "steps/03_dagger/status.json",
+        "steps/03_dagger/final_verification.json"
+      ],
+      "note": "256 A episodes; 125730 labels; 2048 updates; Step 2 control retained"
+    },
+    {
+      "step": "03b",
+      "title": "STOP study and refinement selection",
+      "status": "complete",
+      "path": "steps/03b_stop_refinement",
+      "run": "runs/step3b_smolvlm2_stop",
+      "recorded_completion_utc": "2026-10-25T00:13:57.006118+00:00",
+      "evidence": [
+        "steps/03b_stop_refinement/experiment_status.json",
+        "steps/03b_stop_refinement/check_final.json"
+      ],
+      "note": "Refined update 512 with STOP bias -0.25 selected by user; safeguard failed"
+    },
+    {
+      "step": "04",
+      "title": "World-model transition corpus",
+      "status": "complete",
+      "path": "steps/04_world_model_data",
+      "run": "runs/step4_smolvlm2_refined512",
+      "recorded_completion_utc": "2026-10-25T19:37:08.055336+00:00",
+      "evidence": [
+        "steps/04_world_model_data/status.json",
+        "steps/04_world_model_data/final_verification.json"
+      ],
+      "note": "2488382 movement transitions; 2422469 matched samples"
+    },
+    {
+      "step": "05",
+      "title": "DINO-WM transfer and fresh dynamics",
+      "status": "complete",
+      "path": "steps/05_dino_world_models",
+      "run": "runs/step5_smolvlm2_refined512",
+      "recorded_completion_utc": "2026-10-26T01:00:31.131117+00:00",
+      "evidence": [
+        "steps/05_dino_world_models/status.json",
+        "steps/05_dino_world_models/final_verification.json"
+      ],
+      "note": "37852 updates each; both selected update 36864"
+    },
+    {
+      "step": "06",
+      "title": "Measured alternative-action outcomes",
+      "status": "complete",
+      "path": "steps/06_scorer_labels",
+      "run": "runs/step6_smolvlm2_refined512",
+      "recorded_completion_utc": "2026-10-26T14:09:12.486467+00:00",
+      "evidence": [
+        "steps/06_scorer_labels/status.json",
+        "steps/06_scorer_labels/full/verification.json"
+      ],
+      "note": "1024 B roots + 256 C roots; 5120 branches"
+    },
+    {
+      "step": "07",
+      "title": "Frozen policy and visual features",
+      "status": "complete",
+      "path": "steps/07_scorer_features",
+      "run": "runs/step7_smolvlm2_refined512_dino_pair_v1",
+      "recorded_completion_utc": "2026-10-26T20:44:30.080720+00:00",
+      "evidence": [
+        "steps/07_scorer_features/status.json",
+        "steps/07_scorer_features/verification.json"
+      ],
+      "note": "1280 roots; 28859 prefix updates; 25020 images"
+    },
+    {
+      "step": "08",
+      "title": "Pooled and null-future scorer training",
+      "status": "complete",
+      "path": "steps/08_scorer_training",
+      "run": "runs/step8_smolvlm2_refined512_dino_pair_v1",
+      "recorded_completion_utc": "2026-10-27T05:50:07.767560+00:00",
+      "evidence": [
+        "steps/08_scorer_training/status.json",
+        "steps/08_scorer_training/training_verification.json"
+      ],
+      "note": "2048 updates per variant; matched training audit passed"
+    },
+    {
+      "step": "09",
+      "title": "C navigation calibration and selection",
+      "status": "complete",
+      "path": "steps/09_calibration",
+      "run": "runs/step9_smolvlm2_refined512_dino_pair_v1",
+      "recorded_completion_utc": "2026-10-27T05:50:07.765777+00:00",
+      "evidence": [
+        "steps/09_calibration/status.json",
+        "steps/09_calibration/result.json"
+      ],
+      "note": "Pooled update 1536; null update 1408; both margins 1000000; 29/224 C successes"
+    },
+    {
+      "step": "10",
+      "title": "Final E pilot with five systems",
+      "status": "complete",
+      "path": "steps/10_evaluation",
+      "run": "runs/step10_smolvlm2_refined512_dino_pair_v1",
+      "recorded_completion_utc": "2026-10-27T20:59:38.013726+00:00",
+      "evidence": [
+        "steps/10_evaluation/status.json",
+        "steps/10_evaluation/verification.json"
+      ],
+      "note": "224 episodes per system; 21 successes each; zero overrides"
+    }
+  ],
+  "bundles": {
+    "policy": {
+      "path": "checkpoints/policy",
+      "hash_manifest": "checkpoints/policy/file_sha256.json"
+    },
+    "policy_control": {
+      "path": "checkpoints/policy_control",
+      "hash_manifest": "checkpoints/policy_control/sha256.json"
+    },
+    "encoder": {
+      "path": "checkpoints/encoder",
+      "hash_manifest": "checkpoints/encoder/file_sha256.json"
+    },
+    "dinowm_transfer": {
+      "path": "checkpoints/dinowm_transfer",
+      "hash_manifest": "checkpoints/dinowm_transfer/file_sha256.json"
+    },
+    "dinov2_fresh_dynamics": {
+      "path": "checkpoints/dinov2_fresh_dynamics",
+      "hash_manifest": "checkpoints/dinov2_fresh_dynamics/file_sha256.json"
+    },
+    "scorer_pooled": {
+      "path": "checkpoints/scorer_pooled",
+      "hash_manifest": "checkpoints/scorer_pooled/file_sha256.json"
+    },
+    "scorer_null": {
+      "path": "checkpoints/scorer_null",
+      "hash_manifest": "checkpoints/scorer_null/file_sha256.json"
+    }
+  },
+  "processed_data": [
+    "data/expert_groupA",
+    "data/expert_groupC_600",
+    "data/dagger_groupA_round1_smolvlm2",
+    "data/dagger_groupA_round2_smolvlm2_stop2m",
+    "data/wm_visits_groupA_smolvlm2_refined512_v1",
+    "data/wm_groupA_smolvlm2_refined512_v1",
+    "data/wm_dino_features_refined512_v1",
+    "data/scorer_labels_smolvlm2_refined512_v1",
+    "data/scorer_features_smolvlm2_refined512_dino_pair_v1"
+  ],
+  "results": {
+    "report": "results/RESULTS.md",
+    "metrics": "results/metrics.csv",
+    "full": "results/result.json",
+    "audit": "results/verification.json",
+    "episodes": "results/episodes",
+    "systems": [
+      "policy",
+      "null",
+      "actual",
+      "dinowm_transfer",
+      "dinov2_fresh_dynamics"
+    ],
+    "episodes_per_system": 224,
+    "datasets_per_system": {
+      "r2r": 112,
+      "rxr": 112
+    },
+    "E_scenes": 11,
+    "successes_each": 21,
+    "SR_each": 0.09375,
+    "SPL_each": 0.057790311248129424,
+    "override_rate_each": 0.0,
+    "navigation_gain_demonstrated": false,
+    "mean_navigation_error_infinite": true,
+    "unreachable_goal_episodes_each": 5
+  },
+  "limitations": [
+    "Partial-pass policy SFT (0.1181 passes); completed pilot does not imply convergence.",
+    "E pilot uses 224 of 5508 official unseen episodes.",
+    "Conservative margins yield zero overrides and no navigation improvement.",
+    "Selected policy failed the original stopping safeguard and was explicitly selected by the user.",
+    "RxR uses 15-degree turns rather than the official 30-degree protocol.",
+    "Five unreachable-goal episodes retained; mean navigation error is infinite.",
+    "Actual-next-view scorer is a privileged control."
+  ],
+  "excluded_continuations": {
+    "status": "stopped_by_user",
+    "automatic_progression_enabled": false,
+    "record": "provenance/continuation_stop.json",
+    "runs": [
+      "step5b_smolvlm2_refined512_nwm_pair_v1",
+      "step8b_smolvlm2_refined512_four_models_v1",
+      "step9b_smolvlm2_refined512_four_models_v1",
+      "step10b_smolvlm2_refined512_four_models_v1"
+    ]
+  },
+  "snapshots": [
+    {
+      "path": "steps/00_setup/check_ce_replay_r2r.json",
+      "source": "../../logs/check_ce_replay_r2r.json",
+      "sha256": "f95c23b201a52e65cdc17a0cbe1b5b751daf0717a5de37f535e1d14629a1203b"
+    },
+    {
+      "path": "steps/00_setup/check_ce_replay_rxr.json",
+      "source": "../../logs/check_ce_replay_rxr.json",
+      "sha256": "82ed99b8308941e5c057291c87a9046e67ed26a9fde09c87f04915a433b5ae52"
+    },
+    {
+      "path": "steps/00_setup/check_policy_step.json",
+      "source": "../../logs/check_policy_step.json",
+      "sha256": "93db5c3ec30b7b569e3266d6354434fa6faed1076980c87aaf2a177b5490e0e2"
+    },
+    {
+      "path": "steps/00_setup/scorer_design_check.json",
+      "source": "../../Scorer/check_results.json",
+      "sha256": "0bd9dc0e83b7c098f05b1e84ae11651e74d1532f7b5a070a468845c76437133e"
+    },
+    {
+      "path": "steps/00_setup/model_compatibility_check.json",
+      "source": "../../Scorer/compatibility_results.json",
+      "sha256": "fb9a63bfe5d0b05bb6e0e80988e08bc3fd1ccc1bdd374631aa87867af66332b2"
+    },
+    {
+      "path": "steps/00_setup/setup_env.sh",
+      "source": "../../env/setup_env.sh",
+      "sha256": "0253bd2f2b3e6002b56c30d45d31444a242c2520b874420c109dfe40ba8b10a4"
+    },
+    {
+      "path": "manifest/Backbone_Trials.json",
+      "source": "../../manifest/Backbone_Trials.json",
+      "sha256": "357fc78f4964c22d827ba6c7e7e4820fb36cc51902f382ab62999ff9d5f9f0e0"
+    },
+    {
+      "path": "manifest/World_Model_Trials.json",
+      "source": "../../manifest/World_Model_Trials.json",
+      "sha256": "1dc44978cee34e1d45182a3e42f3e4711f98d7ac64d1857c71c11b85c78195dd"
+    },
+    {
+      "path": "manifest/experiment_manifest.yaml",
+      "source": "../../manifest/experiment_manifest.yaml",
+      "sha256": "43f03d86f514c353e8e618fd1dfc45072eaa50aa5c91ceede886284e52d8fc4c"
+    },
+    {
+      "path": "manifest/model_revisions.json",
+      "source": "../../manifest/model_revisions.json",
+      "sha256": "28f7ec7490f8eca8157ad0a4c179644e7d88cc10f6825333cf5b1cb2cad337a2"
+    },
+    {
+      "path": "manifest/scene_partition.json",
+      "source": "../../manifest/scene_partition.json",
+      "sha256": "8ee6a37535c92f953fe509f9cfa38e1ce2ac069656d4b443fbdfd4b13f54d2d7"
+    },
+    {
+      "path": "manifest/source_pins.json",
+      "source": "../../manifest/source_pins.json",
+      "sha256": "16206175ecbb4b2d237afa02bfb5f7a5f5e8863aff47cf08ab38fc1afe7c6333"
+    },
+    {
+      "path": "docs/Architecture_Compatibility.md",
+      "source": "../../docs/Architecture_Compatibility.md",
+      "sha256": "4d0bf43dbbf1c5baf61e4d684990a499e32255f18eb6ef91ed73118da077bbf0"
+    },
+    {
+      "path": "docs/CE_World_Model_Approach.md",
+      "source": "../../docs/CE_World_Model_Approach.md",
+      "sha256": "7e85e0a5cc7e217e1a7b9029db5f39b3de20d6fe59d2944305d9b8b015d6a9b8"
+    },
+    {
+      "path": "docs/DAgger_Run.md",
+      "source": "../../docs/DAgger_Run.md",
+      "sha256": "8acb4d86a0277666fa0f0ddbc7c06cc858fb45815cf97e8c534f6c3d8d2b343d"
+    },
+    {
+      "path": "docs/Scorer_Design.md",
+      "source": "../../docs/Scorer_Design.md",
+      "sha256": "8b6073ab09fb31eda3931686e7387b1e5c309a45b81f67d1d34a8eb47bee2b18"
+    },
+    {
+      "path": "docs/Side_Notes.md",
+      "source": "../../docs/Side_Notes.md",
+      "sha256": "90ecf8ea6559c83ce3373bc73962544952fe1c02f14d35651b34f011b91547ec"
+    },
+    {
+      "path": "docs/Step10_Run.md",
+      "source": "../../docs/Step10_Run.md",
+      "sha256": "f91fd2f55f0ce453c815047e354fd87734577ee8320abe9c278d13ecc0005530"
+    },
+    {
+      "path": "docs/Step4_Run.md",
+      "source": "../../docs/Step4_Run.md",
+      "sha256": "11809148a6b640e663b460ea42d919adedb4c812f451f122483674e197b666a9"
+    },
+    {
+      "path": "docs/Step5_Run.md",
+      "source": "../../docs/Step5_Run.md",
+      "sha256": "cc182dfa1360c003694141c24b4a11898b95155a64002364b04f1f3a3a887e1e"
+    },
+    {
+      "path": "docs/Step6_Run.md",
+      "source": "../../docs/Step6_Run.md",
+      "sha256": "46a2e87860dbbf99f7bb24e2a05d42acc62f3b3a7f0657274dabd8b379de5f5b"
+    },
+    {
+      "path": "docs/Step7_Run.md",
+      "source": "../../docs/Step7_Run.md",
+      "sha256": "d28bc8bad6da5b546b13a248abb26204034ef1fe3b7643dfefe255ff77f82da9"
+    },
+    {
+      "path": "docs/Step8_Run.md",
+      "source": "../../docs/Step8_Run.md",
+      "sha256": "d7eaa3339949be1e9b394182cb3312b523fbd6c83ca2fa5409d13158e19b40d1"
+    },
+    {
+      "path": "docs/Step9_Run.md",
+      "source": "../../docs/Step9_Run.md",
+      "sha256": "be98f241073ec86ffc7f6e9b385bfbccc815ca45e006b544ffca2c26d76b476b"
+    },
+    {
+      "path": "docs/Vanilla_Training.md",
+      "source": "../../docs/Vanilla_Training.md",
+      "sha256": "2bdac5a7cfaae282629f2d57448a9d77bad424b589255a10e26ba076e0211b38"
+    },
+    {
+      "path": "results/RESULTS.md",
+      "source": "../../runs/step10_smolvlm2_refined512_dino_pair_v1/recovery_v2/RESULTS.md",
+      "sha256": "bf3a5298423495729a605776266dd2800b669198f9fd98b0336e33f463d28c94"
+    },
+    {
+      "path": "results/metrics.csv",
+      "source": "../../runs/step10_smolvlm2_refined512_dino_pair_v1/recovery_v2/metrics.csv",
+      "sha256": "3e6e363dd2620bf6ee0d29211a66a71a1d9602520247e5a84a912ae70dd36fea"
+    },
+    {
+      "path": "results/result.json",
+      "source": "../../runs/step10_smolvlm2_refined512_dino_pair_v1/recovery_v2/result.json",
+      "sha256": "96aaab0d36c8bf08c9136ff7cf902474f817cf5db622e237962fcc947cb1cdc5"
+    },
+    {
+      "path": "results/verification.json",
+      "source": "../../runs/step10_smolvlm2_refined512_dino_pair_v1/recovery_v2/verification.json",
+      "sha256": "fb8ee0c67e0faf5c07864ae8ca59ce23b57de8fbcaf0c0ce1b7e70adf28883e5"
+    },
+    {
+      "path": "results/protocol.json",
+      "source": "../../runs/step10_smolvlm2_refined512_dino_pair_v1/recovery_v2/protocol.json",
+      "sha256": "7978965556896b503151ff903fd43f95a404141323571d15bbce098f7fb9c190"
+    },
+    {
+      "path": "results/selection.json",
+      "source": "../../runs/step10_smolvlm2_refined512_dino_pair_v1/recovery_v2/selection.json",
+      "sha256": "025554c62b851d2b8f81304d09f1030a8b2a140a1bf0d06e1bf2ffdfe50b3b98"
+    },
+    {
+      "path": "results/finalization_v3.json",
+      "source": "../../runs/step10_smolvlm2_refined512_dino_pair_v1/recovery_v2/finalization_v3.json",
+      "sha256": "430051e21d8a401813129931f13e9b9afc3fd07c939e5b14d406225a5f67ebbd"
+    },
+    {
+      "path": "results/status.json",
+      "source": "../../runs/step10_smolvlm2_refined512_dino_pair_v1/recovery_v2/status.json",
+      "sha256": "5fb90b0c83bea11ca0c370cfcfe25da23d6862223b46413dad36f983ef17abdb"
+    },
+    {
+      "path": "results/original_protocol.json",
+      "source": "../../runs/step10_smolvlm2_refined512_dino_pair_v1/protocol.json",
+      "sha256": "058b7708b4beaf30dbc9bc07d8695301e3c7e7a2e875167979b5e782109a1a92"
+    },
+    {
+      "path": "provenance/continuation_stop.json",
+      "source": "../../runs/user_stop_20261027T212833Z.json",
+      "sha256": "73b5127fb074487c72f4ede9fd7f9ed4daf6e9dd3be44cbe71dde68c2849df0e"
+    },
+    {
+      "path": "provenance/nwm_status.json",
+      "source": "../../runs/step5b_smolvlm2_refined512_nwm_pair_v1/status.json",
+      "sha256": "a72b603aa93efe68f3bb20bcd1014fae939a7f76f270d7d27a3e418c6e840cc2"
+    },
+    {
+      "path": "Scorer/check_compatibility.py",
+      "source": "../../Scorer/check_compatibility.py",
+      "sha256": "3b0b90b9203326ad8043932813c56f1612b08c1ff87b0925aebc148a2a17ee24"
+    },
+    {
+      "path": "Scorer/check_design.py",
+      "source": "../../Scorer/check_design.py",
+      "sha256": "0a6d9b978786574568e609852b31d637dbe2aa0f0860ab5ed8c4f6a69c331109"
+    },
+    {
+      "path": "Scorer/check_results.json",
+      "source": "../../Scorer/check_results.json",
+      "sha256": "0bd9dc0e83b7c098f05b1e84ae11651e74d1532f7b5a070a468845c76437133e"
+    },
+    {
+      "path": "Scorer/check_results.windows.json",
+      "source": "../../Scorer/check_results.windows.json",
+      "sha256": "30af403095c986b00928daa88cfef3a74361a1e63d383b8258ee5f75f05e31df"
+    },
+    {
+      "path": "Scorer/compatibility_results.json",
+      "source": "../../Scorer/compatibility_results.json",
+      "sha256": "fb9a63bfe5d0b05bb6e0e80988e08bc3fd1ccc1bdd374631aa87867af66332b2"
+    },
+    {
+      "path": "Scorer/compatibility_results.windows.json",
+      "source": "../../Scorer/compatibility_results.windows.json",
+      "sha256": "15f6109b265722e026c5421c2dba98d75693ecf7db07e036205be378f7635a7f"
+    },
+    {
+      "path": "Scorer/config.json",
+      "source": "../../Scorer/config.json",
+      "sha256": "04b05c8239bcd57484a0ccdbc40863ffef2535d5e7e7f3359ae2eb32ed100471"
+    },
+    {
+      "path": "Scorer/interfaces.py",
+      "source": "../../Scorer/interfaces.py",
+      "sha256": "f04ebf78fd60242b203634acb51a814e3e147bd50da1ed293016d6d5cea0f4b5"
+    },
+    {
+      "path": "Scorer/labels.py",
+      "source": "../../Scorer/labels.py",
+      "sha256": "cf0292e3d858ef091f556cbea68972bed257423648bb806b37657c9bb7e2910e"
+    },
+    {
+      "path": "Scorer/runtime.py",
+      "source": "../../Scorer/runtime.py",
+      "sha256": "9224fae3f14e20997a7988a295054058bef77b82195135bb904673dbc32aee80"
+    },
+    {
+      "path": "Scorer/scorer.py",
+      "source": "../../Scorer/scorer.py",
+      "sha256": "2863c9cbb80ea551ea334effb9aa99d903b87abc5239b9df51fdc633efb155e9"
+    },
+    {
+      "path": "Scorer/world_models.py",
+      "source": "../../Scorer/world_models.py",
+      "sha256": "df909188d68c8a11015e1904ba9d196317fd850941574cc7e659653fccb373b0"
+    }
+  ],
+  "links": [
+    {
+      "path": "runs/step2_smolvlm2",
+      "target": "../../../runs/step2_smolvlm2"
+    },
+    {
+      "path": "runs/step3_smolvlm2",
+      "target": "../../../runs/step3_smolvlm2"
+    },
+    {
+      "path": "runs/step3b_smolvlm2_stop",
+      "target": "../../../runs/step3b_smolvlm2_stop"
+    },
+    {
+      "path": "runs/step4_smolvlm2_refined512",
+      "target": "../../../runs/step4_smolvlm2_refined512"
+    },
+    {
+      "path": "runs/step5_smolvlm2_refined512",
+      "target": "../../../runs/step5_smolvlm2_refined512"
+    },
+    {
+      "path": "runs/step6_smolvlm2_refined512",
+      "target": "../../../runs/step6_smolvlm2_refined512"
+    },
+    {
+      "path": "runs/step7_smolvlm2_refined512_dino_pair_v1",
+      "target": "../../../runs/step7_smolvlm2_refined512_dino_pair_v1"
+    },
+    {
+      "path": "runs/step8_smolvlm2_refined512_dino_pair_v1",
+      "target": "../../../runs/step8_smolvlm2_refined512_dino_pair_v1"
+    },
+    {
+      "path": "runs/step9_smolvlm2_refined512_dino_pair_v1",
+      "target": "../../../runs/step9_smolvlm2_refined512_dino_pair_v1"
+    },
+    {
+      "path": "runs/step10_smolvlm2_refined512_dino_pair_v1",
+      "target": "../../../runs/step10_smolvlm2_refined512_dino_pair_v1"
+    },
+    {
+      "path": "runs/smolvlm2_pretrained_baseline_C64",
+      "target": "../../../runs/smolvlm2_pretrained_baseline_C64"
+    },
+    {
+      "path": "docs/references",
+      "target": "../../../docs/references"
+    },
+    {
+      "path": "steps/01_experiment",
+      "target": "../manifest"
+    },
+    {
+      "path": "steps/02_policy_sft",
+      "target": "../runs/step2_smolvlm2"
+    },
+    {
+      "path": "steps/03_dagger",
+      "target": "../runs/step3_smolvlm2"
+    },
+    {
+      "path": "steps/03b_stop_refinement",
+      "target": "../runs/step3b_smolvlm2_stop"
+    },
+    {
+      "path": "steps/04_world_model_data",
+      "target": "../runs/step4_smolvlm2_refined512"
+    },
+    {
+      "path": "steps/05_dino_world_models",
+      "target": "../runs/step5_smolvlm2_refined512"
+    },
+    {
+      "path": "steps/06_scorer_labels",
+      "target": "../runs/step6_smolvlm2_refined512"
+    },
+    {
+      "path": "steps/07_scorer_features",
+      "target": "../runs/step7_smolvlm2_refined512_dino_pair_v1"
+    },
+    {
+      "path": "steps/08_scorer_training",
+      "target": "../runs/step8_smolvlm2_refined512_dino_pair_v1"
+    },
+    {
+      "path": "steps/09_calibration",
+      "target": "../runs/step9_smolvlm2_refined512_dino_pair_v1"
+    },
+    {
+      "path": "steps/10_evaluation",
+      "target": "../runs/step10_smolvlm2_refined512_dino_pair_v1"
+    },
+    {
+      "path": "checkpoints/policy",
+      "target": "../../../runs/step4_smolvlm2_refined512/reference"
+    },
+    {
+      "path": "checkpoints/policy_control",
+      "target": "../../../runs/step3_smolvlm2/frozen_reference"
+    },
+    {
+      "path": "checkpoints/encoder",
+      "target": "../../../runs/step5_smolvlm2_refined512/frozen/encoder"
+    },
+    {
+      "path": "checkpoints/dinowm_transfer",
+      "target": "../../../runs/step5_smolvlm2_refined512/frozen/dinowm_transfer"
+    },
+    {
+      "path": "checkpoints/dinov2_fresh_dynamics",
+      "target": "../../../runs/step5_smolvlm2_refined512/frozen/dinov2_fresh_dynamics"
+    },
+    {
+      "path": "checkpoints/scorer_pooled",
+      "target": "../../../runs/step9_smolvlm2_refined512_dino_pair_v1/frozen/pooled"
+    },
+    {
+      "path": "checkpoints/scorer_null",
+      "target": "../../../runs/step9_smolvlm2_refined512_dino_pair_v1/frozen/null"
+    },
+    {
+      "path": "data/expert_groupA",
+      "target": "../../../../../data/processed/baseline_v0/expert_groupA"
+    },
+    {
+      "path": "data/expert_groupC_600",
+      "target": "../../../../../data/processed/baseline_v0/expert_groupC_600"
+    },
+    {
+      "path": "data/dagger_groupA_round1_smolvlm2",
+      "target": "../../../../../data/processed/baseline_v0/dagger_groupA_round1_smolvlm2"
+    },
+    {
+      "path": "data/dagger_groupA_round2_smolvlm2_stop2m",
+      "target": "../../../../../data/processed/baseline_v0/dagger_groupA_round2_smolvlm2_stop2m"
+    },
+    {
+      "path": "data/wm_visits_groupA_smolvlm2_refined512_v1",
+      "target": "../../../../../data/processed/baseline_v0/wm_visits_groupA_smolvlm2_refined512_v1"
+    },
+    {
+      "path": "data/wm_groupA_smolvlm2_refined512_v1",
+      "target": "../../../../../data/processed/baseline_v0/wm_groupA_smolvlm2_refined512_v1"
+    },
+    {
+      "path": "data/wm_dino_features_refined512_v1",
+      "target": "../../../../../data/processed/baseline_v0/wm_dino_features_refined512_v1"
+    },
+    {
+      "path": "data/scorer_labels_smolvlm2_refined512_v1",
+      "target": "../../../../../data/processed/baseline_v0/scorer_labels_smolvlm2_refined512_v1"
+    },
+    {
+      "path": "data/scorer_features_smolvlm2_refined512_dino_pair_v1",
+      "target": "../../../../../data/processed/baseline_v0/scorer_features_smolvlm2_refined512_dino_pair_v1"
+    },
+    {
+      "path": "results/episodes",
+      "target": "../../../runs/step10_smolvlm2_refined512_dino_pair_v1/recovery_v2/evaluation"
+    }
+  ]
+}

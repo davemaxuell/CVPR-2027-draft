@@ -1,0 +1,103 @@
+{
+  "format": "controlled_E_evaluation_protocol_v1",
+  "policy_identity_sha256": "729480bf5c8402b07cad653a7ef0f7124be212d50255077290316ba686777ca7",
+  "STOP_bias": -0.25,
+  "calibration_result_sha256": "87cf6e92219ab6527de15a777bc5cbbf7c5f7286e6ca2a70b76a0a4bfe635302",
+  "calibration_protocol_sha256": "6ccc6cc24de92ac4a0838d68ae37755e10885d6efabe5ed67dc61e83a96b547c",
+  "selection_sha256": "025554c62b851d2b8f81304d09f1030a8b2a140a1bf0d06e1bf2ffdfe50b3b98",
+  "systems": [
+    {
+      "name": "policy",
+      "mode": "policy",
+      "checkpoint": null,
+      "world_model": null,
+      "margin": null,
+      "checkpoint_sha256": null
+    },
+    {
+      "name": "null",
+      "mode": "null",
+      "checkpoint": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/step9_smolvlm2_refined512_dino_pair_v1/frozen/null/scorer.pt",
+      "world_model": null,
+      "margin": 1000000.0,
+      "checkpoint_sha256": "67ec176b4001a523f7fffaa7351eec198874d174964ea186a167beacf6d06b4c"
+    },
+    {
+      "name": "actual",
+      "mode": "actual",
+      "checkpoint": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/step9_smolvlm2_refined512_dino_pair_v1/frozen/pooled/scorer.pt",
+      "world_model": null,
+      "margin": 1000000.0,
+      "checkpoint_sha256": "6d6ea577a01e80eb5d9eaa13becf57a1aaa4e46d7ffebb0156340302e0f59992"
+    },
+    {
+      "name": "dinowm_transfer",
+      "mode": "predicted",
+      "checkpoint": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/step9_smolvlm2_refined512_dino_pair_v1/frozen/pooled/scorer.pt",
+      "world_model": "dinowm_transfer",
+      "margin": 1000000.0,
+      "checkpoint_sha256": "6d6ea577a01e80eb5d9eaa13becf57a1aaa4e46d7ffebb0156340302e0f59992"
+    },
+    {
+      "name": "dinov2_fresh_dynamics",
+      "mode": "predicted",
+      "checkpoint": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/step9_smolvlm2_refined512_dino_pair_v1/frozen/pooled/scorer.pt",
+      "world_model": "dinov2_fresh_dynamics",
+      "margin": 1000000.0,
+      "checkpoint_sha256": "6d6ea577a01e80eb5d9eaa13becf57a1aaa4e46d7ffebb0156340302e0f59992"
+    }
+  ],
+  "workers": 4,
+  "sampling_seed": 0,
+  "episodes_per_system": 224,
+  "scope": "Scene-balanced 224-episode pilot on official unseen scenes, not the full 5508-episode benchmark",
+  "RxR_protocol": "English guide, unified 15-degree turns; not official 30-degree RxR-CE",
+  "metrics": [
+    "SR",
+    "SPL",
+    "navigation_error",
+    "nDTW",
+    "SDTW",
+    "forward_collision_rate",
+    "steps",
+    "override_and_fallback_frequency",
+    "latency",
+    "GPU_memory"
+  ],
+  "confidence_intervals": "Paired scene-cluster bootstrap, 2000 resamples, seed 10; no branch-as-independent-episode intervals",
+  "actual_control": "Privileged actual branch-next RGB with the identical pooled scorer and margin; never a deployable comparison",
+  "no_E_tuning": true,
+  "source_sha256": {
+    "Scorer/interfaces.py": "f04ebf78fd60242b203634acb51a814e3e147bd50da1ed293016d6d5cea0f4b5",
+    "Scorer/scorer.py": "2863c9cbb80ea551ea334effb9aa99d903b87abc5239b9df51fdc633efb155e9",
+    "Scorer/world_models.py": "df909188d68c8a11015e1904ba9d196317fd850941574cc7e659653fccb373b0",
+    "navigation_eval/__init__.py": "27ea8a2217b95b2912d357f2830a3ffe355151bd06d5106f9c7a835651c0d2c8",
+    "navigation_eval/controller.py": "f3383670fe939f367804841491c075c86dce9584f7373c59565a1de0df40f3de",
+    "navigation_eval/jobs.py": "a652872285de141d1c00767351883aaceca74e1fd82bf0c98e4f5448ceda852d",
+    "navigation_eval/metrics.py": "b989df2ec67550c26ed53ac89fc2fa309a021d8ed43c1691d0a12dd91ef78fa5",
+    "policy/common.py": "fa30de03d782dae761b2444a2d1dcdb853dd756d25cd76cee84ce6b69c5b474e",
+    "policy/experimental_reference.py": "fe22cc1084f3de7ebeadaace7674ca71e272b9fb5cbfeaec6226995066d17e77",
+    "policy/online.py": "763dd6e8873953cc82e427d196fba32aa2ba1d9bc0a5d64ade187d33d7481ac2",
+    "policy/smolvlm2.py": "2dc097c0f3bd09eacd94cb5a438e15635a62b1a9215a0c66f7c2655b437c1a96",
+    "scorer_data/collection.py": "8e6de5e9302162d0174f84992750b2f78d2a5e8ea559542792194af6ded8f8b1",
+    "scorer_data/metrics.py": "7aedf33edd75dfaad4e020618db7c7e447b136edf18c63b4e90cb51629e08bb5",
+    "scorer_features/common.py": "a36e87ae759974636cf519a21d07d109c0f6d4842b9239d14fa44f79fbd752cd",
+    "scorer_features/policy.py": "a3b9ca7cfc9d1731d8472be6328e37748db035590911fe94eb768545e566b67c",
+    "scorer_training/replay.py": "6aff7b4de79f70ba3acd68d333107e184bb2b90d81adfe548150877de9e78dcd",
+    "sim/config.py": "c345359be6f06d8cbfcd993673c29a9f24df5669b50ade09f15de6a722ca3787",
+    "sim/episodes.py": "a80e05d3c3cf740095a5afaf115a8f8d87ec310a7ec3355118b1783e4ea27ef1",
+    "sim/rxr_dataset.py": "2b5fe06551eeed52b6dbdb3030c9e9c1cfbb884efe99d5a0c530592fd2187bcd",
+    "sim/transition_branch.py": "ff593f70b8cc012557d9f52e976ce73ffeed0dca17e482039550043d7bfdc38e",
+    "tools/eval_navigation.py": "5739baa19b037845fd683750ce86aaba19cf23d34d925bbdb1e153f9c01e6a2e",
+    "wm/common.py": "a8f5349a5884ac8373f4c8b3d86f5591cc6861660c719d9bd362dc2b397941fa",
+    "wm/dino.py": "d4741247bcbb47c94be7873473ad53230a4f75d65157e614993d42b1995bf420",
+    "wm/frozen.py": "46adc698fbc1e3f4184f174d17ea4b17773e2437c8c5c0878b4d4da185db1b32",
+    "experiment_flow/resources.py": "9e41670fc3586192696800b3140271376493495e4d1914237acc6d068c8c9c68",
+    "experiment_flow/__init__.py": "083365eefcd3ec686fba28df9fa328d97e867211e0fdac742f5d67d6034a344b",
+    "tools/prepare_step10.py": "c689f2f5dc3aea6fa82617bdf0aac0d53e1037d9cb8346882ffc686e217d9f34",
+    "tools/run_step10.py": "fa6f64d6ef4b4da39abf942a1a3cfca7296e210f40ea6e803b3f06e15f548042",
+    "tools/finalize_step10.py": "36f7171c9beeb013302e21ba610628aecb205683596cafbcb9757a717023717e",
+    "tools/run_step9.py": "1e9f49d2a0196bab8938659a964ce5cca66c7a93ecf4bf2726bd9e0a3af4b1af"
+  },
+  "reporting_checks_sha256": "2120cd978ce3ab6c4544f81f1c439017dfd42f6dd5d9eda7f07f6bd5173687f4"
+}

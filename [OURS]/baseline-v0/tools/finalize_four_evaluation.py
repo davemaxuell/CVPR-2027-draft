@@ -7,6 +7,7 @@ ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
 import numpy as np
 import torch
 from Scorer.scorer import choose_action
+from navigation_metrics_v2.metrics import display_distance
 from policy.experimental_reference import verify_bundle
 from scorer_features.common import FROZEN,REFERENCE
 from navigation_four.common import ADDITIONS,NWM_RUN,PRIOR_EVALUATION,POLICY_ID,TRIALS,BASE_RUN as FEATURES_RUN,now,read,sha,write,sample_seeds
@@ -36,6 +37,9 @@ def main():
         assert job['checkpoint_sha256']==system['checkpoint_sha256'] and job['margin']==system['margin']
         assert {(r['dataset'],r['episode_id']) for r in rows}==expected and len(rows)==224
         for r in rows:
+            assert r['metric_reporting_version']=='unreachable_goal_v2'
+            assert (r['distance_to_goal'] is None)==r['terminal_goal_unreachable']
+            assert r['spl']<=r['success']+1e-12
             assert r['group']=='E' and r['policy_identity_sha256']==POLICY_ID and r['STOP_bias']==-.25
             assert r['scene']==selection['episode_scenes'][r['dataset']][r['episode_id']]
             assert len(r['events'])==len(r['executed_actions'])==len(r['collided_after_action'])==r['steps']<=r['original_budget']
@@ -74,7 +78,8 @@ def main():
             'full_episode_seconds_per_action':sum(r['seconds'] for r in rows)/sum(r['steps'] for r in rows)}
     # Repeated base evaluation must preserve the native prior E trace exactly.
     for row in rows_by['policy']:
-        prior=read(PRIOR_EVALUATION/'evaluation/policy/episodes'/f"{row['dataset']}_{row['episode_id']}.json")
+        prior_root=Path(read(PRIOR_EVALUATION/'result.json').get('evaluation_directory',str(PRIOR_EVALUATION/'evaluation')))
+        prior=read(prior_root/'policy/episodes'/f"{row['dataset']}_{row['episode_id']}.json")
         for key in ('executed_actions','collided_after_action','positions','rgb_sha256','success','spl','ndtw'):
             assert row[key]==prior[key],('Repeated E base drift',row['episode_id'],key)
     # Shared scene bootstrap preserves pairings and within-scene episode dependence.
@@ -129,6 +134,7 @@ def main():
         'systems':systems,'scene_bootstrap_95':uncertainty,'paired_comparisons':comparisons,
         'scorer_selection':branch,'selection_caveat':reference['selection'],'RxR_protocol':p['RxR_protocol'],
         'actual_view_control_is_privileged':True,'no_E_tuning':True,'E_is_repeated_population':True,
+        'metric_reporting_amendment':p['metric_reporting_amendment'],
         'recipe_declared_before_prior_E_results':True,'prior_E_result':str(PRIOR_EVALUATION/'result.json'),
         'next':'Repeat the recorded procedure for the remaining declared world-model and policy trials under automatic progression authorization'}
     write(RUN/'result.json',result)
@@ -137,7 +143,7 @@ def main():
     with (RUN/'metrics.csv').open('w',newline='') as f:
         writer=csv.writer(f);writer.writerow(columns)
         for name in names:
-            s=systems[name];o=s['overall'];writer.writerow([name,o['episodes'],s['macro_success'],s['macro_spl'],o['distance_to_goal'],s['macro_ndtw'],s['macro_sdtw'],o['forward_collision_rate'],o['steps'],o['override_rate'],s['decision_latency_seconds']['mean'],s['sampled_GPU_process_peak_MiB']])
+            s=systems[name];o=s['overall'];writer.writerow([name,o['episodes'],s['macro_success'],s['macro_spl'],'inf' if o['distance_to_goal'] is None else o['distance_to_goal'],s['macro_ndtw'],s['macro_sdtw'],o['forward_collision_rate'],o['steps'],o['override_rate'],s['decision_latency_seconds']['mean'],s['sampled_GPU_process_peak_MiB']])
     lines=['# Step 10B — four-model unseen-scene pilot repeat','',f"Completed: {result['completed_utc']}",'',
         'All seven systems ran the same 224 episodes: 112 R2R and 112 English-guide RxR episodes across all 11 E scenes. This is a scene-balanced pilot, not the complete 5,508-episode unseen benchmark. The four-model training and calibration recipes were declared before the initial DINO E run. This is a repeated test population: the initial E results were available before this repeat, but they did not choose its recipe, checkpoints or margins. Deployment settings were frozen on C before running this repeat.','',
         'Refined SmolVLM2 checkpoint 512 and STOP bias −0.25 remain the reference. Its deliberate selection despite the original stopping-safeguard failure remains recorded. The Step 2 control and upstream frozen artifacts are intact. RxR uses the agreed 15-degree turns, differing from official 30-degree RxR-CE.','',
@@ -145,8 +151,8 @@ def main():
         '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |']
     for name in names:
         s=systems[name];o=s['overall'];label=name+(' (privileged)' if name=='actual' else '')
-        lines.append(f"| {label} | {100*s['macro_success']:.2f} | {100*s['macro_spl']:.2f} | {o['distance_to_goal']:.2f} | {100*s['macro_ndtw']:.2f} | {100*s['macro_sdtw']:.2f} | {100*o['forward_collision_rate']:.2f} | {o['steps']:.1f} |")
-    lines+=['','The actual-view control previews real simulator outcomes and is privileged. It uses the same pooled scorer and margin as all four world models. The null control was trained separately with matched architecture, initialization, root order and update budget.','',
+        lines.append(f"| {label} | {100*s['macro_success']:.2f} | {100*s['macro_spl']:.2f} | {display_distance(o['distance_to_goal'])} | {100*s['macro_ndtw']:.2f} | {100*s['macro_sdtw']:.2f} | {100*o['forward_collision_rate']:.2f} | {o['steps']:.1f} |")
+    lines+=['','All selected episodes are retained. The inherited reporting amendment records native failed-episode NaN SPL from an infinite initial distance as zero SPL, preserving the original exception. Infinite navigation error remains infinite (JSON null plus an explicit flag); no outcome-based exclusion, capping, or episode replacement is performed.','', 'The actual-view control previews real simulator outcomes and is privileged. It uses the same pooled scorer and margin as all four world models. The null control was trained separately with matched architecture, initialization, root order and update budget.','',
         '| System | SR 95% scene interval | ΔSR vs policy, points (95% interval) | Decision mean / p95, ms | Sampled process peak, GiB |',
         '| --- | --- | --- | ---: | ---: |']
     for name in names:

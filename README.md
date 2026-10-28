@@ -6,6 +6,9 @@ Working repository (public). Datasets are not included.
 
 **Moving to a new machine? Start with [MIGRATION.md](MIGRATION.md).**
 
+**Experiment archive:** [trial_0 — SmolVLM2 + DINO, complete steps 0–10](%5BOURS%5D/baseline-v0/trials/trial_0/README.md).
+The [trial registry](%5BOURS%5D/baseline-v0/trials/README.md) provides the structure for `trial_1` and later experiments.
+
 | Document | What it covers |
 |---|---|
 | [MIGRATION.md](MIGRATION.md) | What is in git / in the release / not included; final sync on the old server; full setup on a new machine |
@@ -18,7 +21,7 @@ Working repository (public). Datasets are not included.
 
 ```text
 [OURS]/baseline-v0/           our pipeline: policy (SmolVLM2-500M + LoRA), DINO/NWM world models, scorer, Habitat sim
-  docs/ manifest/ policy/ wm/ Scorer/ sim/ tools/ env/ third_party/ runs/ logs/
+  docs/ manifest/ policy/ wm/ Scorer/ sim/ tools/ env/ third_party/ runs/ logs/ trials/
 [prior works]/
   ScaleVLN/                   ScaleVLN/DUET (patched) + MatterSim; analysis/vln_viz = the navigation explorer
   ETPNav/                     ETPNav on R2R-CE/RxR-CE + tools/log_etpnav_steps.py (explorer logger)

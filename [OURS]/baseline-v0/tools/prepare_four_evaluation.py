@@ -21,7 +21,8 @@ def main():
     assert selection['group'] == 'E' and selection['seed'] == recipe['E_plan']['selection_seed']
     assert all(len(ids) == 112 for ids in selection['episodes'].values())
     assert len({scene for scenes in selection['episode_scenes'].values() for scene in scenes.values()}) == 11
-    earliest = min(read(p)['completed_utc'] for p in (PRIOR_EVALUATION / 'evaluation/policy/episodes').glob('*.json'))
+    prior_episodes = Path(prior.get('evaluation_directory',str(PRIOR_EVALUATION / 'evaluation'))) / 'policy/episodes'
+    earliest = min(read(p)['completed_utc'] for p in prior_episodes.glob('*.json'))
     assert recipe['declared_utc'] < earliest and read(TRAIN / 'recipe.json')['declared_utc'] < earliest
     if (RUN / 'selection.json').exists(): assert sha(RUN / 'selection.json') == sha(PRIOR_EVALUATION / 'selection.json')
     else:
@@ -55,6 +56,7 @@ def main():
         'confidence_intervals':'Paired scene-cluster bootstrap, 2000 resamples, seed 10',
         'actual_control':'Privileged measured next views; identical pooled scorer and margin',
         'recipe_declared_before_initial_E_results':True, 'E_is_repeated_population':True, 'no_E_tuning':True,
+        'metric_reporting_amendment':prior.get('metric_reporting_amendment'),
         'source_sha256':sources}
     if (RUN / 'protocol.json').exists(): assert read(RUN / 'protocol.json') == protocol
     else:

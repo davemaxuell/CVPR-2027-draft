@@ -16,7 +16,7 @@ from habitat.core.registry import registry
 from habitat.datasets import make_dataset
 from PIL import Image
 from navigation_four.controller import NavigationController
-from navigation_eval.metrics import aggregate
+from navigation_metrics_v2.metrics import aggregate,normalize_episode
 from scorer_data.collection import reset_episode,pixel_sha
 from scorer_data.metrics import terminal_ndtw
 from scorer_features.common import POLICY_ID,now,read,sha,write
@@ -96,7 +96,7 @@ def main():
                     'torch_peak_allocated_bytes_process':torch.cuda.max_memory_allocated(),
                     'torch_peak_reserved_bytes_process':torch.cuda.max_memory_reserved(),
                     'resource_scope':'Per-process PyTorch memory excludes Habitat allocations; decision wall latency measured with declared concurrent workers'}
-                assert all(np.isfinite(row[k]) for k in ('success','spl','distance_to_goal','ndtw','sdtw'))
+                row=normalize_episode(row)
                 assert actions[-1]==0 or len(actions)==budget
                 write(out/'episodes'/f'{name}_{ep.episode_id}.json',row);completed.append(row)
                 progress={'status':'running','rank':args.rank,'completed':len(completed),'last_episode':f'{name}/{ep.episode_id}',

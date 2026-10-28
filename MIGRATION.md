@@ -14,8 +14,9 @@ old H100 server, taken 2026-10-27. Four documents cover the move:
 | Tier | Contents | Size | How you get it |
 |---|---|---:|---|
 | **git** | All code (ours + the patched ScaleVLN/DUET, ETPNav, MatterSim and habitat-lab v0.1.7 sources), docs, drafts, run records and results, logs; the **navigation explorer** (`[prior works]/ScaleVLN/analysis/vln_viz`) with its small caches, all its run logs (DUET/ScaleVLN eval predictions, step logs, what-if results; ETPNav R2R-CE/RxR-CE episode logs) and the small public annotations it reads (R2R/FGR2R/REVERIE/RxR val, connectivity); the **selected/frozen checkpoints** (15 files, every one < 100 MB) | ~3.5 G | `git clone` |
-| **release** `assets-v1` | Every other checkpoint of ours (93 files: intermediate checkpoints, optimizer/trainer states, NWM EMA weights, the upstream DINO-WM checkpoints), the third-party checkpoints we evaluate or start from (12 files: ETPNav R2R-CE/RxR-CE + waypoint predictors + depth encoder, ScaleVLN/DUET fine-tuned + pretrained, LXMERT, REVERIE, HA-VLN-CMA) the two DUET train-split step logs over 100 MB, and the Step 7 scorer features (336 files, 6.1 G: `data/processed/baseline_v0/scorer_features_smolvlm2_refined512_dino_pair_v1`, feature arrays only). Files over 1.9 GiB go up as parts and are joined on download | ~29 G | `python3 -I migration/release_assets.py download` (after the upload in §2.2) |
+| **release** `assets-v1` | Every other checkpoint of ours (95 files: intermediate checkpoints, optimizer/trainer states, NWM EMA weights, the upstream DINO-WM checkpoints), the third-party checkpoints we evaluate or start from (12 files: ETPNav R2R-CE/RxR-CE + waypoint predictors + depth encoder, ScaleVLN/DUET fine-tuned + pretrained, LXMERT, REVERIE, HA-VLN-CMA) the two DUET train-split step logs over 100 MB, and the Step 7 scorer features (336 files, 6.1 G: `data/processed/baseline_v0/scorer_features_smolvlm2_refined512_dino_pair_v1`, feature arrays only); 445 files in all. Files over 1.9 GiB go up as parts and are joined on download | ~30 G | `python3 -I migration/release_assets.py download` (after the upload in §2.2) |
 | **old server** | Everything else: datasets, Matterport-derived files (scenes, skyboxes, house meshes, ETPNav cube-face renders, explorer mesh caches), public weights and model caches, processed training data. 74 GiB required + 64 GiB recommended | — | `python3 -I migration/pull_from_server.py pull --host …` ([RETRIEVE_FROM_SERVER.md](RETRIEVE_FROM_SERVER.md)) |
+| **private release** `private-v1` (repo `CVPR-2027-private`) | For a new machine that cannot reach the old server: the Matterport-derived files it needs (Step 6 labels, DAgger data, world-model visits + corpus, group-C validation renders, ETPNav explorer cube-face renders, the NWM image index), packed as tar parts with per-part and per-file sha256 (`migration/private_archives.py`, `migration/private_assets.json`) | ~59 G | §3.2c |
 | **regenerate** | Expert renders, DINO features (or pull them: 318 G) | ~320 G | scripts, §3.6 |
 
 `migration/release_assets.json` lists every release asset with its original path and sha256;
@@ -65,7 +66,7 @@ own terminal on the server, so the token stays out of shell history and logs:
 ```bash
 cd /data/team_a/dave-workspace/CVPR-2027-draft
 read -rs GITHUB_TOKEN && export GITHUB_TOKEN        # paste the token, press Enter
-python3 -I migration/release_assets.py upload       # ~29 GiB; resumable, re-run after any failure
+python3 -I migration/release_assets.py upload       # ~30 GiB; resumable, re-run after any failure
 unset GITHUB_TOKEN
 ```
 
@@ -159,6 +160,25 @@ Checkpoints land at their original paths: ours under `[OURS]/baseline-v0/runs/`,
 big step logs under `[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/exprs_map/steplogs/`. Files that went up as
 `.partNN` pieces are joined back (the pieces wait in `.release_downloads/` until then).
 If you moved `CVPR-2027-draft-assets/` by disk instead: `release_assets.py download --from-dir /path/to/it`.
+
+### 3.2c Matterport-derived data from the private release (no access to the old server)
+
+The public repo can't hold these, so they are on a release of the **private** repo `davemaxuell/CVPR-2027-private`
+(tag `private-v1`; old server: `private_archives.py`, then `release_assets.py --manifest
+migration/private_assets.json upload`). Each folder is one tar stream in < 2 GiB parts; every part is sha256-checked
+on download, and `<name>.tar.sha256` lists every file for `verify`. Downloads need a fine-grained token with
+access to that repo and *Contents: Read-only* (paste it at the hidden prompt):
+
+```bash
+python3 -I migration/release_assets.py --manifest migration/private_assets.json download    # ~59 GiB, resumable
+python3 -I migration/release_assets.py --manifest migration/private_assets.json verify      # every file's sha256
+```
+
+Parts wait in `.release_downloads/` and are unpacked at their original paths (`data/processed/baseline_v0/…`,
+`[prior works]/ETPNav/data/logs/explorer/`, `[OURS]/baseline-v0/runs/step5_smolvlm2_refined512/data_index/`),
+replacing any regenerated copies there. A marker per archive skips it on re-runs; `--match '<name>.tar*'`
+fetches one folder. Never copy these into the public repo. Not included (regenerate, §3.6): `expert_groupA/`
+(~196 G) and `wm_dino_features_refined512_v1/` (~123 G).
 
 ### 3.3 Datasets and public weights from their public sources (if the server is gone)
 

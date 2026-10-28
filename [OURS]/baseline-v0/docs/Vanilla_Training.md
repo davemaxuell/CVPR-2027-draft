@@ -1,6 +1,6 @@
 # Vanilla Training Formulation
 
-23 October 2026 · Training specification · SmolVLM2 execution: [Step 2 complete](../runs/step2_smolvlm2/RESULTS.md), [Step 3 complete](../runs/step3_smolvlm2/RESULTS.md), [selected refinement and Step 4 complete](Step4_Run.md), [Step 5A DINO pair complete](Step5_Run.md), [Step 6 labels complete](Step6_Run.md), [Step 7 frozen features complete](Step7_Run.md). [Step 8 training](Step8_Run.md) is complete, [Step 9 C calibration](Step9_Run.md) is running, and [Step 10](Step10_Run.md) follows automatically. The [NWM/CDiT repeat](Step5B_Run.md) follows the initial DINO pilot.
+23 October 2026 · Training specification · SmolVLM2 execution: [Step 2 complete](../runs/step2_smolvlm2/RESULTS.md), [Step 3 complete](../runs/step3_smolvlm2/RESULTS.md), [selected refinement and Step 4 complete](Step4_Run.md), [Step 5A DINO pair complete](Step5_Run.md), [Step 6 labels complete](Step6_Run.md), [Step 7 frozen features complete](Step7_Run.md). [Steps 8–9](Step9_Run.md) are complete with conservative base-behavior settings; [Step 10](Step10_Run.md) is complete, with 21/224 successes and zero overrides for all five systems. The [NWM/CDiT repeat](Step5B_Run.md) has started automatically.
 
 **Goal:** establish our existing navigation-policy → world-model → scorer pipeline using ordinary supervised objectives. Train the components in sequence, freeze the upstream components, then connect them for one-action navigation. This document defines the baseline before adding any research contribution.
 

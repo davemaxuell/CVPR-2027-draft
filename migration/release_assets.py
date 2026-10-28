@@ -5,11 +5,13 @@ two explorer step logs over 100 MB) as GitHub release assets.
     # old server: upload everything in migration/release_assets.json (token needs Contents: read and write)
     python3 -I migration/release_assets.py upload
     # new machine, from the repo root (public repo: press Enter at the token prompt; private: Contents: read)
-    python3 -I migration/release_assets.py download                        # everything (~29 GiB)
+    python3 -I migration/release_assets.py download                        # everything (~30 GiB)
     python3 -I migration/release_assets.py download --kind checkpoint      # only checkpoints
     python3 -I migration/release_assets.py download --match 'step5_*'      # by asset name
     python3 -I migration/release_assets.py download --from-dir /mnt/disk/CVPR-2027-draft-assets   # no GitHub
     python3 -I migration/release_assets.py verify
+    # the private release (Matterport-derived data, migration/private_archives.py): same commands plus
+    python3 -I migration/release_assets.py --manifest migration/private_assets.json download   # token: Contents: read
 
 The token comes from GITHUB_TOKEN or GH_TOKEN, else a hidden prompt; it is never written anywhere. Downloads
 from a public repo work without one (empty prompt), using the public release download links.
@@ -160,15 +162,28 @@ def sha256(path):
 
 
 def load_manifest(args):
-    m = json.loads(MANIFEST.read_text())
+    m = json.loads(Path(args.manifest).read_text())
     assets = m['assets']
     if args.kind:
         assets = [a for a in assets if a['kind'] == args.kind]
     if args.match:
         assets = [a for a in assets if fnmatch.fnmatch(a['name'], args.match)]
     names = {a['name'] for a in assets}
-    assets += [a for a in m['assets'] if a.get('of') in names and a['name'] not in names]   # a split file's parts
+    archives = {a['archive'] for a in assets if a.get('archive')}
+    assets += [a for a in m['assets'] if a['name'] not in names and                         # a split file's parts,
+               (a.get('of') in names or a.get('archive') in archives)]                     # a whole archive
     return m, assets
+
+
+def unpacked_marker(archive):
+    return DOWNLOADS / f'{archive}.unpacked'
+
+
+def is_unpacked(archive, assets):
+    """True once the archive was unpacked from exactly these parts (the marker holds their sha256)."""
+    want = sorted(a['sha256'] for a in assets if a.get('archive') == archive and a['kind'] == 'archive-part')
+    t = unpacked_marker(archive)
+    return t.is_file() and json.loads(t.read_text()) == want
 
 
 def present(a):
@@ -243,6 +258,8 @@ def extract_archives(entries, keep_parts):
         if a['kind'] == 'archive-part':
             by_archive.setdefault(a['archive'], []).append(a)
     for name, parts in sorted(by_archive.items()):
+        if is_unpacked(name, entries):
+            continue
         parts.sort(key=lambda a: a['name'])
         files = [DOWNLOADS / p['name'] for p in parts]
         if not all(f.is_file() for f in files):
@@ -259,6 +276,7 @@ def extract_archives(entries, keep_parts):
                 if member.issym() or member.islnk():
                     continue
                 tar.extract(member, dest, **({'filter': 'data'} if hasattr(tarfile, 'data_filter') else {}))
+        unpacked_marker(name).write_text(json.dumps(sorted(p['sha256'] for p in parts)))
         if not keep_parts:
             for f in files:
                 f.unlink()
@@ -319,9 +337,12 @@ class Concat:
 def cmd_download(args):
     m, assets = load_manifest(args)
     whole_ok = {a['name']: present(a) for a in assets if a.get('split')}
+    unpacked = {a['archive'] for a in assets if a['kind'] == 'archive-part' and is_unpacked(a['archive'], assets)}
     todo = []
     for a in assets:
         if a.get('split') or whole_ok.get(a.get('of')) or present(a):   # split files: joined from parts below
+            continue
+        if a['kind'] == 'archive-part' and a['archive'] in unpacked:
             continue
         todo.append(a)
     print(f'{sum(not a.get("split") for a in assets) - len(todo)} already present, {len(todo)} to fetch '
@@ -363,20 +384,34 @@ def cmd_download(args):
     print('download complete')
 
 
+def archive_files(assets):
+    """(path, sha256) of every file inside the archives, from their downloaded .sha256 lists."""
+    out = []
+    for s in assets:
+        if s['kind'] != 'archive-sums':
+            continue
+        t = local_target(s)
+        if not t.is_file():
+            raise SystemExit(f'{s["name"]} not downloaded: run download first')
+        for line in t.read_text().splitlines():
+            digest, rel = line.split('  ', 1)
+            out.append((f'{s["extract_to"]}/{rel}', digest))
+    return out
+
+
 def cmd_verify(args):
     _, assets = load_manifest(args)
+    files = [(a['path'], a['sha256']) for a in assets if a.get('path')] + archive_files(assets)
     missing = bad = 0
-    for a in assets:
-        if not a.get('path'):
-            continue
-        t = local_target(a)
+    for path, digest in files:
+        t = ROOT / path
         if not t.is_file():
             missing += 1
-            print('missing ', a['path'])
-        elif sha256(t) != a['sha256']:
+            print('missing ', path)
+        elif sha256(t) != digest:
             bad += 1
-            print('MISMATCH', a['path'])
-    n = sum(bool(a.get('path')) for a in assets)
+            print('MISMATCH', path)
+    n = len(files)
     print(f'{n - missing - bad}/{n} files OK, {missing} missing, {bad} mismatched')
     return 1 if missing or bad else 0
 
@@ -384,7 +419,9 @@ def cmd_verify(args):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('command', choices=['upload', 'download', 'verify'])
-    ap.add_argument('--kind', choices=['checkpoint', 'file', 'archive-part', 'file-part'])
+    ap.add_argument('--manifest', type=Path, default=MANIFEST,
+                    help='asset list (default: the public release; migration/private_assets.json: the private one)')
+    ap.add_argument('--kind', choices=['checkpoint', 'file', 'archive-part', 'archive-sums', 'file-part'])
     ap.add_argument('--match', help='only assets whose name matches this glob')
     ap.add_argument('--assets-dir', type=Path, default=ASSETS_DIR, help='upload: staged files (export_repo.py)')
     ap.add_argument('--from-dir', help='download: copy from a local folder of assets instead of GitHub')

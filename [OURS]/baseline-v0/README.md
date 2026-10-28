@@ -2,12 +2,16 @@
 
 The navigation policy → world model → scorer pipeline trained stage by stage with ordinary supervised objectives,
 before any research contribution. Spec: [docs/Vanilla_Training.md](docs/Vanilla_Training.md).
-First trial: SmolVLM2-500M policy + DINO-feature world model.
+The completed SmolVLM2-500M + DINO experiment is organized as
+**[trial_0](trials/trial_0/README.md)**: ordered steps 0–10, selected checkpoints,
+configuration snapshots, processed-data links, final results, and verification.
+See the [trial registry](trials/README.md) for `trial_1` and later experiments.
 
 ## Layout
 
 ```text
 baseline-v0/
+├── trials/          experiment registry, trial_0 archive, and template for later trials
 ├── docs/            design spec: Vanilla_Training, CE_World_Model_Approach, Architecture_Compatibility, Scorer_Design
 │   └── references/  the cited dossiers and reviews (reading copies)
 ├── manifest/        what defines the experiment
@@ -224,17 +228,20 @@ selection caveat, Step 2 control and frozen world models are preserved.
 Training finished with the verified DINO-pair cache. The pooled scorer and learned-null-future
 control each received 2,048 updates with identical architecture, initialization, root order and
 budget. Native forward/gradient checks, exact checkpoint resumption and the training-artifact
-audit passed. Candidate deployment selection is now running in group C.
+audit passed. C deployment selection is complete; the required conservative fallback freezes
+both margins at 1,000,000 and reproduces base C224 behavior exactly (29 successes).
 [Step8_Run.md](docs/Step8_Run.md) records the protocol and selection process.
 
 ## Next
 
-Automatic progression was authorized on 27 October 2026. [Step 9](docs/Step9_Run.md) is running
-C navigation checks and margin calibration. Once settings are frozen, the fixed systems and
-controls run automatically on E in Step 10. Keep B for fitting, C for development and E for final evaluation.
+Automatic progression was authorized on 27 October 2026. [Step 9](docs/Step9_Run.md) is complete.
+[Step 10](docs/Step10_Run.md) is complete: all five systems achieved 21/224 E successes (9.375%)
+with identical actions and zero overrides at the conservative C-selected margins. The verified
+report retains all episodes, including five unreachable goals. Keep B for fitting, C for
+development and E for final evaluation.
 The two DINO bundles are frozen in `runs/step5_smolvlm2_refined512/frozen/`.
-The [NWM/CDiT repeat](docs/Step5B_Run.md) has verified CPU assets and checks. Its watcher starts
-GPU profiling and the matched training pipeline automatically after the initial DINO E pilot.
-The [four-model continuation](docs/Four_Model_Repeat.md) is also queued: extend the existing
-features, train one shared scorer across all four models, calibrate on C, and run the seven-system
-E pilot repeat. Its recipes were declared before the initial E results; new GPU checks precede execution.
+The [NWM/CDiT repeat](docs/Step5B_Run.md) started after the initial DINO E pilot, then
+**stopped during caching by user request on 28 October 2026 at 06:28 KST**.
+The [four-model continuation](docs/Four_Model_Repeat.md) was also stopped; automatic
+progression is disabled. The [stop record](runs/user_stop_20261027T212833Z.json)
+preserves that decision. These unfinished extensions are outside completed `trial_0`.

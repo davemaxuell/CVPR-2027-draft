@@ -82,7 +82,7 @@ BIG_OK = ['[prior works]/ScaleVLN/VLN-DUET/datasets/R2R/exprs_map/**']
 TOP_FILES = {'README.md', 'MIGRATION.md', 'DATA_MIGRATION.md', 'TRAINING_STATE.md', 'RETRIEVE_FROM_SERVER.md'}
 TOP_DIRS = {'migration', 'data', 'drafts', '[OURS]', '[prior works]'}
 
-SKIP_NAMES = {'.git', '__pycache__', '.ipynb_checkpoints', '.mypy_cache', '.pytest_cache', '.venvs', '.venv', 'venv'}
+SKIP_NAMES = {'.git', '__pycache__', '.ipynb_checkpoints', '.mypy_cache', '.pytest_cache', '.ruff_cache', '.venvs', '.venv', 'venv'}
 SKIP_GLOBS = ['*.pyc', '*.pid', '*.swp', '.nfs*']
 
 # Whole folders left out (relative to SRC).

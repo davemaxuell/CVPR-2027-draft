@@ -9,12 +9,13 @@ from pathlib import Path
 import numpy as np
 from scorer_features.common import ROOT,POLICY_ID,now,read,sha,write
 from sim.config import load_manifest
-from navigation_eval.metrics import aggregate
+from navigation_metrics_v2.metrics import aggregate
 
 
 def source_hashes():
     paths=list((ROOT/'navigation_eval').glob('*.py'))+[ROOT/'tools/eval_navigation.py']
     paths += list((ROOT/'navigation_four').glob('*.py')) + list((ROOT/'nwm_training').glob('*.py'))
+    paths += [ROOT/'navigation_metrics_v2/metrics.py', ROOT/'navigation_metrics_v2/__init__.py']
     paths += [ROOT/'tools/eval_four_navigation.py', ROOT/'scorer_four/common.py', ROOT/'scorer_four/training_common.py']
     names=['Scorer/scorer.py','Scorer/interfaces.py','Scorer/world_models.py','policy/common.py','policy/online.py',
         'policy/smolvlm2.py','policy/experimental_reference.py','scorer_features/policy.py','scorer_features/common.py',
