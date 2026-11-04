@@ -1,0 +1,68 @@
+{
+  "status": "authorized",
+  "time": "2026-11-04T05:52:42.024762+00:00",
+  "user_instruction": "can you also test it on RXR unseen? (do this for all models too). we want to compare it corerctly.",
+  "trial_id": "trial_1",
+  "models": [
+    "F",
+    "990",
+    "623",
+    "E",
+    "G",
+    "J"
+  ],
+  "scope": "Full RxR-CE val-unseen, English-guide only; same episode set and protocol for all six policies.",
+  "gpu": 0,
+  "existing_R2R_work_preserved": true,
+  "unseen_used_for_selection": false,
+  "training_recipes_unchanged": true,
+  "trial2_holds_unchanged": true,
+  "original_checkpoints_immutable": true,
+  "execution_order": [
+    "existing_F_R2R_completion",
+    "F_rxr_unseen",
+    "990_rxr_unseen",
+    "623_rxr_unseen",
+    "E_training_and_R2R",
+    "E_rxr_unseen",
+    "G_training_and_R2R",
+    "G_rxr_unseen",
+    "J_collection_training_and_R2R",
+    "J_rxr_unseen",
+    "combined_comparison"
+  ],
+  "protocol_deviation": "English-guide scope; established 15-degree turns and 700-step limit. Not the official 30-degree RxR-CE protocol.",
+  "supervisor_before": {
+    "pid": 3326381,
+    "start_ticks": "1222770694",
+    "command": "/home/bufsgpu/yes/envs/rolevln-qwen35/bin/python -B -u /data/team_a/dave-workspace/RoleVLN/queue_after_stageA/supervise.py --scope expanded_stage2"
+  },
+  "F_before": {
+    "status": "running",
+    "stage": "val_unseen",
+    "time": "2026-11-04T05:52:35.817929+00:00",
+    "process": {
+      "pid": 3326401,
+      "start_ticks": "1222770759",
+      "command": "/home/bufsgpu/yes/envs/rolevln/bin/python -B -u /data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/trial_1/full_train_from_990_evaluation/source_v1/evaluate.py --dataset r2r --split val_unseen --name phase1/val_unseen --run-dir /data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/trial_1/step4_qwen35_4b_full_train_from_990 --weights /data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/trial_1/step4_qwen35_4b_full_train_from_990/checkpoints/step_000857 --workers 6"
+    },
+    "counts": {
+      "completed": 1355,
+      "expected": 1839
+    },
+    "activity": [
+      "val_unseen",
+      {
+        "completed": 1355,
+        "expected": 1839
+      },
+      418
+    ],
+    "next_stage": "report"
+  },
+  "mmc4_before": {
+    "pid": 1173412,
+    "start_ticks": "1206343036",
+    "command": "/home/bufsgpu/yes/envs/rolevln-qwen35/bin/python -B -u /data/team_a/dave-workspace/RoleVLN/queue_after_stageA/expanded_stage2/prepare_corpora.py mmc4"
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "status": "authorized",
+  "trial_id": "trial_1",
+  "experiment_id": "full_train_continuation_from_990_20261103",
+  "time_utc": "2026-11-03T05:01:54.945367+00:00",
+  "instruction": "Continue fine-tuning 990 on the full R2R/RxR English-guide training splits",
+  "authorization_record": "/data/team_a/dave-workspace/RoleVLN/queue_after_stageA/expanded_stage2/changes/20261103T050154Z_trial1_continue_from_990/authorization.json",
+  "gpu": 0,
+  "source_root": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/trials/trial_1/continuation_from_990_20261103/source_v1",
+  "run_dir": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/trial_1/step4_qwen35_4b_full_train_from_990",
+  "evaluation_root": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/trial_1/full_train_from_990_evaluation",
+  "initial_checkpoint": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/trial_1/step3_qwen35_4b_streamvln_dagger_r1/checkpoints/step_000990",
+  "initial_model_sha256": "6033ff740ee701705038c8eb5d55150bb1a7d7f8388423d0bb55ee2de306cc4c",
+  "preserved_stage_one_checkpoint": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/trial_1/step2_qwen35_4b_streamvln/checkpoints/step_000623",
+  "expert_root": "/data/team_a/dave-workspace/RoleVLN/data/processed/baseline_v0/trial_1/full_train_english_guide/expert",
+  "validation_root": "/data/team_a/dave-workspace/RoleVLN/data/processed/baseline_v0/trial_1/full_train_english_guide/val_seen_diagnostics_600",
+  "rxr_languages": [
+    "en-US",
+    "en-IN"
+  ],
+  "rxr_roles": [
+    "guide"
+  ],
+  "training": {
+    "method": "additional expert SFT after the completed two-stage model",
+    "recipe": "streamvln_stage2",
+    "mode": "full",
+    "epochs": 1,
+    "effective_batch": 128,
+    "lr": 2e-05,
+    "vision_lr": 5e-06,
+    "weight_decay": 0,
+    "warmup_ratio": 0.03,
+    "schedule": "cosine",
+    "augmentation": "unchanged StreamVLN reference augmentation",
+    "window_steps": 32,
+    "memory_views": 8,
+    "actions_per_response": 4,
+    "bf16": true,
+    "gradient_checkpointing": true,
+    "max_length": 16384,
+    "optimizer": "fresh AdamW; completed 990 has model weights but no retained optimizer state"
+  },
+  "new_dagger_collection": false,
+  "dagger_data_replayed_in_this_continuation": false,
+  "external_cotraining_data": false,
+  "custom_saved_places": false,
+  "fixed_final_epoch_checkpoint": true,
+  "tune_on_val_unseen": false,
+  "old_full_training_pipeline_remains_held": true,
+  "trial_2_training_remains_held": true,
+  "note": "This is an additional fine-tuning stage from 990, not a restart of stage one or a reproduction of the original two-stage schedule."
+}

@@ -1,0 +1,338 @@
+{
+  "config": {
+    "backbone": "qwen35_4b",
+    "repo": "Qwen/Qwen3.5-4B",
+    "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+    "window_steps": 32,
+    "actions_per_turn": 4,
+    "memory_frames": 8,
+    "frame_width": 512,
+    "frame_height": 384,
+    "memory_width": 512,
+    "memory_height": 384,
+    "forward_step_m": 0.25,
+    "turn_angle_deg": 15,
+    "action_tokens": [
+      "STOP",
+      "↑",
+      "←",
+      "→"
+    ],
+    "system_prompt": "You are a helpful assistant.",
+    "task_prompt": "You are an autonomous navigation assistant. Your task is to {instruction} Devise an action sequence to follow the instruction using the four actions: TURN LEFT (←) or TURN RIGHT (→) by {turn:g} degrees, MOVE FORWARD (↑) by {forward_cm:g} centimeters, or STOP.",
+    "memory_prompt": " These are your historical observations: {memory}.",
+    "conjunctions": [
+      "you can see ",
+      "in front of you is ",
+      "there is ",
+      "you can spot ",
+      "you are toward the ",
+      "ahead of you is ",
+      "in your sight is "
+    ],
+    "supervise_turn_end": true,
+    "max_length": 16384
+  },
+  "action_token_ids": {
+    "STOP": 48964,
+    "↑": 73676,
+    "←": 69416,
+    "→": 49300
+  },
+  "tokens_per_view": 192,
+  "tokens_per_memory_view": 192,
+  "fla": "0.6.0",
+  "fla_chunk_kernel": true,
+  "torch": "2.13.0+cu126",
+  "device": "NVIDIA H100 NVL",
+  "data": {
+    "windows": 261,
+    "episodes": 80
+  },
+  "tokens": [
+    {
+      "window": [
+        "rxr",
+        "10039",
+        0
+      ],
+      "tokens": 1919,
+      "images": 8,
+      "memory_views": 0,
+      "supervised": 40,
+      "ok": true
+    },
+    {
+      "window": [
+        "rxr",
+        "10039",
+        32
+      ],
+      "tokens": 3474,
+      "images": 16,
+      "memory_views": 8,
+      "supervised": 40,
+      "ok": true
+    },
+    {
+      "window": [
+        "rxr",
+        "10039",
+        64
+      ],
+      "tokens": 3483,
+      "images": 16,
+      "memory_views": 8,
+      "supervised": 40,
+      "ok": true
+    },
+    {
+      "window": [
+        "rxr",
+        "10039",
+        96
+      ],
+      "tokens": 3478,
+      "images": 16,
+      "memory_views": 8,
+      "supervised": 40,
+      "ok": true
+    }
+  ],
+  "cached_decoding": [
+    {
+      "window": [
+        "rxr",
+        "10039",
+        0
+      ],
+      "rows": [
+        {
+          "step": 16,
+          "action": 2,
+          "fresh_argmax": 2,
+          "max_abs_logit_diff": 0.0
+        },
+        {
+          "step": 17,
+          "action": 2,
+          "fresh_argmax": 2,
+          "max_abs_logit_diff": 0.125
+        },
+        {
+          "step": 18,
+          "action": 2,
+          "fresh_argmax": 2,
+          "max_abs_logit_diff": 0.0
+        },
+        {
+          "step": 19,
+          "action": 2,
+          "fresh_argmax": 2,
+          "max_abs_logit_diff": 0.0
+        }
+      ],
+      "passed": true
+    },
+    {
+      "window": [
+        "rxr",
+        "10039",
+        32
+      ],
+      "rows": [
+        {
+          "step": 48,
+          "action": 1,
+          "fresh_argmax": 1,
+          "max_abs_logit_diff": 0.0
+        },
+        {
+          "step": 49,
+          "action": 1,
+          "fresh_argmax": 1,
+          "max_abs_logit_diff": 0.0
+        },
+        {
+          "step": 50,
+          "action": 1,
+          "fresh_argmax": 1,
+          "max_abs_logit_diff": 0.0
+        },
+        {
+          "step": 51,
+          "action": 1,
+          "fresh_argmax": 1,
+          "max_abs_logit_diff": 0.0
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "train_vs_inference": [
+    {
+      "window": [
+        "rxr",
+        "10039",
+        0
+      ],
+      "rows": [
+        {
+          "step": 0,
+          "max_abs_logit_diff": 0.28125,
+          "same_argmax": true
+        },
+        {
+          "step": 5,
+          "max_abs_logit_diff": 0.125,
+          "same_argmax": true
+        },
+        {
+          "step": 10,
+          "max_abs_logit_diff": 0.0,
+          "same_argmax": true
+        },
+        {
+          "step": 15,
+          "max_abs_logit_diff": 0.0,
+          "same_argmax": true
+        },
+        {
+          "step": 20,
+          "max_abs_logit_diff": 0.0,
+          "same_argmax": true
+        },
+        {
+          "step": 25,
+          "max_abs_logit_diff": 0.0,
+          "same_argmax": true
+        },
+        {
+          "step": 30,
+          "max_abs_logit_diff": 0.0,
+          "same_argmax": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "window": [
+        "rxr",
+        "10039",
+        32
+      ],
+      "rows": [
+        {
+          "step": 35,
+          "max_abs_logit_diff": 0.0,
+          "same_argmax": true
+        },
+        {
+          "step": 40,
+          "max_abs_logit_diff": 0.0,
+          "same_argmax": true
+        },
+        {
+          "step": 45,
+          "max_abs_logit_diff": 0.0,
+          "same_argmax": true
+        },
+        {
+          "step": 50,
+          "max_abs_logit_diff": 0.0,
+          "same_argmax": true
+        },
+        {
+          "step": 55,
+          "max_abs_logit_diff": 0.0,
+          "same_argmax": true
+        },
+        {
+          "step": 60,
+          "max_abs_logit_diff": 0.0,
+          "same_argmax": true
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "train_modes": [
+    {
+      "mode": "lora",
+      "micro_batch": 1,
+      "tokens_per_window": 3477,
+      "trainable_parameters": 121896960,
+      "loss_per_token": 1.3212148666381835,
+      "load_seconds": 2.900641679763794,
+      "seconds_per_update": [
+        0.5809948444366455,
+        0.5852344036102295
+      ],
+      "peak_allocated_gib": 11.684560775756836,
+      "peak_reserved_gib": 12.36328125
+    },
+    {
+      "mode": "llm",
+      "micro_batch": 1,
+      "tokens_per_window": 3483,
+      "trainable_parameters": 4233022976,
+      "loss_per_token": 3.2412063598632814,
+      "load_seconds": 4.161213636398315,
+      "seconds_per_update": [
+        0.6174952983856201,
+        0.6202585697174072
+      ],
+      "peak_allocated_gib": 66.18835592269897,
+      "peak_reserved_gib": 70.103515625
+    },
+    {
+      "mode": "full",
+      "micro_batch": 1,
+      "tokens_per_window": 3483,
+      "trainable_parameters": 4539265536,
+      "loss_per_token": 6.3894706726074215,
+      "load_seconds": 4.116943836212158,
+      "seconds_per_update": [
+        0.7786223888397217,
+        0.9472265243530273
+      ],
+      "peak_allocated_gib": 70.1899938583374,
+      "peak_reserved_gib": 72.7421875
+    }
+  ],
+  "kernels": {
+    "tokens": 3479,
+    "loss_per_token": {
+      "fp32_torch_reference": 2.898669958114624,
+      "bf16_fla": 2.9052581787109375,
+      "bf16_torch_fallback": 2.8937056064605713
+    },
+    "seconds_forward_backward": {
+      "fp32_torch_reference": 7.449347257614136,
+      "bf16_fla": 1.0689890384674072,
+      "bf16_torch_fallback": 3.9815595149993896
+    },
+    "gradient_cosine_vs_fp32": {
+      "bf16_fla": {
+        "visual.blocks.0.attn.qkv.weight": 0.4461964710710644,
+        "visual.blocks.12.mlp.linear_fc1.weight": 0.503723864713488,
+        "visual.merger.linear_fc2.weight": 0.7832067613311274,
+        "layers.0.linear_attn.in_proj_qkv.weight": 0.986724462223468,
+        "layers.2.linear_attn.out_proj.weight": 0.9755293688887162,
+        "layers.3.self_attn.q_proj.weight": 0.9242655325107253,
+        "layers.30.mlp.down_proj.weight": 0.9993085171741252
+      },
+      "bf16_torch_fallback": {
+        "visual.blocks.0.attn.qkv.weight": 0.2094215937188259,
+        "visual.blocks.12.mlp.linear_fc1.weight": 0.19355003631146153,
+        "visual.merger.linear_fc2.weight": 0.721337361176989,
+        "layers.0.linear_attn.in_proj_qkv.weight": 0.9808845576537903,
+        "layers.2.linear_attn.out_proj.weight": 0.9717004654411528,
+        "layers.3.self_attn.q_proj.weight": 0.9083428375447687,
+        "layers.30.mlp.down_proj.weight": 0.9992181210553777
+      }
+    },
+    "fla_at_least_as_close": true
+  },
+  "passed": true
+}

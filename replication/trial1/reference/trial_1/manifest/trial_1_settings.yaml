@@ -1,0 +1,65 @@
+# trial_1 settings (policy stage). Tags as in manifest/experiment_manifest.yaml:
+#   [confirmed] chosen by the user   [verified] checked against files or measured   [inherited] trial_0 protocol
+#   [adopted]   StreamVLN's value, taken because the user chose StreamVLN's recipe for that item
+#   [proposed]  StreamVLN default, not yet chosen   [TBD] needs a decision before the step that uses it
+trial: trial_1
+parent: trial_0
+created: 2026-10-28
+status: planned                                  # code and folders prepared; nothing trained
+
+protocol:                                        # [inherited] shared files, unchanged
+  experiment_manifest: manifest/experiment_manifest.yaml   # simulator block: Habitat 0.2.4, 640x480, HFOV 79, 0.25 m, 15 deg
+  scene_partition: manifest/scene_partition.json           # A fit / B scorer / C development / E final (val_unseen)
+  datasets: [R2R-CE v1-3, RxR-CE v0 English guide (en-US, en-IN)]
+  rxr_turns: unified 15 deg (RxR experts' 30-deg turns split in two; not the official RxR-CE protocol)
+
+policy:
+  backbone: Qwen/Qwen3.5-4B@851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a   # [confirmed] 2026-10-28; [verified] cached, 8.8 GB
+  architecture: 24 Gated DeltaNet + 8 full-attention layers, hidden 2560; ViT 24 layers, 16-px patches, 2x2 merge   # [verified] config.json
+  parameters: {vision: 0.306e9, merger: 0.027e9, language_model: 4.206e9}   # [verified]
+  environment: rolevln-qwen35 (Python 3.12, torch 2.13.0+cu126, triton 3.7.1, transformers 5.5.4, peft 0.18.1, fla-core 0.6.0)   # [verified] env/setup_env_qwen35.sh
+  code: stream_policy/ + tools/{train,eval,collect,check}_stream_*.py
+
+format:                                          # StreamVLN @ e48f6ff7 (vln_action_dataset.py, streamvln_eval.py); [adopted]: the user chose StreamVLN's way
+  window_steps: 32                               # [adopted] num_frames
+  actions_per_turn: 4                            # [adopted] num_future_steps
+  memory_frames: 8                               # [adopted] num_history; frames i*s//8 at window start s
+  view_size: [512, 384]                          # [adopted] 192 tokens (StreamVLN 196); [verified] token count
+  memory_view_size: [512, 384]                   # [adopted] 192 tokens: StreamVLN encodes memory frames like current ones (alternative: [256, 192] = 48)
+  prompt_and_actions: StreamVLN text, arrows "↑ ← →" and "STOP", one token each   # [verified] check_stream_layout.json
+  chat_markup: Qwen im_start/im_end, no thinking block, piecewise tokenization   # [adopted] StreamVLN also replaces the chat template
+  supervised: every action + each assistant turn's <|im_end|>   # [adopted] StreamVLN supervises the assistant turns
+  decoding: argmax over the four action tokens; STOP logit bias 0   # [adopted] greedy, as StreamVLN
+
+stage_one:                                       # step 2
+  data: group-A expert renders (21,330 episodes, 79,814 windows; StreamVLN's 4-action minimum drops 3)   # [verified] steps/01_experiment/data_audit.json
+  validation: group-C renders expert_groupC_600, fixed conjunctions   # [proposed] monitoring only, never changes training
+  train_mode: full                               # [confirmed 2026-10-28] every weight, as StreamVLN; fp32 master weights under bf16 autocast
+  budget: one pass                               # [confirmed 2026-10-28] as StreamVLN; 623 updates x 128 = 79,744 of 79,814 windows (drop-last, none twice)
+  recipe: tools/train_stream_policy.py --recipe streamvln_stage1   # every value below; explicit flags override
+  optimizer: {name: AdamW (fused), lr: 2.0e-5, vision_lr: 5.0e-6, weight_decay: 0.0, clip: 1.0}   # [adopted] StreamVLN
+  schedule: {kind: HF linear warmup then cosine to a floor, warmup_updates: 47, min_lr: 1.85e-5}   # [adopted] StreamVLN stage one
+  effective_batch: 128 = micro-batch 1 x 128 accumulation   # [adopted] StreamVLN; [verified] micro-batch 2 is 44% slower per window
+  augmentation: StreamVLN data_augmentation transforms   # [adopted]
+  memory: ~74 GiB of the H100 NVL's 93.6         # [verified] 67.6 GiB weights + grads + Adam, up to 6.2 GiB activations (longest window)
+  duration: ~17 h on one H100                    # [verified] 0.76 s per window, from a 48-window group-A sample
+  checkpoints: every 156 updates (4 x 9.1 GB bf16); newest keeps a 54 GB resume state, deleted when the pass completes   # [adopted]
+  resume: exact (data stream seeded per draw; fp32 master weights + Adam state)   # [verified] resumed loss identical to all digits
+  validation: every 52 updates, 256 group-C windows, fixed conjunctions   # [proposed] monitoring only
+  action_history: visible, StreamVLN as is (option A); no change-point loss weighting   # [confirmed 2026-10-28]; risk in docs §4.3
+  checkpoint_selection: final checkpoint (update 623), as StreamVLN   # [confirmed 2026-10-28]; updates 156/312/468 for diagnosis only
+
+dagger:                                          # step 3; run by steps/03_dagger/AGENT_PROMPT.md (2026-10-28)
+  rule: StreamVLN (stream_policy/controller.py)  # [verified] scripted checks; thresholds 1.8/0.25 m, 3 m, 12, 0.8, keep 0.5 m / 0.93 / 0.85
+  policy: stage-one final checkpoint (update 623)   # follows the checkpoint decision
+  beta: 0.0                                      # [adopted] StreamVLN DAGGER_P=0
+  episodes: every validated group-A episode (7,489 R2R + 13,844 RxR)   # [adopted] StreamVLN iterates every training episode
+  rounds: 1                                      # [adopted] StreamVLN's released collection
+  seed: 1
+  workers: 6                                     # [verified] ~11 GiB per policy server, ~66 GiB on GPU 0
+  label_source: executed                         # [adopted] StreamVLN; alternative "expert" relabelling
+  stage_two: {recipe: streamvln_stage2, mode: full, budget: one pass, init: stage-one final, data: expert_groupA + the round, concatenated as StreamVLN, schedule: cosine to 0, warmup_frac: 0.03, checkpoint: final}   # [adopted]
+  co_training: none                              # [adopted] by necessity: StreamVLN adds LLaVA-Video-178K, ScanQA/SQA3D, MMC4, not available here
+  diagnostics: group-C closed-loop screens (32 R2R + 32 RxR) of the stage-one and stage-two finals; never used to choose   # [proposed]
+
+downstream: not designed                         # steps 4-10 (world model, scorer, calibration, E)

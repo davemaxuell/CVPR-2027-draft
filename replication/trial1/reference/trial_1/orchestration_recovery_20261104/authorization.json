@@ -1,0 +1,30 @@
+{
+  "time": "2026-11-04T04:22:05.625653+00:00",
+  "scope": "Trial 1 F -> E -> G -> J orchestration repair only",
+  "authorization": "Existing user authorization to execute and maintain the complete Trial 1 sequence, including bounded recovery.",
+  "reason": "Frozen worker_stage.py verifies all child commands against HERE, but evaluation scripts are under separate run output directories; this causes identity capture failures and stalls.",
+  "preserve": [
+    "all frozen training and evaluation sources",
+    "all checkpoint identities",
+    "completed F training and val-seen episodes",
+    "existing failure logs and attempt counts",
+    "existing MMC4 process",
+    "all Trial 2 and unrelated holds"
+  ],
+  "allowed_changes": [
+    "isolated checked launch wrapper",
+    "F and suite command descriptors",
+    "one bounded F retry after verification",
+    "graceful supervisor-only reload to adopt existing workers"
+  ],
+  "supervisor_before": {
+    "pid": 2265132,
+    "start_ticks": "1214606117",
+    "command": "/home/bufsgpu/yes/envs/rolevln-qwen35/bin/python -B -u /data/team_a/dave-workspace/RoleVLN/queue_after_stageA/supervise.py --scope expanded_stage2"
+  },
+  "mmc4_before": {
+    "pid": 1173412,
+    "start_ticks": "1206343036",
+    "command": "/home/bufsgpu/yes/envs/rolevln-qwen35/bin/python -B -u /data/team_a/dave-workspace/RoleVLN/queue_after_stageA/expanded_stage2/prepare_corpora.py mmc4"
+  }
+}

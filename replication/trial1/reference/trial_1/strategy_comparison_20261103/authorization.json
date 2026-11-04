@@ -1,0 +1,83 @@
+{
+  "status": "authorized",
+  "trial_id": "trial_1",
+  "suite_id": "four_strategies_E_F_G_J_20261103",
+  "time": "2026-11-03T05:29:53.246495+00:00",
+  "instruction": "please rethink whether our corrent approach is better, if not choose 4 approaches to do and try!",
+  "selected": [
+    "E",
+    "F",
+    "G",
+    "J"
+  ],
+  "execution_order": [
+    "F_existing",
+    "E",
+    "G",
+    "J"
+  ],
+  "gpu": 0,
+  "source_root": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/trials/trial_1/strategy_comparison_20261103/source_v1",
+  "existing_F_preparation": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/trials/trial_1/continuation_from_990_20261103",
+  "existing_F_run": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/trial_1/step4_qwen35_4b_full_train_from_990",
+  "existing_F_evaluation": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/trial_1/full_train_from_990_evaluation",
+  "expert_root": "/data/team_a/dave-workspace/RoleVLN/data/processed/baseline_v0/trial_1/full_train_english_guide/expert",
+  "validation_root": "/data/team_a/dave-workspace/RoleVLN/data/processed/baseline_v0/trial_1/full_train_english_guide/val_seen_diagnostics_600",
+  "original_dagger_root": "/data/team_a/dave-workspace/RoleVLN/data/processed/baseline_v0/trial_1/dagger_r1_qwen35_4b_streamvln",
+  "fresh_dagger_root": "/data/team_a/dave-workspace/RoleVLN/data/processed/baseline_v0/trial_1/full_train_english_guide/dagger_after_full_sft_990_suite_20261103",
+  "stage_one_checkpoint": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/trial_1/step2_qwen35_4b_streamvln/checkpoints/step_000623",
+  "stage_two_checkpoint": "/data/team_a/dave-workspace/RoleVLN/[OURS]/baseline-v0/runs/trial_1/step3_qwen35_4b_streamvln_dagger_r1/checkpoints/step_000990",
+  "stage_one_sha256": "9145e4968c012ab8995d9268698eb94296af9b142fec4acd0a3f6c47b8ab7985",
+  "stage_two_sha256": "6033ff740ee701705038c8eb5d55150bb1a7d7f8388423d0bb55ee2de306cc4c",
+  "training": {
+    "method": "One epoch of full SFT on full expert data plus branch-specific corrective trajectories.",
+    "recipe": "streamvln_stage2",
+    "mode": "full",
+    "epochs": 1,
+    "effective_batch": 128,
+    "lr": 2e-05,
+    "vision_lr": 5e-06,
+    "weight_decay": 0,
+    "warmup_ratio": 0.03,
+    "schedule": "cosine",
+    "augmentation": "unchanged StreamVLN reference augmentation",
+    "window_steps": 32,
+    "memory_views": 8,
+    "actions_per_response": 4,
+    "bf16": true,
+    "gradient_checkpointing": true,
+    "max_length": 16384,
+    "optimizer": "Fresh AdamW for every added training stage; optimizer state is not inherited from its initializer."
+  },
+  "new_dagger_rounds": 1,
+  "new_dagger_collecting_policy": "Verified final checkpoint of F; frozen throughout J collection.",
+  "J_replays_original_dagger": false,
+  "trial_2_training_remains_held": true,
+  "old_pretrained_restart_remains_held": true,
+  "global_research_pause_unchanged": true,
+  "fixed_final_epoch_checkpoint": true,
+  "unseen_used_for_selection": false,
+  "full_RxR_evaluation_in_scope": false,
+  "changes": "/data/team_a/dave-workspace/RoleVLN/queue_after_stageA/expanded_stage2/changes/20261103T052953Z_trial1_four_strategies",
+  "recovery": "Same native exact-resume method; atomic checkpoints; at most three pipeline/stage attempts, repeated/fatal failures block.",
+  "fairness": "One epoch per branch, so mixed-data branches have more updates than F. E vs G match data, sampling, recipe and budget; F vs G also changes total updates. J adds collection and an extra training stage. No claim of compute-matched causal isolation.",
+  "expected_budgets": {
+    "F": {
+      "windows": 109784,
+      "updates": 857
+    },
+    "E": {
+      "windows": 156691,
+      "updates": 1224
+    },
+    "G": {
+      "windows": 156691,
+      "updates": 1224
+    },
+    "J": {
+      "windows": null,
+      "updates": null,
+      "rule": "floor((109784 + audited fresh DAgger windows)/128)"
+    }
+  }
+}
